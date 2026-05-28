@@ -344,6 +344,21 @@ th[data-col="Notes"] {
 }
 
 th:hover { background: #e8e4dc; color: var(--text); }
+
+th[data-col="EXF"],
+th[data-col="ETA"],
+th[data-col="IHD"],
+th[data-col="CXL Date"] {
+  background: #e8e4dc;
+}
+
+th[data-col="EXF"]:hover,
+th[data-col="ETA"]:hover,
+th[data-col="IHD"]:hover,
+th[data-col="CXL Date"]:hover {
+  background: #dedad2;
+}
+
 th.sorted-asc::after { content: ' ↑'; }
 th.sorted-desc::after { content: ' ↓'; }
 
@@ -787,9 +802,9 @@ td.editable:hover { background: var(--accent-light) !important; }
 .col-ship-method { width: 100px; }
 .col-est-exf     { width: 80px; }
 .col-est-ihd     { width: 80px; }
+.col-exf         { width: 80px; }
 .col-eta         { width: 80px; }
 .col-ihd         { width: 80px; }
-.col-exf         { width: 80px; }
 .col-cxl         { width: 80px; }
 .col-assign      { width: 80px; }
 .col-notes       { width: 200px; }
