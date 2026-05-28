@@ -20,7 +20,7 @@ function isEmptyValue(v) {
 const COLUMNS = [
   "Division","Status","Vendor","Buyer","Buyer PO #","SO #","PO Date","PO #",
   "Old PO #","Style #","Color","PO Qty","Actual Qty","Ctn Qty","Ship Method",
-  "ETA","IHD","EST EXF","EST IHD","EXF","CXL Date","Assign Date","Notes"
+  "EST EXF","EST IHD","ETA","IHD","EXF","CXL Date","Assign Date","Notes"
 ];
 
 const COLUMN_WIDTHS = [
