@@ -20,13 +20,30 @@ function isEmptyValue(v) {
 const COLUMNS = [
   "Division","Status","Vendor","Buyer","Buyer PO #","SO #","PO Date","PO #",
   "Old PO #","Style #","Color","PO Qty","Actual Qty","Ctn Qty","Ship Method","Vessel",
-  "House #","Shipped","ETD","ETA","IHD","EST EXF","EST IHD","CXL Date","Assign Date","Notes"
+  "House #","Shipped","ETD","ETA","IHD","EST EXF","EST IHD","EXF","CXL Date","Assign Date","Notes"
 ];
 
 const COLUMN_WIDTHS = [
   120, 130, 130, 120, 100, 80, 80, 80, 80, 100, 100, 60, 60, 60, 100, 100,
-  80, 80, 80, 80, 80, 80, 80, 80, 80, 200
+  80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 200
 ];
+
+const ROW_KEY_ALIASES = {
+  "PO\nQty": "PO Qty",
+  "Actual\nQty": "Actual Qty",
+  "Assign\nDate": "Assign Date",
+  "TOP ": "TOP",
+};
+
+function normalizeRow(row) {
+  const out = { ...row };
+  for (const [from, to] of Object.entries(ROW_KEY_ALIASES)) {
+    if (from in out && !(to in out)) out[to] = out[from];
+    delete out[from];
+  }
+  delete out[""];
+  return out;
+}
 
 const COLUMN_VISIBILITY_KEY = "poTable.visibleColumns";
 
@@ -185,7 +202,9 @@ function initEditTable() {
 
 const EDITABLE = new Set([
   "PO Qty","Status","Ship Method","Ctn Qty","Vessel","House #",
-  "Shipped","ETD","ETA","IHD","EST EXF","CXL Date","Assign Date","Notes"
+  "Shipped","ETD","ETA","IHD","EST EXF","EXF","CXL Date","Assign Date","Notes",
+  "FOB Cost","Price","OG","PROTO","FIT/PP","BULK","TOP","TRIM",
+  "Production Status","EOD/DISCLAIMER",
 ]);
 
 const READONLY_NO_SELECT_COLS = new Set(["Division", "PO Date", "Vendor"]);
@@ -194,36 +213,59 @@ const COPY_ON_CLICK_COLS = new Set([
   "Buyer", "Buyer PO #", "SO #", "PO #", "Old PO #", "Style #", "Color",
 ]);
 
-const MODAL_SECTIONS = [
-  {
-    title: "PO Information",
-    fields: ["Division", "PO Date", "Buyer PO #", "SO #", "Old PO #", "Status"],
-  },
-  {
-    title: "Vendor & Buyer",
-    fields: ["Vendor", "Buyer"],
-  },
-  {
-    title: "Product",
-    fields: ["Style #", "Color", "PO Qty", "Actual Qty", "Ctn Qty"],
-  },
-  {
-    title: "Shipping",
-    fields: ["Ship Method", "Vessel", "House #", "Shipped", "ETD", "ETA", "IHD"],
-  },
-  {
-    title: "Dates",
-    fields: ["EST EXF", "EST IHD", "CXL Date", "Assign Date"],
-  },
-  {
-    title: "Notes",
-    fields: ["Notes"],
-    fullWidth: true,
-  },
+const MODAL_FIELD_SIZE = {
+  short: new Set([
+    "PO #", "Old PO #", "SO #",
+    "PO Qty", "Actual Qty", "Ctn Qty",
+    "FOB Cost", "Price",
+    "PO Date", "Shipped", "ETD", "ETA", "IHD",
+    "EST EXF", "EST IHD", "EXF", "CXL Date", "Assign Date",
+  ]),
+  medium: new Set([
+    "Division", "Buyer PO #", "Status", "Vendor", "Buyer",
+    "Vessel", "House #", "Ship Method",
+    "Style #", "Color",
+    "OG", "PROTO", "FIT/PP", "BULK", "TOP", "TRIM",
+    "Production Status", "EOD/DISCLAIMER",
+  ]),
+  long: new Set(["Notes"]),
+};
+
+function getModalFieldSize(col) {
+  if (MODAL_FIELD_SIZE.long.has(col)) return "long";
+  if (MODAL_FIELD_SIZE.short.has(col)) return "short";
+  if (MODAL_FIELD_SIZE.medium.has(col)) return "medium";
+  return "medium";
+}
+
+const MODAL_ORDER_ROWS = [
+  ["Division", "Vendor", "Buyer", "Status"],
+  ["PO Date", "Buyer PO #", "SO #", "Old PO #"],
+];
+
+const MODAL_SHIPPING_ROWS = [
+  ["EST EXF", "EST IHD", "Ship Method"],
+  ["EXF", "IHD", "CXL Date"],
+];
+
+const MODAL_SHIPPING_FREIGHT_FIELDS = [
+  "Vessel", "House #", "Shipped", "ETD", "ETA",
+];
+
+const MODAL_PRODUCT_ROWS = [
+  ["Style #", "Color"],
+  ["PO Qty", "Actual Qty", "Ctn Qty"],
+];
+
+const MODAL_PRODUCTION_ROWS = [
+  ["FOB Cost", "Price", "Production Status"],
+  ["OG", "PROTO", "FIT/PP", "BULK", "TOP", "TRIM"],
+  ["EOD/DISCLAIMER"],
 ];
 
 /** @type {Record<string, unknown> | null} */
 let modalRow = null;
+let modalFreightExpanded = false;
 
 const EST_IHD_DAYS_BY_SHIP_METHOD = {
   "Air": 7,
@@ -522,7 +564,116 @@ const STATUS_BADGE = {
   "Shipped":"badge-shipped","Closed":"badge-closed"
 };
 
-const DATE_FIELDS = new Set(["PO Date","Shipped","ETD","ETA","IHD","EST EXF","EST IHD","CXL Date","Assign Date"]);
+const DATE_FIELDS = new Set([
+  "PO Date","Shipped","ETD","ETA","IHD","EST EXF","EST IHD","EXF","CXL Date","Assign Date",
+]);
+
+const COUNTDOWN_DATE_COLS = new Set(["EST EXF", "EST IHD", "EXF", "IHD", "CXL Date"]);
+const CXL_PROXIMITY_COLS = new Set(["IHD", "EST IHD"]);
+
+function getDateFieldValue(col, row) {
+  if (col === "EST IHD") return calculateEstIhd(row["Ship Method"], row["EST EXF"]);
+  return row[col] ?? "";
+}
+
+function diffCalendarDays(fromYmd, toYmd) {
+  const from = parseYmdToLocalDate(fromYmd);
+  const to = parseYmdToLocalDate(toYmd);
+  if (!from || !to) return null;
+  const ms = to.getTime() - from.getTime();
+  return Math.round(ms / 86400000);
+}
+
+function daysFromToday(ymd) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = parseYmdToLocalDate(ymd);
+  if (!target) return null;
+  return diffCalendarDays(formatDateToYmd(today), normalizeToYmd(ymd));
+}
+
+function getCxlProximityLevel(ihdYmd, cxlYmd) {
+  if (isEmptyValue(ihdYmd) || isEmptyValue(cxlYmd)) return null;
+  const daysUntilCxl = diffCalendarDays(normalizeToYmd(ihdYmd), normalizeToYmd(cxlYmd));
+  if (daysUntilCxl == null) return null;
+  if (daysUntilCxl < 0 || daysUntilCxl <= 3) return "danger";
+  if (daysUntilCxl <= 7) return "warning";
+  return null;
+}
+
+function formatDaysLeftLabel(days, { hidePast = false } = {}) {
+  if (days == null) return "";
+  if (days < 0 && hidePast) return "";
+  if (days === 0) return "Today";
+  if (days > 0) return `${days}d`;
+  return `${Math.abs(days)}d ago`;
+}
+
+function clearDateDisplayState(el) {
+  el.classList.remove("date-with-countdown", "date-proximity-warning", "date-proximity-danger");
+}
+
+function applyDateCellDisplay(el, col, row, { context = "table" } = {}) {
+  clearDateDisplayState(el);
+  const rawVal = getDateFieldValue(col, row);
+
+  if (isEmptyValue(rawVal)) {
+    if (context === "modal" && COUNTDOWN_DATE_COLS.has(col)) {
+      el.classList.add("date-with-countdown");
+      el.innerHTML =
+        `<span class="date-display empty-display">${EMPTY_DISPLAY}</span>` +
+        `<span class="date-days-left"></span>`;
+    } else {
+      setDisplayText(el, EMPTY_DISPLAY);
+    }
+    return;
+  }
+
+  const ymd = normalizeToYmd(rawVal);
+  const display = formatDateForDisplay(rawVal);
+  const proximity = CXL_PROXIMITY_COLS.has(col)
+    ? getCxlProximityLevel(ymd, row["CXL Date"])
+    : null;
+
+  if (proximity === "warning") el.classList.add("date-proximity-warning");
+  if (proximity === "danger") el.classList.add("date-proximity-danger");
+
+  if (context === "table") {
+    if (proximity) {
+      el.classList.remove("empty-display");
+      el.innerHTML = `<span class="date-display date-proximity-${proximity}">${display}</span>`;
+    } else {
+      setDisplayText(el, display);
+    }
+    return;
+  }
+
+  const days = daysFromToday(ymd);
+  const daysLabel = COUNTDOWN_DATE_COLS.has(col)
+    ? formatDaysLeftLabel(days, { hidePast: true })
+    : "";
+
+  if (!COUNTDOWN_DATE_COLS.has(col)) {
+    if (proximity) {
+      el.classList.remove("empty-display");
+      el.innerHTML = `<span class="date-display date-proximity-${proximity}">${display}</span>`;
+    } else {
+      setDisplayText(el, display);
+    }
+    return;
+  }
+
+  const dateClasses = ["date-display"];
+  if (proximity === "warning") dateClasses.push("date-proximity-warning");
+  else if (proximity === "danger") dateClasses.push("date-proximity-danger");
+  else if (days === 0) dateClasses.push("date-today");
+
+  el.classList.remove("empty-display");
+  el.classList.add("date-with-countdown");
+  el.innerHTML =
+    `<span class="${dateClasses.join(" ")}">${display}</span>` +
+    `<span class="date-days-left">${daysLabel}</span>`;
+}
 
 
 
@@ -534,11 +685,11 @@ let pageSize = Infinity;
 let currentPage = 1;
 
 const DEMO_DATA = [
-  { "Division":"Elevator Disco","Status":"Received","Vendor":"Acme Textiles","Buyer":"Kim","Buyer PO #":"BP-1001","SO #":"SO-2201","PO Date":"2024-01-15","PO #":"PO-10001","Old PO #":"","Style #":"ST-100","Color":"Navy","PO Qty":500,"Actual Qty":498,"Ctn Qty":50,"Ship Method":"Sea&Air","Vessel":"Ever Given","House #":"H-001","Shipped":"2024-02-01","ETD":"2024-02-05","ETA":"2024-02-20","IHD":"2024-02-25","EST EXF":"2024-02-18","EST IHD":"2024-02-24","CXL Date":"2024-03-01","Assign Date":"2024-01-20","Notes":"Priority shipment" },
-  { "Division":"Freesia","Status":"WIP","Vendor":"Blue Fabrics","Buyer":"Sam","Buyer PO #":"BP-1002","SO #":"SO-2202","PO Date":"2024-01-18","PO #":"PO-10002","Old PO #":"PO-9002","Style #":"ST-200","Color":"Blush","PO Qty":300,"Actual Qty":0,"Ctn Qty":30,"Ship Method":"Air","Vessel":"","House #":"","Shipped":"","ETD":"2024-03-01","ETA":"2024-03-10","IHD":"2024-03-15","EST EXF":"2024-03-08","EST IHD":"2024-03-14","CXL Date":"2024-04-01","Assign Date":"2024-01-22","Notes":"" },
-  { "Division":"Elevator Disco","Status":"Shipped","Vendor":"Orient Mfg","Buyer":"Lee","Buyer PO #":"BP-1003","SO #":"SO-2203","PO Date":"2024-01-20","PO #":"PO-10003","Old PO #":"","Style #":"ST-301","Color":"Ivory","PO Qty":1000,"Actual Qty":1000,"Ctn Qty":100,"Ship Method":"Matson","Vessel":"Matson Kona","House #":"H-202","Shipped":"2024-02-10","ETD":"2024-02-12","ETA":"2024-02-22","IHD":"2024-02-28","EST EXF":"2024-02-20","EST IHD":"2024-02-27","CXL Date":"2024-03-10","Assign Date":"2024-01-25","Notes":"Fragile - handle with care" },
-  { "Division":"Freesia","Status":"Hold","Vendor":"Summit Goods","Buyer":"Kim","Buyer PO #":"BP-1004","SO #":"SO-2204","PO Date":"2024-02-01","PO #":"PO-10004","Old PO #":"","Style #":"ST-410","Color":"Sage","PO Qty":200,"Actual Qty":0,"Ctn Qty":20,"Ship Method":"Air","Vessel":"","House #":"","Shipped":"","ETD":"","ETA":"","IHD":"2024-04-01","EST EXF":"","EST IHD":"","CXL Date":"2024-04-15","Assign Date":"","Notes":"Awaiting quality approval" },
-  { "Division":"Elevator Disco","Status":"Closed","Vendor":"Pacific Imports","Buyer":"Sam","Buyer PO #":"BP-1005","SO #":"SO-2205","PO Date":"2023-12-01","PO #":"PO-10005","Old PO #":"PO-8005","Style #":"ST-501","Color":"Black","PO Qty":750,"Actual Qty":750,"Ctn Qty":75,"Ship Method":"Sea&Air","Vessel":"MSC Maya","House #":"H-099","Shipped":"2024-01-05","ETD":"2024-01-08","ETA":"2024-01-20","IHD":"2024-01-25","EST EXF":"2024-01-18","EST IHD":"2024-01-24","CXL Date":"2024-02-01","Assign Date":"2023-12-10","Notes":"Completed" },
+  { "Division":"Elevator Disco","Status":"Received","Vendor":"Acme Textiles","Buyer":"Kim","Buyer PO #":"BP-1001","SO #":"SO-2201","PO Date":"2024-01-15","PO #":"PO-10001","Old PO #":"","Style #":"ST-100","Color":"Navy","PO Qty":500,"Actual Qty":498,"Ctn Qty":50,"Ship Method":"Sea&Air","Vessel":"Ever Given","House #":"H-001","Shipped":"2024-02-01","ETD":"2024-02-05","ETA":"2024-02-20","IHD":"2024-02-25","EST EXF":"2024-02-18","EST IHD":"2024-02-24","EXF":"2024-02-20","CXL Date":"2024-03-01","Assign Date":"2024-01-20","Notes":"Priority shipment" },
+  { "Division":"Freesia","Status":"WIP","Vendor":"Blue Fabrics","Buyer":"Sam","Buyer PO #":"BP-1002","SO #":"SO-2202","PO Date":"2024-01-18","PO #":"PO-10002","Old PO #":"PO-9002","Style #":"ST-200","Color":"Blush","PO Qty":300,"Actual Qty":0,"Ctn Qty":30,"Ship Method":"Air","Vessel":"","House #":"","Shipped":"","ETD":"2024-03-01","ETA":"2024-03-10","IHD":"2024-03-15","EST EXF":"2024-03-08","EST IHD":"2024-03-14","EXF":"","CXL Date":"2024-04-01","Assign Date":"2024-01-22","Notes":"" },
+  { "Division":"Elevator Disco","Status":"Shipped","Vendor":"Orient Mfg","Buyer":"Lee","Buyer PO #":"BP-1003","SO #":"SO-2203","PO Date":"2024-01-20","PO #":"PO-10003","Old PO #":"","Style #":"ST-301","Color":"Ivory","PO Qty":1000,"Actual Qty":1000,"Ctn Qty":100,"Ship Method":"Matson","Vessel":"Matson Kona","House #":"H-202","Shipped":"2024-02-10","ETD":"2024-02-12","ETA":"2024-02-22","IHD":"2024-02-28","EST EXF":"2024-02-20","EST IHD":"2024-02-27","EXF":"2024-02-22","CXL Date":"2024-03-10","Assign Date":"2024-01-25","Notes":"Fragile - handle with care" },
+  { "Division":"Freesia","Status":"Hold","Vendor":"Summit Goods","Buyer":"Kim","Buyer PO #":"BP-1004","SO #":"SO-2204","PO Date":"2024-02-01","PO #":"PO-10004","Old PO #":"","Style #":"ST-410","Color":"Sage","PO Qty":200,"Actual Qty":0,"Ctn Qty":20,"Ship Method":"Air","Vessel":"","House #":"","Shipped":"","ETD":"","ETA":"","IHD":"2024-04-01","EST EXF":"","EST IHD":"","EXF":"","CXL Date":"2024-04-15","Assign Date":"","Notes":"Awaiting quality approval" },
+  { "Division":"Elevator Disco","Status":"Closed","Vendor":"Pacific Imports","Buyer":"Sam","Buyer PO #":"BP-1005","SO #":"SO-2205","PO Date":"2023-12-01","PO #":"PO-10005","Old PO #":"PO-8005","Style #":"ST-501","Color":"Black","PO Qty":750,"Actual Qty":750,"Ctn Qty":75,"Ship Method":"Sea&Air","Vessel":"MSC Maya","House #":"H-099","Shipped":"2024-01-05","ETD":"2024-01-08","ETA":"2024-01-20","IHD":"2024-01-25","EST EXF":"2024-01-18","EST IHD":"2024-01-24","EXF":"2024-01-20","CXL Date":"2024-02-01","Assign Date":"2023-12-10","Notes":"Completed" },
 ];
 
 async function loadData() {
@@ -550,7 +701,7 @@ async function loadData() {
       const res = await fetch(APPS_SCRIPT_URL);
       const json = await res.json();
       if (!json.success) throw new Error(json.error);
-      allRows = json.data;
+      allRows = json.data.map(normalizeRow);
     }
     syncAllEstIhd(allRows);
     updateColumnFilterHeaderStates();
@@ -811,7 +962,7 @@ function renderTable() {
       if (col === "Status") {
         td.innerHTML = renderStatus(val);
       } else if (DATE_FIELDS.has(col)) {
-        setDisplayText(td, formatDateForDisplay(val));
+        applyDateCellDisplay(td, col, row, { context: "table" });
       } else if (isEmptyValue(val)) {
         setDisplayText(td, EMPTY_DISPLAY);
       } else {
@@ -995,20 +1146,26 @@ function initCellSelectDropdown() {
 }
 
 function createCellInput(col, val) {
-  let input;
+  if (col === "Notes") {
+    const textarea = document.createElement("textarea");
+    textarea.className = "cell-input cell-textarea";
+    textarea.value = val;
+    textarea.rows = 3;
+    return textarea;
+  }
 
   if (DATE_FIELDS.has(col)) {
-    input = document.createElement("input");
+    const input = document.createElement("input");
     input.type = "date";
     input.className = "cell-input";
     input.value = normalizeToYmd(val);
-  } else {
-    input = document.createElement("input");
-    input.type = "text";
-    input.className = "cell-input";
-    input.value = val;
+    return input;
   }
 
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "cell-input";
+  input.value = val;
   return input;
 }
 
@@ -1017,9 +1174,22 @@ function updateModalIfOpen() {
   renderModalContent(modalRow);
 }
 
-function attachCellEditorHandlers(fieldEl, col, row, input) {
+function getEditorComparableValue(col, val) {
+  if (DATE_FIELDS.has(col)) return normalizeToYmd(val) || "";
+  return String(val ?? "").trim();
+}
+
+function attachCellEditorHandlers(fieldEl, col, row, input, originalVal) {
+  const originalComparable = getEditorComparableValue(col, originalVal);
+
   function commit() {
     const newVal = input.value;
+    if (getEditorComparableValue(col, newVal) === originalComparable) {
+      renderTable();
+      updateModalIfOpen();
+      return;
+    }
+
     row[col] = newVal;
 
     const updates = { [col]: newVal };
@@ -1039,8 +1209,9 @@ function attachCellEditorHandlers(fieldEl, col, row, input) {
 
   input.onblur = commit;
   input.onkeydown = e => {
-    if (e.key === "Enter") input.blur();
     if (e.key === "Escape") cancelEdit();
+    if (col === "Notes") return;
+    if (e.key === "Enter") input.blur();
   };
 }
 
@@ -1054,7 +1225,7 @@ function mountFieldEditor(fieldEl, col, row) {
   fieldEl.appendChild(input);
   fieldEl.classList.add("editing");
   fieldEl.dataset.editing = "active";
-  attachCellEditorHandlers(fieldEl, col, row, input);
+  attachCellEditorHandlers(fieldEl, col, row, input, val);
   input.focus();
 }
 
@@ -1142,13 +1313,143 @@ function setFieldDisplayContent(fieldEl, col, row) {
   if (col === "Status") {
     fieldEl.innerHTML = renderStatus(val);
   } else if (DATE_FIELDS.has(col)) {
-    setDisplayText(fieldEl, formatDateForDisplay(val));
+    applyDateCellDisplay(fieldEl, col, row, { context: "modal" });
   } else if (isEmptyValue(val)) {
     setDisplayText(fieldEl, EMPTY_DISPLAY);
   } else {
     fieldEl.textContent = val;
     fieldEl.classList.remove("empty-display");
   }
+}
+
+function createModalField(col, row) {
+  const size = getModalFieldSize(col);
+  const fieldWrap = document.createElement("div");
+  fieldWrap.className = `modal-field modal-field--${size}`;
+  fieldWrap.dataset.col = col;
+
+  const labelEl = document.createElement("label");
+  labelEl.className = "modal-field-label";
+  labelEl.textContent = col;
+
+  const valueEl = document.createElement("div");
+  valueEl.className = "modal-field-value";
+  setFieldDisplayContent(valueEl, col, row);
+  bindFieldInteractions(valueEl, col, row);
+
+  fieldWrap.appendChild(labelEl);
+  fieldWrap.appendChild(valueEl);
+  return fieldWrap;
+}
+
+function shouldShowAssignDate(row) {
+  return String(row["Division"] ?? "").trim() === "Freesia";
+}
+
+function createModalBlock(title) {
+  const block = document.createElement("section");
+  block.className = "modal-block";
+
+  if (title) {
+    const titleEl = document.createElement("h4");
+    titleEl.className = "modal-section-title";
+    titleEl.textContent = title;
+    block.appendChild(titleEl);
+  }
+
+  const content = document.createElement("div");
+  content.className = "modal-block-content";
+  block.appendChild(content);
+  return { block, content };
+}
+
+function createModalFieldRow(cols, row) {
+  const rowEl = document.createElement("div");
+  rowEl.className = "modal-field-row";
+  cols.forEach(col => rowEl.appendChild(createModalField(col, row)));
+  return rowEl;
+}
+
+function appendModalFieldRows(container, rowDefs, row) {
+  rowDefs.forEach(cols => container.appendChild(createModalFieldRow(cols, row)));
+}
+
+function createModalFieldsGrid(cols, row) {
+  const gridEl = document.createElement("div");
+  gridEl.className = "modal-fields-grid";
+
+  cols.forEach(col => {
+    gridEl.appendChild(createModalField(col, row));
+  });
+
+  return gridEl;
+}
+
+function createStylePhotoPlaceholders() {
+  const wrap = document.createElement("div");
+  wrap.className = "modal-style-photos";
+
+  for (let i = 1; i <= 2; i++) {
+    const photo = document.createElement("div");
+    photo.className = "modal-style-photo";
+    photo.setAttribute("aria-label", `Style photo ${i} placeholder`);
+
+    const label = document.createElement("span");
+    label.className = "modal-style-photo-label";
+    label.textContent = `Photo ${i}`;
+
+    photo.appendChild(label);
+    wrap.appendChild(photo);
+  }
+
+  return wrap;
+}
+
+function createModalShippingSection(row) {
+  const { block, content } = createModalBlock("Shipping");
+
+  const freightToggle = document.createElement("span");
+  freightToggle.className = "modal-freight-toggle";
+  freightToggle.setAttribute("role", "button");
+  freightToggle.tabIndex = 0;
+  freightToggle.setAttribute("aria-expanded", String(modalFreightExpanded));
+  freightToggle.setAttribute("aria-controls", "modalFreightFields");
+  freightToggle.textContent = "Freight";
+
+  const collapsible = document.createElement("div");
+  collapsible.id = "modalFreightFields";
+  collapsible.className = "modal-freight-fields";
+  collapsible.hidden = !modalFreightExpanded;
+  collapsible.appendChild(createModalFieldsGrid(MODAL_SHIPPING_FREIGHT_FIELDS, row));
+
+  function toggleFreight() {
+    modalFreightExpanded = !modalFreightExpanded;
+    freightToggle.setAttribute("aria-expanded", String(modalFreightExpanded));
+    freightToggle.classList.toggle("is-open", modalFreightExpanded);
+    collapsible.hidden = !modalFreightExpanded;
+  }
+
+  freightToggle.addEventListener("click", toggleFreight);
+  freightToggle.addEventListener("keydown", e => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      toggleFreight();
+    }
+  });
+  freightToggle.classList.toggle("is-open", modalFreightExpanded);
+
+  MODAL_SHIPPING_ROWS.forEach((cols, index) => {
+    const rowEl = document.createElement("div");
+    rowEl.className = "modal-field-row";
+    cols.forEach(col => rowEl.appendChild(createModalField(col, row)));
+    if (index === MODAL_SHIPPING_ROWS.length - 1) {
+      rowEl.appendChild(freightToggle);
+    }
+    content.appendChild(rowEl);
+  });
+
+  content.appendChild(collapsible);
+  return block;
 }
 
 function renderModalContent(row) {
@@ -1173,44 +1474,54 @@ function renderModalContent(row) {
   badgeEl.innerHTML = renderStatus(row["Status"]);
 
   bodyEl.innerHTML = "";
-  MODAL_SECTIONS.forEach(section => {
-    const sectionEl = document.createElement("section");
-    sectionEl.className = "modal-section";
 
-    const titleEl = document.createElement("h4");
-    titleEl.className = "modal-section-title";
-    titleEl.textContent = section.title;
-    sectionEl.appendChild(titleEl);
+  const layout = document.createElement("div");
+  layout.className = "modal-layout";
 
-    const gridEl = document.createElement("div");
-    gridEl.className = "modal-fields-grid";
+  const main = document.createElement("div");
+  main.className = "modal-layout-main";
 
-    section.fields.forEach(col => {
-      const fieldWrap = document.createElement("div");
-      fieldWrap.className = "modal-field";
-      if (section.fullWidth) fieldWrap.classList.add("modal-field--full");
+  const { block: orderBlock, content: orderContent } = createModalBlock(null);
+  orderBlock.classList.add("modal-block--order");
+  const orderRows = MODAL_ORDER_ROWS.map(cols => [...cols]);
+  if (shouldShowAssignDate(row)) orderRows[1].push("Assign Date");
+  appendModalFieldRows(orderContent, orderRows, row);
 
-      const labelEl = document.createElement("label");
-      labelEl.className = "modal-field-label";
-      labelEl.textContent = col;
+  const notesWrap = document.createElement("div");
+  notesWrap.className = "modal-order-notes";
+  notesWrap.appendChild(createModalField("Notes", row));
+  orderContent.appendChild(notesWrap);
+  main.appendChild(orderBlock);
 
-      const valueEl = document.createElement("div");
-      valueEl.className = "modal-field-value";
-      setFieldDisplayContent(valueEl, col, row);
-      bindFieldInteractions(valueEl, col, row);
+  main.appendChild(createModalShippingSection(row));
 
-      fieldWrap.appendChild(labelEl);
-      fieldWrap.appendChild(valueEl);
-      gridEl.appendChild(fieldWrap);
-    });
+  const bottomSplit = document.createElement("div");
+  bottomSplit.className = "modal-bottom-split";
 
-    sectionEl.appendChild(gridEl);
-    bodyEl.appendChild(sectionEl);
-  });
+  const { block: productBlock, content: productContent } = createModalBlock("Product");
+  appendModalFieldRows(productContent, MODAL_PRODUCT_ROWS, row);
+  bottomSplit.appendChild(productBlock);
+
+  const { block: productionBlock, content: productionContent } = createModalBlock("Production");
+  appendModalFieldRows(productionContent, MODAL_PRODUCTION_ROWS, row);
+  bottomSplit.appendChild(productionBlock);
+
+  main.appendChild(bottomSplit);
+
+  const photosCol = document.createElement("div");
+  photosCol.className = "modal-layout-photos";
+  photosCol.appendChild(createStylePhotoPlaceholders());
+
+  layout.appendChild(main);
+  layout.appendChild(photosCol);
+  bodyEl.appendChild(layout);
 }
 
 function openPODetail(row) {
   closeCellSelectDropdown(false);
+  if (modalRow?.["PO #"] !== row["PO #"]) {
+    modalFreightExpanded = false;
+  }
   modalRow = row;
   renderModalContent(row);
   document.getElementById("modalOverlay").classList.add("open");
