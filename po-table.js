@@ -369,15 +369,19 @@ const SHIP_OPTIONS = ["Air","Sea&Air","Matson"];
 
 const SELECT_EDIT_COLS = new Set(["Status", "Ship Method"]);
 
-const COLUMN_FILTER_COLS = ["Vendor", "Buyer", "Ship Method"];
+const COLUMN_FILTER_COLS = [
+  "Vendor", "Buyer", "Ship Method",
+  "EST EXF", "EST IHD", "EXF", "ETA", "IHD", "CXL Date", "Assign Date",
+];
+
+const DATE_FILTER_COLS = new Set([
+  "EST EXF", "EST IHD", "EXF", "ETA", "IHD", "CXL Date", "Assign Date",
+]);
+
 const BLANK_FILTER_LABEL = "(Blanks)";
 
 /** @type {Record<string, Set<string> | null>} null = show all values */
-const columnFilters = {
-  Vendor: null,
-  Buyer: null,
-  "Ship Method": null,
-};
+const columnFilters = Object.fromEntries(COLUMN_FILTER_COLS.map(col => [col, null]));
 
 let openFilterCol = null;
 /** @type {Set<string>} */
@@ -388,10 +392,43 @@ function normalizeFilterValue(val) {
   return s === "" ? BLANK_FILTER_LABEL : s;
 }
 
+function isOpenRow(row) {
+  return OPEN_STATUSES.has(String(row["Status"] ?? "").trim());
+}
+
+function getColumnFilterRawValue(col, row) {
+  if (col === "EST IHD") return calculateEstIhd(row["Ship Method"], row["EST EXF"]);
+  return row[col];
+}
+
+function getFilterValueKey(col, row) {
+  const raw = getColumnFilterRawValue(col, row);
+  if (DATE_FILTER_COLS.has(col)) {
+    if (isEmptyValue(raw)) return BLANK_FILTER_LABEL;
+    return normalizeToYmd(raw) || BLANK_FILTER_LABEL;
+  }
+  return normalizeFilterValue(raw);
+}
+
+function getFilterValueLabel(col, key) {
+  if (key === BLANK_FILTER_LABEL) return BLANK_FILTER_LABEL;
+  if (DATE_FILTER_COLS.has(col)) return formatDateForDisplay(key);
+  return key;
+}
+
+function compareFilterValues(a, b, col) {
+  if (a === BLANK_FILTER_LABEL) return 1;
+  if (b === BLANK_FILTER_LABEL) return -1;
+  return a.localeCompare(b, undefined, { numeric: !DATE_FILTER_COLS.has(col) });
+}
+
 function getUniqueColumnValues(col) {
   const values = new Set();
-  allRows.forEach(row => values.add(normalizeFilterValue(row[col])));
-  return [...values].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  const sourceRows = DATE_FILTER_COLS.has(col)
+    ? allRows.filter(isOpenRow)
+    : allRows;
+  sourceRows.forEach(row => values.add(getFilterValueKey(col, row)));
+  return [...values].sort((a, b) => compareFilterValues(a, b, col));
 }
 
 function isColumnFilterActive(col) {
@@ -419,7 +456,7 @@ function rowPassesColumnFilters(row) {
     const selected = columnFilters[col];
     if (selected == null) continue;
     if (selected.size === 0) return false;
-    if (!selected.has(normalizeFilterValue(row[col]))) return false;
+    if (!selected.has(getFilterValueKey(col, row))) return false;
   }
   return true;
 }
@@ -455,7 +492,7 @@ function renderColumnFilterList() {
     });
 
     const span = document.createElement("span");
-    span.textContent = value;
+    span.textContent = getFilterValueLabel(openFilterCol, value);
 
     label.appendChild(cb);
     label.appendChild(span);
