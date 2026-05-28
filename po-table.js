@@ -6,6 +6,160 @@ const COLUMNS = [
   "House #","Shipped","ETD","ETA","IHD","EST EXF","EST IHD","CXL Date","Assign Date","Notes"
 ];
 
+const COLUMN_WIDTHS = [
+  120, 130, 130, 120, 100, 80, 80, 80, 80, 100, 100, 60, 60, 60, 100, 100,
+  80, 80, 80, 80, 80, 80, 80, 80, 80, 200
+];
+
+const COLUMN_VISIBILITY_KEY = "poTable.visibleColumns";
+
+/** @type {Set<string>} */
+let visibleColumns = new Set(COLUMNS);
+/** @type {Set<string>} */
+let columnVisibilityDraft = new Set(COLUMNS);
+
+function visibleColumnCount() {
+  return visibleColumns.size;
+}
+
+function loadColumnVisibility() {
+  try {
+    const raw = localStorage.getItem(COLUMN_VISIBILITY_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return;
+    const next = new Set(parsed.filter(col => COLUMNS.includes(col)));
+    if (next.size > 0) visibleColumns = next;
+  } catch {}
+}
+
+function saveColumnVisibility() {
+  localStorage.setItem(COLUMN_VISIBILITY_KEY, JSON.stringify([...visibleColumns]));
+}
+
+function applyColumnVisibility() {
+  const table = document.getElementById("poTable");
+  if (!table) return;
+
+  let minWidth = 0;
+  COLUMNS.forEach((col, i) => {
+    const hidden = !visibleColumns.has(col);
+    if (!hidden) minWidth += COLUMN_WIDTHS[i];
+
+    table.querySelector(`colgroup col:nth-child(${i + 1})`)?.classList.toggle("col-hidden", hidden);
+    table.querySelector(`thead th:nth-child(${i + 1})`)?.classList.toggle("col-hidden", hidden);
+    table.querySelectorAll(`tbody tr:not(.state-row) td:nth-child(${i + 1})`).forEach(td => {
+      td.classList.toggle("col-hidden", hidden);
+    });
+  });
+
+  table.style.minWidth = `${Math.max(minWidth, 400)}px`;
+}
+
+function renderEditTableList() {
+  const list = document.getElementById("editTableColumnList");
+  if (!list) return;
+
+  list.innerHTML = "";
+  COLUMNS.forEach(col => {
+    const label = document.createElement("label");
+    label.className = "column-filter-option";
+
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.value = col;
+    cb.checked = columnVisibilityDraft.has(col);
+    cb.addEventListener("change", () => {
+      if (cb.checked) columnVisibilityDraft.add(col);
+      else columnVisibilityDraft.delete(col);
+    });
+
+    const span = document.createElement("span");
+    span.textContent = col;
+
+    label.appendChild(cb);
+    label.appendChild(span);
+    list.appendChild(label);
+  });
+}
+
+function positionEditTablePopover(anchorBtn) {
+  const pop = document.getElementById("editTablePopover");
+  if (!pop || !anchorBtn) return;
+
+  const rect = anchorBtn.getBoundingClientRect();
+  const maxLeft = window.innerWidth - pop.offsetWidth - 8;
+  const left = Math.min(Math.max(8, rect.right - pop.offsetWidth), maxLeft);
+
+  pop.style.top = `${rect.bottom + 4}px`;
+  pop.style.left = `${left}px`;
+}
+
+function openEditTablePopover(anchorBtn) {
+  columnVisibilityDraft = new Set(visibleColumns);
+  const pop = document.getElementById("editTablePopover");
+  if (!pop) return;
+
+  pop.hidden = false;
+  renderEditTableList();
+  requestAnimationFrame(() => positionEditTablePopover(anchorBtn));
+}
+
+function closeEditTablePopover() {
+  const pop = document.getElementById("editTablePopover");
+  if (pop) pop.hidden = true;
+}
+
+function setEditTableDraftSelectAll(selectAll) {
+  columnVisibilityDraft = selectAll ? new Set(COLUMNS) : new Set();
+  renderEditTableList();
+}
+
+function applyEditTableFromPopover() {
+  if (columnVisibilityDraft.size === 0) {
+    showIndicator("Show at least one column", "error");
+    return;
+  }
+
+  visibleColumns = new Set(columnVisibilityDraft);
+  saveColumnVisibility();
+  applyColumnVisibility();
+  closeEditTablePopover();
+}
+
+function initEditTable() {
+  document.getElementById("editTableBtn")?.addEventListener("click", e => {
+    e.stopPropagation();
+    const pop = document.getElementById("editTablePopover");
+    if (!pop) return;
+    if (pop.hidden) openEditTablePopover(e.currentTarget);
+    else closeEditTablePopover();
+  });
+
+  document.getElementById("editTableSelectAll")?.addEventListener("click", () => setEditTableDraftSelectAll(true));
+  document.getElementById("editTableClearAll")?.addEventListener("click", () => setEditTableDraftSelectAll(false));
+  document.getElementById("editTableOk")?.addEventListener("click", applyEditTableFromPopover);
+  document.getElementById("editTableCancel")?.addEventListener("click", closeEditTablePopover);
+
+  document.addEventListener("click", e => {
+    const pop = document.getElementById("editTablePopover");
+    if (!pop || pop.hidden) return;
+    if (pop.contains(e.target) || e.target.closest("#editTableBtn")) return;
+    closeEditTablePopover();
+  });
+
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape") closeEditTablePopover();
+  });
+
+  window.addEventListener("resize", () => {
+    const pop = document.getElementById("editTablePopover");
+    if (pop && !pop.hidden) {
+      positionEditTablePopover(document.getElementById("editTableBtn"));
+    }
+  });
+}
+
 const EDITABLE = new Set([
   "PO Qty","Status","Ship Method","Ctn Qty","Vessel","House #",
   "Shipped","ETD","ETA","IHD","EST EXF","EST IHD","CXL Date","Assign Date","Notes"
@@ -394,7 +548,8 @@ function renderTable() {
   document.getElementById("rowCounter").textContent = filteredRows.length + " rows";
 
   if (filteredRows.length === 0) {
-    tbody.innerHTML = `<tr class="state-row"><td colspan="${COLUMNS.length}">No POs match your filters.</td></tr>`;
+    tbody.innerHTML = `<tr class="state-row"><td colspan="${visibleColumnCount()}">No POs match your filters.</td></tr>`;
+    applyColumnVisibility();
     return;
   }
 
@@ -434,6 +589,8 @@ function renderTable() {
 
     tbody.appendChild(tr);
   });
+
+  applyColumnVisibility();
 }
 
 function renderStatus(val) {
@@ -523,11 +680,14 @@ function showIndicator(msg, type) {
   indicatorTimer = setTimeout(() => el.classList.remove("visible"), 2500);
 }
 
+loadColumnVisibility();
 initDivisionFilters();
 initStatusFilters();
 initColumnFilterHeaders();
+initEditTable();
 updateSortHeaders();
 updateColumnFilterHeaderStates();
+applyColumnVisibility();
 loadData();
 
 function openPODetail(row) {

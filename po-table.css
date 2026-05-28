@@ -20,12 +20,18 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
   font-family: var(--font);
   background: var(--bg);
   color: var(--text);
   font-size: 13px;
-  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ── Header ── */
@@ -37,8 +43,7 @@ body {
   align-items: center;
   gap: 16px;
   height: 56px;
-  position: sticky;
-  top: 0;
+  flex-shrink: 0;
   z-index: 100;
 }
 
@@ -70,8 +75,7 @@ body {
   flex-wrap: wrap;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 56px;
+  flex-shrink: 0;
   z-index: 90;
 }
 
@@ -127,8 +131,17 @@ select.filter-select:focus { border-color: var(--accent); }
   flex-wrap: wrap;
 }
 
-.filter-btn-group.status-filters {
+.toolbar-status-row {
   flex: 1 1 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.filter-btn-group.status-filters {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .filter-btn {
@@ -223,11 +236,13 @@ select.filter-select:focus { border-color: var(--accent); }
 
 /* ── Table wrapper ── */
 .table-scroll-y {
-  overflow-y: visible;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 
 .table-scroll-x {
-  overflow-x: auto;
+  min-width: min-content;
 }
 
 table {
@@ -382,6 +397,32 @@ th.th-filterable.sorted-desc .th-label::after { content: ' ↓'; }
 .column-filter-cancel {
   padding: 6px 14px;
   font-size: 12px;
+}
+
+.edit-table-popover {
+  min-width: 300px;
+  max-width: 420px;
+}
+
+.edit-table-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.edit-table-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  max-height: 320px;
+  overflow-y: auto;
+  margin-bottom: 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 0;
+}
+
+.col-hidden {
+  display: none;
 }
 
 td {
