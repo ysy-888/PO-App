@@ -6,7 +6,7 @@
   --border: #e2e0d8;
   --border-strong: #c8c5ba;
   --text: #1a1a18;
-  --text-muted: #6b6960;
+  --text-muted: #cbc8bd;
   --accent: #2a5c8f;
   --accent-light: #e6f1fb;
   --danger: #a32d2d;
@@ -319,7 +319,7 @@ th {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--text-muted);
+  color: var(--text);
   border-bottom: 1px solid var(--border-strong);
   border-right: 1px solid var(--border);
   white-space: nowrap;
@@ -411,7 +411,7 @@ th.th-filterable.sorted-desc .th-label::after { content: ' ↓'; }
 /* ── Cell select dropdown ── */
 .cell-select-dropdown {
   position: fixed;
-  z-index: 200;
+  z-index: 1100;
   background: var(--surface);
   border: 1px solid var(--border-strong);
   border-radius: 6px;
@@ -592,6 +592,14 @@ tr.editing td { background: var(--edit-bg); }
 
 td.readonly { color: var(--text); }
 
+td.empty-display,
+td.editable.empty-display,
+.modal-field-value.empty-display,
+.modal-po-num.empty-display,
+.empty-display {
+  color: var(--text-muted) !important;
+}
+
 td.readonly-no-select,
 td.readonly-copy {
   user-select: none;
@@ -713,14 +721,17 @@ td.editable:hover { background: var(--accent-light) !important; }
 
 /* Floating Card Layout Container */
 .modal-card {
-  background: #ffffff;
+  background: var(--surface);
   width: 100%;
-  max-width: 75%;
+  max-width: 920px;
+  max-height: 90vh;
   border-radius: 12px;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   padding: 24px;
   transform: scale(0.95);
   transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
 }
 
 /* Pop scaling animation on open */
@@ -732,9 +743,135 @@ td.editable:hover { background: var(--accent-light) !important; }
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid #e2e8f0;
+  gap: 16px;
+  border-bottom: 1px solid var(--border);
   padding-bottom: 12px;
+  margin-bottom: 16px;
+  flex-shrink: 0;
+}
+
+.modal-header-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.modal-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.modal-po-num.readonly-copy {
+  cursor: pointer;
+}
+
+.modal-status-badge {
+  display: inline-flex;
+  align-items: center;
+}
+
+.modal-body {
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.modal-section {
   margin-bottom: 20px;
+}
+
+.modal-section:last-child {
+  margin-bottom: 0;
+}
+
+.modal-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-fields-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 14px;
+}
+
+.modal-field--full {
+  grid-column: 1 / -1;
+}
+
+.modal-field-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.modal-field-value {
+  position: relative;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modal-field-value[data-col="Division"],
+.modal-field-value[data-col="Buyer"],
+.modal-field-value[data-col="Buyer PO #"],
+.modal-field-value[data-col="Style #"],
+.modal-field-value[data-col="Notes"] {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.modal-field-value.editing {
+  background: var(--edit-bg);
+  padding: 0;
+  border-color: var(--accent);
+}
+
+.modal-field-value.editable:hover {
+  background: var(--accent-light) !important;
+}
+
+.modal-field-value .cell-input,
+.modal-field-value .cell-select {
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: #fff;
+  color: var(--text);
+  outline: none;
+  text-align: inherit;
+}
+
+.modal-field--full .modal-field-value {
+  white-space: normal;
+  word-break: break-word;
+  align-items: flex-start;
 }
 
 .btn-close {
@@ -743,18 +880,7 @@ td.editable:hover { background: var(--accent-light) !important; }
   font-size: 18px;
   cursor: pointer;
   color: #64748b;
-}
-
-.detail-field {
-  margin-bottom: 14px;
-  font-size: 14px;
-  color: #334155;
-}
-
-.detail-field strong {
-  display: inline-block;
-  width: 100px;
-  color: #64748b;
+  flex-shrink: 0;
 }
 
 .column-filter-option input[type="checkbox"] {

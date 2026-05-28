@@ -1,4 +1,21 @@
-const APPS_SCRIPT_URL = "https://script.google.com/a/macros/elevatordisco.com/s/AKfycbyAipm-x3kYHv0LuMc0Ffkfmvj-U24U8UjnDNih92jz_mE3izKVU7NBJJMO_xB5CnJM6w/exec";
+﻿const APPS_SCRIPT_URL = "https://script.google.com/a/macros/elevatordisco.com/s/AKfycbyAipm-x3kYHv0LuMc0Ffkfmvj-U24U8UjnDNih92jz_mE3izKVU7NBJJMO_xB5CnJM6w/exec";
+
+const EMPTY_DISPLAY = "\u2014";
+const EN_DASH = "\u2013";
+const ELLIPSIS = "\u2026";
+const CHECK_MARK = "\u2713";
+
+function setDisplayText(el, text) {
+  el.textContent = text;
+  el.classList.toggle("empty-display", text === EMPTY_DISPLAY);
+}
+
+function isEmptyValue(v) {
+  if (v === null || v === undefined) return true;
+  const s = String(v).trim();
+  if (s === "") return true;
+  return /^[\u2014\u2013\u2212-]+$/.test(s);
+}
 
 const COLUMNS = [
   "Division","Status","Vendor","Buyer","Buyer PO #","SO #","PO Date","PO #",
@@ -176,6 +193,37 @@ const READONLY_NO_SELECT_COLS = new Set(["Division", "PO Date", "Vendor"]);
 const COPY_ON_CLICK_COLS = new Set([
   "Buyer", "Buyer PO #", "SO #", "PO #", "Old PO #", "Style #", "Color",
 ]);
+
+const MODAL_SECTIONS = [
+  {
+    title: "PO Information",
+    fields: ["Division", "PO Date", "Buyer PO #", "SO #", "Old PO #", "Status"],
+  },
+  {
+    title: "Vendor & Buyer",
+    fields: ["Vendor", "Buyer"],
+  },
+  {
+    title: "Product",
+    fields: ["Style #", "Color", "PO Qty", "Actual Qty", "Ctn Qty"],
+  },
+  {
+    title: "Shipping",
+    fields: ["Ship Method", "Vessel", "House #", "Shipped", "ETD", "ETA", "IHD"],
+  },
+  {
+    title: "Dates",
+    fields: ["EST EXF", "EST IHD", "CXL Date", "Assign Date"],
+  },
+  {
+    title: "Notes",
+    fields: ["Notes"],
+    fullWidth: true,
+  },
+];
+
+/** @type {Record<string, unknown> | null} */
+let modalRow = null;
 
 const EST_IHD_DAYS_BY_SHIP_METHOD = {
   "Air": 7,
@@ -488,13 +536,13 @@ let currentPage = 1;
 const DEMO_DATA = [
   { "Division":"Elevator Disco","Status":"Received","Vendor":"Acme Textiles","Buyer":"Kim","Buyer PO #":"BP-1001","SO #":"SO-2201","PO Date":"2024-01-15","PO #":"PO-10001","Old PO #":"","Style #":"ST-100","Color":"Navy","PO Qty":500,"Actual Qty":498,"Ctn Qty":50,"Ship Method":"Sea&Air","Vessel":"Ever Given","House #":"H-001","Shipped":"2024-02-01","ETD":"2024-02-05","ETA":"2024-02-20","IHD":"2024-02-25","EST EXF":"2024-02-18","EST IHD":"2024-02-24","CXL Date":"2024-03-01","Assign Date":"2024-01-20","Notes":"Priority shipment" },
   { "Division":"Freesia","Status":"WIP","Vendor":"Blue Fabrics","Buyer":"Sam","Buyer PO #":"BP-1002","SO #":"SO-2202","PO Date":"2024-01-18","PO #":"PO-10002","Old PO #":"PO-9002","Style #":"ST-200","Color":"Blush","PO Qty":300,"Actual Qty":0,"Ctn Qty":30,"Ship Method":"Air","Vessel":"","House #":"","Shipped":"","ETD":"2024-03-01","ETA":"2024-03-10","IHD":"2024-03-15","EST EXF":"2024-03-08","EST IHD":"2024-03-14","CXL Date":"2024-04-01","Assign Date":"2024-01-22","Notes":"" },
-  { "Division":"Elevator Disco","Status":"Shipped","Vendor":"Orient Mfg","Buyer":"Lee","Buyer PO #":"BP-1003","SO #":"SO-2203","PO Date":"2024-01-20","PO #":"PO-10003","Old PO #":"","Style #":"ST-301","Color":"Ivory","PO Qty":1000,"Actual Qty":1000,"Ctn Qty":100,"Ship Method":"Matson","Vessel":"Matson Kona","House #":"H-202","Shipped":"2024-02-10","ETD":"2024-02-12","ETA":"2024-02-22","IHD":"2024-02-28","EST EXF":"2024-02-20","EST IHD":"2024-02-27","CXL Date":"2024-03-10","Assign Date":"2024-01-25","Notes":"Fragile — handle with care" },
+  { "Division":"Elevator Disco","Status":"Shipped","Vendor":"Orient Mfg","Buyer":"Lee","Buyer PO #":"BP-1003","SO #":"SO-2203","PO Date":"2024-01-20","PO #":"PO-10003","Old PO #":"","Style #":"ST-301","Color":"Ivory","PO Qty":1000,"Actual Qty":1000,"Ctn Qty":100,"Ship Method":"Matson","Vessel":"Matson Kona","House #":"H-202","Shipped":"2024-02-10","ETD":"2024-02-12","ETA":"2024-02-22","IHD":"2024-02-28","EST EXF":"2024-02-20","EST IHD":"2024-02-27","CXL Date":"2024-03-10","Assign Date":"2024-01-25","Notes":"Fragile - handle with care" },
   { "Division":"Freesia","Status":"Hold","Vendor":"Summit Goods","Buyer":"Kim","Buyer PO #":"BP-1004","SO #":"SO-2204","PO Date":"2024-02-01","PO #":"PO-10004","Old PO #":"","Style #":"ST-410","Color":"Sage","PO Qty":200,"Actual Qty":0,"Ctn Qty":20,"Ship Method":"Air","Vessel":"","House #":"","Shipped":"","ETD":"","ETA":"","IHD":"2024-04-01","EST EXF":"","EST IHD":"","CXL Date":"2024-04-15","Assign Date":"","Notes":"Awaiting quality approval" },
   { "Division":"Elevator Disco","Status":"Closed","Vendor":"Pacific Imports","Buyer":"Sam","Buyer PO #":"BP-1005","SO #":"SO-2205","PO Date":"2023-12-01","PO #":"PO-10005","Old PO #":"PO-8005","Style #":"ST-501","Color":"Black","PO Qty":750,"Actual Qty":750,"Ctn Qty":75,"Ship Method":"Sea&Air","Vessel":"MSC Maya","House #":"H-099","Shipped":"2024-01-05","ETD":"2024-01-08","ETA":"2024-01-20","IHD":"2024-01-25","EST EXF":"2024-01-18","EST IHD":"2024-01-24","CXL Date":"2024-02-01","Assign Date":"2023-12-10","Notes":"Completed" },
 ];
 
 async function loadData() {
-  showIndicator("Refreshing…", "");
+  showIndicator(`Refreshing${ELLIPSIS}`, "");
   try {
     if (APPS_SCRIPT_URL === "YOUR_APPS_SCRIPT_WEB_APP_URL_HERE") {
       allRows = DEMO_DATA;
@@ -577,7 +625,7 @@ function updateRowCounter() {
 
   const start = (currentPage - 1) * pageSize + 1;
   const end = Math.min(currentPage * pageSize, total);
-  el.textContent = `${start}–${end} of ${total}`;
+  el.textContent = `${start}${EN_DASH}${end} of ${total}`;
 }
 
 function updatePaginationUI() {
@@ -654,7 +702,7 @@ function sortBy(col) {
 }
 
 function formatDateForDisplay(v) {
-  if (!v) return "—";
+  if (isEmptyValue(v)) return EMPTY_DISPLAY;
 
   const s = String(v).trim();
 
@@ -667,7 +715,7 @@ function formatDateForDisplay(v) {
 }
 
 function normalizeToYmd(v) {
-  if (!v) return "";
+  if (isEmptyValue(v)) return "";
   const s = String(v).trim();
   const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T\s].*)?$/.exec(s);
   if (m) return `${m[1]}-${m[2]}-${m[3]}`;
@@ -689,9 +737,11 @@ function formatDateToYmd(date) {
 }
 
 function calculateEstIhd(shipMethod, estExf) {
-  const method = String(shipMethod ?? "").trim();
+  if (isEmptyValue(shipMethod) || isEmptyValue(estExf)) return "";
+
+  const method = String(shipMethod).trim();
   const exfYmd = normalizeToYmd(estExf);
-  if (!method || !exfYmd) return "";
+  if (!exfYmd) return "";
 
   const days = EST_IHD_DAYS_BY_SHIP_METHOD[method];
   if (days == null) return "";
@@ -760,12 +810,13 @@ function renderTable() {
 
       if (col === "Status") {
         td.innerHTML = renderStatus(val);
+      } else if (DATE_FIELDS.has(col)) {
+        setDisplayText(td, formatDateForDisplay(val));
+      } else if (isEmptyValue(val)) {
+        setDisplayText(td, EMPTY_DISPLAY);
       } else {
-        if (DATE_FIELDS.has(col)) {
-          td.textContent = formatDateForDisplay(val);
-        } else {
-          td.textContent = val !== "" && val !== null ? val : (editable ? "" : "—");
-        }
+        td.textContent = val;
+        td.classList.remove("empty-display");
       }
 
       tr.appendChild(td);
@@ -778,20 +829,20 @@ function renderTable() {
 }
 
 function renderStatus(val) {
-  if (!val) return '<span style="color:var(--text-muted)">—</span>';
+  if (isEmptyValue(val)) return `<span class="empty-display">${EMPTY_DISPLAY}</span>`;
   const cls = STATUS_BADGE[val] || "badge-cancelled";
   return `<span class="badge ${cls}">${val}</span>`;
 }
 
 function getCopyText(col, rawVal) {
-  if (rawVal === "" || rawVal === null || rawVal === undefined) return "";
+  if (isEmptyValue(rawVal)) return "";
   if (DATE_FIELDS.has(col)) return formatDateForDisplay(rawVal);
   return String(rawVal).trim();
 }
 
 async function copyCellValue(col, rawVal) {
   const text = getCopyText(col, rawVal);
-  if (!text || text === "—") {
+  if (!text || text === EMPTY_DISPLAY) {
     showIndicator("Nothing to copy", "error");
     return;
   }
@@ -804,7 +855,7 @@ async function copyCellValue(col, rawVal) {
   }
 }
 
-/** @type {{ td: HTMLTableCellElement, col: string, row: Record<string, unknown> } | null} */
+/** @type {{ anchor: HTMLElement, col: string, row: Record<string, unknown> } | null} */
 let openCellSelect = null;
 
 function getCellSelectOptions(col) {
@@ -814,17 +865,17 @@ function getCellSelectOptions(col) {
   if (col === "Ship Method") {
     return ["", ...SHIP_OPTIONS].map(value => ({
       value,
-      label: value || "—",
+      label: value || EMPTY_DISPLAY,
     }));
   }
   return [];
 }
 
-function positionCellSelectDropdown(td) {
+function positionCellSelectDropdown(anchorEl) {
   const pop = document.getElementById("cellSelectDropdown");
-  if (!pop || !td) return;
+  if (!pop || !anchorEl) return;
 
-  const rect = td.getBoundingClientRect();
+  const rect = anchorEl.getBoundingClientRect();
   pop.style.top = `${rect.bottom + 2}px`;
   pop.style.left = `${rect.left}px`;
   pop.style.width = `${rect.width}px`;
@@ -859,13 +910,13 @@ function renderCellSelectDropdown(col, row) {
   });
 }
 
-function closeCellSelectDropdown(clearCellState = true) {
+function closeCellSelectDropdown(clearAnchorState = true) {
   const pop = document.getElementById("cellSelectDropdown");
   if (pop) pop.hidden = true;
 
-  if (clearCellState && openCellSelect?.td) {
-    delete openCellSelect.td.dataset.editing;
-    openCellSelect.td.classList.remove("select-cell-open", "select-cell-hover");
+  if (clearAnchorState && openCellSelect?.anchor) {
+    delete openCellSelect.anchor.dataset.editing;
+    openCellSelect.anchor.classList.remove("select-cell-open", "select-cell-hover");
   }
 
   openCellSelect = null;
@@ -892,34 +943,35 @@ function selectCellSelectOption(value) {
 
   saveUpdate(row["PO #"], updates);
   renderTable();
+  updateModalIfOpen();
 }
 
-function openCellSelectDropdown(td, col, row) {
-  if (openCellSelect?.td === td) {
+function openCellSelectDropdown(anchorEl, col, row) {
+  if (openCellSelect?.anchor === anchorEl) {
     closeCellSelectDropdown();
     return;
   }
 
   closeCellSelectDropdown();
-  openCellSelect = { td, col, row };
+  openCellSelect = { anchor: anchorEl, col, row };
 
-  td.dataset.editing = "active";
-  td.classList.add("select-cell-open");
-  td.classList.remove("select-cell-hover");
+  anchorEl.dataset.editing = "active";
+  anchorEl.classList.add("select-cell-open");
+  anchorEl.classList.remove("select-cell-hover");
 
   renderCellSelectDropdown(col, row);
   const pop = document.getElementById("cellSelectDropdown");
   if (!pop) return;
 
   pop.hidden = false;
-  requestAnimationFrame(() => positionCellSelectDropdown(td));
+  requestAnimationFrame(() => positionCellSelectDropdown(anchorEl));
 }
 
 function initCellSelectDropdown() {
   document.addEventListener("click", e => {
     const pop = document.getElementById("cellSelectDropdown");
     if (!pop || pop.hidden) return;
-    if (pop.contains(e.target) || e.target.closest("td.select-cell")) return;
+    if (pop.contains(e.target) || e.target.closest(".select-cell")) return;
     closeCellSelectDropdown();
   });
 
@@ -930,11 +982,15 @@ function initCellSelectDropdown() {
   });
 
   window.addEventListener("resize", () => {
-    if (openCellSelect) positionCellSelectDropdown(openCellSelect.td);
+    if (openCellSelect) positionCellSelectDropdown(openCellSelect.anchor);
   });
 
   document.querySelector(".table-scroll-y")?.addEventListener("scroll", () => {
-    if (openCellSelect) positionCellSelectDropdown(openCellSelect.td);
+    if (openCellSelect) positionCellSelectDropdown(openCellSelect.anchor);
+  }, { passive: true });
+
+  document.getElementById("modalBody")?.addEventListener("scroll", () => {
+    if (openCellSelect) positionCellSelectDropdown(openCellSelect.anchor);
   }, { passive: true });
 }
 
@@ -956,7 +1012,12 @@ function createCellInput(col, val) {
   return input;
 }
 
-function attachCellEditorHandlers(td, col, row, input) {
+function updateModalIfOpen() {
+  if (!modalRow || !document.getElementById("modalOverlay")?.classList.contains("open")) return;
+  renderModalContent(modalRow);
+}
+
+function attachCellEditorHandlers(fieldEl, col, row, input) {
   function commit() {
     const newVal = input.value;
     row[col] = newVal;
@@ -968,46 +1029,57 @@ function attachCellEditorHandlers(td, col, row, input) {
 
     saveUpdate(row["PO #"], updates);
     renderTable();
+    updateModalIfOpen();
+  }
+
+  function cancelEdit() {
+    renderTable();
+    updateModalIfOpen();
   }
 
   input.onblur = commit;
   input.onkeydown = e => {
     if (e.key === "Enter") input.blur();
-    if (e.key === "Escape") renderTable();
+    if (e.key === "Escape") cancelEdit();
   };
 }
 
-function mountCellEditor(td, col, row) {
-  if (td.dataset.editing === "active") return;
+function mountFieldEditor(fieldEl, col, row) {
+  if (fieldEl.dataset.editing === "active") return;
 
   const val = row[col] ?? "";
   const input = createCellInput(col, val);
 
-  td.innerHTML = "";
-  td.appendChild(input);
-  td.classList.add("editing");
-  td.dataset.editing = "active";
-  attachCellEditorHandlers(td, col, row, input);
+  fieldEl.innerHTML = "";
+  fieldEl.appendChild(input);
+  fieldEl.classList.add("editing");
+  fieldEl.dataset.editing = "active";
+  attachCellEditorHandlers(fieldEl, col, row, input);
   input.focus();
 }
 
-function bindSelectCellInteractions(td, col, row) {
-  td.classList.add("select-cell");
+function mountCellEditor(td, col, row) {
+  mountFieldEditor(td, col, row);
+}
 
-  td.addEventListener("mouseenter", () => {
-    if (td.dataset.editing) return;
-    td.classList.add("select-cell-hover");
+function bindSelectCellInteractions(anchorEl, col, row) {
+  anchorEl.classList.add("select-cell");
+
+  anchorEl.addEventListener("mouseenter", () => {
+    if (anchorEl.dataset.editing) return;
+    anchorEl.classList.add("select-cell-hover");
   });
 
-  td.addEventListener("mouseleave", () => {
-    if (td.dataset.editing === "active") return;
-    td.classList.remove("select-cell-hover");
+  anchorEl.addEventListener("mouseleave", () => {
+    if (anchorEl.dataset.editing === "active") return;
+    anchorEl.classList.remove("select-cell-hover");
   });
 
-  td.addEventListener("mousedown", e => {
+  anchorEl.addEventListener("mousedown", e => {
     if (e.button !== 0) return;
     e.preventDefault();
-    openCellSelectDropdown(td, col, row);
+    e.stopPropagation();
+    openCellSelectDropdown(anchorEl, col, row);
   });
 }
 
@@ -1022,23 +1094,154 @@ function bindEditableCell(td, col, row) {
 
 function startEdit(td, col, row) {
   if (td.dataset.editing === "active") return;
-  mountCellEditor(td, col, row);
+  mountFieldEditor(td, col, row);
+}
+
+function bindFieldInteractions(fieldEl, col, row) {
+  fieldEl.dataset.col = col;
+
+  if (EDITABLE.has(col)) {
+    if (SELECT_EDIT_COLS.has(col)) {
+      fieldEl.classList.add("editable", "select-cell");
+      fieldEl.title = "Click to choose";
+      bindSelectCellInteractions(fieldEl, col, row);
+    } else {
+      fieldEl.classList.add("editable");
+      fieldEl.title = "Click to edit";
+      fieldEl.onclick = e => {
+        e.stopPropagation();
+        mountFieldEditor(fieldEl, col, row);
+      };
+    }
+    return;
+  }
+
+  if (READONLY_NO_SELECT_COLS.has(col)) {
+    fieldEl.classList.add("readonly", "readonly-no-select");
+    return;
+  }
+
+  if (COPY_ON_CLICK_COLS.has(col)) {
+    fieldEl.classList.add("readonly", "readonly-copy");
+    fieldEl.title = "Click to copy";
+    fieldEl.onclick = e => {
+      e.stopPropagation();
+      copyCellValue(col, row[col]);
+    };
+    return;
+  }
+
+  fieldEl.classList.add("readonly");
+}
+
+function setFieldDisplayContent(fieldEl, col, row) {
+  const val = col === "EST IHD"
+    ? calculateEstIhd(row["Ship Method"], row["EST EXF"])
+    : (row[col] ?? "");
+
+  if (col === "Status") {
+    fieldEl.innerHTML = renderStatus(val);
+  } else if (DATE_FIELDS.has(col)) {
+    setDisplayText(fieldEl, formatDateForDisplay(val));
+  } else if (isEmptyValue(val)) {
+    setDisplayText(fieldEl, EMPTY_DISPLAY);
+  } else {
+    fieldEl.textContent = val;
+    fieldEl.classList.remove("empty-display");
+  }
+}
+
+function renderModalContent(row) {
+  const poNumEl = document.getElementById("modalPoNum");
+  const badgeEl = document.getElementById("modalStatusBadge");
+  const bodyEl = document.getElementById("modalBody");
+  if (!poNumEl || !badgeEl || !bodyEl) return;
+
+  const poNum = isEmptyValue(row["PO #"]) ? EMPTY_DISPLAY : row["PO #"];
+  setDisplayText(poNumEl, poNum);
+  poNumEl.className = "modal-po-num";
+  poNumEl.onclick = null;
+  if (COPY_ON_CLICK_COLS.has("PO #") && poNum !== EMPTY_DISPLAY) {
+    poNumEl.classList.add("readonly-copy");
+    poNumEl.title = "Click to copy";
+    poNumEl.onclick = e => {
+      e.stopPropagation();
+      copyCellValue("PO #", row["PO #"]);
+    };
+  }
+
+  badgeEl.innerHTML = renderStatus(row["Status"]);
+
+  bodyEl.innerHTML = "";
+  MODAL_SECTIONS.forEach(section => {
+    const sectionEl = document.createElement("section");
+    sectionEl.className = "modal-section";
+
+    const titleEl = document.createElement("h4");
+    titleEl.className = "modal-section-title";
+    titleEl.textContent = section.title;
+    sectionEl.appendChild(titleEl);
+
+    const gridEl = document.createElement("div");
+    gridEl.className = "modal-fields-grid";
+
+    section.fields.forEach(col => {
+      const fieldWrap = document.createElement("div");
+      fieldWrap.className = "modal-field";
+      if (section.fullWidth) fieldWrap.classList.add("modal-field--full");
+
+      const labelEl = document.createElement("label");
+      labelEl.className = "modal-field-label";
+      labelEl.textContent = col;
+
+      const valueEl = document.createElement("div");
+      valueEl.className = "modal-field-value";
+      setFieldDisplayContent(valueEl, col, row);
+      bindFieldInteractions(valueEl, col, row);
+
+      fieldWrap.appendChild(labelEl);
+      fieldWrap.appendChild(valueEl);
+      gridEl.appendChild(fieldWrap);
+    });
+
+    sectionEl.appendChild(gridEl);
+    bodyEl.appendChild(sectionEl);
+  });
+}
+
+function openPODetail(row) {
+  closeCellSelectDropdown(false);
+  modalRow = row;
+  renderModalContent(row);
+  document.getElementById("modalOverlay").classList.add("open");
+}
+
+function closeModal(event) {
+  if (event.target.id === "modalOverlay") {
+    closeModalForce();
+  }
+}
+
+function closeModalForce() {
+  closeCellSelectDropdown(false);
+  modalRow = null;
+  document.getElementById("modalOverlay").classList.remove("open");
 }
 
 async function saveUpdate(poNumber, updates) {
   if (APPS_SCRIPT_URL === "YOUR_APPS_SCRIPT_WEB_APP_URL_HERE") {
-    showIndicator("Demo mode — not saved to sheet", "");
+    showIndicator(`Demo mode ${EMPTY_DISPLAY} not saved to sheet`, "");
     return;
   }
   try {
-    showIndicator("Saving…", "");
+    showIndicator(`Saving${ELLIPSIS}`, "");
     const res = await fetch(APPS_SCRIPT_URL, {
       method: "POST",
       body: JSON.stringify({ action: "update", poNumber, updates })
     });
     const json = await res.json();
     if (!json.success) throw new Error(json.error);
-    showIndicator("Saved ✓", "success");
+    showIndicator(`Saved ${CHECK_MARK}`, "success");
   } catch (err) {
     showIndicator("Save failed: " + err.message, "error");
   }
@@ -1064,29 +1267,3 @@ updateSortHeaders();
 updateColumnFilterHeaderStates();
 applyColumnVisibility();
 loadData();
-
-function openPODetail(row) {
-  // 1. Populate values into DOM slots
-  document.getElementById("viewPoNum").textContent = row["PO #"] ?? "—";
-  document.getElementById("viewDivision").textContent = row["Division"] ?? "—";
-  document.getElementById("viewVendor").textContent = row["Vendor"] ?? "—";
-  document.getElementById("viewBuyer").textContent = row["Buyer"] ?? "—";
-  document.getElementById("viewStyle").textContent = row["Style #"] ?? "—";
-  document.getElementById("viewColor").textContent = row["Color"] ?? "—";
-  document.getElementById("viewActualQty").textContent = row["Actual Qty"] ?? "—";
-
-  // 2. Open backdrop overlay
-  document.getElementById("modalOverlay").classList.add("open");
-}
-
-// Closes modal if user clicks directly on the dim backdrop mesh environment
-function closeModal(event) {
-  if (event.target.id === "modalOverlay") {
-    closeModalForce();
-  }
-}
-
-// Regular toggle function triggered by the "X" button
-function closeModalForce() {
-  document.getElementById("modalOverlay").classList.remove("open");
-}

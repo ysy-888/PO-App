@@ -137,25 +137,15 @@
 <div class="save-indicator" id="saveIndicator"></div>
 
 <div id="modalOverlay" class="modal-backdrop" onclick="closeModal(event)">
-  <div class="modal-card">
-    
+  <div class="modal-card" onclick="event.stopPropagation()">
     <div class="modal-header">
-      <h3>PO # <span id="viewPoNum">—</span></h3>
-      <button class="btn-close" onclick="closeModalForce()">✕</button>
+      <div class="modal-header-main">
+        <h3>PO # <span id="modalPoNum" class="modal-po-num">—</span></h3>
+        <span id="modalStatusBadge" class="modal-status-badge"></span>
+      </div>
+      <button type="button" class="btn-close" onclick="closeModalForce()" aria-label="Close">✕</button>
     </div>
-    
-    <div class="modal-body">
-      <div class="detail-field"><strong>Division:</strong> <span id="viewDivision">—</span></div>
-      <div class="detail-field"><strong>Vendor:</strong> <span id="viewVendor">—</span></div>
-      <div class="detail-field"><strong>Buyer:</strong> <span id="viewBuyer">—</span></div>
-      <div class="detail-field"><strong>Style #:</strong> <span id="viewStyle">—</span></div>
-      <div class="detail-field"><strong>Color:</strong> <span id="viewColor">—</span></div>
-      <div class="detail-field"><strong>Actual Qty:</strong> <span id="viewActualQty">—</span></div>
-      <hr />
-      <p style="font-size: 12px; color: var(--text-muted); margin-top: 12px;">
-        Tip: Read-only fields are shown here. Click directly on cells in the main table grid to edit mutable values.
-      </p>
-    </div>
+    <div class="modal-body" id="modalBody"></div>
   </div>
 </div>
 
