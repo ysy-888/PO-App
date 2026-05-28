@@ -42,14 +42,20 @@ function applyColumnVisibility() {
   if (!table) return;
 
   let minWidth = 0;
+  let leadingSet = false;
   COLUMNS.forEach((col, i) => {
     const hidden = !visibleColumns.has(col);
     if (!hidden) minWidth += COLUMN_WIDTHS[i];
+    const isLeading = !hidden && !leadingSet;
+    if (isLeading) leadingSet = true;
 
     table.querySelector(`colgroup col:nth-child(${i + 1})`)?.classList.toggle("col-hidden", hidden);
-    table.querySelector(`thead th:nth-child(${i + 1})`)?.classList.toggle("col-hidden", hidden);
+    const thEl = table.querySelector(`thead th:nth-child(${i + 1})`);
+    thEl?.classList.toggle("col-hidden", hidden);
+    thEl?.classList.toggle("col-leading", isLeading);
     table.querySelectorAll(`tbody tr:not(.state-row) td:nth-child(${i + 1})`).forEach(td => {
       td.classList.toggle("col-hidden", hidden);
+      td.classList.toggle("col-leading", isLeading);
     });
   });
 
@@ -162,8 +168,14 @@ function initEditTable() {
 
 const EDITABLE = new Set([
   "PO Qty","Status","Ship Method","Ctn Qty","Vessel","House #",
-  "Shipped","ETD","ETA","IHD","EST EXF","EST IHD","CXL Date","Assign Date","Notes"
+  "Shipped","ETD","ETA","IHD","EST EXF","CXL Date","Assign Date","Notes"
 ]);
+
+const EST_IHD_DAYS_BY_SHIP_METHOD = {
+  "Air": 7,
+  "Sea&Air": 14,
+  "Matson": 21,
+};
 
 // Single source of truth for status filter, cell editor, and default table sort.
 // Reorder entries to change sort priority (top = first). Add/remove statuses here only.
@@ -244,6 +256,8 @@ function setDivisionFilter(division) {
 }
 
 const SHIP_OPTIONS = ["Air","Sea&Air","Matson"];
+
+const SELECT_EDIT_COLS = new Set(["Status", "Ship Method"]);
 
 const COLUMN_FILTER_COLS = ["Vendor", "Buyer", "Ship Method"];
 const BLANK_FILTER_LABEL = "(Blanks)";
@@ -468,6 +482,7 @@ async function loadData() {
       if (!json.success) throw new Error(json.error);
       allRows = json.data;
     }
+    syncAllEstIhd(allRows);
     updateColumnFilterHeaderStates();
     applyFilters();
     showIndicator("Loaded", "success");
@@ -532,7 +547,7 @@ function formatDateForDisplay(v) {
   if (!m) return s; // fallback: don't change unknown formats
 
   const [, yyyy, mm, dd] = m;
-  return `${mm}/${dd}/${yyyy.slice(2)}`; // MM/DD/YY
+  return `${Number(mm)}/${Number(dd)}/${yyyy.slice(2)}`;
 }
 
 function normalizeToYmd(v) {
@@ -543,7 +558,46 @@ function normalizeToYmd(v) {
   return s;
 }
 
+function parseYmdToLocalDate(ymd) {
+  const normalized = normalizeToYmd(ymd);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(normalized);
+  if (!m) return null;
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+}
+
+function formatDateToYmd(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function calculateEstIhd(shipMethod, estExf) {
+  const method = String(shipMethod ?? "").trim();
+  const exfYmd = normalizeToYmd(estExf);
+  if (!method || !exfYmd) return "";
+
+  const days = EST_IHD_DAYS_BY_SHIP_METHOD[method];
+  if (days == null) return "";
+
+  const base = parseYmdToLocalDate(exfYmd);
+  if (!base) return "";
+
+  base.setDate(base.getDate() + days);
+  return formatDateToYmd(base);
+}
+
+function syncEstIhdForRow(row) {
+  row["EST IHD"] = calculateEstIhd(row["Ship Method"], row["EST EXF"]);
+  return row["EST IHD"];
+}
+
+function syncAllEstIhd(rows) {
+  rows.forEach(syncEstIhdForRow);
+}
+
 function renderTable() {
+  closeCellSelectDropdown(false);
   const tbody = document.getElementById("tableBody");
   document.getElementById("rowCounter").textContent = filteredRows.length + " rows";
 
@@ -563,13 +617,16 @@ function renderTable() {
 
     COLUMNS.forEach(col => {
       const td = document.createElement("td");
+      td.dataset.col = col;
       const editable = EDITABLE.has(col);
-      const val = row[col] ?? "";
+      const val = col === "EST IHD"
+        ? calculateEstIhd(row["Ship Method"], row["EST EXF"])
+        : (row[col] ?? "");
 
       if (editable) {
         td.className = "editable";
-        td.title = "Click to edit";
-        td.onclick = () => startEdit(td, col, row);
+        td.title = SELECT_EDIT_COLS.has(col) ? "Click to choose" : "Click to edit";
+        bindEditableCell(td, col, row);
       } else {
         td.className = "readonly";
       }
@@ -599,30 +656,144 @@ function renderStatus(val) {
   return `<span class="badge ${cls}">${val}</span>`;
 }
 
-function startEdit(td, col, row) {
-  if (td.querySelector("input,select")) return;
-  const val = row[col] ?? "";
+/** @type {{ td: HTMLTableCellElement, col: string, row: Record<string, unknown> } | null} */
+let openCellSelect = null;
+
+function getCellSelectOptions(col) {
+  if (col === "Status") {
+    return STATUS_SORT_ORDER.map(value => ({ value, label: value }));
+  }
+  if (col === "Ship Method") {
+    return ["", ...SHIP_OPTIONS].map(value => ({
+      value,
+      label: value || "—",
+    }));
+  }
+  return [];
+}
+
+function positionCellSelectDropdown(td) {
+  const pop = document.getElementById("cellSelectDropdown");
+  if (!pop || !td) return;
+
+  const rect = td.getBoundingClientRect();
+  pop.style.top = `${rect.bottom + 2}px`;
+  pop.style.left = `${rect.left}px`;
+  pop.style.width = `${rect.width}px`;
+}
+
+function renderCellSelectDropdown(col, row) {
+  const pop = document.getElementById("cellSelectDropdown");
+  if (!pop) return;
+
+  const currentVal = row[col] ?? "";
+  pop.dataset.col = col;
+  pop.innerHTML = "";
+
+  getCellSelectOptions(col).forEach(({ value, label }) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "cell-select-option";
+    if (value === currentVal) btn.classList.add("selected");
+
+    if (col === "Status" && value) {
+      btn.innerHTML = renderStatus(value);
+    } else {
+      btn.textContent = label;
+    }
+
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      selectCellSelectOption(value);
+    });
+
+    pop.appendChild(btn);
+  });
+}
+
+function closeCellSelectDropdown(clearCellState = true) {
+  const pop = document.getElementById("cellSelectDropdown");
+  if (pop) pop.hidden = true;
+
+  if (clearCellState && openCellSelect?.td) {
+    delete openCellSelect.td.dataset.editing;
+    openCellSelect.td.classList.remove("select-cell-open", "select-cell-hover");
+  }
+
+  openCellSelect = null;
+}
+
+function selectCellSelectOption(value) {
+  if (!openCellSelect) return;
+
+  const { col, row } = openCellSelect;
+  const currentVal = row[col] ?? "";
+
+  if (value === currentVal) {
+    closeCellSelectDropdown();
+    return;
+  }
+
+  closeCellSelectDropdown(false);
+
+  row[col] = value;
+  const updates = { [col]: value };
+  if (col === "Ship Method") {
+    updates["EST IHD"] = syncEstIhdForRow(row);
+  }
+
+  saveUpdate(row["PO #"], updates);
+  renderTable();
+}
+
+function openCellSelectDropdown(td, col, row) {
+  if (openCellSelect?.td === td) {
+    closeCellSelectDropdown();
+    return;
+  }
+
+  closeCellSelectDropdown();
+  openCellSelect = { td, col, row };
+
+  td.dataset.editing = "active";
+  td.classList.add("select-cell-open");
+  td.classList.remove("select-cell-hover");
+
+  renderCellSelectDropdown(col, row);
+  const pop = document.getElementById("cellSelectDropdown");
+  if (!pop) return;
+
+  pop.hidden = false;
+  requestAnimationFrame(() => positionCellSelectDropdown(td));
+}
+
+function initCellSelectDropdown() {
+  document.addEventListener("click", e => {
+    const pop = document.getElementById("cellSelectDropdown");
+    if (!pop || pop.hidden) return;
+    if (pop.contains(e.target) || e.target.closest("td.select-cell")) return;
+    closeCellSelectDropdown();
+  });
+
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && openCellSelect) {
+      closeCellSelectDropdown();
+    }
+  });
+
+  window.addEventListener("resize", () => {
+    if (openCellSelect) positionCellSelectDropdown(openCellSelect.td);
+  });
+
+  document.querySelector(".table-scroll-y")?.addEventListener("scroll", () => {
+    if (openCellSelect) positionCellSelectDropdown(openCellSelect.td);
+  }, { passive: true });
+}
+
+function createCellInput(col, val) {
   let input;
 
-  if (col === "Status") {
-    input = document.createElement("select");
-    input.className = "cell-select";
-    STATUS_SORT_ORDER.forEach(s => {
-      const o = document.createElement("option");
-      o.value = s; o.textContent = s;
-      if (s === val) o.selected = true;
-      input.appendChild(o);
-    });
-  } else if (col === "Ship Method") {
-    input = document.createElement("select");
-    input.className = "cell-select";
-    ["", ...SHIP_OPTIONS].forEach(s => {
-      const o = document.createElement("option");
-      o.value = s; o.textContent = s || "—";
-      if (s === val) o.selected = true;
-      input.appendChild(o);
-    });
-  } else if (DATE_FIELDS.has(col)) {
+  if (DATE_FIELDS.has(col)) {
     input = document.createElement("input");
     input.type = "date";
     input.className = "cell-input";
@@ -634,25 +805,79 @@ function startEdit(td, col, row) {
     input.value = val;
   }
 
-  td.innerHTML = "";
-  td.appendChild(input);
-  input.focus();
+  return input;
+}
 
+function attachCellEditorHandlers(td, col, row, input) {
   function commit() {
     const newVal = input.value;
     row[col] = newVal;
-    saveUpdate(row["PO #"], col, newVal);
+
+    const updates = { [col]: newVal };
+    if (col === "Ship Method" || col === "EST EXF") {
+      updates["EST IHD"] = syncEstIhdForRow(row);
+    }
+
+    saveUpdate(row["PO #"], updates);
     renderTable();
   }
 
   input.onblur = commit;
   input.onkeydown = e => {
-    if (e.key === "Enter") { input.blur(); }
-    if (e.key === "Escape") { renderTable(); }
+    if (e.key === "Enter") input.blur();
+    if (e.key === "Escape") renderTable();
   };
 }
 
-async function saveUpdate(poNumber, field, value) {
+function mountCellEditor(td, col, row) {
+  if (td.dataset.editing === "active") return;
+
+  const val = row[col] ?? "";
+  const input = createCellInput(col, val);
+
+  td.innerHTML = "";
+  td.appendChild(input);
+  td.classList.add("editing");
+  td.dataset.editing = "active";
+  attachCellEditorHandlers(td, col, row, input);
+  input.focus();
+}
+
+function bindSelectCellInteractions(td, col, row) {
+  td.classList.add("select-cell");
+
+  td.addEventListener("mouseenter", () => {
+    if (td.dataset.editing) return;
+    td.classList.add("select-cell-hover");
+  });
+
+  td.addEventListener("mouseleave", () => {
+    if (td.dataset.editing === "active") return;
+    td.classList.remove("select-cell-hover");
+  });
+
+  td.addEventListener("mousedown", e => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    openCellSelectDropdown(td, col, row);
+  });
+}
+
+function bindEditableCell(td, col, row) {
+  if (SELECT_EDIT_COLS.has(col)) {
+    bindSelectCellInteractions(td, col, row);
+    return;
+  }
+
+  td.onclick = () => startEdit(td, col, row);
+}
+
+function startEdit(td, col, row) {
+  if (td.dataset.editing === "active") return;
+  mountCellEditor(td, col, row);
+}
+
+async function saveUpdate(poNumber, updates) {
   if (APPS_SCRIPT_URL === "YOUR_APPS_SCRIPT_WEB_APP_URL_HERE") {
     showIndicator("Demo mode — not saved to sheet", "");
     return;
@@ -661,7 +886,7 @@ async function saveUpdate(poNumber, field, value) {
     showIndicator("Saving…", "");
     const res = await fetch(APPS_SCRIPT_URL, {
       method: "POST",
-      body: JSON.stringify({ action: "update", poNumber, updates: { [field]: value } })
+      body: JSON.stringify({ action: "update", poNumber, updates })
     });
     const json = await res.json();
     if (!json.success) throw new Error(json.error);
@@ -684,6 +909,7 @@ loadColumnVisibility();
 initDivisionFilters();
 initStatusFilters();
 initColumnFilterHeaders();
+initCellSelectDropdown();
 initEditTable();
 updateSortHeaders();
 updateColumnFilterHeaderStates();

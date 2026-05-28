@@ -16,6 +16,8 @@
   --edit-bg: #fffef7;
   --font: 'DM Sans', system-ui, sans-serif;
   --font-mono: 'DM Mono', monospace;
+  --icon-caret-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M3.5 6.25 8 10.75l4.5-4.5' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --icon-filter: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M3 5h18l-6.5 7.5V19l-3 1.5V12.5L3 5z' fill='%23000'/%3E%3C/svg%3E");
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -261,7 +263,7 @@ thead {
 
 th {
   padding: 8px 10px;
-  text-align: left;
+  text-align: center;
   font-weight: 600;
   font-size: 11px;
   text-transform: uppercase;
@@ -276,25 +278,57 @@ th {
   cursor: pointer;
 }
 
+th.col-leading,
+td.col-leading {
+  padding-left: 24px;
+}
+
+th[data-col="Division"],
+th[data-col="Buyer"],
+th[data-col="Buyer PO #"],
+th[data-col="Style #"],
+th[data-col="Notes"] {
+  text-align: left;
+}
+
 th:hover { background: #e8e4dc; color: var(--text); }
 th.sorted-asc::after { content: ' ↑'; }
 th.sorted-desc::after { content: ' ↓'; }
 
 th.th-filterable {
   cursor: pointer;
-  padding-right: 22px;
+  padding-right: 26px;
   position: relative;
 }
 
-th.th-filterable::after {
-  content: '▾';
+th.th-filterable::after,
+td.select-cell.select-cell-hover::after {
+  content: '';
   position: absolute;
   right: 8px;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 10px;
+  width: 16px;
+  height: 16px;
   color: var(--text-muted);
+  background-color: currentColor;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  -webkit-mask-size: contain;
   pointer-events: none;
+}
+
+th.th-filterable::after {
+  mask-image: var(--icon-filter);
+  -webkit-mask-image: var(--icon-filter);
+}
+
+td.select-cell.select-cell-hover::after {
+  mask-image: var(--icon-caret-down);
+  -webkit-mask-image: var(--icon-caret-down);
 }
 
 th.th-filterable.filter-active::after {
@@ -317,11 +351,48 @@ th.th-filterable .th-label:hover {
 
 th.th-filterable.sorted-asc::after,
 th.th-filterable.sorted-desc::after {
-  content: '▾';
+  content: '';
 }
 
 th.th-filterable.sorted-asc .th-label::after { content: ' ↑'; }
 th.th-filterable.sorted-desc .th-label::after { content: ' ↓'; }
+
+/* ── Cell select dropdown ── */
+.cell-select-dropdown {
+  position: fixed;
+  z-index: 200;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  padding: 4px 0;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.cell-select-option {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  background: none;
+  font-family: var(--font);
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+  text-align: center;
+}
+
+.cell-select-option:hover { background: var(--row-hover); }
+
+.cell-select-option.selected {
+  background: var(--accent-light);
+  color: var(--accent);
+}
+
+td.select-cell.select-cell-open {
+  background: var(--accent-light) !important;
+}
 
 /* ── Column filter popover ── */
 .column-filter-popover {
@@ -427,6 +498,7 @@ th.th-filterable.sorted-desc .th-label::after { content: ' ↓'; }
 
 td {
   padding: 7px 10px;
+  text-align: center;
   border-bottom: 1px solid var(--border);
   border-right: 1px solid var(--border);
   vertical-align: middle;
@@ -438,14 +510,13 @@ td {
   max-width: 0;
 }
 
-tr:hover td { background: var(--row-hover); }
-tr.editing td { background: var(--edit-bg); }
-
-td.readonly { color: var(--text-muted); }
-
-/* ── Inline edit ── */
-td.editable { cursor: pointer; }
-td.editable:hover { background: var(--accent-light) !important; }
+td[data-col="Division"],
+td[data-col="Buyer"],
+td[data-col="Buyer PO #"],
+td[data-col="Style #"],
+td[data-col="Notes"] {
+  text-align: left;
+}
 
 td input.cell-input,
 td select.cell-select {
@@ -458,7 +529,25 @@ td select.cell-select {
   background: #fff;
   color: var(--text);
   outline: none;
+  text-align: inherit;
 }
+
+td.select-cell {
+  position: relative;
+}
+
+td.select-cell.select-cell-hover {
+  padding-right: 26px;
+}
+
+tr:hover td { background: var(--row-hover); }
+tr.editing td { background: var(--edit-bg); }
+
+td.readonly { color: var(--text); }
+
+/* ── Inline edit ── */
+td.editable { cursor: pointer; }
+td.editable:hover { background: var(--accent-light) !important; }
 
 /* ── Status badges ── */
 .badge {
@@ -609,4 +698,8 @@ td select.cell-select {
   display: inline-block;
   width: 100px;
   color: #64748b;
+}
+
+.column-filter-option input[type="checkbox"] {
+  accent-color: var(--accent);
 }
