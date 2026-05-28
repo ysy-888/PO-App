@@ -62,8 +62,7 @@
       <col class="col-so" /><col class="col-po-date" /><col class="col-po" />
       <col class="col-old-po" /><col class="col-style" /><col class="col-color" />
       <col class="col-po-qty" /><col class="col-actual-qty" /><col class="col-ctn-qty" />
-      <col class="col-ship-method" /><col class="col-vessel" /><col class="col-house" />
-      <col class="col-shipped" /><col class="col-etd" /><col class="col-eta" />
+      <col class="col-ship-method" /><col class="col-eta" />
       <col class="col-ihd" /><col class="col-est-exf" /><col class="col-est-ihd" /><col class="col-exf" />
       <col class="col-cxl" /><col class="col-assign" /><col class="col-notes" />
     </colgroup>
@@ -84,10 +83,6 @@
         <th data-col="Actual Qty" onclick="sortBy('Actual Qty')">Actual Qty</th>
         <th data-col="Ctn Qty" onclick="sortBy('Ctn Qty')">Ctn Qty</th>
         <th class="th-filterable" data-col="Ship Method"><span class="th-label">Ship Method</span></th>
-        <th data-col="Vessel" onclick="sortBy('Vessel')">Vessel</th>
-        <th data-col="House #" onclick="sortBy('House #')">House #</th>
-        <th data-col="Shipped" onclick="sortBy('Shipped')">Shipped</th>
-        <th data-col="ETD" onclick="sortBy('ETD')">ETD</th>
         <th data-col="ETA" onclick="sortBy('ETA')">ETA</th>
         <th data-col="IHD" onclick="sortBy('IHD')">IHD</th>
         <th data-col="EST EXF" onclick="sortBy('EST EXF')">EST EXF</th>
@@ -99,7 +94,7 @@
       </tr>
     </thead>
     <tbody id="tableBody">
-      <tr class="state-row"><td colspan="27">Loading POs…</td></tr>
+      <tr class="state-row"><td colspan="23">Loading POs…</td></tr>
     </tbody>
   </table>
   </div>

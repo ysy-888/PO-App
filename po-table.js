@@ -19,13 +19,13 @@ function isEmptyValue(v) {
 
 const COLUMNS = [
   "Division","Status","Vendor","Buyer","Buyer PO #","SO #","PO Date","PO #",
-  "Old PO #","Style #","Color","PO Qty","Actual Qty","Ctn Qty","Ship Method","Vessel",
-  "House #","Shipped","ETD","ETA","IHD","EST EXF","EST IHD","EXF","CXL Date","Assign Date","Notes"
+  "Old PO #","Style #","Color","PO Qty","Actual Qty","Ctn Qty","Ship Method",
+  "ETA","IHD","EST EXF","EST IHD","EXF","CXL Date","Assign Date","Notes"
 ];
 
 const COLUMN_WIDTHS = [
-  120, 130, 130, 120, 100, 80, 80, 80, 80, 100, 100, 60, 60, 60, 100, 100,
-  80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 200
+  120, 130, 130, 120, 100, 80, 80, 80, 80, 100, 100, 60, 60, 60, 100,
+  80, 80, 80, 80, 80, 80, 80, 200
 ];
 
 const ROW_KEY_ALIASES = {

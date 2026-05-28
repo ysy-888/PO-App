@@ -785,10 +785,6 @@ td.editable:hover { background: var(--accent-light) !important; }
 .col-actual-qty  { width: 60px; }
 .col-ctn-qty     { width: 60px; }
 .col-ship-method { width: 100px; }
-.col-vessel      { width: 100px; }
-.col-house       { width: 80px; }
-.col-shipped     { width: 80px; }
-.col-etd         { width: 80px; }
 .col-eta         { width: 80px; }
 .col-ihd         { width: 80px; }
 .col-est-exf     { width: 80px; }
