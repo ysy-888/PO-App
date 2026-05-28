@@ -236,6 +236,57 @@ select.filter-select:focus { border-color: var(--accent); }
   display: none;
 }
 
+.page-size-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.page-size-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.page-size-select {
+  min-width: 72px;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pagination[hidden] {
+  display: none;
+}
+
+.btn-page {
+  padding: 5px 10px;
+  min-width: 32px;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.btn-page:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-page:disabled:hover {
+  background: var(--surface);
+}
+
+.page-indicator {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  min-width: 52px;
+  text-align: center;
+}
+
 /* ── Table wrapper ── */
 .table-scroll-y {
   flex: 1;
@@ -536,14 +587,20 @@ td.select-cell {
   position: relative;
 }
 
-td.select-cell.select-cell-hover {
-  padding-right: 26px;
-}
-
 tr:hover td { background: var(--row-hover); }
 tr.editing td { background: var(--edit-bg); }
 
 td.readonly { color: var(--text); }
+
+td.readonly-no-select,
+td.readonly-copy {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+td.readonly-copy {
+  cursor: pointer;
+}
 
 /* ── Inline edit ── */
 td.editable { cursor: pointer; }

@@ -171,6 +171,12 @@ const EDITABLE = new Set([
   "Shipped","ETD","ETA","IHD","EST EXF","CXL Date","Assign Date","Notes"
 ]);
 
+const READONLY_NO_SELECT_COLS = new Set(["Division", "PO Date", "Vendor"]);
+
+const COPY_ON_CLICK_COLS = new Set([
+  "Buyer", "Buyer PO #", "SO #", "PO #", "Old PO #", "Style #", "Color",
+]);
+
 const EST_IHD_DAYS_BY_SHIP_METHOD = {
   "Air": 7,
   "Sea&Air": 14,
@@ -184,6 +190,19 @@ const STATUS_SORT_ORDER = [
   "Assigned", "WIP", "Requested", "Hold",  
   "Shipped", "CXL", "Closed", 
 ];
+
+const STATUS_FILTER_OPEN = "__open__";
+const OPEN_STATUSES = new Set(
+  STATUS_SORT_ORDER.filter(status => status !== "CXL" && status !== "Closed")
+);
+
+function rowMatchesStatusFilter(row) {
+  if (!activeStatus) return true;
+  if (activeStatus === STATUS_FILTER_OPEN) {
+    return OPEN_STATUSES.has(row["Status"]);
+  }
+  return row["Status"] === activeStatus;
+}
 
 function statusSortIndex(status) {
   const i = STATUS_SORT_ORDER.indexOf(String(status ?? "").trim());
@@ -211,6 +230,7 @@ function initStatusFilters() {
 
   group.innerHTML = "";
   group.appendChild(makeBtn("All", ""));
+  group.appendChild(makeBtn("Open", STATUS_FILTER_OPEN));
   STATUS_SORT_ORDER.forEach(s => group.appendChild(makeBtn(s, s)));
   document.querySelectorAll("#statusFilters .filter-btn").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.status === activeStatus);
@@ -462,6 +482,8 @@ let allRows = [];
 let filteredRows = [];
 let sortCol = "Status";
 let sortDir = 1;
+let pageSize = Infinity;
+let currentPage = 1;
 
 const DEMO_DATA = [
   { "Division":"Elevator Disco","Status":"Received","Vendor":"Acme Textiles","Buyer":"Kim","Buyer PO #":"BP-1001","SO #":"SO-2201","PO Date":"2024-01-15","PO #":"PO-10001","Old PO #":"","Style #":"ST-100","Color":"Navy","PO Qty":500,"Actual Qty":498,"Ctn Qty":50,"Ship Method":"Sea&Air","Vessel":"Ever Given","House #":"H-001","Shipped":"2024-02-01","ETD":"2024-02-05","ETA":"2024-02-20","IHD":"2024-02-25","EST EXF":"2024-02-18","EST IHD":"2024-02-24","CXL Date":"2024-03-01","Assign Date":"2024-01-20","Notes":"Priority shipment" },
@@ -494,10 +516,9 @@ async function loadData() {
 function applyFilters() {
   const q = document.getElementById("searchInput").value.toLowerCase();
   const div = activeDivision;
-  const status = activeStatus;
   filteredRows = allRows.filter(row => {
     if (div && row["Division"] !== div) return false;
-    if (status && row["Status"] !== status) return false;
+    if (!rowMatchesStatusFilter(row)) return false;
     if (!rowPassesColumnFilters(row)) return false;
     if (q) {
       const haystack = COLUMNS.map(c => String(row[c] ?? "")).join(" ").toLowerCase();
@@ -517,8 +538,103 @@ function applyFilters() {
     });
   }
 
+  currentPage = 1;
   renderTable();
   updateClearAllFiltersButton();
+}
+
+function isPageSizeAll() {
+  return !Number.isFinite(pageSize);
+}
+
+function getTotalPages() {
+  if (isPageSizeAll() || filteredRows.length === 0) return 1;
+  return Math.ceil(filteredRows.length / pageSize);
+}
+
+function getPagedRows() {
+  if (isPageSizeAll()) return filteredRows;
+  const totalPages = getTotalPages();
+  currentPage = Math.min(Math.max(1, currentPage), totalPages);
+  const start = (currentPage - 1) * pageSize;
+  return filteredRows.slice(start, start + pageSize);
+}
+
+function updateRowCounter() {
+  const el = document.getElementById("rowCounter");
+  if (!el) return;
+
+  const total = filteredRows.length;
+  if (total === 0) {
+    el.textContent = "0 rows";
+    return;
+  }
+
+  if (isPageSizeAll()) {
+    el.textContent = `${total} row${total === 1 ? "" : "s"}`;
+    return;
+  }
+
+  const start = (currentPage - 1) * pageSize + 1;
+  const end = Math.min(currentPage * pageSize, total);
+  el.textContent = `${start}–${end} of ${total}`;
+}
+
+function updatePaginationUI() {
+  const nav = document.getElementById("paginationNav");
+  if (!nav) return;
+
+  const totalPages = getTotalPages();
+  const showPagination = !isPageSizeAll() && filteredRows.length > pageSize;
+  nav.hidden = !showPagination;
+
+  if (!showPagination) return;
+
+  const indicator = document.getElementById("pageIndicator");
+  if (indicator) indicator.textContent = `${currentPage} / ${totalPages}`;
+
+  const first = document.getElementById("pageFirst");
+  const prev = document.getElementById("pagePrev");
+  const next = document.getElementById("pageNext");
+  const last = document.getElementById("pageLast");
+  const onFirst = currentPage <= 1;
+  const onLast = currentPage >= totalPages;
+
+  if (first) first.disabled = onFirst;
+  if (prev) prev.disabled = onFirst;
+  if (next) next.disabled = onLast;
+  if (last) last.disabled = onLast;
+}
+
+function scrollTableToTop() {
+  document.querySelector(".table-scroll-y")?.scrollTo({ top: 0 });
+}
+
+function goToPage(page) {
+  const totalPages = getTotalPages();
+  const nextPage = Math.min(Math.max(1, page), totalPages);
+  if (nextPage === currentPage) return;
+  currentPage = nextPage;
+  closeCellSelectDropdown(false);
+  renderTable();
+  scrollTableToTop();
+}
+
+function setPageSize(value) {
+  pageSize = value === "all" ? Infinity : Number(value);
+  currentPage = 1;
+  closeCellSelectDropdown(false);
+  renderTable();
+}
+
+function initPagination() {
+  const select = document.getElementById("pageSizeSelect");
+  select?.addEventListener("change", () => setPageSize(select.value));
+
+  document.getElementById("pageFirst")?.addEventListener("click", () => goToPage(1));
+  document.getElementById("pagePrev")?.addEventListener("click", () => goToPage(currentPage - 1));
+  document.getElementById("pageNext")?.addEventListener("click", () => goToPage(currentPage + 1));
+  document.getElementById("pageLast")?.addEventListener("click", () => goToPage(getTotalPages()));
 }
 
 function updateSortHeaders() {
@@ -599,7 +715,9 @@ function syncAllEstIhd(rows) {
 function renderTable() {
   closeCellSelectDropdown(false);
   const tbody = document.getElementById("tableBody");
-  document.getElementById("rowCounter").textContent = filteredRows.length + " rows";
+  const rowsToRender = getPagedRows();
+  updateRowCounter();
+  updatePaginationUI();
 
   if (filteredRows.length === 0) {
     tbody.innerHTML = `<tr class="state-row"><td colspan="${visibleColumnCount()}">No POs match your filters.</td></tr>`;
@@ -608,7 +726,7 @@ function renderTable() {
   }
 
   tbody.innerHTML = "";
-  filteredRows.forEach(row => {
+  rowsToRender.forEach(row => {
     const tr = document.createElement("tr");
     tr.dataset.po = row["PO #"];
 
@@ -627,6 +745,15 @@ function renderTable() {
         td.className = "editable";
         td.title = SELECT_EDIT_COLS.has(col) ? "Click to choose" : "Click to edit";
         bindEditableCell(td, col, row);
+      } else if (READONLY_NO_SELECT_COLS.has(col)) {
+        td.className = "readonly readonly-no-select";
+      } else if (COPY_ON_CLICK_COLS.has(col)) {
+        td.className = "readonly readonly-copy";
+        td.title = "Click to copy";
+        td.addEventListener("click", e => {
+          e.stopPropagation();
+          copyCellValue(col, row[col]);
+        });
       } else {
         td.className = "readonly";
       }
@@ -654,6 +781,27 @@ function renderStatus(val) {
   if (!val) return '<span style="color:var(--text-muted)">—</span>';
   const cls = STATUS_BADGE[val] || "badge-cancelled";
   return `<span class="badge ${cls}">${val}</span>`;
+}
+
+function getCopyText(col, rawVal) {
+  if (rawVal === "" || rawVal === null || rawVal === undefined) return "";
+  if (DATE_FIELDS.has(col)) return formatDateForDisplay(rawVal);
+  return String(rawVal).trim();
+}
+
+async function copyCellValue(col, rawVal) {
+  const text = getCopyText(col, rawVal);
+  if (!text || text === "—") {
+    showIndicator("Nothing to copy", "error");
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(text);
+    showIndicator(`Copied ${text}`, "success");
+  } catch {
+    showIndicator("Copy failed", "error");
+  }
 }
 
 /** @type {{ td: HTMLTableCellElement, col: string, row: Record<string, unknown> } | null} */
@@ -910,6 +1058,7 @@ initDivisionFilters();
 initStatusFilters();
 initColumnFilterHeaders();
 initCellSelectDropdown();
+initPagination();
 initEditTable();
 updateSortHeaders();
 updateColumnFilterHeaderStates();

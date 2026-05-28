@@ -32,6 +32,22 @@
     <div class="filter-btn-group status-filters" id="statusFilters" role="group" aria-label="Status"></div>
     <div class="toolbar-end">
       <button type="button" class="clear-all-filters-btn" id="clearAllColumnFiltersBtn" hidden>Clear all filters</button>
+      <label class="page-size-control">
+        <span class="page-size-label">Rows</span>
+        <select id="pageSizeSelect" class="filter-select page-size-select" aria-label="Rows per page">
+          <option value="30">30</option>
+          <option value="60">60</option>
+          <option value="120">120</option>
+          <option value="all" selected>All</option>
+        </select>
+      </label>
+      <nav class="pagination" id="paginationNav" hidden aria-label="Table pages">
+        <button type="button" class="btn btn-page" id="pageFirst" title="First page" aria-label="First page">«</button>
+        <button type="button" class="btn btn-page" id="pagePrev" title="Previous page" aria-label="Previous page">‹</button>
+        <span class="page-indicator" id="pageIndicator">1 / 1</span>
+        <button type="button" class="btn btn-page" id="pageNext" title="Next page" aria-label="Next page">›</button>
+        <button type="button" class="btn btn-page" id="pageLast" title="Last page" aria-label="Last page">»</button>
+      </nav>
       <div class="counter" id="rowCounter">— rows</div>
     </div>
   </div>
