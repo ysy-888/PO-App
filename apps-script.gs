@@ -1,18 +1,25 @@
 const SHEET_NAME = "POs";
+const SHIPMENTS_SHEET_NAME = "Shipments";
 const COLUMN_DEFAULT_KEY = "defaultVisibleColumns";
 const STATUS_DEFAULT_KEY = "defaultStatusFilter";
+const SHIPMENT_ID_FIELD = "Shipment ID";
 
 /*
-  Row 1 must use these exact header names (see po-table.js COLUMNS for table display order).
-  Physical column order in the sheet does NOT need to match the table — the app maps by name.
+  POs sheet row 1 headers (see po-table.js COLUMNS). Add column: Shipment ID
 
-  Selected, Flag, Status, Division, Vendor, Buyer, Buyer PO #, SO #, PO Date, PO #,
-  Old PO #, Style #, Color, PO Qty, Actual Qty, Ctn Qty, Ship Method, Vessel,
-  House #, Shipped, ETD, EST EXF, EST IHD, EXF, ETA, IHD, CXL Date, Assign Date, Notes
+  Shipments sheet row 1 headers (auto-created if missing):
+    Shipment ID, Ship Method, Vessel, House #, EXF, Shipped, ETD, ETA, IHD, Notes
 
-  Selected is shown in the app only (session-local). Flag and other fields persist in the sheet.
-  If your sheet predates the app updates, add headers for: Selected, EXF
+  Selected is session-local in the app only.
 */
+
+const SHIPMENT_DATA_FIELDS = [
+  "Ship Method", "Vessel", "House #", "EXF", "Shipped", "ETD", "ETA", "IHD", "Notes"
+];
+
+const PO_SYNC_FROM_SHIPMENT_FIELDS = [
+  "Ship Method", "Vessel", "House #", "EXF", "Shipped", "ETD", "ETA", "IHD"
+];
 
 const EDITABLE_FIELDS = [
   "Flag",
@@ -21,14 +28,47 @@ const EDITABLE_FIELDS = [
   "EST EXF", "EST IHD", "EXF", "CXL Date", "Assign Date", "Notes"
 ];
 
+const SHIPMENT_EDITABLE_FIELDS = SHIPMENT_DATA_FIELDS.slice();
+
 function getSheet() {
   return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+}
+
+function getShipmentsSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(SHIPMENTS_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHIPMENTS_SHEET_NAME);
+    sheet.getRange(1, 1, 1, SHIPMENT_DATA_FIELDS.length + 1).setValues([[
+      SHIPMENT_ID_FIELD, ...SHIPMENT_DATA_FIELDS
+    ]]);
+  }
+  return sheet;
 }
 
 function corsResponse(data) {
   return ContentService
     .createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+function sheetToObjects_(sheet, requiredField) {
+  const range = sheet.getDataRange();
+  const rows = range.getValues();
+  if (rows.length < 2) return [];
+  const headers = rows[0].map(h => String(h ?? "").trim());
+  return rows.slice(1)
+    .map((row, i) => {
+      const obj = { _rowIndex: i + 2 };
+      headers.forEach((h, j) => {
+        if (h) obj[h] = row[j];
+      });
+      return obj;
+    })
+    .filter(obj => {
+      if (!requiredField) return true;
+      return String(obj[requiredField] ?? "").trim() !== "";
+    });
 }
 
 function getDefaultColumns_() {
@@ -71,21 +111,240 @@ function handleSaveColumnDefault(payload) {
   return corsResponse({ success: true });
 }
 
+function generateShipmentId_(shipments) {
+  const year = new Date().getFullYear();
+  let max = 0;
+  shipments.forEach(s => {
+    const m = /^SHP-(\d{4})-(\d+)$/.exec(String(s[SHIPMENT_ID_FIELD] ?? "").trim());
+    if (m && Number(m[1]) === year) max = Math.max(max, Number(m[2]));
+  });
+  return "SHP-" + year + "-" + String(max + 1).padStart(3, "0");
+}
+
+function pickShipmentData_(source) {
+  const out = {};
+  SHIPMENT_DATA_FIELDS.forEach(field => {
+    if (source && source[field] !== undefined) out[field] = source[field];
+  });
+  return out;
+}
+
+function findPoRowIndex_(poSheet, poNumber) {
+  const rows = poSheet.getDataRange().getValues();
+  const headers = rows[0].map(h => String(h ?? "").trim());
+  const poCol = headers.indexOf("PO #");
+  if (poCol === -1) throw new Error("PO # column not found in sheet.");
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][poCol]) === String(poNumber)) return { rowIndex: i + 1, headers: headers };
+  }
+  return null;
+}
+
+function writePoFields_(poSheet, rowIndex, headers, updates) {
+  Object.entries(updates).forEach(([field, value]) => {
+    const colIndex = headers.indexOf(field);
+    if (colIndex !== -1) poSheet.getRange(rowIndex, colIndex + 1).setValue(value);
+  });
+}
+
+function syncPosFromShipment_(poSheet, shipmentId, shipmentData, poNumbers) {
+  const syncData = pickShipmentData_(shipmentData);
+  syncData[SHIPMENT_ID_FIELD] = shipmentId;
+  const list = Array.isArray(poNumbers) ? poNumbers.map(String) : [];
+  list.forEach(poNumber => {
+    const found = findPoRowIndex_(poSheet, poNumber);
+    if (!found) throw new Error("PO # not found: " + poNumber);
+    writePoFields_(poSheet, found.rowIndex, found.headers, syncData);
+  });
+}
+
+function findPoRowsByShipmentId_(poSheet, shipmentId) {
+  const rows = poSheet.getDataRange().getValues();
+  if (rows.length < 2) return [];
+  const headers = rows[0].map(h => String(h ?? "").trim());
+  const shipCol = headers.indexOf(SHIPMENT_ID_FIELD);
+  if (shipCol === -1) return [];
+  const key = String(shipmentId ?? "").trim();
+  const matches = [];
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][shipCol] ?? "").trim() !== key) continue;
+    matches.push({ rowIndex: i + 1, headers: headers });
+  }
+  return matches;
+}
+
+function clearPoShipmentDataAtRow_(poSheet, rowIndex, headers) {
+  const updates = {};
+  updates[SHIPMENT_ID_FIELD] = "";
+  SHIPMENT_DATA_FIELDS.forEach(field => {
+    updates[field] = "";
+  });
+  writePoFields_(poSheet, rowIndex, headers, updates);
+}
+
+function findShipmentRowIndex_(shipmentsSheet, shipmentId) {
+  const rows = shipmentsSheet.getDataRange().getValues();
+  const headers = rows[0].map(h => String(h ?? "").trim());
+  const idCol = headers.indexOf(SHIPMENT_ID_FIELD);
+  if (idCol === -1) throw new Error("Shipment ID column not found.");
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][idCol]) === String(shipmentId)) {
+      return { rowIndex: i + 1, headers: headers };
+    }
+  }
+  return null;
+}
+
+function appendShipmentRow_(shipmentsSheet, shipmentId, shipmentData) {
+  const headers = shipmentsSheet.getRange(1, 1, 1, shipmentsSheet.getLastColumn()).getValues()[0]
+    .map(h => String(h ?? "").trim());
+  const row = headers.map(h => {
+    if (h === SHIPMENT_ID_FIELD) return shipmentId;
+    return shipmentData[h] !== undefined ? shipmentData[h] : "";
+  });
+  shipmentsSheet.appendRow(row);
+}
+
+function getPoShipmentId_(poSheet, poNumber) {
+  const found = findPoRowIndex_(poSheet, poNumber);
+  if (!found) return "";
+  const col = found.headers.indexOf(SHIPMENT_ID_FIELD);
+  if (col === -1) return "";
+  return String(poSheet.getRange(found.rowIndex, col + 1).getValue() ?? "").trim();
+}
+
+function assertPosNotAssigned_(poSheet, poNumbers) {
+  const list = Array.isArray(poNumbers) ? poNumbers.map(String) : [];
+  for (let i = 0; i < list.length; i++) {
+    const poNumber = list[i];
+    const existing = getPoShipmentId_(poSheet, poNumber);
+    if (existing) {
+      throw new Error("PO " + poNumber + " is already assigned to " + existing);
+    }
+  }
+}
+
+function handleCreateShipment(payload) {
+  const poNumbers = payload.poNumbers || [];
+  if (!Array.isArray(poNumbers) || poNumbers.length === 0) {
+    return corsResponse({ success: false, error: "Select at least one PO." });
+  }
+
+  const shipmentData = pickShipmentData_(payload.shipment || {});
+  const shipmentsSheet = getShipmentsSheet_();
+  const poSheet = getSheet();
+
+  try {
+    assertPosNotAssigned_(poSheet, poNumbers);
+  } catch (err) {
+    return corsResponse({ success: false, error: err.message });
+  }
+
+  const existing = sheetToObjects_(shipmentsSheet, SHIPMENT_ID_FIELD);
+  const shipmentId = generateShipmentId_(existing);
+
+  appendShipmentRow_(shipmentsSheet, shipmentId, shipmentData);
+  syncPosFromShipment_(poSheet, shipmentId, shipmentData, poNumbers);
+
+  return corsResponse({ success: true, shipmentId: shipmentId });
+}
+
+function handleUpdateShipment(payload) {
+  const shipmentId = String(payload.shipmentId ?? "").trim();
+  if (!shipmentId) {
+    return corsResponse({ success: false, error: "Shipment ID is required." });
+  }
+
+  const shipmentData = pickShipmentData_(payload.shipment || {});
+  const poNumbers = payload.poNumbers;
+
+  const shipmentsSheet = getShipmentsSheet_();
+  const poSheet = getSheet();
+  const found = findShipmentRowIndex_(shipmentsSheet, shipmentId);
+  if (!found) {
+    return corsResponse({ success: false, error: "Shipment not found: " + shipmentId });
+  }
+
+  found.headers.forEach((field, colIndex) => {
+    if (field === SHIPMENT_ID_FIELD) return;
+    if (shipmentData[field] !== undefined) {
+      shipmentsSheet.getRange(found.rowIndex, colIndex + 1).setValue(shipmentData[field]);
+    }
+  });
+
+  let linkedPos = poNumbers;
+  if (!Array.isArray(linkedPos)) {
+    const allPos = sheetToObjects_(poSheet, "PO #");
+    linkedPos = allPos
+      .filter(row => String(row[SHIPMENT_ID_FIELD] ?? "") === shipmentId)
+      .map(row => String(row["PO #"]));
+  }
+
+  syncPosFromShipment_(poSheet, shipmentId, shipmentData, linkedPos);
+
+  return corsResponse({ success: true, shipmentId: shipmentId });
+}
+
+function handleDeleteShipment(payload) {
+  const shipmentIds = payload.shipmentIds || [];
+  if (!Array.isArray(shipmentIds) || shipmentIds.length === 0) {
+    return corsResponse({ success: false, error: "Select at least one shipment." });
+  }
+
+  const shipmentsSheet = getShipmentsSheet_();
+  const poSheet = getSheet();
+  const rowsToDelete = [];
+
+  shipmentIds.forEach(rawId => {
+    const shipmentId = String(rawId ?? "").trim();
+    if (!shipmentId) return;
+
+    findPoRowsByShipmentId_(poSheet, shipmentId).forEach(match => {
+      clearPoShipmentDataAtRow_(poSheet, match.rowIndex, match.headers);
+    });
+
+    const found = findShipmentRowIndex_(shipmentsSheet, shipmentId);
+    if (found) rowsToDelete.push(found.rowIndex);
+  });
+
+  rowsToDelete.sort((a, b) => b - a);
+  rowsToDelete.forEach(rowIndex => shipmentsSheet.deleteRow(rowIndex));
+
+  return corsResponse({ success: true, deleted: rowsToDelete.length });
+}
+
+function handleUpdate(payload) {
+  const { poNumber, updates } = payload;
+
+  const invalidFields = Object.keys(updates).filter(f => !EDITABLE_FIELDS.includes(f));
+  if (invalidFields.length > 0) {
+    return corsResponse({
+      success: false,
+      error: "Not allowed to edit: " + invalidFields.join(", ")
+    });
+  }
+
+  const poSheet = getSheet();
+  const found = findPoRowIndex_(poSheet, poNumber);
+  if (!found) {
+    return corsResponse({ success: false, error: "PO # not found: " + poNumber });
+  }
+
+  writePoFields_(poSheet, found.rowIndex, found.headers, updates);
+  return corsResponse({ success: true, message: "PO updated successfully." });
+}
+
 function doGet(e) {
   try {
-    const sheet = getSheet();
-    const rows = sheet.getDataRange().getValues();
-
-    const headers = rows[0];
-    const data = rows.slice(1).map((row, i) => {
-      const obj = { _rowIndex: i + 2 };
-      headers.forEach((h, j) => { obj[h] = row[j]; });
-      return obj;
-    });
+    const poSheet = getSheet();
+    const shipmentsSheet = getShipmentsSheet_();
+    const data = sheetToObjects_(poSheet, "PO #");
+    const shipments = sheetToObjects_(shipmentsSheet, SHIPMENT_ID_FIELD);
 
     return corsResponse({
       success: true,
       data: data,
+      shipments: shipments,
       defaultColumns: getDefaultColumns_(),
       defaultStatusFilter: getDefaultStatusFilter_(),
     });
@@ -101,51 +360,12 @@ function doPost(e) {
 
     if (action === "update") return handleUpdate(payload);
     if (action === "saveColumnDefault") return handleSaveColumnDefault(payload);
+    if (action === "createShipment") return handleCreateShipment(payload);
+    if (action === "updateShipment") return handleUpdateShipment(payload);
+    if (action === "deleteShipment") return handleDeleteShipment(payload);
 
     return corsResponse({ success: false, error: "Unknown action: " + action });
   } catch (err) {
     return corsResponse({ success: false, error: err.message });
   }
-}
-
-function handleUpdate(payload) {
-  const { poNumber, updates } = payload;
-
-  const invalidFields = Object.keys(updates).filter(f => !EDITABLE_FIELDS.includes(f));
-  if (invalidFields.length > 0) {
-    return corsResponse({
-      success: false,
-      error: "Not allowed to edit: " + invalidFields.join(", ")
-    });
-  }
-
-  const sheet = getSheet();
-  const rows = sheet.getDataRange().getValues();
-  const headers = rows[0];
-  const poColIndex = headers.indexOf("PO #");
-
-  if (poColIndex === -1) {
-    return corsResponse({ success: false, error: "PO # column not found in sheet." });
-  }
-
-  let targetRow = -1;
-  for (let i = 1; i < rows.length; i++) {
-    if (String(rows[i][poColIndex]) === String(poNumber)) {
-      targetRow = i + 1;
-      break;
-    }
-  }
-
-  if (targetRow === -1) {
-    return corsResponse({ success: false, error: "PO # not found: " + poNumber });
-  }
-
-  Object.entries(updates).forEach(([field, value]) => {
-    const colIndex = headers.indexOf(field);
-    if (colIndex !== -1) {
-      sheet.getRange(targetRow, colIndex + 1).setValue(value);
-    }
-  });
-
-  return corsResponse({ success: true, message: "PO updated successfully." });
 }

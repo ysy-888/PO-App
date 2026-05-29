@@ -1,4 +1,4 @@
-﻿const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzE1aQiqIUnQ2zSDrMhlnpfNBT2G2poY7_C6PJ9wHYv9olX3xGpOXWDjgzQQBR-7epoTw/exec";
+﻿const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzCKa9STkgEnLL_hUQ5bFkXa4ZQcPCLR9TCpr1fiPW5v0fEFhGw0wG9GNH7uwvOV0qFZw/exec";
 
 const EMPTY_DISPLAY = "\u2014";
 const EN_DASH = "\u2013";
@@ -171,16 +171,15 @@ function isEmptyValue(v) {
 const COLUMNS = [
   "Selected","Flag",
   "Status","Division","Vendor","Buyer","Buyer PO #","SO #","PO Date","PO #",
-  "Old PO #","Style #","Color","PO Qty","Actual Qty","Ctn Qty","Ship Method",
+  "Old PO #","Style #","Color","PO Qty","Actual Qty","Ctn Qty",
   "Vessel","House #","Shipped","ETD",
-  "EST EXF","EST IHD","EXF","ETA","IHD","CXL Date","Assign Date","Notes"
+  "EST EXF","EST IHD","Ship Method","Shipment ID","EXF","ETA","IHD","CXL Date","Assign Date","Notes"
 ];
 
 const COLUMN_WIDTHS = [
   52, 36,
-  130, 120, 130, 120, 100, 80, 80, 80, 80, 100, 100, 60, 60, 60, 100,
-  100, 80, 80, 80,
-  80, 80, 80, 80, 80, 80, 80, 200
+  130, 120, 130, 120, 100, 80, 80, 80, 80, 100, 100, 60, 60, 60,
+  100, 80, 96, 80, 80, 80, 100, 80, 80, 80, 80, 80, 80, 200
 ];
 
 const COLUMN_LABELS = {
@@ -466,7 +465,7 @@ function getModalFieldSize(col) {
 
 const MODAL_ORDER_INFO_ROWS = [
   ["Status", "Division", "Vendor", "Buyer"],
-  ["Buyer PO #", "SO #", "Old PO #", "Flag"],
+  ["Buyer PO #", "SO #", "Old PO #"],
 ];
 
 const MODAL_ORDER_DATE_ROWS = [
@@ -630,7 +629,7 @@ const SHIP_OPTIONS = ["Air","Sea&Air","Matson"];
 const SELECT_EDIT_COLS = new Set(["Status", "Ship Method"]);
 
 const COLUMN_FILTER_COLS = [
-  "Vendor", "Buyer", "Ship Method",
+  "Vendor", "Buyer", "Ship Method", "Shipment ID",
   "EST EXF", "EST IHD", "EXF", "ETA", "IHD", "CXL Date", "Assign Date",
 ];
 
@@ -1003,16 +1002,37 @@ function resetLocalSelectedState(rows) {
   rows.forEach(row => { row["Selected"] = false; });
 }
 
+async function postAppsScript(payload) {
+  if (APPS_SCRIPT_URL === "YOUR_APPS_SCRIPT_WEB_APP_URL_HERE") {
+    throw new Error("Not available in demo mode");
+  }
+  const res = await fetch(APPS_SCRIPT_URL, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  return res.json();
+}
+
 async function loadData() {
   showIndicator(`Refreshing${ELLIPSIS}`, "");
   try {
     if (APPS_SCRIPT_URL === "YOUR_APPS_SCRIPT_WEB_APP_URL_HERE") {
       allRows = DEMO_DATA.map(row => ({ ...row }));
+      window.__pendingShipments = [];
+      if (typeof onShipmentsDataLoaded === "function") {
+        onShipmentsDataLoaded([]);
+        window.__pendingShipments = null;
+      }
     } else {
       const res = await fetch(APPS_SCRIPT_URL);
       const json = await res.json();
       if (!json.success) throw new Error(json.error);
       allRows = json.data.map(normalizeRow);
+      window.__pendingShipments = json.shipments ?? [];
+      if (typeof onShipmentsDataLoaded === "function") {
+        onShipmentsDataLoaded(window.__pendingShipments);
+        window.__pendingShipments = null;
+      }
       if (json.defaultColumns) applyDefaultColumnsFromServer(json.defaultColumns);
       applyDefaultStatusFilterFromServer(json.defaultStatusFilter);
     }
@@ -1021,6 +1041,7 @@ async function loadData() {
     syncAllEstIhd(allRows);
     updateColumnFilterHeaderStates();
     applyFilters();
+    if (typeof onPoSelectionChanged === "function") onPoSelectionChanged();
     showIndicator("Loaded", "success");
   } catch (err) {
     showIndicator("Load failed: " + err.message, "error");
@@ -1294,6 +1315,7 @@ function toggleRowSelected(row, selected) {
   if (isTruthy(row["Selected"]) === next) return false;
   row["Selected"] = next;
   updateSelectAllHeader();
+  if (typeof onPoSelectionChanged === "function") onPoSelectionChanged();
   return true;
 }
 
@@ -1308,7 +1330,7 @@ function isRowMiniSelectBlocked(target) {
   if (!(target instanceof Element)) return true;
   return Boolean(target.closest(
     "input, textarea, select, button, .cell-select-dropdown, .po-flag-btn, " +
-    ".td-select-cell, .select-cell, .editable, .copyable-text"
+    ".td-select-cell, .select-cell, .editable, .copyable-text, .shipment-id-link"
   ));
 }
 
@@ -1593,6 +1615,7 @@ function setAllFilteredSelected(selected) {
   });
   if (!changed) return;
   renderTable();
+  if (typeof onPoSelectionChanged === "function") onPoSelectionChanged();
 }
 
 function updateSelectAllHeader() {
@@ -1612,6 +1635,7 @@ function updateSelectAllHeader() {
   cb.checked = selectedCount === filteredRows.length;
   cb.indeterminate = selectedCount > 0 && selectedCount < filteredRows.length;
   updateRowCounter();
+  if (typeof onPoSelectionChanged === "function") onPoSelectionChanged();
 }
 
 function updateFlagFilterHeaderState() {
@@ -1666,8 +1690,7 @@ function renderSelectedCell(td, row) {
   td.appendChild(cb);
 }
 
-function renderFlagCell(td, row) {
-  td.className = "td-flag-cell readonly-no-select";
+function createPoFlagButton(row) {
   const flagged = isTruthy(row["Flag"]);
   const btn = document.createElement("button");
   btn.type = "button";
@@ -1679,7 +1702,13 @@ function renderFlagCell(td, row) {
     e.stopPropagation();
     toggleRowFlag(row);
   });
-  td.appendChild(btn);
+  return btn;
+}
+
+function renderFlagCell(td, row) {
+  td.className = "td-flag-cell readonly-no-select";
+  td.replaceChildren();
+  td.appendChild(createPoFlagButton(row));
 }
 
 function renderTable() {
@@ -1719,6 +1748,15 @@ function renderTable() {
       }
       if (col === "Flag") {
         renderFlagCell(td, row);
+        tr.appendChild(td);
+        return;
+      }
+      if (col === "Shipment ID") {
+        if (typeof renderShipmentIdCell === "function") renderShipmentIdCell(td, row);
+        else {
+          td.className = "readonly readonly-no-select";
+          setDisplayText(td, isEmptyValue(row[col]) ? EMPTY_DISPLAY : row[col]);
+        }
         tr.appendChild(td);
         return;
       }
@@ -2293,9 +2331,9 @@ function createModalShippingSection(row) {
 
 function renderModalContent(row) {
   const poNumEl = document.getElementById("modalPoNum");
-  const badgeEl = document.getElementById("modalStatusBadge");
+  const flagEl = document.getElementById("modalFlagBtn");
   const bodyEl = document.getElementById("modalBody");
-  if (!poNumEl || !badgeEl || !bodyEl) return;
+  if (!poNumEl || !flagEl || !bodyEl) return;
 
   const poNum = isEmptyValue(row["PO #"]) ? EMPTY_DISPLAY : row["PO #"];
   poNumEl.className = "modal-po-num";
@@ -2306,7 +2344,7 @@ function renderModalContent(row) {
     setDisplayText(poNumEl, poNum);
   }
 
-  badgeEl.innerHTML = renderStatus(row["Status"]);
+  flagEl.replaceChildren(createPoFlagButton(row));
 
   bodyEl.innerHTML = "";
 
@@ -2318,7 +2356,12 @@ function renderModalContent(row) {
 
   main.appendChild(createModalOrderSection(row));
 
-  main.appendChild(createModalShippingSection(row));
+  const shippingBlock = createModalShippingSection(row);
+  const shippingContent = shippingBlock.querySelector(".modal-block-content");
+  if (shippingContent && typeof appendPoModalLinkedShipment === "function") {
+    appendPoModalLinkedShipment(row, shippingContent);
+  }
+  main.appendChild(shippingBlock);
 
   const bottomSplit = document.createElement("div");
   bottomSplit.className = "modal-bottom-split";
@@ -2347,7 +2390,7 @@ function shouldIgnoreRowDblClick(e) {
   if (!(target instanceof Element)) return false;
 
   return Boolean(target.closest(
-    "input, textarea, select, button, .cell-select-dropdown, .po-flag-btn, .td-select-cell, .select-cell, .editing, [data-editing='active']"
+    "input, textarea, select, button, .cell-select-dropdown, .po-flag-btn, .td-select-cell, .select-cell, .editing, [data-editing='active'], .shipment-id-link"
   ));
 }
 
@@ -2358,7 +2401,11 @@ function openPODetail(row) {
   }
   modalRow = row;
   renderModalContent(row);
-  document.getElementById("modalOverlay").classList.add("open");
+  if (typeof bringModalToFront === "function") {
+    bringModalToFront(document.getElementById("modalOverlay"));
+  } else {
+    document.getElementById("modalOverlay").classList.add("open");
+  }
 }
 
 function closeModal(event) {
