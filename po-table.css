@@ -13,7 +13,7 @@
   --accent-light: #e6f1fb;
   --danger: #a32d2d;
   --success: #1a8e2f;
-  --warning: #854f0b;
+  --warning: #c60505;
   --row-hover: #f9f8f5;
   --edit-bg: #fffef7;
   --editable-hover-border: #cfcbc2;
@@ -364,6 +364,16 @@ select.filter-select:focus { border-color: var(--accent); }
   white-space: nowrap;
   min-width: 52px;
   text-align: center;
+}
+
+.selection-mode-banner {
+  padding: 7px 24px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #0e7490;
+  background: #ecfeff;
+  border-bottom: 1px solid #a5f3fc;
+  flex-shrink: 0;
 }
 
 /* ── Table wrapper ── */
@@ -897,9 +907,12 @@ td.td-flag-cell {
   text-align: center;
 }
 
-th.th-select-col,
-th.th-flag-col {
+th.th-select-col {
   cursor: default;
+}
+
+th.th-flag-col {
+  cursor: pointer;
 }
 
 th.th-select-col input[type="checkbox"],
@@ -916,6 +929,18 @@ th.th-select-col input[type="checkbox"],
   align-items: center;
   justify-content: center;
   color: var(--text-muted);
+}
+
+th.th-flag-col.filter-active {
+  background: var(--accent-light);
+}
+
+th.th-flag-col.filter-active .th-flag-icon {
+  color: var(--warning);
+}
+
+th.th-flag-col.filter-active .th-flag-icon svg path {
+  fill: currentColor;
 }
 
 .po-flag-btn {
@@ -941,9 +966,13 @@ th.th-select-col input[type="checkbox"],
   color: var(--warning);
 }
 
+.po-flag-btn.is-flagged svg path {
+  fill: currentColor;
+}
+
 .po-flag-btn.is-flagged:hover {
-  background: var(--row-hover);
-  color: #854f0b;
+  background: transparent;
+  color: #f73636;
 }
 
 tr.row-flagged td {
@@ -951,15 +980,15 @@ tr.row-flagged td {
 }
 
 tr.row-flagged:hover td {
-  background: rgb(249, 237, 237)
+  background: rgb(238, 214, 214)
 }
 
 tr.row-flagged:has(.po-select-checkbox:checked) td {
-  background: #ffefcf;
+  background: #f7dbf3;
 }
 
 tr.row-flagged:has(.po-select-checkbox:checked):hover td {
-  background: #ffe8bc !important;
+  background: #fdc8fb !important;
 }
 
 tr:has(.po-select-checkbox:checked):not(.row-flagged) td {

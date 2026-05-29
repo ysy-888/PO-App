@@ -5,8 +5,10 @@ const EN_DASH = "\u2013";
 const ELLIPSIS = "\u2026";
 const CHECK_MARK = "\u2713";
 const CXL_COUNTDOWN_STORAGE_KEY = "poTable.cxlCountdown";
+const SELECTION_MODE_STORAGE_KEY = "poTable.selectionMode";
 
 let cxlCountdownEnabled = false;
+let selectionModeEnabled = false;
 
 function loadCxlCountdownPreference() {
   try {
@@ -43,6 +45,51 @@ function toggleCxlCountdown() {
   setCxlCountdownEnabled(!cxlCountdownEnabled);
 }
 
+function loadSelectionModePreference() {
+  try {
+    selectionModeEnabled = localStorage.getItem(SELECTION_MODE_STORAGE_KEY) === "1";
+  } catch {
+    selectionModeEnabled = false;
+  }
+}
+
+function saveSelectionModePreference() {
+  try {
+    localStorage.setItem(SELECTION_MODE_STORAGE_KEY, selectionModeEnabled ? "1" : "0");
+  } catch {
+    /* ignore storage failures */
+  }
+}
+
+function updateHeaderMenuSelectionModeCheck() {
+  const check = document.getElementById("headerMenuSelectionModeCheck");
+  const toggleBtn = document.getElementById("headerMenuToggleSelectionMode");
+  const banner = document.getElementById("selectionModeBanner");
+  if (check) check.hidden = !selectionModeEnabled;
+  if (toggleBtn) toggleBtn.setAttribute("aria-checked", selectionModeEnabled ? "true" : "false");
+  if (banner) banner.hidden = !selectionModeEnabled;
+}
+
+function setSelectionModeEnabled(enabled) {
+  selectionModeEnabled = enabled;
+  saveSelectionModePreference();
+  updateHeaderMenuSelectionModeCheck();
+  if (!selectionModeEnabled) clearMiniSelection();
+}
+
+function toggleSelectionMode() {
+  setSelectionModeEnabled(!selectionModeEnabled);
+}
+
+function isSelectionModeEnabled() {
+  return selectionModeEnabled;
+}
+
+function updateHeaderMenuChecks() {
+  updateHeaderMenuCountdownCheck();
+  updateHeaderMenuSelectionModeCheck();
+}
+
 function closeHeaderMenu() {
   const menu = document.getElementById("headerMenuDropdown");
   const btn = document.getElementById("headerMenuBtn");
@@ -56,7 +103,7 @@ function openHeaderMenu() {
   if (!menu || !btn) return;
   menu.hidden = false;
   btn.setAttribute("aria-expanded", "true");
-  updateHeaderMenuCountdownCheck();
+  updateHeaderMenuChecks();
 }
 
 function initHeaderMenu() {
@@ -81,6 +128,11 @@ function initHeaderMenu() {
     toggleCxlCountdown();
   });
 
+  document.getElementById("headerMenuToggleSelectionMode")?.addEventListener("click", e => {
+    e.stopPropagation();
+    toggleSelectionMode();
+  });
+
   document.addEventListener("click", e => {
     if (menu.hidden) return;
     if (menu.contains(e.target) || btn.contains(e.target)) return;
@@ -91,7 +143,7 @@ function initHeaderMenu() {
     if (e.key === "Escape") closeHeaderMenu();
   });
 
-  updateHeaderMenuCountdownCheck();
+  updateHeaderMenuChecks();
 }
 
 function setDisplayText(el, text) {
@@ -138,6 +190,8 @@ const COLUMN_LABELS = {
 };
 
 const UI_ONLY_COLS = new Set(["Selected", "Flag"]);
+/** Session-local only — never read from or written to the sheet. */
+const LOCAL_ONLY_COLS = new Set(["Selected"]);
 
 const ALWAYS_VISIBLE_COLUMNS = new Set(["Selected", "Flag", "Status"]);
 
@@ -372,7 +426,7 @@ function initEditTable() {
 }
 
 const EDITABLE = new Set([
-  "Selected","Flag",
+  "Flag",
   "PO Qty","Status","Ship Method","Ctn Qty","Vessel","House #",
   "Shipped","ETD","ETA","IHD","EST EXF","EXF","CXL Date","Assign Date","Notes",
   "FOB Cost","Price","OG","PROTO","FIT/PP","BULK","TOP","TRIM",
@@ -501,6 +555,9 @@ function statusSortIndex(status) {
   const i = STATUS_SORT_ORDER.indexOf(String(status ?? "").trim());
   return i === -1 ? STATUS_SORT_ORDER.length : i;
 }
+
+/** Default multi-column sort when no header sort is active (first = highest priority). */
+const DEFAULT_SORT_COLUMNS = ["Status", "CXL Date", "Buyer", "Buyer PO #"];
 
 const DIVISIONS = ["Elevator Disco", "Freesia"];
 
@@ -639,7 +696,7 @@ function isColumnFilterActive(col) {
 }
 
 function hasActiveColumnFilters() {
-  return COLUMN_FILTER_COLS.some(col => columnFilters[col] != null);
+  return flagFilterActive || COLUMN_FILTER_COLS.some(col => columnFilters[col] != null);
 }
 
 function updateClearAllFiltersButton() {
@@ -648,9 +705,11 @@ function updateClearAllFiltersButton() {
 }
 
 function clearAllColumnFilters() {
+  flagFilterActive = false;
   COLUMN_FILTER_COLS.forEach(col => { columnFilters[col] = null; });
   closeColumnFilterPopover();
   updateColumnFilterHeaderStates();
+  updateFlagFilterHeaderState();
   applyFilters();
 }
 
@@ -926,7 +985,8 @@ function applyDateCellDisplay(el, col, row, { context = "table" } = {}) {
 
 let allRows = [];
 let filteredRows = [];
-let sortCol = "Status";
+let flagFilterActive = false;
+let sortCol = null;
 let sortDir = 1;
 let pageSize = Infinity;
 let currentPage = 1;
@@ -939,11 +999,15 @@ const DEMO_DATA = [
   { "Division":"Elevator Disco","Status":"Closed","Vendor":"Pacific Imports","Buyer":"Sam","Buyer PO #":"BP-1005","SO #":"SO-2205","PO Date":"2023-12-01","PO #":"PO-10005","Old PO #":"PO-8005","Style #":"ST-501","Color":"Black","PO Qty":750,"Actual Qty":750,"Ctn Qty":75,"Ship Method":"Sea&Air","Vessel":"MSC Maya","House #":"H-099","Shipped":"2024-01-05","ETD":"2024-01-08","ETA":"2024-01-20","IHD":"2024-01-25","EST EXF":"2024-01-18","EST IHD":"2024-01-24","EXF":"2024-01-20","CXL Date":"2024-02-01","Assign Date":"2023-12-10","Notes":"Completed" },
 ];
 
+function resetLocalSelectedState(rows) {
+  rows.forEach(row => { row["Selected"] = false; });
+}
+
 async function loadData() {
   showIndicator(`Refreshing${ELLIPSIS}`, "");
   try {
     if (APPS_SCRIPT_URL === "YOUR_APPS_SCRIPT_WEB_APP_URL_HERE") {
-      allRows = DEMO_DATA;
+      allRows = DEMO_DATA.map(row => ({ ...row }));
     } else {
       const res = await fetch(APPS_SCRIPT_URL);
       const json = await res.json();
@@ -952,6 +1016,8 @@ async function loadData() {
       if (json.defaultColumns) applyDefaultColumnsFromServer(json.defaultColumns);
       applyDefaultStatusFilterFromServer(json.defaultStatusFilter);
     }
+    resetLocalSelectedState(allRows);
+    clearMiniSelection();
     syncAllEstIhd(allRows);
     updateColumnFilterHeaderStates();
     applyFilters();
@@ -961,12 +1027,55 @@ async function loadData() {
   }
 }
 
+function compareDateFieldValues(aVal, bVal) {
+  const aYmd = normalizeToYmd(aVal);
+  const bYmd = normalizeToYmd(bVal);
+  if (!aYmd && !bYmd) return 0;
+  if (!aYmd) return 1;
+  if (!bYmd) return -1;
+  return aYmd.localeCompare(bYmd);
+}
+
+function compareTextFieldValues(aVal, bVal) {
+  const a = String(aVal ?? "").trim();
+  const b = String(bVal ?? "").trim();
+  if (!a && !b) return 0;
+  if (!a) return 1;
+  if (!b) return -1;
+  return a.localeCompare(b, undefined, { numeric: true });
+}
+
+function compareRowsByColumn(col, a, b) {
+  if (col === "Status") return statusSortIndex(a.Status) - statusSortIndex(b.Status);
+  if (DATE_FIELDS.has(col)) return compareDateFieldValues(a[col], b[col]);
+  return compareTextFieldValues(a[col], b[col]);
+}
+
+function compareRowsForSort(a, b) {
+  if (sortCol) {
+    const primary = compareRowsByColumn(sortCol, a, b) * sortDir;
+    if (primary !== 0) return primary;
+    for (const col of DEFAULT_SORT_COLUMNS) {
+      if (col === sortCol) continue;
+      const cmp = compareRowsByColumn(col, a, b);
+      if (cmp !== 0) return cmp;
+    }
+    return 0;
+  }
+  for (const col of DEFAULT_SORT_COLUMNS) {
+    const cmp = compareRowsByColumn(col, a, b);
+    if (cmp !== 0) return cmp;
+  }
+  return 0;
+}
+
 function applyFilters() {
   const q = document.getElementById("searchInput").value.toLowerCase();
   const div = activeDivision;
   filteredRows = allRows.filter(row => {
     if (div && row["Division"] !== div) return false;
     if (!rowMatchesStatusFilter(row)) return false;
+    if (flagFilterActive && !isTruthy(row["Flag"])) return false;
     if (!rowPassesColumnFilters(row)) return false;
     if (q) {
       const haystack = COLUMNS.map(c => String(row[c] ?? "")).join(" ").toLowerCase();
@@ -975,16 +1084,7 @@ function applyFilters() {
     return true;
   });
 
-  if (sortCol) {
-    filteredRows.sort((a, b) => {
-      if (sortCol === "Status") {
-        return (statusSortIndex(a.Status) - statusSortIndex(b.Status)) * sortDir;
-      }
-      const av = a[sortCol] ?? "";
-      const bv = b[sortCol] ?? "";
-      return String(av).localeCompare(String(bv), undefined, { numeric: true }) * sortDir;
-    });
-  }
+  filteredRows.sort(compareRowsForSort);
 
   currentPage = 1;
   renderTable();
@@ -1104,8 +1204,16 @@ function updateSortHeaders() {
 }
 
 function sortBy(col) {
-  if (sortCol === col) sortDir *= -1;
-  else { sortCol = col; sortDir = 1; }
+  if (sortCol === col) {
+    if (sortDir === 1) sortDir = -1;
+    else {
+      sortCol = null;
+      sortDir = 1;
+    }
+  } else {
+    sortCol = col;
+    sortDir = 1;
+  }
   updateSortHeaders();
   applyFilters();
 }
@@ -1181,11 +1289,10 @@ function toSheetBool(val) {
   return !!val;
 }
 
-function toggleRowSelected(row, selected, { persist = true } = {}) {
+function toggleRowSelected(row, selected) {
   const next = toSheetBool(selected);
   if (isTruthy(row["Selected"]) === next) return false;
   row["Selected"] = next;
-  if (persist) saveUpdate(row["PO #"], { Selected: next });
   updateSelectAllHeader();
   return true;
 }
@@ -1364,16 +1471,13 @@ function toggleMiniSelectedCheckboxState() {
   const targetState = resolveMiniSelectTargetState(rows);
   if (targetState === null) return;
 
-  const updates = [];
+  let changed = false;
   rows.forEach(row => {
-    if (toggleRowSelected(row, targetState, { persist: false })) {
-      updates.push({ poNumber: row["PO #"], next: targetState });
-    }
+    if (toggleRowSelected(row, targetState)) changed = true;
   });
 
-  if (updates.length === 0) return;
+  if (!changed) return;
   renderTable();
-  updates.forEach(({ poNumber, next }) => saveUpdate(poNumber, { Selected: next }));
 }
 
 function initRowMiniSelection() {
@@ -1381,6 +1485,7 @@ function initRowMiniSelection() {
   if (!tbody) return;
 
   tbody.addEventListener("pointerdown", e => {
+    if (!isSelectionModeEnabled()) return;
     if (e.button !== 0) return;
     const tr = e.target.closest("tr[data-po]");
     if (!tr || isRowMiniSelectBlocked(e.target)) return;
@@ -1401,6 +1506,7 @@ function initRowMiniSelection() {
   });
 
   tbody.addEventListener("pointermove", e => {
+    if (!isSelectionModeEnabled()) return;
     if (e.pointerId !== rowSelectPointerId) return;
     if (!(e.buttons & 1)) return;
 
@@ -1448,6 +1554,7 @@ function initRowMiniSelection() {
   });
 
   document.addEventListener("keydown", e => {
+    if (!isSelectionModeEnabled()) return;
     if (e.key !== " " && e.code !== "Space") return;
     if (miniSelectedIndices.size === 0) return;
     if (isTypingInField(e.target)) return;
@@ -1478,15 +1585,14 @@ function toggleRowFlag(row) {
 
 function setAllFilteredSelected(selected) {
   const next = toSheetBool(selected);
-  const changed = [];
+  let changed = false;
   filteredRows.forEach(row => {
     if (isTruthy(row["Selected"]) === next) return;
     row["Selected"] = next;
-    changed.push(row["PO #"]);
+    changed = true;
   });
-  if (changed.length === 0) return;
+  if (!changed) return;
   renderTable();
-  changed.forEach(poNumber => saveUpdate(poNumber, { Selected: next }));
 }
 
 function updateSelectAllHeader() {
@@ -1506,6 +1612,29 @@ function updateSelectAllHeader() {
   cb.checked = selectedCount === filteredRows.length;
   cb.indeterminate = selectedCount > 0 && selectedCount < filteredRows.length;
   updateRowCounter();
+}
+
+function updateFlagFilterHeaderState() {
+  const th = document.querySelector('th.th-flag-col[data-col="Flag"]');
+  if (!th) return;
+  th.classList.toggle("filter-active", flagFilterActive);
+  th.setAttribute("aria-pressed", flagFilterActive ? "true" : "false");
+  th.title = flagFilterActive ? "Show all rows" : "Show flagged only";
+}
+
+function toggleFlagFilter() {
+  flagFilterActive = !flagFilterActive;
+  updateFlagFilterHeaderState();
+  applyFilters();
+}
+
+function initFlagFilterHeader() {
+  const th = document.querySelector('th.th-flag-col[data-col="Flag"]');
+  if (!th) return;
+  th.setAttribute("role", "button");
+  th.setAttribute("aria-pressed", "false");
+  th.title = "Show flagged only";
+  th.addEventListener("click", toggleFlagFilter);
 }
 
 function initRowSelection() {
@@ -2245,6 +2374,11 @@ function closeModalForce() {
 }
 
 async function saveUpdate(poNumber, updates) {
+  const sheetUpdates = Object.fromEntries(
+    Object.entries(updates).filter(([field]) => !LOCAL_ONLY_COLS.has(field))
+  );
+  if (Object.keys(sheetUpdates).length === 0) return;
+
   if (APPS_SCRIPT_URL === "YOUR_APPS_SCRIPT_WEB_APP_URL_HERE") {
     showIndicator(`Demo mode ${EMPTY_DISPLAY} not saved to sheet`, "");
     return;
@@ -2253,7 +2387,7 @@ async function saveUpdate(poNumber, updates) {
     showIndicator(`Saving${ELLIPSIS}`, "");
     const res = await fetch(APPS_SCRIPT_URL, {
       method: "POST",
-      body: JSON.stringify({ action: "update", poNumber, updates })
+      body: JSON.stringify({ action: "update", poNumber, updates: sheetUpdates })
     });
     const json = await res.json();
     if (!json.success) throw new Error(json.error);
@@ -2274,9 +2408,11 @@ function showIndicator(msg, type) {
 
 loadColumnVisibility();
 loadCxlCountdownPreference();
+loadSelectionModePreference();
 initDivisionFilters();
 initStatusFilters();
 initColumnFilterHeaders();
+initFlagFilterHeader();
 initCellSelectDropdown();
 initPagination();
 initHeaderMenu();
@@ -2284,5 +2420,6 @@ initEditTable();
 initRowSelection();
 updateSortHeaders();
 updateColumnFilterHeaderStates();
+updateFlagFilterHeaderState();
 applyColumnVisibility();
 loadData();

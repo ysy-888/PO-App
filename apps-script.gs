@@ -10,11 +10,12 @@ const STATUS_DEFAULT_KEY = "defaultStatusFilter";
   Old PO #, Style #, Color, PO Qty, Actual Qty, Ctn Qty, Ship Method, Vessel,
   House #, Shipped, ETD, EST EXF, EST IHD, EXF, ETA, IHD, CXL Date, Assign Date, Notes
 
+  Selected is shown in the app only (session-local). Flag and other fields persist in the sheet.
   If your sheet predates the app updates, add headers for: Selected, EXF
 */
 
 const EDITABLE_FIELDS = [
-  "Selected", "Flag",
+  "Flag",
   "PO Qty", "Status", "Ship Method", "Ctn Qty",
   "Vessel", "House #", "Shipped", "ETD", "ETA", "IHD",
   "EST EXF", "EST IHD", "EXF", "CXL Date", "Assign Date", "Notes"
