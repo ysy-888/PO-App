@@ -983,7 +983,7 @@ tr:has(.po-select-checkbox:checked):not(.row-flagged):hover td {
 }
 
 .mini-select-ants-rect {
-  stroke: #06b6d4;
+  stroke: #19da90;
   stroke-width: 2;
   stroke-dasharray: 6 4;
   animation: mini-select-ants-march 1.1s linear infinite;
