@@ -271,6 +271,11 @@ select.filter-select:focus { border-color: var(--accent); }
 
 .btn:hover { background: var(--bg); }
 
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .btn-primary {
   background: var(--accent);
   color: #fff;

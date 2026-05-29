@@ -261,9 +261,13 @@
         <h3>PO # <span id="modalPoNum" class="modal-po-num">—</span></h3>
         <span id="modalFlagBtn" class="modal-flag-slot"></span>
       </div>
-      <button type="button" class="btn-close" onclick="closeModalForce()" aria-label="Close">✕</button>
+      <button type="button" class="btn-close" id="modalCloseBtn" aria-label="Close">✕</button>
     </div>
     <div class="modal-body" id="modalBody"></div>
+    <div class="modal-footer">
+      <button type="button" class="btn" id="modalCancelBtn">Cancel</button>
+      <button type="button" class="btn btn-primary" id="modalSaveBtn" disabled>Save</button>
+    </div>
   </div>
 </div>
 

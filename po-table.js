@@ -495,6 +495,8 @@ const MODAL_PRODUCTION_ROWS = [
 
 /** @type {Record<string, unknown> | null} */
 let modalRow = null;
+/** @type {Record<string, unknown> | null} */
+let modalSnapshot = null;
 let modalFreightExpanded = false;
 
 const EST_IHD_DAYS_BY_SHIP_METHOD = {
@@ -1600,6 +1602,12 @@ function updateModalIfOpen() {
 function toggleRowFlag(row) {
   const next = !isTruthy(row["Flag"]);
   row["Flag"] = next;
+  if (isPoModalOpenForRow(row)) {
+    renderTable();
+    updateModalIfOpen();
+    updateModalSaveState();
+    return;
+  }
   saveUpdate(row["PO #"], { Flag: next });
   renderTable();
   updateModalIfOpen();
@@ -1934,9 +1942,20 @@ function selectCellSelectOption(value) {
   closeCellSelectDropdown(false);
 
   row[col] = value;
+  if (col === "Ship Method") {
+    syncEstIhdForRow(row);
+  }
+
+  if (isModalFieldEl(openCellSelect.anchor)) {
+    renderTable();
+    updateModalIfOpen();
+    updateModalSaveState();
+    return;
+  }
+
   const updates = { [col]: value };
   if (col === "Ship Method") {
-    updates["EST IHD"] = syncEstIhdForRow(row);
+    updates["EST IHD"] = row["EST IHD"];
   }
 
   saveUpdate(row["PO #"], updates);
@@ -2021,22 +2040,108 @@ function getEditorComparableValue(col, val) {
   return String(val ?? "").trim();
 }
 
+function isModalFieldEl(fieldEl) {
+  return Boolean(fieldEl?.classList?.contains("modal-field-value"));
+}
+
+function isPoModalOpenForRow(row) {
+  if (!modalRow || !row) return false;
+  const overlay = document.getElementById("modalOverlay");
+  if (!overlay?.classList.contains("open")) return false;
+  return String(modalRow["PO #"]) === String(row["PO #"]);
+}
+
+function snapshotModalRow(row) {
+  return { ...row };
+}
+
+function fieldValuesEqual(col, a, b) {
+  if (col === "Flag") return isTruthy(a) === isTruthy(b);
+  if (DATE_FIELDS.has(col)) {
+    return getEditorComparableValue(col, a) === getEditorComparableValue(col, b);
+  }
+  return String(a ?? "").trim() === String(b ?? "").trim();
+}
+
+function getModalPendingUpdates() {
+  if (!modalRow || !modalSnapshot) return {};
+  const updates = {};
+  const keys = new Set([...Object.keys(modalRow), ...Object.keys(modalSnapshot)]);
+  keys.forEach(key => {
+    if (LOCAL_ONLY_COLS.has(key)) return;
+    if (fieldValuesEqual(key, modalRow[key], modalSnapshot[key])) return;
+    updates[key] = modalRow[key];
+  });
+  return updates;
+}
+
+function hasModalPendingChanges() {
+  return Object.keys(getModalPendingUpdates()).length > 0;
+}
+
+function updateModalSaveState() {
+  const saveBtn = document.getElementById("modalSaveBtn");
+  if (!saveBtn) return;
+  saveBtn.disabled = !hasModalPendingChanges();
+}
+
+function refreshAfterModalFieldEdit(fieldEl, col, row) {
+  delete fieldEl.dataset.editing;
+  fieldEl.classList.remove("editing");
+  setFieldDisplayContent(fieldEl, col, row);
+  if (EDITABLE.has(col) && !SELECT_EDIT_COLS.has(col)) {
+    wrapEditablePreview(fieldEl);
+  }
+  renderTable();
+  updateModalSaveState();
+}
+
+function commitActiveModalEditor() {
+  const active = document.querySelector("#modalOverlay .modal-field-value[data-editing='active']");
+  if (!active || !modalRow) return;
+  const input = active.querySelector(".cell-input, .cell-textarea");
+  if (!input) return;
+  const col = active.dataset.col;
+  if (!col) return;
+
+  active.onblur = null;
+  input.onblur = null;
+  modalRow[col] = input.value;
+  if (col === "Ship Method" || col === "EST EXF") {
+    syncEstIhdForRow(modalRow);
+  }
+  refreshAfterModalFieldEdit(active, col, modalRow);
+}
+
 function attachCellEditorHandlers(fieldEl, col, row, input, originalVal) {
   const originalComparable = getEditorComparableValue(col, originalVal);
+  const inModal = isModalFieldEl(fieldEl);
 
   function commit() {
     const newVal = input.value;
     if (getEditorComparableValue(col, newVal) === originalComparable) {
-      renderTable();
-      updateModalIfOpen();
+      if (inModal) {
+        refreshAfterModalFieldEdit(fieldEl, col, row);
+      } else {
+        renderTable();
+        updateModalIfOpen();
+      }
       return;
     }
 
     row[col] = newVal;
+    if (col === "Ship Method" || col === "EST EXF") {
+      syncEstIhdForRow(row);
+    }
+
+    if (inModal) {
+      refreshAfterModalFieldEdit(fieldEl, col, row);
+      return;
+    }
 
     const updates = { [col]: newVal };
     if (col === "Ship Method" || col === "EST EXF") {
-      updates["EST IHD"] = syncEstIhdForRow(row);
+      updates["EST IHD"] = row["EST IHD"];
     }
 
     saveUpdate(row["PO #"], updates);
@@ -2045,6 +2150,10 @@ function attachCellEditorHandlers(fieldEl, col, row, input, originalVal) {
   }
 
   function cancelEdit() {
+    if (inModal) {
+      refreshAfterModalFieldEdit(fieldEl, col, row);
+      return;
+    }
     renderTable();
     updateModalIfOpen();
   }
@@ -2383,6 +2492,7 @@ function renderModalContent(row) {
   layout.appendChild(main);
   layout.appendChild(photosCol);
   bodyEl.appendChild(layout);
+  updateModalSaveState();
 }
 
 function shouldIgnoreRowDblClick(e) {
@@ -2400,6 +2510,7 @@ function openPODetail(row) {
     modalFreightExpanded = false;
   }
   modalRow = row;
+  modalSnapshot = snapshotModalRow(row);
   renderModalContent(row);
   if (typeof bringModalToFront === "function") {
     bringModalToFront(document.getElementById("modalOverlay"));
@@ -2410,14 +2521,56 @@ function openPODetail(row) {
 
 function closeModal(event) {
   if (event.target.id === "modalOverlay") {
-    closeModalForce();
+    cancelModalChanges();
   }
 }
 
-function closeModalForce() {
+function dismissModalOverlay() {
   closeCellSelectDropdown(false);
   modalRow = null;
-  document.getElementById("modalOverlay").classList.remove("open");
+  modalSnapshot = null;
+  document.getElementById("modalOverlay")?.classList.remove("open");
+  updateModalSaveState();
+}
+
+function cancelModalChanges() {
+  commitActiveModalEditor();
+  if (modalRow && modalSnapshot) {
+    Object.keys(modalSnapshot).forEach(key => {
+      modalRow[key] = modalSnapshot[key];
+    });
+    renderTable();
+  }
+  dismissModalOverlay();
+}
+
+async function saveModalChanges() {
+  if (!modalRow || !modalSnapshot) return;
+  commitActiveModalEditor();
+
+  const updates = getModalPendingUpdates();
+  if (Object.keys(updates).length === 0) {
+    dismissModalOverlay();
+    return;
+  }
+
+  await saveUpdate(modalRow["PO #"], updates);
+  modalSnapshot = snapshotModalRow(modalRow);
+  renderTable();
+  renderModalContent(modalRow);
+  updateModalSaveState();
+}
+
+function initPoModalActions() {
+  document.getElementById("modalSaveBtn")?.addEventListener("click", () => {
+    saveModalChanges();
+  });
+  document.getElementById("modalCancelBtn")?.addEventListener("click", () => {
+    cancelModalChanges();
+  });
+  document.getElementById("modalCloseBtn")?.addEventListener("click", () => {
+    cancelModalChanges();
+  });
 }
 
 async function saveUpdate(poNumber, updates) {
@@ -2461,6 +2614,7 @@ initStatusFilters();
 initColumnFilterHeaders();
 initFlagFilterHeader();
 initCellSelectDropdown();
+initPoModalActions();
 initPagination();
 initHeaderMenu();
 initEditTable();
