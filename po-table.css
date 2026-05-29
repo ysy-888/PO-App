@@ -10,7 +10,8 @@
   --filter-icon: #8f8b83;
   --filter-icon-active: #8a7424;
   --accent: #2d2d29;
-  --accent-light: #f4e695;
+  --accent-light: #efeee9;
+  --accent-heavy: #f4e695;
   --danger: #a32d2d;
   --success: #1a8e2f;
   --warning: #c60505;
@@ -331,9 +332,8 @@ select.filter-select:focus { border-color: var(--accent); }
 }
 
 .pagination-block {
-  margin-left: auto;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: 12px;
   flex-shrink: 0;
 }
@@ -422,14 +422,93 @@ select.filter-select:focus { border-color: var(--accent); }
   text-align: center;
 }
 
-.selection-mode-banner {
-  padding: 7px 24px;
+/* ── App footer ── */
+.app-footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 24px;
+  min-height: 44px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  z-index: 90;
+}
+
+.app-footer[hidden] {
+  display: none !important;
+}
+
+.selection-mode-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   color: #0e7490;
   background: #ecfeff;
-  border-bottom: 1px solid #a5f3fc;
+  border: 1px solid #a5f3fc;
+  white-space: nowrap;
+  margin-right: auto;
+}
+
+.selection-mode-status[hidden] {
+  display: none;
+}
+
+.app-footer-end {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
   flex-shrink: 0;
+}
+
+.app-footer-end[hidden] {
+  display: none !important;
+}
+
+body.selection-mode-active #tableBody tr[data-po],
+body.selection-mode-active #tableBody tr[data-po] td {
+  cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+body.selection-mode-active #tableBody tr[data-po] td * {
+  cursor: inherit;
+}
+
+body.selection-mode-active #tableBody td.editable,
+body.selection-mode-active #tableBody td.editable.empty-display,
+body.selection-mode-active #tableBody td.editable .empty-display,
+body.selection-mode-active #tableBody td.select-cell {
+  cursor: default;
+}
+
+body.selection-mode-active #tableBody td.editable:hover .editable-preview,
+body.selection-mode-active #tableBody td.select-cell.select-cell-hover::after {
+  border-color: transparent;
+  background: transparent;
+}
+
+body.selection-mode-active #tableBody .copyable-text,
+body.selection-mode-active #tableBody .copyable-text:hover {
+  cursor: default;
+  text-decoration: none;
+}
+
+body.selection-mode-active #tableBody .shipment-id-link {
+  pointer-events: none;
+  cursor: default;
+  text-decoration: none;
+  color: inherit;
+}
+
+body.selection-mode-active #tableBody .po-select-checkbox,
+body.selection-mode-active #tableBody .po-flag-btn {
+  cursor: pointer;
 }
 
 /* ── Table wrapper ── */
@@ -625,7 +704,7 @@ th.th-filterable.filter-active::after {
 }
 
 th.th-filterable.filter-active {
-  background: var(--accent-light);
+  background: var(--accent-heavy);
   color: var(--text);
 }
 
@@ -675,9 +754,6 @@ th.th-filterable .th-label:hover {
   color: var(--accent);
 }
 
-td.select-cell.select-cell-open {
-  background: var(--accent-light) !important;
-}
 
 /* ── Column filter popover ── */
 .column-filter-popover {
@@ -2057,19 +2133,30 @@ td.editable:not(.select-cell):hover .editable-preview {
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid var(--border);
+  flex-shrink: 0;
 }
 
 .shipment-modal-card {
   width: calc(100vw - 40px);
   max-width: 1320px;
   max-height: calc(100vh - 48px);
-  overflow: auto;
+  overflow: hidden;
+}
+
+.shipment-modal-card .modal-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .shipment-modal-layout {
   display: flex;
   gap: 16px;
-  align-items: flex-start;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
 }
 
 .shipment-modal-left {
@@ -2080,6 +2167,9 @@ td.editable:not(.select-cell):hover .editable-preview {
 .shipment-modal-right {
   flex: 1 1 0;
   min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .shipment-form-edit {
@@ -2117,22 +2207,40 @@ td.editable:not(.select-cell):hover .editable-preview {
 }
 
 .shipment-linked-po-table-wrap {
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
+  overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: 6px;
-  max-height: min(420px, calc(100vh - 220px));
-  overflow-y: auto;
   width: 100%;
 }
 
 /* Override global `table { min-width: 2800px }` and `td { max-width: 0 }`. */
 .shipment-linked-po-table {
   width: 100%;
-  min-width: 920px;
+  min-width: 860px;
   max-width: none;
   border-collapse: collapse;
   table-layout: fixed;
   font-size: 12px;
+}
+
+.shipment-linked-po-table th.th-select-col,
+.shipment-linked-po-table td.td-select-cell {
+  width: 52px;
+  min-width: 52px;
+  max-width: none;
+  padding-left: 12px;
+  padding-right: 6px;
+  overflow: visible;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.shipment-linked-po-table th:nth-child(2),
+.shipment-linked-po-table td:nth-child(2) {
+  padding-left: 6px;
 }
 
 .shipment-linked-po-table th {
@@ -2217,6 +2325,11 @@ td.editable:not(.select-cell):hover .editable-preview {
 }
 
 .shipment-linked-po-table col.shipment-po-col-notes {
+  width: 36%;
+}
+
+.shipment-linked-po-table th.shipment-po-cell-notes,
+.shipment-linked-po-table td.shipment-po-cell-notes {
   width: auto;
 }
 
@@ -2230,7 +2343,7 @@ td.editable:not(.select-cell):hover .editable-preview {
 }
 
 .shipment-linked-po-table tbody tr:hover td {
-  background: transparent;
+  background: var(--row-hover);
 }
 
 .shipment-linked-po-table th:hover {
@@ -2285,6 +2398,29 @@ td.editable:not(.select-cell):hover .editable-preview {
   margin-top: 0;
   padding-top: 0;
   border-top: none;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.shipment-modal-po-count {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.shipment-modal-po-count-num {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.shipment-modal-po-count-unit {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
 }
 
 .shipment-linked-po-list {

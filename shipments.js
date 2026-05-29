@@ -30,6 +30,7 @@ const SHIPMENT_LINKED_PO_COLUMNS = [
 ];
 
 const SHIPMENT_LINKED_PO_COL_CLASSES = [
+  "shipment-po-col-select",
   "shipment-po-col-id",
   "shipment-po-col-style",
   "shipment-po-col-vendor",
@@ -43,7 +44,7 @@ const SHIPMENT_LINKED_PO_COL_CLASSES = [
 ];
 
 /** Linked PO table column widths (px); Notes column is flexible (null). */
-const SHIPMENT_LINKED_PO_COLUMN_WIDTHS = [100, 120, 120, 120, 120, 80, 80, 80, 100, null];
+const SHIPMENT_LINKED_PO_COLUMN_WIDTHS = [52, 72, 120, 88, 120, 120, 58, 58, 58, 92, null];
 
 /** PO fields cleared when a shipment is deleted (matches apps-script.gs sync fields). */
 const SHIPMENT_PO_CLEAR_FIELDS = [
@@ -80,7 +81,8 @@ function getShipmentById(id) {
 
 function getPosForShipment(shipmentId) {
   const key = String(shipmentId ?? "").trim();
-  return allRows.filter(row => String(row[SHIPMENT_ID_FIELD] ?? "").trim() === key);
+  if (isEmptyValue(key)) return [];
+  return allRows.filter(row => getPoShipmentId(row) === key);
 }
 
 function countPosForShipment(shipmentId) {
@@ -95,8 +97,14 @@ function getUnassignedCheckedFilteredPos() {
   return getCheckedFilteredPos().filter(row => !poHasShipment(row));
 }
 
+function getPoShipmentId(row) {
+  return String(row[SHIPMENT_ID_FIELD] ?? "").trim();
+}
+
 function poHasShipment(row) {
-  return String(row[SHIPMENT_ID_FIELD] ?? "").trim() !== "";
+  const id = getPoShipmentId(row);
+  if (isEmptyValue(id)) return false;
+  return getShipmentById(id) != null;
 }
 
 function getCheckedFilteredShipments() {
@@ -205,10 +213,12 @@ function switchAppView(view) {
   if (shipmentToolbar) shipmentToolbar.hidden = view !== "shipments";
   if (poTableWrap) poTableWrap.hidden = view !== "po";
   if (shipmentTableWrap) shipmentTableWrap.hidden = view !== "shipments";
-  const selectionBanner = document.getElementById("selectionModeBanner");
-  if (selectionBanner && view !== "po") selectionBanner.hidden = true;
-  else if (selectionBanner && view === "po") {
-    selectionBanner.hidden = !selectionModeEnabled;
+  const poFooterEnd = document.getElementById("poFooterEnd");
+  const appFooter = document.getElementById("appFooter");
+  if (poFooterEnd) poFooterEnd.hidden = view !== "po";
+  if (appFooter) appFooter.hidden = view !== "po";
+  if (typeof updateHeaderMenuSelectionModeCheck === "function") {
+    updateHeaderMenuSelectionModeCheck();
   }
   poTab?.classList.toggle("is-active", view === "po");
   poTab?.setAttribute("aria-selected", view === "po" ? "true" : "false");
@@ -313,8 +323,6 @@ function updateCreateShipmentButton() {
   const count = eligible.length;
   const show = currentAppView === "po" && count > 0;
   btn.hidden = !show;
-  if (!show) return;
-  btn.textContent = count === 1 ? "Create shipment (1 PO)" : `Create shipment (${count} POs)`;
 }
 
 function bringModalToFront(overlay) {
@@ -467,6 +475,7 @@ function renderCreateShipmentModal(poNumbers) {
     formId: "createShipmentForm",
     linkedSource: pos,
   }));
+  setShipmentModalPoCount(document.getElementById("createShipmentPoCount"), pos);
 
   bringModalToFront(document.getElementById("createShipmentOverlay"));
 }
@@ -488,7 +497,7 @@ async function submitCreateShipment() {
   });
   if (alreadyAssigned.length > 0) {
     showIndicator(
-      `Cannot create: ${alreadyAssigned.length} PO(s) already on a shipment`,
+      `Cannot create: PO ${alreadyAssigned.join(", ")} already on a shipment`,
       "error"
     );
     return;
@@ -588,18 +597,66 @@ function getLinkedPoRows(source) {
   return getPosForShipment(source[SHIPMENT_ID_FIELD]);
 }
 
+function setShipmentModalPoCount(el, source) {
+  if (!el) return;
+  const count = getLinkedPoRows(source).length;
+  const unit = count === 1 ? "PO" : "POs";
+  el.innerHTML =
+    `<span class="shipment-modal-po-count-num">${count}</span>` +
+    `<span class="shipment-modal-po-count-unit">${unit}</span>`;
+}
+
+function getLinkedPosFromModalTable() {
+  const tbody = document.querySelector(".shipment-linked-po-table tbody");
+  if (!tbody) return [];
+  return [...tbody.querySelectorAll("tr[data-po]")]
+    .map(tr => findRowByPo(tr.dataset.po))
+    .filter(Boolean);
+}
+
+function updateShipmentLinkedPoSelectAllHeader(pos) {
+  const cb = document.getElementById("shipmentLinkedPoSelectAll");
+  if (!cb) return;
+
+  if (pos.length === 0) {
+    cb.checked = false;
+    cb.indeterminate = false;
+    cb.disabled = true;
+    return;
+  }
+
+  cb.disabled = false;
+  const selectedCount = pos.filter(row => isTruthy(row["Selected"])).length;
+  cb.checked = selectedCount === pos.length;
+  cb.indeterminate = selectedCount > 0 && selectedCount < pos.length;
+}
+
+function syncLinkedPoTableCheckboxes(pos) {
+  const tbody = document.querySelector(".shipment-linked-po-table tbody");
+  if (!tbody) return;
+  pos.forEach(row => {
+    const po = String(row["PO #"] ?? "");
+    const tr = [...tbody.querySelectorAll("tr[data-po]")].find(el => String(el.dataset.po) === po);
+    const cb = tr?.querySelector(".po-select-checkbox");
+    if (cb) cb.checked = isTruthy(row["Selected"]);
+  });
+  updateShipmentLinkedPoSelectAllHeader(pos);
+}
+
+function setAllLinkedPosSelected(pos, selected) {
+  let changed = false;
+  pos.forEach(row => {
+    if (toggleRowSelected(row, selected)) changed = true;
+  });
+  if (changed) syncLinkedPoTableCheckboxes(pos);
+}
+
 function renderShipmentLinkedPoSection(source) {
   const section = document.createElement("section");
   section.className = "shipment-linked-pos";
 
-  const title = document.createElement("h4");
-  title.className = "modal-section-title";
-  title.textContent = "Linked POs";
-  section.appendChild(title);
-
   const pos = getLinkedPoRows(source);
   const count = pos.length;
-  title.textContent = count === 1 ? "Linked POs (1)" : `Linked POs (${count})`;
 
   if (count === 0) {
     const empty = document.createElement("p");
@@ -627,6 +684,19 @@ function renderShipmentLinkedPoSection(source) {
 
   const thead = document.createElement("thead");
   const headRow = document.createElement("tr");
+
+  const selectTh = document.createElement("th");
+  selectTh.className = "th-select-col";
+  const selectAllCb = document.createElement("input");
+  selectAllCb.type = "checkbox";
+  selectAllCb.id = "shipmentLinkedPoSelectAll";
+  selectAllCb.setAttribute("aria-label", "Select all linked POs");
+  selectAllCb.addEventListener("change", () => {
+    setAllLinkedPosSelected(pos, selectAllCb.checked);
+  });
+  selectTh.appendChild(selectAllCb);
+  headRow.appendChild(selectTh);
+
   SHIPMENT_LINKED_PO_COLUMNS.forEach(({ label, cellClass }) => {
     const th = document.createElement("th");
     th.textContent = label;
@@ -639,6 +709,12 @@ function renderShipmentLinkedPoSection(source) {
   const tbody = document.createElement("tbody");
   pos.forEach(row => {
     const tr = document.createElement("tr");
+    tr.dataset.po = row["PO #"];
+
+    const selectTd = document.createElement("td");
+    renderSelectedCell(selectTd, row);
+    tr.appendChild(selectTd);
+
     SHIPMENT_LINKED_PO_COLUMNS.forEach(({ col, cellClass }) => {
       const td = document.createElement("td");
       if (cellClass) td.className = cellClass;
@@ -671,6 +747,7 @@ function renderShipmentLinkedPoSection(source) {
   table.appendChild(tbody);
   wrap.appendChild(table);
   section.appendChild(wrap);
+  updateShipmentLinkedPoSelectAllHeader(pos);
   return section;
 }
 
@@ -680,6 +757,7 @@ function renderShipmentModalContent(shipment) {
   if (!idEl || !body) return;
 
   idEl.textContent = shipment[SHIPMENT_ID_FIELD] ?? EMPTY_DISPLAY;
+  setShipmentModalPoCount(document.getElementById("shipmentModalPoCount"), shipment);
   body.innerHTML = "";
   body.appendChild(buildShipmentModalLayout({
     shipment,
@@ -810,8 +888,8 @@ function renderPoModalLinkedShipment(row) {
   if (!slot) return;
 
   slot.replaceChildren();
-  const id = String(row[SHIPMENT_ID_FIELD] ?? "").trim();
-  if (!id) {
+  const id = getPoShipmentId(row);
+  if (isEmptyValue(id) || !getShipmentById(id)) {
     slot.hidden = true;
     return;
   }
@@ -878,6 +956,8 @@ function onShipmentsDataLoaded(shipments) {
 // Hook called from po-table.js after renderTable / selection changes
 function onPoSelectionChanged() {
   updateCreateShipmentButton();
+  const pos = getLinkedPosFromModalTable();
+  if (pos.length) updateShipmentLinkedPoSelectAllHeader(pos);
 }
 
 initShipments();

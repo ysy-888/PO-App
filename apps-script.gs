@@ -220,22 +220,32 @@ function appendShipmentRow_(shipmentsSheet, shipmentId, shipmentData) {
   shipmentsSheet.appendRow(row);
 }
 
+function isEmptyShipmentId_(value) {
+  const s = String(value ?? "").trim();
+  if (s === "") return true;
+  return /^[\u2014\u2013\u2212-]+$/.test(s);
+}
+
 function getPoShipmentId_(poSheet, poNumber) {
   const found = findPoRowIndex_(poSheet, poNumber);
   if (!found) return "";
   const col = found.headers.indexOf(SHIPMENT_ID_FIELD);
   if (col === -1) return "";
-  return String(poSheet.getRange(found.rowIndex, col + 1).getValue() ?? "").trim();
+  const value = String(poSheet.getRange(found.rowIndex, col + 1).getValue() ?? "").trim();
+  if (isEmptyShipmentId_(value)) return "";
+  return value;
 }
 
 function assertPosNotAssigned_(poSheet, poNumbers) {
+  const shipmentsSheet = getShipmentsSheet_();
   const list = Array.isArray(poNumbers) ? poNumbers.map(String) : [];
   for (let i = 0; i < list.length; i++) {
     const poNumber = list[i];
     const existing = getPoShipmentId_(poSheet, poNumber);
-    if (existing) {
-      throw new Error("PO " + poNumber + " is already assigned to " + existing);
-    }
+    if (!existing) continue;
+    const shipmentFound = findShipmentRowIndex_(shipmentsSheet, existing);
+    if (!shipmentFound) continue;
+    throw new Error("PO " + poNumber + " is already assigned to " + existing);
   }
 }
 

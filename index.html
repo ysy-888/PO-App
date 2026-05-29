@@ -51,27 +51,7 @@
     <div class="toolbar-end">
       <button type="button" class="btn btn-secondary" id="createShipmentBtn" hidden>Create shipment</button>
       <button type="button" class="clear-all-filters-btn" id="clearAllColumnFiltersBtn" hidden>Clear all filters</button>
-      <div class="pagination-block">
-        <nav class="pagination" id="paginationNav" hidden aria-label="Table pages">
-          <button type="button" class="btn btn-page" id="pageFirst" title="First page" aria-label="First page">«</button>
-          <button type="button" class="btn btn-page" id="pagePrev" title="Previous page" aria-label="Previous page">‹</button>
-          <span class="page-indicator" id="pageIndicator">1 / 1</span>
-          <button type="button" class="btn btn-page" id="pageNext" title="Next page" aria-label="Next page">›</button>
-          <button type="button" class="btn btn-page" id="pageLast" title="Last page" aria-label="Last page">»</button>
-        </nav>
-        <div class="page-controls">
-          <div class="counter" id="rowCounter">— rows</div>
-          <label class="page-size-control">
-            <span class="page-size-label">Rows</span>
-            <select id="pageSizeSelect" class="filter-select page-size-select" aria-label="Rows per page">
-              <option value="30">30</option>
-              <option value="60">60</option>
-              <option value="120">120</option>
-              <option value="all" selected>All</option>
-            </select>
-          </label>
-        </div>
-      </div>
+      <div class="counter" id="rowCounter">— rows</div>
     </div>
   </div>
 </div>
@@ -85,10 +65,6 @@
     <button type="button" class="btn btn-danger" id="deleteShipmentBtn" hidden>Delete shipment</button>
     <div class="counter" id="shipmentRowCounter">— shipments</div>
   </div>
-</div>
-
-<div id="selectionModeBanner" class="selection-mode-banner" hidden role="status" aria-live="polite">
-  Selection Mode Enabled
 </div>
 
 <div id="poTableWrap" class="table-scroll-y">
@@ -197,6 +173,32 @@
   </div>
 </div>
 
+<footer id="appFooter" class="app-footer">
+  <div id="selectionModeBanner" class="selection-mode-status" hidden role="status" aria-live="polite">
+    Selection Mode Enabled
+  </div>
+  <div id="poFooterEnd" class="app-footer-end">
+    <div class="pagination-block">
+      <nav class="pagination" id="paginationNav" hidden aria-label="Table pages">
+        <button type="button" class="btn btn-page" id="pageFirst" title="First page" aria-label="First page">«</button>
+        <button type="button" class="btn btn-page" id="pagePrev" title="Previous page" aria-label="Previous page">‹</button>
+        <span class="page-indicator" id="pageIndicator">1 / 1</span>
+        <button type="button" class="btn btn-page" id="pageNext" title="Next page" aria-label="Next page">›</button>
+        <button type="button" class="btn btn-page" id="pageLast" title="Last page" aria-label="Last page">»</button>
+      </nav>
+      <label class="page-size-control">
+        <span class="page-size-label">Rows</span>
+        <select id="pageSizeSelect" class="filter-select page-size-select" aria-label="Rows per page">
+          <option value="30">30</option>
+          <option value="60">60</option>
+          <option value="120">120</option>
+          <option value="all" selected>All</option>
+        </select>
+      </label>
+    </div>
+  </div>
+</footer>
+
 <div id="editTablePopover" class="column-filter-popover edit-table-popover" hidden>
   <div class="edit-table-header">
     <span class="edit-table-title">Show columns</span>
@@ -249,7 +251,10 @@
       <div class="modal-header-main">
         <h3>Create Shipment</h3>
       </div>
-      <button type="button" class="btn-close" id="createShipmentCancelBtn" aria-label="Close">✕</button>
+      <div class="modal-header-actions">
+        <span id="createShipmentPoCount" class="shipment-modal-po-count"></span>
+        <button type="button" class="btn-close" id="createShipmentCancelBtn" aria-label="Close">✕</button>
+      </div>
     </div>
     <div class="modal-body" id="createShipmentBody"></div>
     <div class="modal-footer">
@@ -265,7 +270,10 @@
       <div class="modal-header-main">
         <h3>Shipment <span id="shipmentModalId" class="modal-po-num">—</span></h3>
       </div>
-      <button type="button" class="btn-close" id="shipmentModalCloseBtn" aria-label="Close">✕</button>
+      <div class="modal-header-actions">
+        <span id="shipmentModalPoCount" class="shipment-modal-po-count"></span>
+        <button type="button" class="btn-close" id="shipmentModalCloseBtn" aria-label="Close">✕</button>
+      </div>
     </div>
     <div class="modal-body" id="shipmentModalBody"></div>
     <div class="modal-footer">

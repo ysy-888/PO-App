@@ -65,20 +65,39 @@ function updateHeaderMenuSelectionModeCheck() {
   const check = document.getElementById("headerMenuSelectionModeCheck");
   const toggleBtn = document.getElementById("headerMenuToggleSelectionMode");
   const banner = document.getElementById("selectionModeBanner");
+  const poViewActive = isPoTableViewActive();
   if (check) check.hidden = !selectionModeEnabled;
   if (toggleBtn) toggleBtn.setAttribute("aria-checked", selectionModeEnabled ? "true" : "false");
-  if (banner) banner.hidden = !selectionModeEnabled;
+  if (banner) banner.hidden = !selectionModeEnabled || !poViewActive;
+  document.body.classList.toggle("selection-mode-active", selectionModeEnabled && poViewActive);
 }
 
 function setSelectionModeEnabled(enabled) {
   selectionModeEnabled = enabled;
   saveSelectionModePreference();
   updateHeaderMenuSelectionModeCheck();
+  closeCellSelectDropdown(false);
   if (!selectionModeEnabled) clearMiniSelection();
+  renderTable();
 }
 
 function toggleSelectionMode() {
   setSelectionModeEnabled(!selectionModeEnabled);
+}
+
+function isPoTableViewActive() {
+  const wrap = document.getElementById("poTableWrap");
+  return Boolean(wrap && !wrap.hidden);
+}
+
+function initSelectionModeKeyboard() {
+  document.addEventListener("keydown", e => {
+    if (e.key !== "s" || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (isTypingInField(e.target)) return;
+    if (!isPoTableViewActive()) return;
+    e.preventDefault();
+    toggleSelectionMode();
+  });
 }
 
 function isSelectionModeEnabled() {
@@ -229,6 +248,9 @@ function normalizeRow(row) {
     delete out[from];
   }
   delete out[""];
+  if ("Shipment ID" in out && isEmptyValue(out["Shipment ID"])) {
+    out["Shipment ID"] = "";
+  }
   return out;
 }
 
@@ -1404,6 +1426,7 @@ function toggleRowSelected(row, selected) {
 
 /** @type {Set<number>} visible row indices on the current page */
 let miniSelectedIndices = new Set();
+let miniSelectClickAnchorIndex = -1;
 let rowSelectPointerId = null;
 let rowSelectAnchorIndex = -1;
 let rowSelectRangeMode = false;
@@ -1527,7 +1550,14 @@ function applyMiniSelectionClasses() {
 function clearMiniSelection() {
   if (miniSelectedIndices.size === 0) return;
   miniSelectedIndices.clear();
+  miniSelectClickAnchorIndex = -1;
   applyMiniSelectionClasses();
+}
+
+function getMiniSelectShiftAnchor() {
+  if (miniSelectClickAnchorIndex >= 0) return miniSelectClickAnchorIndex;
+  if (miniSelectedIndices.size === 0) return -1;
+  return Math.min(...miniSelectedIndices);
 }
 
 function setMiniSelectionByIndexRange(startIdx, endIdx) {
@@ -1598,6 +1628,18 @@ function initRowMiniSelection() {
     const idx = getRowIndexFromTr(tr);
     if (idx === -1) return;
 
+    if (e.shiftKey) {
+      e.preventDefault();
+      const anchor = getMiniSelectShiftAnchor();
+      if (anchor === -1) {
+        setMiniSelectionByIndexRange(idx, idx);
+        miniSelectClickAnchorIndex = idx;
+      } else {
+        setMiniSelectionByIndexRange(anchor, idx);
+      }
+      return;
+    }
+
     rowSelectPointerId = e.pointerId;
     rowSelectAnchorIndex = idx;
     rowSelectRangeMode = false;
@@ -1635,6 +1677,9 @@ function initRowMiniSelection() {
       clearMiniSelection();
     } else if (!rowSelectRangeMode && rowSelectAnchorIndex >= 0) {
       setMiniSelectionByIndexRange(rowSelectAnchorIndex, rowSelectAnchorIndex);
+      miniSelectClickAnchorIndex = rowSelectAnchorIndex;
+    } else if (rowSelectRangeMode && rowSelectAnchorIndex >= 0) {
+      miniSelectClickAnchorIndex = rowSelectAnchorIndex;
     }
 
     if (tbody.hasPointerCapture(e.pointerId)) {
@@ -1822,9 +1867,12 @@ function renderTable() {
     tr.className = "clickable-row";
     if (isTruthy(row["Flag"])) tr.classList.add("row-flagged");
     tr.ondblclick = e => {
+      if (isSelectionModeEnabled()) return;
       if (shouldIgnoreRowDblClick(e)) return;
       openPODetail(row);
     };
+
+    const interactionLocked = isSelectionModeEnabled();
 
     COLUMNS.forEach(col => {
       const td = document.createElement("td");
@@ -1841,7 +1889,10 @@ function renderTable() {
         return;
       }
       if (col === "Shipment ID") {
-        if (typeof renderShipmentIdCell === "function") renderShipmentIdCell(td, row);
+        if (interactionLocked) {
+          td.className = "readonly readonly-no-select";
+          setDisplayText(td, isEmptyValue(row[col]) ? EMPTY_DISPLAY : row[col]);
+        } else if (typeof renderShipmentIdCell === "function") renderShipmentIdCell(td, row);
         else {
           td.className = "readonly readonly-no-select";
           setDisplayText(td, isEmptyValue(row[col]) ? EMPTY_DISPLAY : row[col]);
@@ -1850,7 +1901,7 @@ function renderTable() {
         return;
       }
 
-      const editable = isPoFieldEditable(col, row);
+      const editable = isPoFieldEditable(col, row) && !interactionLocked;
       const val = col === "EST IHD"
         ? calculateEstIhd(row["Ship Method"], row["EST EXF"])
         : (row[col] ?? "");
@@ -1875,7 +1926,7 @@ function renderTable() {
         td.innerHTML = renderStatus(val);
       } else if (DATE_FIELDS.has(col)) {
         applyDateCellDisplay(td, col, row, { context: "table" });
-      } else if (COPY_ON_CLICK_COLS.has(col)) {
+      } else if (COPY_ON_CLICK_COLS.has(col) && !interactionLocked) {
         mountCopyableText(td, col, val);
       } else if (isEmptyValue(val)) {
         setDisplayText(td, EMPTY_DISPLAY);
@@ -1912,6 +1963,7 @@ function getCopyText(col, rawVal) {
 }
 
 async function copyCellValue(col, rawVal) {
+  if (isSelectionModeEnabled()) return;
   const text = getCopyText(col, rawVal);
   if (!text || text === EMPTY_DISPLAY) {
     showIndicator("Nothing to copy", "error");
@@ -1938,6 +1990,13 @@ function mountCopyableText(container, col, rawVal) {
   const span = document.createElement("span");
   span.className = "copyable-text";
   span.textContent = text;
+  if (isSelectionModeEnabled()) {
+    span.classList.add("copyable-text--locked");
+    span.title = "";
+    container.appendChild(span);
+    return;
+  }
+
   span.title = "Click to copy";
   span.addEventListener("click", e => {
     e.stopPropagation();
@@ -2056,6 +2115,7 @@ function selectCellSelectOption(value) {
 }
 
 function openCellSelectDropdown(anchorEl, col, row) {
+  if (isSelectionModeEnabled()) return;
   if (isAppSaving()) return;
   if (!isPoFieldEditable(col, row)) return;
   if (openCellSelect?.anchor === anchorEl) {
@@ -2266,6 +2326,7 @@ function attachCellEditorHandlers(fieldEl, col, row, input, originalVal) {
 }
 
 function mountFieldEditor(fieldEl, col, row) {
+  if (isSelectionModeEnabled()) return;
   if (isAppSaving()) return;
   if (!isPoFieldEditable(col, row)) return;
   if (fieldEl.dataset.editing === "active") return;
@@ -2286,6 +2347,7 @@ function mountCellEditor(td, col, row) {
 }
 
 function bindSelectCellInteractions(anchorEl, col, row) {
+  if (isSelectionModeEnabled()) return;
   anchorEl.classList.add("select-cell");
 
   anchorEl.addEventListener("mouseenter", () => {
@@ -2307,6 +2369,7 @@ function bindSelectCellInteractions(anchorEl, col, row) {
 }
 
 function bindEditableCell(td, col, row) {
+  if (isSelectionModeEnabled()) return;
   if (!isPoFieldEditable(col, row)) return;
   if (SELECT_EDIT_COLS.has(col)) {
     bindSelectCellInteractions(td, col, row);
@@ -2317,6 +2380,7 @@ function bindEditableCell(td, col, row) {
 }
 
 function startEdit(td, col, row) {
+  if (isSelectionModeEnabled()) return;
   if (!isPoFieldEditable(col, row)) return;
   if (td.dataset.editing === "active") return;
   mountFieldEditor(td, col, row);
@@ -2834,6 +2898,7 @@ initCellSelectDropdown();
 initPoModalActions();
 initPagination();
 initHeaderMenu();
+initSelectionModeKeyboard();
 initEditTable();
 initRowSelection();
 updateSortHeaders();
