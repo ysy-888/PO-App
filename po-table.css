@@ -111,6 +111,15 @@ input[type="search"] {
   outline: none;
 }
 
+input[type="search"]:focus::placeholder {
+  opacity: 0;
+}
+
+input[type="search"]:hover:not(:focus) {
+  background: var(--surface);
+  border-color: #aaa69a;
+}
+
 input[type="search"]:focus { border-color: var(--accent); background: #fff; }
 
 select.filter-select {
@@ -212,10 +221,26 @@ select.filter-select:focus { border-color: var(--accent); }
   flex-shrink: 0;
 }
 
+.pagination-block {
+  margin-left: auto;
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.page-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
 .counter {
   font-size: 12px;
-  color: var(--text-muted);
+  color: var(--text);
   white-space: nowrap;
+  text-align: right;
 }
 
 .clear-all-filters-btn {
@@ -282,7 +307,7 @@ select.filter-select:focus { border-color: var(--accent); }
 
 .page-indicator {
   font-size: 12px;
-  color: var(--text-muted);
+  color: var(--text);
   white-space: nowrap;
   min-width: 52px;
   text-align: center;
@@ -693,12 +718,10 @@ td.editable.empty-display,
   font-weight: 600;
 }
 
-td.date-proximity-warning,
 .modal-field-value.date-proximity-warning {
   background: #faeeda;
 }
 
-td.date-proximity-danger,
 .modal-field-value.date-proximity-danger {
   background: #fcebeb;
 }
@@ -785,9 +808,9 @@ td.editable:hover { background: var(--accent-light) !important; }
 }
 
 /* ── Column widths ── */
-.col-division    { width: 120px; }
-.col-status      { width: 130px; }
-.col-vendor      { width: 130px; }
+.col-division    { width: 100px; }
+.col-status      { width: 100px; }
+.col-vendor      { width: 80px; }
 .col-buyer       { width: 120px; }
 .col-buyer-po    { width: 100px; }
 .col-so          { width: 80px; }

@@ -672,8 +672,10 @@ function applyDateCellDisplay(el, col, row, { context = "table" } = {}) {
     ? getCxlProximityLevel(ymd, row["CXL Date"])
     : null;
 
-  if (proximity === "warning") el.classList.add("date-proximity-warning");
-  if (proximity === "danger") el.classList.add("date-proximity-danger");
+  if (context !== "table") {
+    if (proximity === "warning") el.classList.add("date-proximity-warning");
+    if (proximity === "danger") el.classList.add("date-proximity-danger");
+  }
 
   if (context === "table") {
     if (proximity) {
