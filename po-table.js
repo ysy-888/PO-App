@@ -6,6 +6,8 @@ const ELLIPSIS = "\u2026";
 const CHECK_MARK = "\u2713";
 const CXL_COUNTDOWN_STORAGE_KEY = "poTable.cxlCountdown";
 const SELECTION_MODE_STORAGE_KEY = "poTable.selectionMode";
+const PAGE_SIZE_STORAGE_KEY = "poTable.pageSize";
+const DEFAULT_PAGE_SIZE = "60";
 
 let cxlCountdownEnabled = false;
 let selectionModeEnabled = false;
@@ -97,6 +99,85 @@ function initSelectionModeKeyboard() {
     if (!isPoTableViewActive()) return;
     e.preventDefault();
     toggleSelectionMode();
+  });
+}
+
+function isPaginationKeyboardEnabled() {
+  if (!isPoTableViewActive()) return false;
+  if (isPageSizeAll()) return false;
+  if (filteredRows.length <= pageSize) return false;
+  return true;
+}
+
+function initPaginationKeyboard() {
+  document.addEventListener("keydown", e => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+    if (isTypingInField(e.target)) return;
+    if (document.querySelector(".modal-backdrop.open")) return;
+    if (typeof openCellSelect !== "undefined" && openCellSelect) return;
+    if (!isPaginationKeyboardEnabled()) return;
+
+    e.preventDefault();
+    if (e.key === "ArrowLeft") goToPage(currentPage - 1);
+    else goToPage(currentPage + 1);
+  });
+}
+
+function focusPoSearch() {
+  const input = document.getElementById("searchInput");
+  if (!input) return;
+  input.focus();
+  input.select();
+}
+
+function updateSearchInputState(input) {
+  if (!input) return;
+  const hasText = input.value.trim().length > 0;
+  const showFilled = hasText && document.activeElement !== input;
+  input.classList.toggle("has-value", showFilled);
+}
+
+function initSearchInput() {
+  const input = document.getElementById("searchInput");
+  if (!input) return;
+  input.addEventListener("focus", () => input.classList.remove("has-value"));
+  input.addEventListener("blur", () => updateSearchInputState(input));
+  updateSearchInputState(input);
+  input.addEventListener("keydown", e => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    input.blur();
+  });
+}
+
+function initToolbarKeyboard() {
+  document.addEventListener("keydown", e => {
+    if (!isPoTableViewActive()) return;
+    if (document.querySelector(".modal-backdrop.open")) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+    if (e.key === " " || e.code === "Space") {
+      if (isTypingInField(e.target)) return;
+      if (isSelectionModeEnabled() && miniSelectedIndices.size > 0) return;
+      e.preventDefault();
+      focusPoSearch();
+      return;
+    }
+
+    if (isTypingInField(e.target)) return;
+
+    const key = e.key.toLowerCase();
+    if (key === "a") {
+      e.preventDefault();
+      setDivisionFilter("");
+    } else if (key === "e") {
+      e.preventDefault();
+      setDivisionFilter("Elevator Disco");
+    } else if (key === "f") {
+      e.preventDefault();
+      setDivisionFilter("Freesia");
+    }
   });
 }
 
@@ -1092,7 +1173,7 @@ let filteredRows = [];
 let flagFilterActive = false;
 let sortCol = null;
 let sortDir = 1;
-let pageSize = Infinity;
+let pageSize = 60;
 let currentPage = 1;
 
 const DEMO_DATA = [
@@ -1303,14 +1384,51 @@ function goToPage(page) {
   scrollTableToTop();
 }
 
+function normalizePageSizeValue(value) {
+  const raw = String(value ?? "").trim();
+  if (raw === "all") return "all";
+  const n = Number(raw);
+  if (n === 30 || n === 60 || n === 120) return String(n);
+  return DEFAULT_PAGE_SIZE;
+}
+
+function loadPageSizePreference() {
+  try {
+    const stored = localStorage.getItem(PAGE_SIZE_STORAGE_KEY);
+    if (stored == null) return DEFAULT_PAGE_SIZE;
+    return normalizePageSizeValue(stored);
+  } catch {
+    return DEFAULT_PAGE_SIZE;
+  }
+}
+
+function savePageSizePreference(value) {
+  try {
+    localStorage.setItem(PAGE_SIZE_STORAGE_KEY, normalizePageSizeValue(value));
+  } catch {
+    /* ignore storage failures */
+  }
+}
+
+function applyPageSize(value) {
+  const normalized = normalizePageSizeValue(value);
+  pageSize = normalized === "all" ? Infinity : Number(normalized);
+  currentPage = 1;
+  const select = document.getElementById("pageSizeSelect");
+  if (select) select.value = normalized;
+}
+
 function setPageSize(value) {
-  pageSize = value === "all" ? Infinity : Number(value);
+  const normalized = normalizePageSizeValue(value);
+  savePageSizePreference(normalized);
+  pageSize = normalized === "all" ? Infinity : Number(normalized);
   currentPage = 1;
   closeCellSelectDropdown(false);
   renderTable();
 }
 
 function initPagination() {
+  applyPageSize(loadPageSizePreference());
   const select = document.getElementById("pageSizeSelect");
   select?.addEventListener("change", () => setPageSize(select.value));
 
@@ -2881,10 +2999,16 @@ function showIndicator(msg, type) {
   }
 
   const el = document.getElementById("saveIndicator");
+  if (!el) return;
   el.textContent = msg;
-  el.className = "save-indicator visible " + (type || "");
+  el.hidden = false;
+  el.className = "save-indicator visible" + (type ? ` ${type}` : "");
   clearTimeout(indicatorTimer);
-  indicatorTimer = setTimeout(() => el.classList.remove("visible"), 2500);
+  indicatorTimer = setTimeout(() => {
+    el.classList.remove("visible", "success", "error");
+    el.hidden = true;
+    el.textContent = "";
+  }, 2500);
 }
 
 loadColumnVisibility();
@@ -2897,10 +3021,13 @@ initFlagFilterHeader();
 initCellSelectDropdown();
 initPoModalActions();
 initPagination();
+initPaginationKeyboard();
 initHeaderMenu();
 initSelectionModeKeyboard();
 initEditTable();
 initRowSelection();
+initToolbarKeyboard();
+initSearchInput();
 updateSortHeaders();
 updateColumnFilterHeaderStates();
 updateFlagFilterHeaderState();

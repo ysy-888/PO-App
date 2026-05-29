@@ -214,9 +214,7 @@ function switchAppView(view) {
   if (poTableWrap) poTableWrap.hidden = view !== "po";
   if (shipmentTableWrap) shipmentTableWrap.hidden = view !== "shipments";
   const poFooterEnd = document.getElementById("poFooterEnd");
-  const appFooter = document.getElementById("appFooter");
   if (poFooterEnd) poFooterEnd.hidden = view !== "po";
-  if (appFooter) appFooter.hidden = view !== "po";
   if (typeof updateHeaderMenuSelectionModeCheck === "function") {
     updateHeaderMenuSelectionModeCheck();
   }

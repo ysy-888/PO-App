@@ -174,8 +174,11 @@
 </div>
 
 <footer id="appFooter" class="app-footer">
-  <div id="selectionModeBanner" class="selection-mode-status" hidden role="status" aria-live="polite">
-    Selection Mode Enabled
+  <div class="app-footer-message-slot">
+    <div id="selectionModeBanner" class="selection-mode-status" hidden role="status" aria-live="polite">
+      Selection Mode Enabled
+    </div>
+    <div class="save-indicator" id="saveIndicator" role="status" aria-live="polite" hidden></div>
   </div>
   <div id="poFooterEnd" class="app-footer-end">
     <div class="pagination-block">
@@ -190,9 +193,9 @@
         <span class="page-size-label">Rows</span>
         <select id="pageSizeSelect" class="filter-select page-size-select" aria-label="Rows per page">
           <option value="30">30</option>
-          <option value="60">60</option>
+          <option value="60" selected>60</option>
           <option value="120">120</option>
-          <option value="all" selected>All</option>
+          <option value="all">All</option>
         </select>
       </label>
     </div>
@@ -242,8 +245,6 @@
     <p class="app-saving-message" id="appSavingMessage">Saving…</p>
   </div>
 </div>
-
-<div class="save-indicator" id="saveIndicator"></div>
 
 <div id="createShipmentOverlay" class="modal-backdrop">
   <div class="modal-card shipment-modal-card" onclick="event.stopPropagation()">
