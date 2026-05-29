@@ -7,6 +7,8 @@
   --border-strong: #c8c5ba;
   --text: #1a1a18;
   --text-muted: #cbc8bd;
+  --filter-icon: #8f8b83;
+  --filter-icon-active: #5f5c57;
   --accent: #2d2d29;
   --accent-light: #e6f1fb;
   --danger: #a32d2d;
@@ -14,6 +16,7 @@
   --warning: #854f0b;
   --row-hover: #f9f8f5;
   --edit-bg: #fffef7;
+  --editable-hover-border: #cfcbc2;
   --font: 'DM Sans', system-ui, sans-serif;
   --font-mono: 'DM Mono', monospace;
   --icon-caret-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M3.5 6.25 8 10.75l4.5-4.5' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
@@ -425,7 +428,8 @@ th.th-filterable.sorted-asc::before { content: '↑'; }
 th.th-filterable.sorted-desc::before { content: '↓'; }
 
 th.th-filterable::after,
-td.select-cell.select-cell-hover::after {
+td.select-cell.select-cell-hover::after,
+td.select-cell.select-cell-open::after {
   content: '';
   position: absolute;
   right: 8px;
@@ -433,7 +437,6 @@ td.select-cell.select-cell-hover::after {
   transform: translateY(-50%);
   width: 16px;
   height: 16px;
-  color: var(--text-muted);
   background-color: currentColor;
   mask-repeat: no-repeat;
   mask-position: center;
@@ -445,11 +448,17 @@ td.select-cell.select-cell-hover::after {
 }
 
 th.th-filterable::after {
+  color: var(--filter-icon);
+  width: 18px;
+  height: 18px;
+  opacity: 1;
   mask-image: var(--icon-filter);
   -webkit-mask-image: var(--icon-filter);
 }
 
-td.select-cell.select-cell-hover::after {
+td.select-cell.select-cell-hover::after,
+td.select-cell.select-cell-open::after {
+  color: var(--text);
   mask-image: var(--icon-caret-down);
   -webkit-mask-image: var(--icon-caret-down);
 }
@@ -466,7 +475,7 @@ td.select-cell.select-cell-hover::after {
   transform: translateY(-50%);
   width: 16px;
   height: 16px;
-  color: var(--text-muted);
+  color: var(--text);
   background-color: currentColor;
   mask-image: var(--icon-caret-down);
   mask-repeat: no-repeat;
@@ -480,11 +489,12 @@ td.select-cell.select-cell-hover::after {
 }
 
 .modal-field-value.select-cell.select-cell-open::after {
-  color: var(--accent);
+  color: var(--text);
 }
 
 th.th-filterable.filter-active::after {
-  color: var(--accent);
+  color: var(--filter-icon-active);
+  opacity: 1;
 }
 
 th.th-filterable.filter-active {
@@ -718,6 +728,14 @@ td.editable.empty-display,
 .modal-po-num.empty-display,
 .empty-display {
   color: var(--text-muted) !important;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+
+td.editable.empty-display,
+td.editable .empty-display {
+  cursor: pointer;
 }
 
 /* ── Date CXL proximity (table) & countdown (modal) ── */
@@ -781,14 +799,24 @@ td.editable.empty-display,
   font-weight: 500;
 }
 
-td.readonly-no-select,
-td.readonly-copy {
+td.readonly-no-select {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.copyable-text {
+  cursor: var(--cursor-copy);
   user-select: none;
   -webkit-user-select: none;
 }
 
 th.th-select-col,
-td.td-select-cell,
+td.td-select-cell {
+  padding-left: 24px;
+  padding-right: 8px;
+  text-align: left;
+}
+
 th.th-flag-col,
 td.td-flag-cell {
   padding-left: 6px;
@@ -803,8 +831,8 @@ th.th-flag-col {
 
 th.th-select-col input[type="checkbox"],
 .po-select-checkbox {
-  width: 14px;
-  height: 14px;
+  width: 18px;
+  height: 18px;
   margin: 0;
   cursor: pointer;
   accent-color: var(--accent);
@@ -862,22 +890,31 @@ tr.row-flagged:has(.po-select-checkbox:checked):hover td {
 }
 
 tr:has(.po-select-checkbox:checked):not(.row-flagged) td {
-  background: #faf9f6;
+  background: #eceafe;
 }
 
 tr:has(.po-select-checkbox:checked):not(.row-flagged):hover td {
-  background: #f3f2ed !important;
-}
-
-td.readonly-copy,
-.modal-po-num.readonly-copy,
-.modal-field-value.readonly-copy {
-  cursor: var(--cursor-copy);
+  background: #e1ddfa !important;
 }
 
 /* ── Inline edit ── */
 td.editable { cursor: pointer; }
-td.editable:hover { background: var(--accent-light) !important; }
+
+.editable-preview {
+  display: inline-block;
+  padding: 3px 6px;
+  border: 1.5px solid transparent;
+  border-radius: 4px;
+  max-width: 100%;
+  vertical-align: middle;
+  line-height: 1.2;
+  box-sizing: border-box;
+}
+
+td.editable:not(.select-cell):hover .editable-preview {
+  border-color: var(--editable-hover-border);
+  background: #fff;
+}
 
 /* ── Status badges ── */
 .badge {
@@ -933,7 +970,7 @@ td.editable:hover { background: var(--accent-light) !important; }
 }
 
 /* ── Column widths ── */
-.col-select      { width: 36px; }
+.col-select      { width: 52px; }
 .col-flag        { width: 36px; }
 .col-division    { width: 120px; }
 .col-status      { width: 130px; }
@@ -1297,8 +1334,13 @@ td.editable:hover { background: var(--accent-light) !important; }
   min-height: 68px;
 }
 
-.modal-field-value.editable:hover {
-  background: var(--accent-light) !important;
+.modal-field-value.editable:not(.select-cell):hover {
+  background: var(--bg) !important;
+}
+
+.modal-field-value.editable:not(.select-cell):hover .editable-preview {
+  border-color: var(--editable-hover-border);
+  background: #fff;
 }
 
 .modal-field-value .cell-input,

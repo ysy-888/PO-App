@@ -10,6 +10,16 @@ function setDisplayText(el, text) {
   el.classList.toggle("empty-display", text === EMPTY_DISPLAY);
 }
 
+function wrapEditablePreview(cell) {
+  if (!cell || cell.classList.contains("select-cell") || cell.dataset.editing === "active") return;
+  if (cell.querySelector(":scope > .editable-preview")) return;
+
+  const preview = document.createElement("span");
+  preview.className = "editable-preview";
+  while (cell.firstChild) preview.appendChild(cell.firstChild);
+  cell.appendChild(preview);
+}
+
 function isEmptyValue(v) {
   if (v === null || v === undefined) return true;
   const s = String(v).trim();
@@ -26,7 +36,7 @@ const COLUMNS = [
 ];
 
 const COLUMN_WIDTHS = [
-  36, 36,
+  52, 36,
   130, 120, 130, 120, 100, 80, 80, 80, 80, 100, 100, 60, 60, 60, 100,
   100, 80, 80, 80,
   80, 80, 80, 80, 80, 80, 80, 200
@@ -1157,7 +1167,10 @@ function renderTable() {
 
     tr.className = "clickable-row";
     if (isTruthy(row["Flag"])) tr.classList.add("row-flagged");
-    tr.ondblclick = () => openPODetail(row);
+    tr.ondblclick = e => {
+      if (shouldIgnoreRowDblClick(e)) return;
+      openPODetail(row);
+    };
 
     COLUMNS.forEach(col => {
       const td = document.createElement("td");
@@ -1186,12 +1199,7 @@ function renderTable() {
       } else if (READONLY_NO_SELECT_COLS.has(col)) {
         td.className = "readonly readonly-no-select";
       } else if (COPY_ON_CLICK_COLS.has(col)) {
-        td.className = "readonly readonly-copy";
-        td.title = "Click to copy";
-        td.addEventListener("click", e => {
-          e.stopPropagation();
-          copyCellValue(col, row[col]);
-        });
+        td.className = "readonly";
       } else {
         td.className = "readonly";
       }
@@ -1200,11 +1208,17 @@ function renderTable() {
         td.innerHTML = renderStatus(val);
       } else if (DATE_FIELDS.has(col)) {
         applyDateCellDisplay(td, col, row, { context: "table" });
+      } else if (COPY_ON_CLICK_COLS.has(col)) {
+        mountCopyableText(td, col, val);
       } else if (isEmptyValue(val)) {
         setDisplayText(td, EMPTY_DISPLAY);
       } else {
         td.textContent = val;
         td.classList.remove("empty-display");
+      }
+
+      if (editable && !SELECT_EDIT_COLS.has(col)) {
+        wrapEditablePreview(td);
       }
 
       tr.appendChild(td);
@@ -1242,6 +1256,26 @@ async function copyCellValue(col, rawVal) {
   } catch {
     showIndicator("Copy failed", "error");
   }
+}
+
+function mountCopyableText(container, col, rawVal) {
+  container.innerHTML = "";
+  const text = getCopyText(col, rawVal);
+  if (!text || text === EMPTY_DISPLAY) {
+    setDisplayText(container, EMPTY_DISPLAY);
+    return;
+  }
+
+  container.classList.remove("empty-display");
+  const span = document.createElement("span");
+  span.className = "copyable-text";
+  span.textContent = text;
+  span.title = "Click to copy";
+  span.addEventListener("click", e => {
+    e.stopPropagation();
+    copyCellValue(col, rawVal);
+  });
+  container.appendChild(span);
 }
 
 /** @type {{ anchor: HTMLElement, col: string, row: Record<string, unknown> } | null} */
@@ -1531,12 +1565,7 @@ function bindFieldInteractions(fieldEl, col, row) {
   }
 
   if (COPY_ON_CLICK_COLS.has(col)) {
-    fieldEl.classList.add("readonly", "readonly-copy");
-    fieldEl.title = "Click to copy";
-    fieldEl.onclick = e => {
-      e.stopPropagation();
-      copyCellValue(col, row[col]);
-    };
+    fieldEl.classList.add("readonly");
     return;
   }
 
@@ -1554,6 +1583,8 @@ function setFieldDisplayContent(fieldEl, col, row) {
     renderFlagCell(fieldEl, row);
   } else if (DATE_FIELDS.has(col)) {
     applyDateCellDisplay(fieldEl, col, row, { context: "modal" });
+  } else if (COPY_ON_CLICK_COLS.has(col)) {
+    mountCopyableText(fieldEl, col, val);
   } else if (isEmptyValue(val)) {
     setDisplayText(fieldEl, EMPTY_DISPLAY);
   } else {
@@ -1579,6 +1610,9 @@ function createModalField(col, row) {
 
   fieldWrap.appendChild(labelEl);
   fieldWrap.appendChild(valueEl);
+  if (EDITABLE.has(col) && !SELECT_EDIT_COLS.has(col)) {
+    wrapEditablePreview(valueEl);
+  }
   return fieldWrap;
 }
 
@@ -1699,16 +1733,12 @@ function renderModalContent(row) {
   if (!poNumEl || !badgeEl || !bodyEl) return;
 
   const poNum = isEmptyValue(row["PO #"]) ? EMPTY_DISPLAY : row["PO #"];
-  setDisplayText(poNumEl, poNum);
   poNumEl.className = "modal-po-num";
   poNumEl.onclick = null;
-  if (COPY_ON_CLICK_COLS.has("PO #") && poNum !== EMPTY_DISPLAY) {
-    poNumEl.classList.add("readonly-copy");
-    poNumEl.title = "Click to copy";
-    poNumEl.onclick = e => {
-      e.stopPropagation();
-      copyCellValue("PO #", row["PO #"]);
-    };
+  if (COPY_ON_CLICK_COLS.has("PO #") && !isEmptyValue(row["PO #"])) {
+    mountCopyableText(poNumEl, "PO #", row["PO #"]);
+  } else {
+    setDisplayText(poNumEl, poNum);
   }
 
   badgeEl.innerHTML = renderStatus(row["Status"]);
@@ -1755,6 +1785,15 @@ function renderModalContent(row) {
   layout.appendChild(main);
   layout.appendChild(photosCol);
   bodyEl.appendChild(layout);
+}
+
+function shouldIgnoreRowDblClick(e) {
+  const target = e.target;
+  if (!(target instanceof Element)) return false;
+
+  return Boolean(target.closest(
+    "input, textarea, select, button, .cell-select-dropdown, .po-flag-btn, .td-select-cell, .select-cell, .editing, [data-editing='active']"
+  ));
 }
 
 function openPODetail(row) {
