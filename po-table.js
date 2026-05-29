@@ -1008,24 +1008,32 @@ function getPagedRows() {
   return filteredRows.slice(start, start + pageSize);
 }
 
-function updateRowCounter() {
-  const el = document.getElementById("rowCounter");
-  if (!el) return;
+function getFilteredSelectedCount() {
+  return filteredRows.filter(row => isTruthy(row["Selected"])).length;
+}
 
+function getRowCounterText() {
   const total = filteredRows.length;
-  if (total === 0) {
-    el.textContent = "0 rows";
-    return;
-  }
+  if (total === 0) return "0 rows";
 
   if (isPageSizeAll()) {
-    el.textContent = `${total} row${total === 1 ? "" : "s"}`;
-    return;
+    return `${total} row${total === 1 ? "" : "s"}`;
   }
 
   const start = (currentPage - 1) * pageSize + 1;
   const end = Math.min(currentPage * pageSize, total);
-  el.textContent = `${start}${EN_DASH}${end} of ${total}`;
+  return `${start}${EN_DASH}${end} of ${total}`;
+}
+
+function updateRowCounter() {
+  const el = document.getElementById("rowCounter");
+  if (!el) return;
+
+  const rowText = getRowCounterText();
+  const selectedCount = getFilteredSelectedCount();
+  el.textContent = selectedCount >= 1
+    ? `${selectedCount} selected out of ${rowText}`
+    : rowText;
 }
 
 function updatePaginationUI() {
@@ -1489,13 +1497,15 @@ function updateSelectAllHeader() {
     cb.checked = false;
     cb.indeterminate = false;
     cb.disabled = true;
+    updateRowCounter();
     return;
   }
 
   cb.disabled = false;
-  const selectedCount = filteredRows.filter(row => isTruthy(row["Selected"])).length;
+  const selectedCount = getFilteredSelectedCount();
   cb.checked = selectedCount === filteredRows.length;
   cb.indeterminate = selectedCount > 0 && selectedCount < filteredRows.length;
+  updateRowCounter();
 }
 
 function initRowSelection() {
@@ -1553,6 +1563,7 @@ function renderTable() {
   if (filteredRows.length === 0) {
     tbody.innerHTML = `<tr class="state-row"><td colspan="${visibleColumnCount()}">No POs match your filters.</td></tr>`;
     applyColumnVisibility();
+    updateSelectAllHeader();
     return;
   }
 
