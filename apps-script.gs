@@ -1,5 +1,6 @@
 const SHEET_NAME = "POs";
 const COLUMN_DEFAULT_KEY = "defaultVisibleColumns";
+const STATUS_DEFAULT_KEY = "defaultStatusFilter";
 
 /*
   Row 1 must use these exact header names (see po-table.js COLUMNS for table display order).
@@ -50,8 +51,22 @@ function saveDefaultColumns_(columns) {
   );
 }
 
+function getDefaultStatusFilter_() {
+  return PropertiesService.getScriptProperties().getProperty(STATUS_DEFAULT_KEY);
+}
+
+function saveDefaultStatusFilter_(statusFilter) {
+  PropertiesService.getScriptProperties().setProperty(
+    STATUS_DEFAULT_KEY,
+    String(statusFilter)
+  );
+}
+
 function handleSaveColumnDefault(payload) {
   saveDefaultColumns_(payload.columns);
+  if (payload.statusFilter !== undefined) {
+    saveDefaultStatusFilter_(payload.statusFilter);
+  }
   return corsResponse({ success: true });
 }
 
@@ -71,6 +86,7 @@ function doGet(e) {
       success: true,
       data: data,
       defaultColumns: getDefaultColumns_(),
+      defaultStatusFilter: getDefaultStatusFilter_(),
     });
   } catch (err) {
     return corsResponse({ success: false, error: err.message });

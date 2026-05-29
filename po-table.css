@@ -72,6 +72,56 @@ body {
   gap: 10px;
 }
 
+.header-menu-wrap {
+  position: relative;
+}
+
+.btn-icon {
+  padding: 7px 10px;
+  min-width: 36px;
+  justify-content: center;
+}
+
+.header-menu-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 190px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  padding: 4px 0;
+  z-index: 120;
+}
+
+.header-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  font-family: var(--font);
+  font-size: 13px;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.header-menu-item:hover {
+  background: var(--row-hover);
+}
+
+.header-menu-check {
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+}
+
 /* ── Toolbar ── */
 .toolbar {
   padding: 12px 24px;
@@ -324,6 +374,7 @@ select.filter-select:focus { border-color: var(--accent); }
 }
 
 .table-scroll-x {
+  position: relative;
   min-width: min-content;
 }
 
@@ -738,35 +789,14 @@ td.editable .empty-display {
   cursor: pointer;
 }
 
-/* ── Date CXL proximity (table) & countdown (modal) ── */
-.date-with-countdown {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  flex-wrap: wrap;
-  max-width: 100%;
-}
-
-.modal-field-value.date-with-countdown {
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  gap: 1px;
-  min-height: 48px;
-  line-height: 1.2;
-  white-space: normal;
-  overflow: visible;
-  text-overflow: unset;
-}
-
-.modal-field-value.date-with-countdown .date-days-left {
-  min-height: 12px;
-}
-
+/* ── Date CXL proximity & countdown ── */
 .date-display.date-today {
-  color: var(--success);
-  font-weight: 600;
+  color: #1f7a12;
+  font-weight: 700;
+}
+
+.modal-field-value .date-display.date-today {
+  color: #1f7a12;
 }
 
 .date-display.date-proximity-warning {
@@ -787,16 +817,59 @@ td.editable .empty-display {
   background: #fcebeb;
 }
 
-.date-days-left {
-  font-size: 10px;
-  font-family: var(--font);
-  color: var(--text-muted);
-  white-space: nowrap;
+.cxl-countdown-stack {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  line-height: 1.2;
+  max-width: 100%;
+}
+
+.cxl-countdown-stack .date-display {
+  display: block;
   line-height: 1.2;
 }
 
-.date-with-countdown .date-days-left {
+.cxl-countdown-label {
+  font-size: 10px;
+  line-height: 1;
+  color: #6f6c65;
   font-weight: 500;
+  text-align: center;
+  white-space: nowrap;
+}
+
+td.date-countdown-cell .editable-preview {
+  display: inline-block;
+  vertical-align: middle;
+  line-height: 1.2;
+  transform: none;
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
+
+td.date-countdown-cell .cxl-countdown-stack {
+  vertical-align: middle;
+  transform: translateY(-2px);
+}
+
+.modal-field-value.date-countdown-cell {
+  justify-content: center;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+}
+
+.modal-field-value.date-countdown-cell .editable-preview {
+  display: inline-block;
+  width: auto;
+  max-width: 100%;
+  line-height: 1.2;
+  transform: none;
+  padding: 0;
+  border: none;
+  background: transparent;
 }
 
 td.readonly-no-select {
@@ -895,6 +968,40 @@ tr:has(.po-select-checkbox:checked):not(.row-flagged) td {
 
 tr:has(.po-select-checkbox:checked):not(.row-flagged):hover td {
   background: #e1ddfa !important;
+}
+
+.mini-select-ants {
+  position: absolute;
+  pointer-events: none;
+  z-index: 44;
+  overflow: visible;
+}
+
+.mini-select-ants-svg {
+  display: block;
+  overflow: visible;
+}
+
+.mini-select-ants-rect {
+  stroke: #06b6d4;
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  animation: mini-select-ants-march 1.1s linear infinite;
+}
+
+@keyframes mini-select-ants-march {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+
+body.row-drag-selecting {
+  user-select: none;
+  cursor: default;
+}
+
+body.row-drag-selecting #tableBody tr[data-po] {
+  cursor: default;
 }
 
 /* ── Inline edit ── */
@@ -1088,7 +1195,7 @@ td.editable:not(.select-cell):hover .editable-preview {
 .modal-layout-main {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
 }
 
@@ -1110,11 +1217,79 @@ td.editable:not(.select-cell):hover .editable-preview {
 .modal-block-content {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .modal-block--order .modal-block-content {
-  gap: 8px;
+  gap: 0;
+}
+
+.modal-order-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px 20px;
+  align-items: start;
+}
+
+.modal-order-info {
+  min-width: 0;
+}
+
+.modal-order-dates {
+  flex-shrink: 0;
+}
+
+.modal-order-dates .modal-field-row {
+  display: grid;
+  grid-template-columns: repeat(3, 72px);
+  gap: 4px 6px;
+  align-items: end;
+}
+
+.modal-order-dates .modal-field--date,
+.modal-order-dates .modal-field--date-slot {
+  width: 72px;
+}
+
+.modal-order-dates .modal-field-label {
+  font-size: 9px;
+}
+
+.modal-order-dates .modal-field-value {
+  min-height: 34px;
+  height: 34px;
+  padding: 2px 4px;
+  font-size: 11px;
+  justify-content: center;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+.modal-order-dates .modal-field-value .editable-preview {
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.modal-order-dates .modal-field-value.editable:not(.select-cell):hover {
+  background: var(--bg) !important;
+}
+
+.modal-order-dates .modal-field-value.editable:not(.select-cell):hover .editable-preview {
+  border-color: transparent;
+  background: transparent;
+}
+
+.modal-order-dates .cxl-countdown-stack {
+  gap: 2px;
+}
+
+.modal-order-dates .cxl-countdown-label {
+  font-size: 8px;
+}
+
+.modal-block--shipping .modal-block-content {
+  gap: 4px;
 }
 
 .modal-field-row {
@@ -1172,6 +1347,10 @@ td.editable:not(.select-cell):hover .editable-preview {
 
 .modal-field--short {
   width: 88px;
+}
+
+.modal-field--date {
+  width: 72px;
 }
 
 .modal-field--medium {

@@ -4,6 +4,95 @@ const EMPTY_DISPLAY = "\u2014";
 const EN_DASH = "\u2013";
 const ELLIPSIS = "\u2026";
 const CHECK_MARK = "\u2713";
+const CXL_COUNTDOWN_STORAGE_KEY = "poTable.cxlCountdown";
+
+let cxlCountdownEnabled = false;
+
+function loadCxlCountdownPreference() {
+  try {
+    cxlCountdownEnabled = localStorage.getItem(CXL_COUNTDOWN_STORAGE_KEY) === "1";
+  } catch {
+    cxlCountdownEnabled = false;
+  }
+}
+
+function saveCxlCountdownPreference() {
+  try {
+    localStorage.setItem(CXL_COUNTDOWN_STORAGE_KEY, cxlCountdownEnabled ? "1" : "0");
+  } catch {
+    /* ignore storage failures */
+  }
+}
+
+function updateHeaderMenuCountdownCheck() {
+  const check = document.getElementById("headerMenuCountdownCheck");
+  const toggleBtn = document.getElementById("headerMenuToggleCountdown");
+  if (check) check.hidden = !cxlCountdownEnabled;
+  if (toggleBtn) toggleBtn.setAttribute("aria-checked", cxlCountdownEnabled ? "true" : "false");
+}
+
+function setCxlCountdownEnabled(enabled) {
+  cxlCountdownEnabled = enabled;
+  saveCxlCountdownPreference();
+  updateHeaderMenuCountdownCheck();
+  renderTable();
+  updateModalIfOpen();
+}
+
+function toggleCxlCountdown() {
+  setCxlCountdownEnabled(!cxlCountdownEnabled);
+}
+
+function closeHeaderMenu() {
+  const menu = document.getElementById("headerMenuDropdown");
+  const btn = document.getElementById("headerMenuBtn");
+  if (menu) menu.hidden = true;
+  if (btn) btn.setAttribute("aria-expanded", "false");
+}
+
+function openHeaderMenu() {
+  const menu = document.getElementById("headerMenuDropdown");
+  const btn = document.getElementById("headerMenuBtn");
+  if (!menu || !btn) return;
+  menu.hidden = false;
+  btn.setAttribute("aria-expanded", "true");
+  updateHeaderMenuCountdownCheck();
+}
+
+function initHeaderMenu() {
+  const btn = document.getElementById("headerMenuBtn");
+  const menu = document.getElementById("headerMenuDropdown");
+  if (!btn || !menu) return;
+
+  btn.addEventListener("click", e => {
+    e.stopPropagation();
+    if (menu.hidden) openHeaderMenu();
+    else closeHeaderMenu();
+  });
+
+  document.getElementById("headerMenuEditTable")?.addEventListener("click", e => {
+    e.stopPropagation();
+    closeHeaderMenu();
+    openEditTablePopover(btn);
+  });
+
+  document.getElementById("headerMenuToggleCountdown")?.addEventListener("click", e => {
+    e.stopPropagation();
+    toggleCxlCountdown();
+  });
+
+  document.addEventListener("click", e => {
+    if (menu.hidden) return;
+    if (menu.contains(e.target) || btn.contains(e.target)) return;
+    closeHeaderMenu();
+  });
+
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape") closeHeaderMenu();
+  });
+
+  updateHeaderMenuCountdownCheck();
+}
 
 function setDisplayText(el, text) {
   el.textContent = text;
@@ -134,6 +223,7 @@ async function saveDefaultColumnVisibility() {
 
   visibleColumns = getDefaultVisibleColumnsSet();
   applyColumnVisibility();
+  setProgramDefaultStatusFilter(activeStatus);
 
   if (APPS_SCRIPT_URL === "YOUR_APPS_SCRIPT_WEB_APP_URL_HERE") {
     showIndicator("Default view saved", "success");
@@ -147,6 +237,7 @@ async function saveDefaultColumnVisibility() {
       body: JSON.stringify({
         action: "saveColumnDefault",
         columns: [...DEFAULT_VISIBLE_COLUMNS],
+        statusFilter: defaultStatusFilter,
       }),
     });
     const json = await res.json();
@@ -254,14 +345,6 @@ function applyEditTableFromPopover() {
 }
 
 function initEditTable() {
-  document.getElementById("editTableBtn")?.addEventListener("click", e => {
-    e.stopPropagation();
-    const pop = document.getElementById("editTablePopover");
-    if (!pop) return;
-    if (pop.hidden) openEditTablePopover(e.currentTarget);
-    else closeEditTablePopover();
-  });
-
   document.getElementById("editTableSelectAll")?.addEventListener("click", () => setEditTableDraftSelectAll(true));
   document.getElementById("editTableClearAll")?.addEventListener("click", () => setEditTableDraftSelectAll(false));
   document.getElementById("editTableSaveDefault")?.addEventListener("click", saveDefaultColumnVisibility);
@@ -272,7 +355,7 @@ function initEditTable() {
   document.addEventListener("click", e => {
     const pop = document.getElementById("editTablePopover");
     if (!pop || pop.hidden) return;
-    if (pop.contains(e.target) || e.target.closest("#editTableBtn")) return;
+    if (pop.contains(e.target) || e.target.closest("#headerMenuBtn") || e.target.closest("#headerMenuEditTable")) return;
     closeEditTablePopover();
   });
 
@@ -283,7 +366,7 @@ function initEditTable() {
   window.addEventListener("resize", () => {
     const pop = document.getElementById("editTablePopover");
     if (pop && !pop.hidden) {
-      positionEditTablePopover(document.getElementById("editTableBtn"));
+      positionEditTablePopover(document.getElementById("headerMenuBtn"));
     }
   });
 }
@@ -327,18 +410,23 @@ function getModalFieldSize(col) {
   return "medium";
 }
 
-const MODAL_ORDER_ROWS = [
+const MODAL_ORDER_INFO_ROWS = [
   ["Status", "Division", "Vendor", "Buyer"],
-  ["PO Date", "Buyer PO #", "SO #", "Old PO #", "Flag"],
+  ["Buyer PO #", "SO #", "Old PO #", "Flag"],
+];
+
+const MODAL_ORDER_DATE_ROWS = [
+  ["PO Date", "EST EXF", "EST IHD"],
+  ["EXF", "IHD", "CXL Date"],
+  ["Shipped", "ETD", "ETA"],
 ];
 
 const MODAL_SHIPPING_ROWS = [
-  ["EST EXF", "EST IHD", "Ship Method"],
-  ["EXF", "IHD", "CXL Date"],
+  ["Ship Method"],
 ];
 
 const MODAL_SHIPPING_FREIGHT_FIELDS = [
-  "Vessel", "House #", "Shipped", "ETD", "ETA",
+  "Vessel", "House #",
 ];
 
 const MODAL_PRODUCT_ROWS = [
@@ -375,6 +463,32 @@ const OPEN_STATUSES = new Set(
   STATUS_SORT_ORDER.filter(status => status !== "CXL" && status !== "Closed")
 );
 
+/** Shared default status filter — Open POs until saved otherwise. */
+let defaultStatusFilter = STATUS_FILTER_OPEN;
+
+function isValidStatusFilter(value) {
+  return value === "" ||
+    value === STATUS_FILTER_OPEN ||
+    STATUS_SORT_ORDER.includes(value);
+}
+
+function setProgramDefaultStatusFilter(status) {
+  if (!isValidStatusFilter(status)) return false;
+  defaultStatusFilter = status;
+  return true;
+}
+
+function applyDefaultStatusFilter(status) {
+  if (!setProgramDefaultStatusFilter(status)) return false;
+  setStatusFilter(status);
+  return true;
+}
+
+function applyDefaultStatusFilterFromServer(statusFilter) {
+  if (statusFilter === null || statusFilter === undefined) return false;
+  return applyDefaultStatusFilter(statusFilter);
+}
+
 function rowMatchesStatusFilter(row) {
   if (!activeStatus) return true;
   if (activeStatus === STATUS_FILTER_OPEN) {
@@ -391,7 +505,7 @@ function statusSortIndex(status) {
 const DIVISIONS = ["Elevator Disco", "Freesia"];
 
 let activeDivision = "";
-let activeStatus = "";
+let activeStatus = STATUS_FILTER_OPEN;
 
 function initStatusFilters() {
   const group = document.getElementById("statusFilters");
@@ -694,7 +808,10 @@ const DATE_FIELDS = new Set([
   "PO Date","Shipped","ETD","ETA","IHD","EST EXF","EST IHD","EXF","CXL Date","Assign Date",
 ]);
 
-const COUNTDOWN_DATE_COLS = new Set(["EST EXF", "EST IHD", "EXF", "IHD", "CXL Date"]);
+const COUNTDOWN_DATE_COLS = new Set([
+  "Assign Date",
+  "EST EXF", "EST IHD", "EXF", "ETA", "IHD", "CXL Date", "Shipped", "ETD",
+]);
 const CXL_PROXIMITY_COLS = new Set(["IHD", "EST IHD"]);
 
 function getDateFieldValue(col, row) {
@@ -727,16 +844,34 @@ function getCxlProximityLevel(ihdYmd, cxlYmd) {
   return null;
 }
 
-function formatDaysLeftLabel(days, { hidePast = false } = {}) {
-  if (days == null) return "";
-  if (days < 0 && hidePast) return "";
-  if (days === 0) return "Today";
-  if (days > 0) return `${days}d`;
-  return `${Math.abs(days)}d ago`;
+function renderCountdownDateMarkup(display, countdownLabel, dateClasses) {
+  return (
+    `<span class="cxl-countdown-stack">` +
+    `<span class="${dateClasses.join(" ")}">${display}</span>` +
+    (countdownLabel ? `<span class="cxl-countdown-label">${countdownLabel}</span>` : "") +
+    `</span>`
+  );
+}
+
+function buildCountdownDateClasses(proximity, days) {
+  const dateClasses = ["date-display"];
+  if (proximity === "warning") dateClasses.push("date-proximity-warning");
+  else if (proximity === "danger") dateClasses.push("date-proximity-danger");
+  else if (days === 0) dateClasses.push("date-today");
+  return dateClasses;
+}
+
+function getFutureCountdownLabel(days) {
+  if (days == null || days <= 0) return "";
+  return `D-${days}`;
 }
 
 function clearDateDisplayState(el) {
-  el.classList.remove("date-with-countdown", "date-proximity-warning", "date-proximity-danger");
+  el.classList.remove(
+    "date-countdown-cell",
+    "date-proximity-warning",
+    "date-proximity-danger"
+  );
 }
 
 function applyDateCellDisplay(el, col, row, { context = "table" } = {}) {
@@ -744,14 +879,7 @@ function applyDateCellDisplay(el, col, row, { context = "table" } = {}) {
   const rawVal = getDateFieldValue(col, row);
 
   if (isEmptyValue(rawVal)) {
-    if (context === "modal" && COUNTDOWN_DATE_COLS.has(col)) {
-      el.classList.add("date-with-countdown");
-      el.innerHTML =
-        `<span class="date-display empty-display">${EMPTY_DISPLAY}</span>` +
-        `<span class="date-days-left"></span>`;
-    } else {
-      setDisplayText(el, EMPTY_DISPLAY);
-    }
+    setDisplayText(el, EMPTY_DISPLAY);
     return;
   }
 
@@ -761,46 +889,37 @@ function applyDateCellDisplay(el, col, row, { context = "table" } = {}) {
     ? getCxlProximityLevel(ymd, row["CXL Date"])
     : null;
 
-  if (context !== "table") {
+  if (context === "modal") {
     if (proximity === "warning") el.classList.add("date-proximity-warning");
     if (proximity === "danger") el.classList.add("date-proximity-danger");
   }
 
-  if (context === "table") {
-    if (proximity) {
+  if (cxlCountdownEnabled && COUNTDOWN_DATE_COLS.has(col)) {
+    const days = daysFromToday(ymd);
+    const countdownLabel = getFutureCountdownLabel(days);
+    const dateClasses = buildCountdownDateClasses(proximity, days);
+
+    if (countdownLabel || days === 0) {
+      el.classList.add("date-countdown-cell");
       el.classList.remove("empty-display");
-      el.innerHTML = `<span class="date-display date-proximity-${proximity}">${display}</span>`;
-    } else {
-      setDisplayText(el, display);
+      el.innerHTML = renderCountdownDateMarkup(display, countdownLabel, dateClasses);
+      return;
     }
+  }
+
+  if (context === "table" && proximity) {
+    el.classList.remove("empty-display");
+    el.innerHTML = `<span class="date-display date-proximity-${proximity}">${display}</span>`;
     return;
   }
 
-  const days = daysFromToday(ymd);
-  const daysLabel = COUNTDOWN_DATE_COLS.has(col)
-    ? formatDaysLeftLabel(days, { hidePast: true })
-    : "";
-
-  if (!COUNTDOWN_DATE_COLS.has(col)) {
-    if (proximity) {
-      el.classList.remove("empty-display");
-      el.innerHTML = `<span class="date-display date-proximity-${proximity}">${display}</span>`;
-    } else {
-      setDisplayText(el, display);
-    }
+  if (context === "modal" && proximity) {
+    el.classList.remove("empty-display");
+    el.innerHTML = `<span class="date-display date-proximity-${proximity}">${display}</span>`;
     return;
   }
 
-  const dateClasses = ["date-display"];
-  if (proximity === "warning") dateClasses.push("date-proximity-warning");
-  else if (proximity === "danger") dateClasses.push("date-proximity-danger");
-  else if (days === 0) dateClasses.push("date-today");
-
-  el.classList.remove("empty-display");
-  el.classList.add("date-with-countdown");
-  el.innerHTML =
-    `<span class="${dateClasses.join(" ")}">${display}</span>` +
-    `<span class="date-days-left">${daysLabel}</span>`;
+  setDisplayText(el, display);
 }
 
 
@@ -831,6 +950,7 @@ async function loadData() {
       if (!json.success) throw new Error(json.error);
       allRows = json.data.map(normalizeRow);
       if (json.defaultColumns) applyDefaultColumnsFromServer(json.defaultColumns);
+      applyDefaultStatusFilterFromServer(json.defaultStatusFilter);
     }
     syncAllEstIhd(allRows);
     updateColumnFilterHeaderStates();
@@ -943,6 +1063,7 @@ function goToPage(page) {
   const nextPage = Math.min(Math.max(1, page), totalPages);
   if (nextPage === currentPage) return;
   currentPage = nextPage;
+  clearMiniSelection();
   closeCellSelectDropdown(false);
   renderTable();
   scrollTableToTop();
@@ -1052,12 +1173,286 @@ function toSheetBool(val) {
   return !!val;
 }
 
-function toggleRowSelected(row, selected) {
+function toggleRowSelected(row, selected, { persist = true } = {}) {
   const next = toSheetBool(selected);
-  if (isTruthy(row["Selected"]) === next) return;
+  if (isTruthy(row["Selected"]) === next) return false;
   row["Selected"] = next;
-  saveUpdate(row["PO #"], { Selected: next });
+  if (persist) saveUpdate(row["PO #"], { Selected: next });
   updateSelectAllHeader();
+  return true;
+}
+
+/** @type {Set<number>} visible row indices on the current page */
+let miniSelectedIndices = new Set();
+let rowSelectPointerId = null;
+let rowSelectAnchorIndex = -1;
+let rowSelectRangeMode = false;
+let rowSelectToggleOff = false;
+
+function isRowMiniSelectBlocked(target) {
+  if (!(target instanceof Element)) return true;
+  return Boolean(target.closest(
+    "input, textarea, select, button, .cell-select-dropdown, .po-flag-btn, " +
+    ".td-select-cell, .select-cell, .editable, .copyable-text"
+  ));
+}
+
+function isTypingInField(target) {
+  if (!(target instanceof Element)) return false;
+  return Boolean(target.closest('input, textarea, select, [contenteditable="true"]'));
+}
+
+function getVisibleRowTrList() {
+  return [...document.querySelectorAll("#tableBody tr[data-po]")];
+}
+
+function getRowIndexFromTr(tr) {
+  if (!tr) return -1;
+  return getVisibleRowTrList().indexOf(tr);
+}
+
+function getRowIndexAtPoint(x, y) {
+  const tr = document.elementFromPoint(x, y)?.closest("#tableBody tr[data-po]");
+  return getRowIndexFromTr(tr);
+}
+
+function getOffsetWithin(el, container) {
+  let top = 0;
+  let left = 0;
+  let current = el;
+  while (current && current !== container) {
+    top += current.offsetTop;
+    left += current.offsetLeft;
+    current = current.offsetParent;
+  }
+  if (current !== container) {
+    const er = el.getBoundingClientRect();
+    const cr = container.getBoundingClientRect();
+    return { top: er.top - cr.top, left: er.left - cr.left };
+  }
+  return { top, left };
+}
+
+let miniSelectAntsEl = null;
+
+function ensureMiniSelectAntsOverlay() {
+  if (miniSelectAntsEl) return miniSelectAntsEl;
+  const container = document.querySelector(".table-scroll-x");
+  if (!container) return null;
+
+  miniSelectAntsEl = document.createElement("div");
+  miniSelectAntsEl.id = "miniSelectAnts";
+  miniSelectAntsEl.className = "mini-select-ants";
+  miniSelectAntsEl.hidden = true;
+  miniSelectAntsEl.innerHTML =
+    `<svg class="mini-select-ants-svg" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
+    `<rect class="mini-select-ants-rect" fill="none"/></svg>`;
+  container.appendChild(miniSelectAntsEl);
+  return miniSelectAntsEl;
+}
+
+function updateMiniSelectAntsOverlay() {
+  const overlay = ensureMiniSelectAntsOverlay();
+  if (!overlay) return;
+
+  if (miniSelectedIndices.size === 0) {
+    overlay.hidden = true;
+    return;
+  }
+
+  const container = document.querySelector(".table-scroll-x");
+  const table = document.getElementById("poTable");
+  const trs = getVisibleRowTrList();
+  const sorted = [...miniSelectedIndices].sort((a, b) => a - b);
+  const firstTr = trs[sorted[0]];
+  const lastTr = trs[sorted[sorted.length - 1]];
+  if (!container || !table || !firstTr || !lastTr) {
+    overlay.hidden = true;
+    return;
+  }
+
+  const firstOff = getOffsetWithin(firstTr, container);
+  const lastOff = getOffsetWithin(lastTr, container);
+  const tableOff = getOffsetWithin(table, container);
+  const width = table.offsetWidth;
+  const height = lastOff.top + lastTr.offsetHeight - firstOff.top;
+  const inset = 0.75;
+
+  overlay.style.top = `${firstOff.top}px`;
+  overlay.style.left = `${tableOff.left}px`;
+  overlay.style.width = `${width}px`;
+  overlay.style.height = `${height}px`;
+  overlay.hidden = false;
+
+  const svg = overlay.querySelector(".mini-select-ants-svg");
+  const rect = overlay.querySelector(".mini-select-ants-rect");
+  if (!svg || !rect) return;
+
+  svg.setAttribute("width", String(width));
+  svg.setAttribute("height", String(height));
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  rect.setAttribute("x", String(inset));
+  rect.setAttribute("y", String(inset));
+  rect.setAttribute("width", String(Math.max(0, width - inset * 2)));
+  rect.setAttribute("height", String(Math.max(0, height - inset * 2)));
+}
+
+function applyMiniSelectionClasses() {
+  getVisibleRowTrList().forEach((tr, i) => {
+    tr.classList.toggle("row-mini-selected", miniSelectedIndices.has(i));
+  });
+  requestAnimationFrame(updateMiniSelectAntsOverlay);
+}
+
+function clearMiniSelection() {
+  if (miniSelectedIndices.size === 0) return;
+  miniSelectedIndices.clear();
+  applyMiniSelectionClasses();
+}
+
+function setMiniSelectionByIndexRange(startIdx, endIdx) {
+  const trs = getVisibleRowTrList();
+  if (startIdx < 0 || endIdx < 0 || trs.length === 0) return;
+
+  const lo = Math.min(startIdx, endIdx);
+  const hi = Math.max(startIdx, endIdx);
+  miniSelectedIndices.clear();
+  for (let i = lo; i <= hi; i++) miniSelectedIndices.add(i);
+  applyMiniSelectionClasses();
+}
+
+function getVisiblePageRow(index) {
+  const rows = getPagedRows();
+  return rows[index] ?? null;
+}
+
+function findRowByPo(po) {
+  return allRows.find(row => String(row["PO #"]) === String(po));
+}
+
+function getMiniSelectedRows() {
+  const rows = [];
+  miniSelectedIndices.forEach(index => {
+    const row = getVisiblePageRow(index);
+    if (row) rows.push(row);
+  });
+  return rows;
+}
+
+function resolveMiniSelectTargetState(rows) {
+  const total = rows.length;
+  if (total === 0) return null;
+
+  const selectedCount = rows.filter(row => isTruthy(row["Selected"])).length;
+  if (selectedCount === total) return false;
+  if (selectedCount === 0) return true;
+  return selectedCount > total / 2;
+}
+
+function toggleMiniSelectedCheckboxState() {
+  const rows = getMiniSelectedRows();
+  if (rows.length === 0) return;
+
+  const targetState = resolveMiniSelectTargetState(rows);
+  if (targetState === null) return;
+
+  const updates = [];
+  rows.forEach(row => {
+    if (toggleRowSelected(row, targetState, { persist: false })) {
+      updates.push({ poNumber: row["PO #"], next: targetState });
+    }
+  });
+
+  if (updates.length === 0) return;
+  renderTable();
+  updates.forEach(({ poNumber, next }) => saveUpdate(poNumber, { Selected: next }));
+}
+
+function initRowMiniSelection() {
+  const tbody = document.getElementById("tableBody");
+  if (!tbody) return;
+
+  tbody.addEventListener("pointerdown", e => {
+    if (e.button !== 0) return;
+    const tr = e.target.closest("tr[data-po]");
+    if (!tr || isRowMiniSelectBlocked(e.target)) return;
+
+    const idx = getRowIndexFromTr(tr);
+    if (idx === -1) return;
+
+    rowSelectPointerId = e.pointerId;
+    rowSelectAnchorIndex = idx;
+    rowSelectRangeMode = false;
+    rowSelectToggleOff = miniSelectedIndices.size === 1 && miniSelectedIndices.has(idx);
+    if (!rowSelectToggleOff) {
+      setMiniSelectionByIndexRange(idx, idx);
+    }
+
+    tbody.setPointerCapture(e.pointerId);
+    document.body.classList.add("row-drag-selecting");
+  });
+
+  tbody.addEventListener("pointermove", e => {
+    if (e.pointerId !== rowSelectPointerId) return;
+    if (!(e.buttons & 1)) return;
+
+    const currentIdx = getRowIndexAtPoint(e.clientX, e.clientY);
+    if (currentIdx === -1) return;
+
+    if (currentIdx !== rowSelectAnchorIndex) {
+      rowSelectRangeMode = true;
+      rowSelectToggleOff = false;
+    }
+
+    if (rowSelectRangeMode) {
+      setMiniSelectionByIndexRange(rowSelectAnchorIndex, currentIdx);
+    }
+  });
+
+  function endRowPointerSelect(e) {
+    if (e.pointerId !== rowSelectPointerId) return;
+
+    if (!rowSelectRangeMode && rowSelectToggleOff) {
+      clearMiniSelection();
+    } else if (!rowSelectRangeMode && rowSelectAnchorIndex >= 0) {
+      setMiniSelectionByIndexRange(rowSelectAnchorIndex, rowSelectAnchorIndex);
+    }
+
+    if (tbody.hasPointerCapture(e.pointerId)) {
+      tbody.releasePointerCapture(e.pointerId);
+    }
+
+    rowSelectPointerId = null;
+    rowSelectAnchorIndex = -1;
+    rowSelectRangeMode = false;
+    rowSelectToggleOff = false;
+    document.body.classList.remove("row-drag-selecting");
+  }
+
+  tbody.addEventListener("pointerup", endRowPointerSelect);
+  tbody.addEventListener("pointercancel", endRowPointerSelect);
+
+  document.addEventListener("mousedown", e => {
+    if (rowSelectPointerId !== null) return;
+    if (e.target.closest("#tableBody")) return;
+    if (e.target.closest(".column-filter-popover, .cell-select-dropdown, .header-menu-dropdown")) return;
+    clearMiniSelection();
+  });
+
+  document.addEventListener("keydown", e => {
+    if (e.key !== " " && e.code !== "Space") return;
+    if (miniSelectedIndices.size === 0) return;
+    if (isTypingInField(e.target)) return;
+    e.preventDefault();
+    toggleMiniSelectedCheckboxState();
+  });
+
+  document.querySelector(".table-scroll-y")?.addEventListener(
+    "scroll",
+    updateMiniSelectAntsOverlay,
+    { passive: true }
+  );
+  window.addEventListener("resize", updateMiniSelectAntsOverlay, { passive: true });
 }
 
 function updateModalIfOpen() {
@@ -1109,6 +1504,7 @@ function initRowSelection() {
     e.stopPropagation();
     setAllFilteredSelected(cb.checked);
   });
+  initRowMiniSelection();
 }
 
 const FLAG_ICON_SVG =
@@ -1229,6 +1625,7 @@ function renderTable() {
 
   applyColumnVisibility();
   updateSelectAllHeader();
+  applyMiniSelectionClasses();
 }
 
 function renderStatus(val) {
@@ -1593,10 +1990,11 @@ function setFieldDisplayContent(fieldEl, col, row) {
   }
 }
 
-function createModalField(col, row) {
-  const size = getModalFieldSize(col);
+function createModalField(col, row, { dateSlot = false } = {}) {
+  const size = dateSlot ? "date" : getModalFieldSize(col);
   const fieldWrap = document.createElement("div");
   fieldWrap.className = `modal-field modal-field--${size}`;
+  if (dateSlot) fieldWrap.classList.add("modal-field--date-slot");
   fieldWrap.dataset.col = col;
 
   const labelEl = document.createElement("label");
@@ -1620,6 +2018,34 @@ function shouldShowAssignDate(row) {
   return String(row["Division"] ?? "").trim() === "Freesia";
 }
 
+function createModalOrderSection(row) {
+  const { block, content } = createModalBlock(null);
+  block.classList.add("modal-block--order");
+
+  const split = document.createElement("div");
+  split.className = "modal-order-split";
+
+  const infoCol = document.createElement("div");
+  infoCol.className = "modal-order-info";
+  appendModalFieldRows(infoCol, MODAL_ORDER_INFO_ROWS, row);
+
+  const notesWrap = document.createElement("div");
+  notesWrap.className = "modal-order-notes";
+  notesWrap.appendChild(createModalField("Notes", row));
+  infoCol.appendChild(notesWrap);
+
+  const datesCol = document.createElement("div");
+  datesCol.className = "modal-order-dates";
+  const dateRows = MODAL_ORDER_DATE_ROWS.map(cols => [...cols]);
+  if (shouldShowAssignDate(row)) dateRows[1].push("Assign Date");
+  appendModalFieldRows(datesCol, dateRows, row, { dateSlot: true });
+
+  split.appendChild(infoCol);
+  split.appendChild(datesCol);
+  content.appendChild(split);
+  return block;
+}
+
 function createModalBlock(title) {
   const block = document.createElement("section");
   block.className = "modal-block";
@@ -1637,23 +2063,23 @@ function createModalBlock(title) {
   return { block, content };
 }
 
-function createModalFieldRow(cols, row) {
+function createModalFieldRow(cols, row, options = {}) {
   const rowEl = document.createElement("div");
   rowEl.className = "modal-field-row";
-  cols.forEach(col => rowEl.appendChild(createModalField(col, row)));
+  cols.forEach(col => rowEl.appendChild(createModalField(col, row, options)));
   return rowEl;
 }
 
-function appendModalFieldRows(container, rowDefs, row) {
-  rowDefs.forEach(cols => container.appendChild(createModalFieldRow(cols, row)));
+function appendModalFieldRows(container, rowDefs, row, options = {}) {
+  rowDefs.forEach(cols => container.appendChild(createModalFieldRow(cols, row, options)));
 }
 
-function createModalFieldsGrid(cols, row) {
+function createModalFieldsGrid(cols, row, options = {}) {
   const gridEl = document.createElement("div");
   gridEl.className = "modal-fields-grid";
 
   cols.forEach(col => {
-    gridEl.appendChild(createModalField(col, row));
+    gridEl.appendChild(createModalField(col, row, options));
   });
 
   return gridEl;
@@ -1681,6 +2107,13 @@ function createStylePhotoPlaceholders() {
 
 function createModalShippingSection(row) {
   const { block, content } = createModalBlock("Shipping");
+
+  MODAL_SHIPPING_ROWS.forEach(cols => {
+    content.appendChild(createModalFieldRow(cols, row));
+  });
+
+  const freightHeaderRow = document.createElement("div");
+  freightHeaderRow.className = "modal-freight-header";
 
   const freightToggle = document.createElement("span");
   freightToggle.className = "modal-freight-toggle";
@@ -1712,16 +2145,8 @@ function createModalShippingSection(row) {
   });
   freightToggle.classList.toggle("is-open", modalFreightExpanded);
 
-  MODAL_SHIPPING_ROWS.forEach((cols, index) => {
-    const rowEl = document.createElement("div");
-    rowEl.className = "modal-field-row";
-    cols.forEach(col => rowEl.appendChild(createModalField(col, row)));
-    if (index === MODAL_SHIPPING_ROWS.length - 1) {
-      rowEl.appendChild(freightToggle);
-    }
-    content.appendChild(rowEl);
-  });
-
+  freightHeaderRow.appendChild(freightToggle);
+  content.appendChild(freightHeaderRow);
   content.appendChild(collapsible);
   return block;
 }
@@ -1751,17 +2176,7 @@ function renderModalContent(row) {
   const main = document.createElement("div");
   main.className = "modal-layout-main";
 
-  const { block: orderBlock, content: orderContent } = createModalBlock(null);
-  orderBlock.classList.add("modal-block--order");
-  const orderRows = MODAL_ORDER_ROWS.map(cols => [...cols]);
-  if (shouldShowAssignDate(row)) orderRows[1].push("Assign Date");
-  appendModalFieldRows(orderContent, orderRows, row);
-
-  const notesWrap = document.createElement("div");
-  notesWrap.className = "modal-order-notes";
-  notesWrap.appendChild(createModalField("Notes", row));
-  orderContent.appendChild(notesWrap);
-  main.appendChild(orderBlock);
+  main.appendChild(createModalOrderSection(row));
 
   main.appendChild(createModalShippingSection(row));
 
@@ -1847,11 +2262,13 @@ function showIndicator(msg, type) {
 }
 
 loadColumnVisibility();
+loadCxlCountdownPreference();
 initDivisionFilters();
 initStatusFilters();
 initColumnFilterHeaders();
 initCellSelectDropdown();
 initPagination();
+initHeaderMenu();
 initEditTable();
 initRowSelection();
 updateSortHeaders();
