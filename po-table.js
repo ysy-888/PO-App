@@ -1,4 +1,4 @@
-﻿const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzCKa9STkgEnLL_hUQ5bFkXa4ZQcPCLR9TCpr1fiPW5v0fEFhGw0wG9GNH7uwvOV0qFZw/exec";
+﻿const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxSW8k68B3F0Jq0YIxRU2W_mOL353SCCMc8FdQY1lptix5Q-PuzykZkP-7UamXnap4PYA/exec";
 
 const EMPTY_DISPLAY = "\u2014";
 const EN_DASH = "\u2013";
@@ -427,10 +427,21 @@ function initEditTable() {
 const EDITABLE = new Set([
   "Flag",
   "PO Qty","Status","Ship Method","Ctn Qty","Vessel","House #",
-  "Shipped","ETD","ETA","IHD","EST EXF","EXF","CXL Date","Assign Date","Notes",
+  "IHD","EST EXF","CXL Date","Assign Date","Notes",
   "FOB Cost","Price","OG","PROTO","FIT/PP","BULK","TOP","TRIM",
-  "Production Status","EOD/DISCLAIMER",
 ]);
+
+/** Set on PO sheet; values come from the linked shipment. */
+const SHIPMENT_MANAGED_PO_FIELDS = new Set(["EXF", "Shipped", "ETD", "ETA"]);
+
+function isPoFieldEditable(col, row) {
+  if (!EDITABLE.has(col)) return false;
+  if (SHIPMENT_MANAGED_PO_FIELDS.has(col)) return false;
+  if (col === "Ship Method" && typeof poHasShipment === "function" && poHasShipment(row)) {
+    return false;
+  }
+  return true;
+}
 
 const READONLY_NO_SELECT_COLS = new Set(["Division", "PO Date", "Vendor"]);
 
@@ -451,7 +462,6 @@ const MODAL_FIELD_SIZE = {
     "Vessel", "House #", "Ship Method",
     "Style #", "Color",
     "OG", "PROTO", "FIT/PP", "BULK", "TOP", "TRIM",
-    "Production Status", "EOD/DISCLAIMER",
   ]),
   long: new Set(["Notes"]),
 };
@@ -464,33 +474,18 @@ function getModalFieldSize(col) {
 }
 
 const MODAL_ORDER_INFO_ROWS = [
-  ["Status", "Division", "Vendor", "Buyer"],
+  ["Status", "Division"],
+  ["Vendor", "Buyer"],
   ["Buyer PO #", "SO #", "Old PO #"],
 ];
 
-const MODAL_ORDER_DATE_ROWS = [
-  ["PO Date", "EST EXF", "EST IHD"],
-  ["EXF", "IHD", "CXL Date"],
-  ["Shipped", "ETD", "ETA"],
-];
-
-const MODAL_SHIPPING_ROWS = [
-  ["Ship Method"],
-];
-
-const MODAL_SHIPPING_FREIGHT_FIELDS = [
-  "Vessel", "House #",
-];
-
 const MODAL_PRODUCT_ROWS = [
-  ["Style #", "Color"],
   ["PO Qty", "Actual Qty", "Ctn Qty"],
+  ["FOB Cost", "Price"],
 ];
 
 const MODAL_PRODUCTION_ROWS = [
-  ["FOB Cost", "Price", "Production Status"],
   ["OG", "PROTO", "FIT/PP", "BULK", "TOP", "TRIM"],
-  ["EOD/DISCLAIMER"],
 ];
 
 /** @type {Record<string, unknown> | null} */
@@ -1600,10 +1595,10 @@ function updateModalIfOpen() {
 }
 
 function toggleRowFlag(row) {
+  if (isAppSaving()) return;
   const next = !isTruthy(row["Flag"]);
   row["Flag"] = next;
   if (isPoModalOpenForRow(row)) {
-    renderTable();
     updateModalIfOpen();
     updateModalSaveState();
     return;
@@ -1769,7 +1764,7 @@ function renderTable() {
         return;
       }
 
-      const editable = EDITABLE.has(col);
+      const editable = isPoFieldEditable(col, row);
       const val = col === "EST IHD"
         ? calculateEstIhd(row["Ship Method"], row["EST EXF"])
         : (row[col] ?? "");
@@ -1778,7 +1773,11 @@ function renderTable() {
         td.className = "editable";
         td.title = SELECT_EDIT_COLS.has(col) ? "Click to choose" : "Click to edit";
         bindEditableCell(td, col, row);
-      } else if (READONLY_NO_SELECT_COLS.has(col)) {
+      } else if (
+        READONLY_NO_SELECT_COLS.has(col)
+        || SHIPMENT_MANAGED_PO_FIELDS.has(col)
+        || (col === "Ship Method" && typeof poHasShipment === "function" && poHasShipment(row))
+      ) {
         td.className = "readonly readonly-no-select";
       } else if (COPY_ON_CLICK_COLS.has(col)) {
         td.className = "readonly";
@@ -1929,10 +1928,12 @@ function closeCellSelectDropdown(clearAnchorState = true) {
 }
 
 function selectCellSelectOption(value) {
+  if (isAppSaving()) return;
   if (!openCellSelect) return;
 
-  const { col, row } = openCellSelect;
+  const { anchor, col, row } = openCellSelect;
   const currentVal = row[col] ?? "";
+  const inModal = isModalFieldEl(anchor);
 
   if (value === currentVal) {
     closeCellSelectDropdown();
@@ -1940,15 +1941,20 @@ function selectCellSelectOption(value) {
   }
 
   closeCellSelectDropdown(false);
+  delete anchor.dataset.editing;
+  anchor.classList.remove("select-cell-open", "select-cell-hover");
 
   row[col] = value;
   if (col === "Ship Method") {
     syncEstIhdForRow(row);
   }
 
-  if (isModalFieldEl(openCellSelect.anchor)) {
-    renderTable();
-    updateModalIfOpen();
+  if (inModal) {
+    if (col === "Ship Method") {
+      updateModalIfOpen();
+    } else {
+      setFieldDisplayContent(anchor, col, row);
+    }
     updateModalSaveState();
     return;
   }
@@ -1964,6 +1970,8 @@ function selectCellSelectOption(value) {
 }
 
 function openCellSelectDropdown(anchorEl, col, row) {
+  if (isAppSaving()) return;
+  if (!isPoFieldEditable(col, row)) return;
   if (openCellSelect?.anchor === anchorEl) {
     closeCellSelectDropdown();
     return;
@@ -2089,10 +2097,12 @@ function refreshAfterModalFieldEdit(fieldEl, col, row) {
   delete fieldEl.dataset.editing;
   fieldEl.classList.remove("editing");
   setFieldDisplayContent(fieldEl, col, row);
-  if (EDITABLE.has(col) && !SELECT_EDIT_COLS.has(col)) {
+  if (isPoFieldEditable(col, row) && !SELECT_EDIT_COLS.has(col)) {
     wrapEditablePreview(fieldEl);
   }
-  renderTable();
+  if (col === "Ship Method" || col === "EST EXF") {
+    updateModalIfOpen();
+  }
   updateModalSaveState();
 }
 
@@ -2161,12 +2171,17 @@ function attachCellEditorHandlers(fieldEl, col, row, input, originalVal) {
   input.onblur = commit;
   input.onkeydown = e => {
     if (e.key === "Escape") cancelEdit();
-    if (col === "Notes") return;
-    if (e.key === "Enter") input.blur();
+    if (e.key === "Enter") {
+      if (col === "Notes" && e.shiftKey) return;
+      if (col === "Notes") e.preventDefault();
+      input.blur();
+    }
   };
 }
 
 function mountFieldEditor(fieldEl, col, row) {
+  if (isAppSaving()) return;
+  if (!isPoFieldEditable(col, row)) return;
   if (fieldEl.dataset.editing === "active") return;
 
   const val = row[col] ?? "";
@@ -2206,6 +2221,7 @@ function bindSelectCellInteractions(anchorEl, col, row) {
 }
 
 function bindEditableCell(td, col, row) {
+  if (!isPoFieldEditable(col, row)) return;
   if (SELECT_EDIT_COLS.has(col)) {
     bindSelectCellInteractions(td, col, row);
     return;
@@ -2215,6 +2231,7 @@ function bindEditableCell(td, col, row) {
 }
 
 function startEdit(td, col, row) {
+  if (!isPoFieldEditable(col, row)) return;
   if (td.dataset.editing === "active") return;
   mountFieldEditor(td, col, row);
 }
@@ -2227,7 +2244,7 @@ function bindFieldInteractions(fieldEl, col, row) {
     return;
   }
 
-  if (EDITABLE.has(col)) {
+  if (isPoFieldEditable(col, row)) {
     if (SELECT_EDIT_COLS.has(col)) {
       fieldEl.classList.add("editable", "select-cell");
       fieldEl.title = "Click to choose";
@@ -2243,7 +2260,11 @@ function bindFieldInteractions(fieldEl, col, row) {
     return;
   }
 
-  if (READONLY_NO_SELECT_COLS.has(col)) {
+  if (
+    READONLY_NO_SELECT_COLS.has(col)
+    || SHIPMENT_MANAGED_PO_FIELDS.has(col)
+    || (col === "Ship Method" && typeof poHasShipment === "function" && poHasShipment(row))
+  ) {
     fieldEl.classList.add("readonly", "readonly-no-select");
     return;
   }
@@ -2295,7 +2316,7 @@ function createModalField(col, row, { dateSlot = false } = {}) {
 
   fieldWrap.appendChild(labelEl);
   fieldWrap.appendChild(valueEl);
-  if (EDITABLE.has(col) && !SELECT_EDIT_COLS.has(col)) {
+  if (isPoFieldEditable(col, row) && !SELECT_EDIT_COLS.has(col)) {
     wrapEditablePreview(valueEl);
   }
   return fieldWrap;
@@ -2309,27 +2330,150 @@ function createModalOrderSection(row) {
   const { block, content } = createModalBlock(null);
   block.classList.add("modal-block--order");
 
+  appendModalFieldRows(content, MODAL_ORDER_INFO_ROWS, row);
+  content.appendChild(createModalFieldRow(
+    ["PO Date", "Notes"],
+    row,
+    { rowClass: "modal-field-row--po-date-notes" }
+  ));
+  return block;
+}
+
+function createModalOrderProductSplit(row) {
   const split = document.createElement("div");
-  split.className = "modal-order-split";
+  split.className = "modal-top-split";
 
-  const infoCol = document.createElement("div");
-  infoCol.className = "modal-order-info";
-  appendModalFieldRows(infoCol, MODAL_ORDER_INFO_ROWS, row);
+  split.appendChild(createModalOrderSection(row));
 
-  const notesWrap = document.createElement("div");
-  notesWrap.className = "modal-order-notes";
-  notesWrap.appendChild(createModalField("Notes", row));
-  infoCol.appendChild(notesWrap);
+  const { block: productBlock, content: productContent } = createModalBlock(null);
+  productBlock.classList.add("modal-block--product");
+  productContent.appendChild(createModalFieldRow(
+    ["Style #", "Color"],
+    row,
+    { rowClass: "modal-field-row--style-color" }
+  ));
+  appendModalFieldRows(productContent, MODAL_PRODUCT_ROWS, row);
+  split.appendChild(productBlock);
 
-  const datesCol = document.createElement("div");
-  datesCol.className = "modal-order-dates";
-  const dateRows = MODAL_ORDER_DATE_ROWS.map(cols => [...cols]);
-  if (shouldShowAssignDate(row)) dateRows[1].push("Assign Date");
-  appendModalFieldRows(datesCol, dateRows, row, { dateSlot: true });
+  return split;
+}
 
-  split.appendChild(infoCol);
-  split.appendChild(datesCol);
-  content.appendChild(split);
+function createModalActualDateRow(row) {
+  const actualCols = ["EXF", "IHD"];
+  if (shouldShowAssignDate(row)) actualCols.push("Assign Date");
+  const actualRow = createModalFieldRow(
+    actualCols,
+    row,
+    { dateSlot: true, rowClass: "modal-field-row--date-grid" }
+  );
+  if (!shouldShowAssignDate(row)) {
+    const spacer = document.createElement("div");
+    spacer.className = "modal-field modal-field--date modal-field--date-spacer";
+    spacer.setAttribute("aria-hidden", "true");
+    actualRow.appendChild(spacer);
+  }
+  return actualRow;
+}
+
+function createModalShippingPairRow(leftContent, rightContent, { freightCell = false } = {}) {
+  const rowEl = document.createElement("div");
+  rowEl.className = "modal-shipping-row";
+
+  const leftCell = document.createElement("div");
+  leftCell.className = "modal-shipping-cell";
+  leftCell.appendChild(leftContent);
+
+  const rightCell = document.createElement("div");
+  rightCell.className = "modal-freight-cell";
+  if (freightCell) {
+    rightCell.classList.add("modal-freight-cell--fields");
+    if (rightContent) rightCell.appendChild(rightContent);
+  }
+
+  rowEl.appendChild(leftCell);
+  rowEl.appendChild(rightCell);
+  return { row: rowEl, rightCell };
+}
+
+function createModalShippingSection(row) {
+  const block = document.createElement("section");
+  block.className = "modal-block modal-block--shipping";
+
+  const headerRow = document.createElement("div");
+  headerRow.className = "modal-section-header-row";
+
+  const titleEl = document.createElement("h4");
+  titleEl.className = "modal-section-title";
+  titleEl.textContent = "Shipping";
+
+  const freightHeader = document.createElement("div");
+  freightHeader.className = "modal-freight-header";
+
+  const freightLabel = document.createElement("span");
+  freightLabel.className = "modal-freight-label";
+  freightLabel.textContent = "Freight";
+
+  const freightArrow = document.createElement("button");
+  freightArrow.type = "button";
+  freightArrow.className = "modal-freight-arrow";
+  freightArrow.setAttribute("aria-expanded", String(modalFreightExpanded));
+  freightArrow.setAttribute("aria-label", "Toggle freight fields");
+
+  const freightCells = [];
+
+  function setFreightVisible(visible) {
+    freightCells.forEach(cell => {
+      cell.hidden = !visible;
+    });
+  }
+
+  function toggleFreight() {
+    modalFreightExpanded = !modalFreightExpanded;
+    freightArrow.setAttribute("aria-expanded", String(modalFreightExpanded));
+    freightArrow.classList.toggle("is-open", modalFreightExpanded);
+    setFreightVisible(modalFreightExpanded);
+  }
+
+  freightArrow.addEventListener("click", toggleFreight);
+  freightArrow.classList.toggle("is-open", modalFreightExpanded);
+
+  freightHeader.appendChild(freightLabel);
+  freightHeader.appendChild(freightArrow);
+  headerRow.appendChild(titleEl);
+  headerRow.appendChild(freightHeader);
+  block.appendChild(headerRow);
+
+  const content = document.createElement("div");
+  content.className = "modal-block-content modal-shipping-body";
+
+  const shipMethodPair = createModalShippingPairRow(
+    createModalFieldRow(["Ship Method"], row, { rowClass: "modal-field-row--ship-method-full" }),
+    createModalFieldRow(["Vessel", "House #"], row),
+    { freightCell: true }
+  );
+  freightCells.push(shipMethodPair.rightCell);
+  content.appendChild(shipMethodPair.row);
+
+  const estDatesPair = createModalShippingPairRow(
+    createModalFieldRow(
+      ["EST EXF", "EST IHD", "CXL Date"],
+      row,
+      { dateSlot: true, rowClass: "modal-field-row--date-grid" }
+    ),
+    createModalFieldRow(["Shipped", "ETD", "ETA"], row),
+    { freightCell: true }
+  );
+  freightCells.push(estDatesPair.rightCell);
+  content.appendChild(estDatesPair.row);
+
+  content.appendChild(createModalShippingPairRow(
+    createModalActualDateRow(row),
+    null
+  ).row);
+
+  setFreightVisible(modalFreightExpanded);
+
+  block.appendChild(content);
   return block;
 }
 
@@ -2353,6 +2497,13 @@ function createModalBlock(title) {
 function createModalFieldRow(cols, row, options = {}) {
   const rowEl = document.createElement("div");
   rowEl.className = "modal-field-row";
+  if (options.rowClass) {
+    rowEl.classList.add(options.rowClass);
+  } else if (cols.length === 2) {
+    rowEl.classList.add("modal-field-row--2");
+  } else if (cols.length === 3) {
+    rowEl.classList.add("modal-field-row--3");
+  }
   cols.forEach(col => rowEl.appendChild(createModalField(col, row, options)));
   return rowEl;
 }
@@ -2392,52 +2543,6 @@ function createStylePhotoPlaceholders() {
   return wrap;
 }
 
-function createModalShippingSection(row) {
-  const { block, content } = createModalBlock("Shipping");
-
-  MODAL_SHIPPING_ROWS.forEach(cols => {
-    content.appendChild(createModalFieldRow(cols, row));
-  });
-
-  const freightHeaderRow = document.createElement("div");
-  freightHeaderRow.className = "modal-freight-header";
-
-  const freightToggle = document.createElement("span");
-  freightToggle.className = "modal-freight-toggle";
-  freightToggle.setAttribute("role", "button");
-  freightToggle.tabIndex = 0;
-  freightToggle.setAttribute("aria-expanded", String(modalFreightExpanded));
-  freightToggle.setAttribute("aria-controls", "modalFreightFields");
-  freightToggle.textContent = "Freight";
-
-  const collapsible = document.createElement("div");
-  collapsible.id = "modalFreightFields";
-  collapsible.className = "modal-freight-fields";
-  collapsible.hidden = !modalFreightExpanded;
-  collapsible.appendChild(createModalFieldsGrid(MODAL_SHIPPING_FREIGHT_FIELDS, row));
-
-  function toggleFreight() {
-    modalFreightExpanded = !modalFreightExpanded;
-    freightToggle.setAttribute("aria-expanded", String(modalFreightExpanded));
-    freightToggle.classList.toggle("is-open", modalFreightExpanded);
-    collapsible.hidden = !modalFreightExpanded;
-  }
-
-  freightToggle.addEventListener("click", toggleFreight);
-  freightToggle.addEventListener("keydown", e => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      toggleFreight();
-    }
-  });
-  freightToggle.classList.toggle("is-open", modalFreightExpanded);
-
-  freightHeaderRow.appendChild(freightToggle);
-  content.appendChild(freightHeaderRow);
-  content.appendChild(collapsible);
-  return block;
-}
-
 function renderModalContent(row) {
   const poNumEl = document.getElementById("modalPoNum");
   const flagEl = document.getElementById("modalFlagBtn");
@@ -2455,6 +2560,10 @@ function renderModalContent(row) {
 
   flagEl.replaceChildren(createPoFlagButton(row));
 
+  if (typeof renderPoModalLinkedShipment === "function") {
+    renderPoModalLinkedShipment(row);
+  }
+
   bodyEl.innerHTML = "";
 
   const layout = document.createElement("div");
@@ -2463,27 +2572,12 @@ function renderModalContent(row) {
   const main = document.createElement("div");
   main.className = "modal-layout-main";
 
-  main.appendChild(createModalOrderSection(row));
-
-  const shippingBlock = createModalShippingSection(row);
-  const shippingContent = shippingBlock.querySelector(".modal-block-content");
-  if (shippingContent && typeof appendPoModalLinkedShipment === "function") {
-    appendPoModalLinkedShipment(row, shippingContent);
-  }
-  main.appendChild(shippingBlock);
-
-  const bottomSplit = document.createElement("div");
-  bottomSplit.className = "modal-bottom-split";
-
-  const { block: productBlock, content: productContent } = createModalBlock("Product");
-  appendModalFieldRows(productContent, MODAL_PRODUCT_ROWS, row);
-  bottomSplit.appendChild(productBlock);
+  main.appendChild(createModalOrderProductSplit(row));
+  main.appendChild(createModalShippingSection(row));
 
   const { block: productionBlock, content: productionContent } = createModalBlock("Production");
   appendModalFieldRows(productionContent, MODAL_PRODUCTION_ROWS, row);
-  bottomSplit.appendChild(productionBlock);
-
-  main.appendChild(bottomSplit);
+  main.appendChild(productionBlock);
 
   const photosCol = document.createElement("div");
   photosCol.className = "modal-layout-photos";
@@ -2505,13 +2599,14 @@ function shouldIgnoreRowDblClick(e) {
 }
 
 function openPODetail(row) {
+  if (isAppSaving()) return;
   closeCellSelectDropdown(false);
   if (modalRow?.["PO #"] !== row["PO #"]) {
     modalFreightExpanded = false;
   }
-  modalRow = row;
+  modalRow = snapshotModalRow(row);
   modalSnapshot = snapshotModalRow(row);
-  renderModalContent(row);
+  renderModalContent(modalRow);
   if (typeof bringModalToFront === "function") {
     bringModalToFront(document.getElementById("modalOverlay"));
   } else {
@@ -2534,18 +2629,19 @@ function dismissModalOverlay() {
 }
 
 function cancelModalChanges() {
+  if (isAppSaving()) return;
   commitActiveModalEditor();
-  if (modalRow && modalSnapshot) {
-    Object.keys(modalSnapshot).forEach(key => {
-      modalRow[key] = modalSnapshot[key];
-    });
-    renderTable();
-  }
   dismissModalOverlay();
 }
 
+function applyModalUpdatesToTableRow(poNumber, updates) {
+  const actualRow = findRowByPo(poNumber);
+  if (!actualRow) return;
+  Object.assign(actualRow, updates);
+}
+
 async function saveModalChanges() {
-  if (!modalRow || !modalSnapshot) return;
+  if (isAppSaving() || !modalRow || !modalSnapshot) return;
   commitActiveModalEditor();
 
   const updates = getModalPendingUpdates();
@@ -2554,11 +2650,18 @@ async function saveModalChanges() {
     return;
   }
 
-  await saveUpdate(modalRow["PO #"], updates);
-  modalSnapshot = snapshotModalRow(modalRow);
-  renderTable();
-  renderModalContent(modalRow);
-  updateModalSaveState();
+  const poNumber = modalRow["PO #"];
+  dismissModalOverlay();
+  setAppSaving(true, "Saving…");
+  try {
+    const ok = await saveUpdate(poNumber, updates);
+    if (ok) {
+      applyModalUpdatesToTableRow(poNumber, updates);
+      renderTable();
+    }
+  } finally {
+    setAppSaving(false);
+  }
 }
 
 function initPoModalActions() {
@@ -2577,11 +2680,11 @@ async function saveUpdate(poNumber, updates) {
   const sheetUpdates = Object.fromEntries(
     Object.entries(updates).filter(([field]) => !LOCAL_ONLY_COLS.has(field))
   );
-  if (Object.keys(sheetUpdates).length === 0) return;
+  if (Object.keys(sheetUpdates).length === 0) return true;
 
   if (APPS_SCRIPT_URL === "YOUR_APPS_SCRIPT_WEB_APP_URL_HERE") {
     showIndicator(`Demo mode ${EMPTY_DISPLAY} not saved to sheet`, "");
-    return;
+    return true;
   }
   try {
     showIndicator(`Saving${ELLIPSIS}`, "");
@@ -2592,13 +2695,41 @@ async function saveUpdate(poNumber, updates) {
     const json = await res.json();
     if (!json.success) throw new Error(json.error);
     showIndicator(`Saved ${CHECK_MARK}`, "success");
+    return true;
   } catch (err) {
     showIndicator("Save failed: " + err.message, "error");
+    return false;
   }
+}
+
+let appSaveInProgress = false;
+
+function isAppSaving() {
+  return appSaveInProgress;
+}
+
+function setAppSaving(active, message = "Saving…") {
+  appSaveInProgress = active;
+  document.body.classList.toggle("app-saving", active);
+  document.body.setAttribute("aria-busy", active ? "true" : "false");
+
+  const overlay = document.getElementById("appSavingOverlay");
+  const msgEl = document.getElementById("appSavingMessage");
+  if (overlay) {
+    overlay.hidden = !active;
+    overlay.setAttribute("aria-hidden", active ? "false" : "true");
+  }
+  if (msgEl && active) msgEl.textContent = message;
 }
 
 let indicatorTimer;
 function showIndicator(msg, type) {
+  const overlayMsg = document.getElementById("appSavingMessage");
+  if (isAppSaving() && !type && overlayMsg) {
+    overlayMsg.textContent = msg;
+    return;
+  }
+
   const el = document.getElementById("saveIndicator");
   el.textContent = msg;
   el.className = "save-indicator visible " + (type || "");

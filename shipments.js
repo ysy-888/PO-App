@@ -20,11 +20,12 @@ const SHIPMENT_LINKED_PO_COLUMNS = [
   { col: "PO #", label: "PO #", cellClass: "shipment-po-cell-id" },
   { col: "Style #", label: "Style #", cellClass: "shipment-po-cell-wrap" },
   { col: "Vendor", label: "Vendor", cellClass: "shipment-po-cell-vendor" },
-  { col: "Ctn Qty", label: "CTN", cellClass: "shipment-po-cell-qty" },
-  { col: "PO Qty", label: "Order", cellClass: "shipment-po-cell-qty" },
-  { col: "Actual Qty", label: "Actual", cellClass: "shipment-po-cell-qty" },
-  { col: "CXL Date", label: "CXL", cellClass: "shipment-po-cell-date" },
   { col: "Buyer", label: "Buyer", cellClass: "shipment-po-cell-buyer" },
+  { col: "Buyer PO #", label: "Buyer PO #", cellClass: "shipment-po-cell-buyer-po" },
+  { col: "PO Qty", label: "Order Qty", cellClass: "shipment-po-cell-qty" },
+  { col: "Actual Qty", label: "Actual Qty", cellClass: "shipment-po-cell-qty" },
+  { col: "Ctn Qty", label: "Ctn Qty", cellClass: "shipment-po-cell-qty" },
+  { col: "CXL Date", label: "CXL Date", cellClass: "shipment-po-cell-date" },
   { col: "Notes", label: "Notes", cellClass: "shipment-po-cell-notes" },
 ];
 
@@ -32,16 +33,17 @@ const SHIPMENT_LINKED_PO_COL_CLASSES = [
   "shipment-po-col-id",
   "shipment-po-col-style",
   "shipment-po-col-vendor",
+  "shipment-po-col-buyer",
+  "shipment-po-col-buyer-po",
   "shipment-po-col-qty",
   "shipment-po-col-qty",
   "shipment-po-col-qty",
   "shipment-po-col-date",
-  "shipment-po-col-buyer",
   "shipment-po-col-notes",
 ];
 
 /** Linked PO table column widths (px); Notes column is flexible (null). */
-const SHIPMENT_LINKED_PO_COLUMN_WIDTHS = [100, 120, 120, 80, 80, 80, 100, 120, null];
+const SHIPMENT_LINKED_PO_COLUMN_WIDTHS = [100, 120, 120, 120, 120, 80, 80, 80, 100, null];
 
 /** PO fields cleared when a shipment is deleted (matches apps-script.gs sync fields). */
 const SHIPMENT_PO_CLEAR_FIELDS = [
@@ -326,6 +328,7 @@ function bringModalToFront(overlay) {
 }
 
 function openShipmentDetail(shipmentOrId) {
+  if (isAppSaving()) return;
   const shipment = typeof shipmentOrId === "string"
     ? getShipmentById(shipmentOrId)
     : shipmentOrId;
@@ -396,6 +399,51 @@ function createShipmentFormField(col, value, { readOnly = false } = {}) {
   return wrap;
 }
 
+function buildShipmentFormEdit(shipment, formId) {
+  const form = document.createElement("div");
+  form.className = "shipment-form-edit";
+  form.id = formId;
+
+  const mainGrid = document.createElement("div");
+  mainGrid.className = "shipment-form-main-grid";
+  SHIPMENT_MODAL_INFO_FIELDS.forEach(col => {
+    mainGrid.appendChild(createShipmentFormField(col, shipment[col] ?? ""));
+  });
+  form.appendChild(mainGrid);
+
+  const dateStack = document.createElement("div");
+  dateStack.className = "shipment-form-date-stack";
+  SHIPMENT_MODAL_DATE_FIELDS.forEach(col => {
+    const field = createShipmentFormField(col, shipment[col] ?? "");
+    field.classList.add("shipment-form-field--date");
+    dateStack.appendChild(field);
+  });
+  form.appendChild(dateStack);
+
+  const notesField = createShipmentFormField("Notes", shipment["Notes"] ?? "");
+  notesField.classList.add("shipment-form-field--notes");
+  form.appendChild(notesField);
+
+  return form;
+}
+
+function buildShipmentModalLayout({ shipment = {}, formId, linkedSource }) {
+  const layout = document.createElement("div");
+  layout.className = "shipment-modal-layout";
+
+  const left = document.createElement("div");
+  left.className = "shipment-modal-left";
+  left.appendChild(buildShipmentFormEdit(shipment, formId));
+
+  const right = document.createElement("div");
+  right.className = "shipment-modal-right";
+  right.appendChild(renderShipmentLinkedPoSection(linkedSource));
+
+  layout.appendChild(left);
+  layout.appendChild(right);
+  return layout;
+}
+
 function readShipmentForm(container) {
   const data = {};
   container.querySelectorAll("[data-field]").forEach(el => {
@@ -407,30 +455,18 @@ function readShipmentForm(container) {
 function renderCreateShipmentModal(poNumbers) {
   createShipmentPoNumbers = poNumbers.slice();
   const body = document.getElementById("createShipmentBody");
-  const subtitle = document.getElementById("createShipmentSubtitle");
   if (!body) return;
 
-  if (subtitle) {
-    subtitle.textContent = poNumbers.length === 1
-      ? "Assigning 1 PO to a new shipment"
-      : `Assigning ${poNumbers.length} POs to a new shipment`;
-  }
+  const pos = poNumbers
+    .map(po => allRows.find(r => String(r["PO #"]) === String(po)))
+    .filter(Boolean);
 
   body.innerHTML = "";
-  const form = document.createElement("div");
-  form.className = "shipment-form-grid";
-  SHIPMENT_FORM_FIELDS.forEach(col => form.appendChild(createShipmentFormField(col, "")));
-  body.appendChild(form);
-
-  const list = document.createElement("div");
-  list.className = "shipment-po-chip-list";
-  poNumbers.forEach(po => {
-    const chip = document.createElement("span");
-    chip.className = "shipment-po-chip";
-    chip.textContent = po;
-    list.appendChild(chip);
-  });
-  body.appendChild(list);
+  body.appendChild(buildShipmentModalLayout({
+    shipment: {},
+    formId: "createShipmentForm",
+    linkedSource: pos,
+  }));
 
   bringModalToFront(document.getElementById("createShipmentOverlay"));
 }
@@ -441,8 +477,9 @@ function closeCreateShipmentModal() {
 }
 
 async function submitCreateShipment() {
-  const body = document.getElementById("createShipmentBody");
-  if (!body || createShipmentPoNumbers.length === 0) return;
+  const form = document.getElementById("createShipmentForm");
+  if (!form || createShipmentPoNumbers.length === 0) return;
+  if (isAppSaving()) return;
 
   const poNumbers = createShipmentPoNumbers.slice();
   const alreadyAssigned = poNumbers.filter(po => {
@@ -457,8 +494,9 @@ async function submitCreateShipment() {
     return;
   }
 
-  const shipment = readShipmentForm(body);
+  const shipment = readShipmentForm(form);
   closeCreateShipmentModal();
+  setAppSaving(true, "Creating shipment…");
   showIndicator(`Creating shipment${ELLIPSIS}`, "");
 
   try {
@@ -477,7 +515,34 @@ async function submitCreateShipment() {
     switchAppView("shipments");
   } catch (err) {
     showIndicator("Create failed: " + err.message, "error");
+  } finally {
+    setAppSaving(false);
   }
+}
+
+function parseShipmentIdSequence(id) {
+  const s = String(id ?? "").trim();
+  let m = /^SHP-(\d{4})$/.exec(s);
+  if (m) return Number(m[1]);
+  m = /^SHP(\d{2})-(\d+)$/.exec(s);
+  if (m) return Number(m[2]);
+  m = /^SHP-(\d{4})-(\d+)$/.exec(s);
+  if (m) return Number(m[2]);
+  m = /^SHP-(\d+)$/.exec(s);
+  if (m) return Number(m[1]);
+  return 0;
+}
+
+function formatShipmentId(sequence) {
+  return `SHP-${String(sequence).padStart(4, "0")}`;
+}
+
+function generateDemoShipmentId() {
+  let max = 0;
+  allShipments.forEach(shipment => {
+    max = Math.max(max, parseShipmentIdSequence(shipment[SHIPMENT_ID_FIELD]));
+  });
+  return formatShipmentId(max + 1);
 }
 
 async function demoCreateShipment(poNumbers, shipment) {
@@ -489,9 +554,7 @@ async function demoCreateShipment(poNumbers, shipment) {
     throw new Error(`${blocked.length} PO(s) already assigned to a shipment`);
   }
 
-  const year = new Date().getFullYear();
-  const nextNum = allShipments.filter(s => String(s[SHIPMENT_ID_FIELD]).startsWith(`SHP-${year}-`)).length + 1;
-  const shipmentId = `SHP-${year}-${String(nextNum).padStart(3, "0")}`;
+  const shipmentId = generateDemoShipmentId();
   const record = { [SHIPMENT_ID_FIELD]: shipmentId, ...shipment };
   allShipments.push(record);
 
@@ -520,7 +583,12 @@ function formatShipmentLinkedPoCell(col, row) {
   return String(val);
 }
 
-function renderShipmentLinkedPoSection(shipment) {
+function getLinkedPoRows(source) {
+  if (Array.isArray(source)) return source;
+  return getPosForShipment(source[SHIPMENT_ID_FIELD]);
+}
+
+function renderShipmentLinkedPoSection(source) {
   const section = document.createElement("section");
   section.className = "shipment-linked-pos";
 
@@ -529,7 +597,7 @@ function renderShipmentLinkedPoSection(shipment) {
   title.textContent = "Linked POs";
   section.appendChild(title);
 
-  const pos = getPosForShipment(shipment[SHIPMENT_ID_FIELD]);
+  const pos = getLinkedPoRows(source);
   const count = pos.length;
   title.textContent = count === 1 ? "Linked POs (1)" : `Linked POs (${count})`;
 
@@ -613,59 +681,28 @@ function renderShipmentModalContent(shipment) {
 
   idEl.textContent = shipment[SHIPMENT_ID_FIELD] ?? EMPTY_DISPLAY;
   body.innerHTML = "";
-
-  const layout = document.createElement("div");
-  layout.className = "shipment-modal-layout";
-
-  const left = document.createElement("div");
-  left.className = "shipment-modal-left";
-
-  const form = document.createElement("div");
-  form.className = "shipment-form-edit";
-  form.id = "shipmentEditForm";
-
-  const mainGrid = document.createElement("div");
-  mainGrid.className = "shipment-form-main-grid";
-  SHIPMENT_MODAL_INFO_FIELDS.forEach(col => {
-    mainGrid.appendChild(createShipmentFormField(col, shipment[col] ?? ""));
-  });
-  form.appendChild(mainGrid);
-
-  const dateStack = document.createElement("div");
-  dateStack.className = "shipment-form-date-stack";
-  SHIPMENT_MODAL_DATE_FIELDS.forEach(col => {
-    const field = createShipmentFormField(col, shipment[col] ?? "");
-    field.classList.add("shipment-form-field--date");
-    dateStack.appendChild(field);
-  });
-  form.appendChild(dateStack);
-
-  const notesField = createShipmentFormField("Notes", shipment["Notes"] ?? "");
-  notesField.classList.add("shipment-form-field--notes");
-  form.appendChild(notesField);
-
-  left.appendChild(form);
-  layout.appendChild(left);
-
-  const right = document.createElement("div");
-  right.className = "shipment-modal-right";
-  right.appendChild(renderShipmentLinkedPoSection(shipment));
-  layout.appendChild(right);
-  body.appendChild(layout);
+  body.appendChild(buildShipmentModalLayout({
+    shipment,
+    formId: "shipmentEditForm",
+    linkedSource: shipment,
+  }));
 }
 
 async function saveShipmentModal() {
-  if (!shipmentModalRow) return;
+  if (isAppSaving() || !shipmentModalRow) return;
   const form = document.getElementById("shipmentEditForm");
   if (!form) return;
 
   const shipmentId = shipmentModalRow[SHIPMENT_ID_FIELD];
   const shipment = readShipmentForm(form);
+  const savedRowRef = shipmentModalRow;
+  closeShipmentModalForce();
+  setAppSaving(true, "Saving…");
   showIndicator(`Saving${ELLIPSIS}`, "");
 
   try {
     if (APPS_SCRIPT_URL === "YOUR_APPS_SCRIPT_WEB_APP_URL_HERE") {
-      Object.assign(shipmentModalRow, shipment);
+      Object.assign(savedRowRef, shipment);
       getPosForShipment(shipmentId).forEach(row => {
         ["Ship Method", "Vessel", "House #", "EXF", "Shipped", "ETD", "ETA", "IHD"].forEach(field => {
           if (shipment[field] !== undefined) row[field] = shipment[field];
@@ -682,16 +719,17 @@ async function saveShipmentModal() {
       });
       if (!json.success) throw new Error(json.error);
       await loadData();
-      shipmentModalRow = getShipmentById(shipmentId);
-      if (shipmentModalRow) renderShipmentModalContent(shipmentModalRow);
     }
     showIndicator(`Saved ${CHECK_MARK}`, "success");
   } catch (err) {
     showIndicator("Save failed: " + err.message, "error");
+  } finally {
+    setAppSaving(false);
   }
 }
 
 async function deleteSelectedShipments() {
+  if (isAppSaving()) return;
   const selected = getCheckedFilteredShipments();
   if (selected.length === 0) {
     showIndicator("Select shipments first", "error");
@@ -742,6 +780,7 @@ function demoDeleteShipments(shipmentIds) {
 }
 
 function openCreateShipmentFromSelection() {
+  if (isAppSaving()) return;
   const selected = getCheckedFilteredPos();
   if (selected.length === 0) {
     showIndicator("Select POs first", "error");
@@ -766,37 +805,35 @@ function openCreateShipmentFromSelection() {
   renderCreateShipmentModal(eligible.map(row => row["PO #"]));
 }
 
-function appendPoModalLinkedShipment(row, container) {
+function renderPoModalLinkedShipment(row) {
+  const slot = document.getElementById("modalLinkedShipment");
+  if (!slot) return;
+
+  slot.replaceChildren();
   const id = String(row[SHIPMENT_ID_FIELD] ?? "").trim();
-  const wrap = document.createElement("div");
-  wrap.className = "modal-linked-shipment";
+  if (!id) {
+    slot.hidden = true;
+    return;
+  }
+
+  slot.hidden = false;
 
   const label = document.createElement("span");
   label.className = "modal-linked-shipment-label";
   label.textContent = "Linked Shipment";
 
-  if (!id) {
-    const none = document.createElement("span");
-    none.className = "modal-linked-shipment-none";
-    none.textContent = EMPTY_DISPLAY;
-    wrap.appendChild(label);
-    wrap.appendChild(none);
-    container.prepend(wrap);
-    return;
-  }
-
   const btn = document.createElement("button");
   btn.type = "button";
-  btn.className = "btn btn-link modal-linked-shipment-btn";
+  btn.className = "modal-linked-shipment-header-link";
   btn.textContent = id;
+  btn.title = "Open linked shipment";
   btn.addEventListener("click", e => {
     e.stopPropagation();
     openLinkedShipmentFromPo(row);
   });
 
-  wrap.appendChild(label);
-  wrap.appendChild(btn);
-  container.prepend(wrap);
+  slot.appendChild(label);
+  slot.appendChild(btn);
 }
 
 function initShipmentSelection() {

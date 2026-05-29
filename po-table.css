@@ -1164,6 +1164,65 @@ td.editable:not(.select-cell):hover .editable-preview {
 .save-indicator.success { background: var(--success); }
 .save-indicator.error   { background: var(--danger); }
 
+.app-saving-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: all;
+}
+
+.app-saving-overlay[hidden] {
+  display: none;
+}
+
+.app-saving-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(245, 244, 240, 0.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.app-saving-panel {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  min-width: 160px;
+  padding: 22px 28px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(26, 26, 24, 0.12);
+}
+
+.app-saving-spinner {
+  width: 30px;
+  height: 30px;
+  border: 2.5px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: app-saving-spin 0.75s linear infinite;
+}
+
+.app-saving-message {
+  margin: 0;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  letter-spacing: 0.01em;
+}
+
+@keyframes app-saving-spin {
+  to { transform: rotate(360deg); }
+}
+
 /* ── Loading / empty ── */
 .state-row td {
   text-align: center;
@@ -1247,6 +1306,149 @@ td.editable:not(.select-cell):hover .editable-preview {
 
 #modalOverlay .modal-card {
   font-family: var(--font);
+  max-width: 980px;
+}
+
+#modalOverlay .modal-layout {
+  grid-template-columns: minmax(0, 1fr) 168px;
+  gap: 14px;
+}
+
+#modalOverlay .modal-layout-photos .modal-style-photos {
+  width: 168px;
+  gap: 8px;
+}
+
+#modalOverlay .modal-layout-photos .modal-style-photo {
+  width: 168px;
+}
+
+#modalOverlay .modal-field--long {
+  width: 100%;
+  max-width: 340px;
+}
+
+#modalOverlay .modal-block--order .modal-field--long,
+#modalOverlay .modal-block--product .modal-field--long {
+  width: auto;
+  max-width: none;
+}
+
+#modalOverlay .modal-block--order .modal-field--short,
+#modalOverlay .modal-block--order .modal-field--medium,
+#modalOverlay .modal-block--product .modal-field--short,
+#modalOverlay .modal-block--product .modal-field--medium {
+  width: auto;
+}
+
+#modalOverlay .modal-field-row--po-date-notes .modal-field--long {
+  flex: none;
+  width: auto;
+  max-width: none;
+}
+
+#modalOverlay {
+  --modal-field-height: 34px;
+}
+
+#modalOverlay .modal-field-value {
+  height: var(--modal-field-height);
+  min-height: var(--modal-field-height);
+  max-height: var(--modal-field-height);
+  box-sizing: border-box;
+  padding: 0 8px;
+  align-items: center;
+  line-height: 1.2;
+}
+
+#modalOverlay .modal-field--long .modal-field-value {
+  min-height: var(--modal-field-height);
+  max-height: var(--modal-field-height);
+  padding-top: 0;
+  padding-bottom: 0;
+  align-items: center;
+  white-space: nowrap;
+  overflow: hidden;
+  line-height: 1.2;
+}
+
+#modalOverlay .modal-field-value .editable-preview {
+  padding: 0;
+  border: none;
+  line-height: 1.2;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#modalOverlay .modal-field-value.editable:not(.select-cell):hover .editable-preview {
+  border: none;
+  background: transparent;
+}
+
+#modalOverlay .modal-field-value.editable:not(.select-cell):hover {
+  border-color: var(--editable-hover-border);
+  background: #fff !important;
+}
+
+#modalOverlay .modal-field-value.select-cell {
+  cursor: pointer;
+  overflow: visible;
+}
+
+#modalOverlay .modal-field-value.select-cell:hover,
+#modalOverlay .modal-field-value.select-cell.select-cell-hover,
+#modalOverlay .modal-field-value.select-cell.select-cell-open {
+  border-color: var(--editable-hover-border);
+  background: #fff !important;
+}
+
+#modalOverlay .modal-field-value.date-countdown-cell {
+  overflow: hidden;
+}
+
+#modalOverlay .modal-field-value.date-countdown-cell .cxl-countdown-stack {
+  flex-direction: row;
+  gap: 3px;
+  align-items: center;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+#modalOverlay .modal-field-value.date-countdown-cell .cxl-countdown-label {
+  font-size: 9px;
+  flex-shrink: 0;
+}
+
+#modalOverlay .modal-field-value.editing {
+  height: auto;
+  min-height: var(--modal-field-height);
+  max-height: none;
+  overflow: visible;
+}
+
+#modalOverlay .modal-field-value .cell-input,
+#modalOverlay .modal-field-value .cell-select {
+  height: var(--modal-field-height);
+  min-height: var(--modal-field-height);
+  padding: 0 8px;
+  box-sizing: border-box;
+}
+
+#modalOverlay .modal-field-value .cell-textarea {
+  min-height: var(--modal-field-height);
+  padding: 6px 8px;
+  line-height: 1.2;
+}
+
+#modalOverlay .modal-field--long .modal-field-value.editing {
+  min-height: 68px;
+  align-items: flex-start;
+}
+
+#modalOverlay .modal-field--long .modal-field-value.editing .cell-textarea {
+  min-height: 68px;
 }
 
 /* Pop scaling animation on open */
@@ -1270,6 +1472,37 @@ td.editable:not(.select-cell):hover .editable-preview {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+  min-width: 0;
+}
+
+.modal-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.modal-linked-shipment-slot {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.modal-linked-shipment-header-link {
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.modal-linked-shipment-header-link:hover {
+  color: #1e4a75;
+  text-decoration: underline;
 }
 
 .modal-header h3 {
@@ -1322,76 +1555,224 @@ td.editable:not(.select-cell):hover .editable-preview {
   gap: 4px;
 }
 
-.modal-block--order .modal-block-content {
-  gap: 0;
+.modal-block--order .modal-block-content,
+.modal-block--product .modal-block-content {
+  gap: 8px;
 }
 
-.modal-order-split {
+.modal-block--order .modal-field-row,
+.modal-block--product .modal-field-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12px 20px;
-  align-items: start;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  column-gap: 8px;
+  row-gap: 6px;
+  align-items: end;
+  width: 100%;
 }
 
-.modal-order-info {
+.modal-block--order .modal-field-row > .modal-field,
+.modal-block--product .modal-field-row > .modal-field {
+  width: auto;
   min-width: 0;
 }
 
-.modal-order-dates {
+.modal-block--order .modal-field-row--2 > .modal-field,
+.modal-block--product .modal-field-row--2 > .modal-field {
+  grid-column: span 3;
+}
+
+.modal-block--order .modal-field-row--3 > .modal-field,
+.modal-block--product .modal-field-row--3 > .modal-field {
+  grid-column: span 2;
+}
+
+.modal-block--order .modal-field-row--po-date-notes > .modal-field:first-child {
+  grid-column: span 2;
+}
+
+.modal-block--order .modal-field-row--po-date-notes > .modal-field--long {
+  grid-column: span 4;
+}
+
+.modal-block--product .modal-field-row--style-color > .modal-field:first-child {
+  grid-column: span 4;
+}
+
+.modal-block--product .modal-field-row--style-color > .modal-field:last-child {
+  grid-column: span 2;
+}
+
+.modal-top-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+
+.modal-section-header-row {
+  --modal-shipping-col-width: 228px;
+  --modal-shipping-col-gap: 56px;
+  display: grid;
+  grid-template-columns: var(--modal-shipping-col-width) minmax(0, 1fr);
+  column-gap: var(--modal-shipping-col-gap);
+  align-items: center;
+  margin-bottom: 6px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-section-header-row .modal-section-title {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+  min-width: 0;
+}
+
+.modal-block--shipping .modal-shipping-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.modal-shipping-row {
+  --modal-shipping-col-width: 228px;
+  --modal-shipping-col-gap: 56px;
+  display: grid;
+  grid-template-columns: var(--modal-shipping-col-width) minmax(0, 1fr);
+  column-gap: var(--modal-shipping-col-gap);
+  align-items: end;
+}
+
+.modal-shipping-cell {
+  min-width: 0;
+}
+
+.modal-freight-cell {
+  min-width: 0;
+  padding-left: 8px;
+}
+
+.modal-freight-cell[hidden] {
+  display: none;
+}
+
+.modal-freight-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding-left: 8px;
+}
+
+.modal-freight-label {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  user-select: none;
+}
+
+.modal-freight-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
   flex-shrink: 0;
 }
 
-.modal-order-dates .modal-field-row {
+.modal-freight-arrow:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: #fff;
+}
+
+.modal-freight-arrow::after {
+  content: '';
+  width: 14px;
+  height: 14px;
+  color: currentColor;
+  background-color: currentColor;
+  mask-image: var(--icon-caret-down);
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
+  -webkit-mask-image: var(--icon-caret-down);
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  -webkit-mask-size: contain;
+  transition: transform 0.15s ease;
+}
+
+.modal-freight-arrow.is-open::after {
+  transform: rotate(180deg);
+}
+
+.modal-shipping-row .modal-field-row--date-grid {
   display: grid;
   grid-template-columns: repeat(3, 72px);
   gap: 4px 6px;
   align-items: end;
 }
 
-.modal-order-dates .modal-field--date,
-.modal-order-dates .modal-field--date-slot {
+.modal-shipping-row .modal-field--date,
+.modal-shipping-row .modal-field--date-slot,
+.modal-shipping-row .modal-field--date-spacer {
   width: 72px;
 }
 
-.modal-order-dates .modal-field-label {
+.modal-shipping-row .modal-field--date-spacer {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.modal-shipping-row .modal-field-label {
   font-size: 9px;
 }
 
-.modal-order-dates .modal-field-value {
-  min-height: 34px;
-  height: 34px;
-  padding: 2px 4px;
+.modal-shipping-row .modal-field-value {
   font-size: 11px;
   justify-content: center;
-  align-items: center;
-  box-sizing: border-box;
 }
 
-.modal-order-dates .modal-field-value .editable-preview {
-  padding: 0;
-  border: none;
-  background: transparent;
-}
-
-.modal-order-dates .modal-field-value.editable:not(.select-cell):hover {
+.modal-shipping-row .modal-field-value.editable:not(.select-cell):hover {
   background: var(--bg) !important;
 }
 
-.modal-order-dates .modal-field-value.editable:not(.select-cell):hover .editable-preview {
-  border-color: transparent;
-  background: transparent;
-}
-
-.modal-order-dates .cxl-countdown-stack {
+.modal-shipping-row .cxl-countdown-stack {
   gap: 2px;
 }
 
-.modal-order-dates .cxl-countdown-label {
+.modal-shipping-row .cxl-countdown-label {
   font-size: 8px;
 }
 
+.modal-shipping-row .modal-field-row--ship-method-full {
+  display: flex;
+  align-items: flex-end;
+}
+
+.modal-shipping-row .modal-field-row--ship-method-full .modal-field--medium {
+  width: 228px;
+}
+
+.modal-freight-cell .modal-field-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  align-items: flex-end;
+}
+
 .modal-block--shipping .modal-block-content {
-  gap: 4px;
+  gap: 0;
 }
 
 .modal-field-row {
@@ -1399,23 +1780,6 @@ td.editable:not(.select-cell):hover .editable-preview {
   flex-wrap: wrap;
   gap: 6px 8px;
   align-items: flex-end;
-}
-
-.modal-freight-fields {
-  margin-top: 2px;
-}
-
-.modal-freight-fields[hidden] {
-  display: none;
-}
-
-.modal-order-notes {
-  width: 100%;
-  max-width: 520px;
-}
-
-.modal-order-notes .modal-field--long {
-  width: 100%;
 }
 
 .modal-bottom-split {
@@ -1520,47 +1884,6 @@ td.editable:not(.select-cell):hover .editable-preview {
 .modal-field-value[data-col="Status"] {
   justify-content: center;
   text-align: center;
-}
-
-.modal-freight-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  align-self: flex-end;
-  margin-bottom: 7px;
-  font-family: var(--font);
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text);
-  cursor: pointer;
-  user-select: none;
-}
-
-.modal-freight-toggle:hover {
-  color: var(--accent);
-}
-
-.modal-freight-toggle::after {
-  content: '';
-  width: 14px;
-  height: 14px;
-  color: currentColor;
-  background-color: currentColor;
-  mask-image: var(--icon-caret-down);
-  mask-repeat: no-repeat;
-  mask-position: center;
-  mask-size: contain;
-  -webkit-mask-image: var(--icon-caret-down);
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  -webkit-mask-size: contain;
-  transition: transform 0.15s ease;
-}
-
-.modal-freight-toggle.is-open::after {
-  transform: rotate(180deg);
 }
 
 .modal-style-photos {
@@ -1695,9 +2018,13 @@ td.editable:not(.select-cell):hover .editable-preview {
 
 #shipmentTable th.th-select-col,
 #shipmentTable td.td-select-cell {
-  width: 40px;
-  padding-left: 12px;
-  padding-right: 2px;
+  width: 52px;
+  min-width: 52px;
+  max-width: none;
+  padding-left: 24px;
+  padding-right: 8px;
+  overflow: visible;
+  box-sizing: border-box;
 }
 
 #shipmentTable th:nth-child(2),
@@ -1705,18 +2032,8 @@ td.editable:not(.select-cell):hover .editable-preview {
   padding-left: 6px;
 }
 
-.modal-card--compact {
-  max-width: 720px;
-  max-height: calc(100vh - 48px);
-  overflow: auto;
-}
-
-.modal-subtitle {
-  margin: 0;
-  font-size: 12px;
-  color: var(--text-muted);
-  font-weight: 400;
-}
+.col-shipment-id { width: 100px; }
+.col-po-count    { width: 80px; }
 
 .modal-footer {
   display: flex;
@@ -1796,7 +2113,7 @@ td.editable:not(.select-cell):hover .editable-preview {
 /* Override global `table { min-width: 2800px }` and `td { max-width: 0 }`. */
 .shipment-linked-po-table {
   width: 100%;
-  min-width: 800px;
+  min-width: 920px;
   max-width: none;
   border-collapse: collapse;
   table-layout: fixed;
@@ -1875,6 +2192,7 @@ td.editable:not(.select-cell):hover .editable-preview {
 
 .shipment-linked-po-table .shipment-po-cell-wrap,
 .shipment-linked-po-table .shipment-po-cell-vendor,
+.shipment-linked-po-table .shipment-po-cell-buyer-po,
 .shipment-linked-po-table .shipment-po-cell-buyer,
 .shipment-linked-po-table .shipment-po-cell-notes {
   white-space: normal;
@@ -1918,20 +2236,10 @@ td.editable:not(.select-cell):hover .editable-preview {
   color: var(--text-muted);
 }
 
-.shipment-form-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px 12px;
-}
-
 .shipment-form-field {
   display: flex;
   flex-direction: column;
   gap: 4px;
-}
-
-.shipment-form-field:has(textarea) {
-  grid-column: 1 / -1;
 }
 
 .shipment-form-label {
@@ -1950,23 +2258,6 @@ td.editable:not(.select-cell):hover .editable-preview {
   font-family: var(--font);
   font-size: 13px;
   background: #fff;
-}
-
-.shipment-po-chip-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 12px;
-}
-
-.shipment-po-chip {
-  display: inline-flex;
-  padding: 4px 8px;
-  border-radius: 999px;
-  background: var(--accent-light);
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 500;
 }
 
 .shipment-linked-pos {
@@ -2008,25 +2299,13 @@ td.editable:not(.select-cell):hover .editable-preview {
   font-size: 13px;
 }
 
-.modal-linked-shipment {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-  padding-bottom: 10px;
-  border-bottom: 1px dashed var(--border);
-}
-
 .modal-linked-shipment-label {
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-muted);
-}
-
-.modal-linked-shipment-none {
-  color: var(--text-muted);
+  white-space: nowrap;
 }
 
 .td-shipment-id-cell {

@@ -158,6 +158,20 @@
 <div id="shipmentTableWrap" class="table-scroll-y" hidden>
   <div class="table-scroll-x">
   <table id="shipmentTable">
+    <colgroup>
+      <col class="col-select" />
+      <col class="col-shipment-id" />
+      <col class="col-ship-method" />
+      <col class="col-po-count" />
+      <col class="col-vessel" />
+      <col class="col-house" />
+      <col class="col-shipped" />
+      <col class="col-etd" />
+      <col class="col-exf" />
+      <col class="col-eta" />
+      <col class="col-ihd" />
+      <col class="col-notes" />
+    </colgroup>
     <thead>
       <tr>
         <th class="th-select-col">
@@ -219,20 +233,27 @@
 
 <div id="cellSelectDropdown" class="cell-select-dropdown" hidden></div>
 
+<div id="appSavingOverlay" class="app-saving-overlay" hidden aria-hidden="true">
+  <div class="app-saving-backdrop"></div>
+  <div class="app-saving-panel" role="status" aria-live="polite">
+    <div class="app-saving-spinner" aria-hidden="true"></div>
+    <p class="app-saving-message" id="appSavingMessage">Saving…</p>
+  </div>
+</div>
+
 <div class="save-indicator" id="saveIndicator"></div>
 
 <div id="createShipmentOverlay" class="modal-backdrop">
-  <div class="modal-card modal-card--compact" onclick="event.stopPropagation()">
+  <div class="modal-card shipment-modal-card" onclick="event.stopPropagation()">
     <div class="modal-header">
       <div class="modal-header-main">
         <h3>Create Shipment</h3>
-        <p class="modal-subtitle" id="createShipmentSubtitle"></p>
       </div>
       <button type="button" class="btn-close" id="createShipmentCancelBtn" aria-label="Close">✕</button>
     </div>
     <div class="modal-body" id="createShipmentBody"></div>
     <div class="modal-footer">
-      <button type="button" class="btn btn-primary" id="createShipmentSaveBtn">Create shipment</button>
+      <button type="button" class="btn btn-primary" id="createShipmentSaveBtn">Create</button>
       <button type="button" class="btn" data-dismiss="create-shipment">Cancel</button>
     </div>
   </div>
@@ -261,7 +282,10 @@
         <h3>PO # <span id="modalPoNum" class="modal-po-num">—</span></h3>
         <span id="modalFlagBtn" class="modal-flag-slot"></span>
       </div>
-      <button type="button" class="btn-close" id="modalCloseBtn" aria-label="Close">✕</button>
+      <div class="modal-header-actions">
+        <div id="modalLinkedShipment" class="modal-linked-shipment-slot" hidden></div>
+        <button type="button" class="btn-close" id="modalCloseBtn" aria-label="Close">✕</button>
+      </div>
     </div>
     <div class="modal-body" id="modalBody"></div>
     <div class="modal-footer">

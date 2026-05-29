@@ -111,14 +111,29 @@ function handleSaveColumnDefault(payload) {
   return corsResponse({ success: true });
 }
 
+function parseShipmentIdSequence_(id) {
+  const s = String(id ?? "").trim();
+  let m = /^SHP-(\d{4})$/.exec(s);
+  if (m) return Number(m[1]);
+  m = /^SHP(\d{2})-(\d+)$/.exec(s);
+  if (m) return Number(m[2]);
+  m = /^SHP-(\d{4})-(\d+)$/.exec(s);
+  if (m) return Number(m[2]);
+  m = /^SHP-(\d+)$/.exec(s);
+  if (m) return Number(m[1]);
+  return 0;
+}
+
+function formatShipmentId_(sequence) {
+  return "SHP-" + String(sequence).padStart(4, "0");
+}
+
 function generateShipmentId_(shipments) {
-  const year = new Date().getFullYear();
   let max = 0;
   shipments.forEach(s => {
-    const m = /^SHP-(\d{4})-(\d+)$/.exec(String(s[SHIPMENT_ID_FIELD] ?? "").trim());
-    if (m && Number(m[1]) === year) max = Math.max(max, Number(m[2]));
+    max = Math.max(max, parseShipmentIdSequence_(s[SHIPMENT_ID_FIELD]));
   });
-  return "SHP-" + year + "-" + String(max + 1).padStart(3, "0");
+  return formatShipmentId_(max + 1);
 }
 
 function pickShipmentData_(source) {
