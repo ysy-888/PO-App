@@ -1,4 +1,4 @@
-﻿const APPS_SCRIPT_URL = "https://script.google.com/a/macros/elevatordisco.com/s/AKfycbyAipm-x3kYHv0LuMc0Ffkfmvj-U24U8UjnDNih92jz_mE3izKVU7NBJJMO_xB5CnJM6w/exec";
+﻿const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzE1aQiqIUnQ2zSDrMhlnpfNBT2G2poY7_C6PJ9wHYv9olX3xGpOXWDjgzQQBR-7epoTw/exec";
 
 const EMPTY_DISPLAY = "\u2014";
 const EN_DASH = "\u2013";
@@ -18,15 +18,50 @@ function isEmptyValue(v) {
 }
 
 const COLUMNS = [
-  "Division","Status","Vendor","Buyer","Buyer PO #","SO #","PO Date","PO #",
+  "Selected","Flag",
+  "Status","Division","Vendor","Buyer","Buyer PO #","SO #","PO Date","PO #",
   "Old PO #","Style #","Color","PO Qty","Actual Qty","Ctn Qty","Ship Method",
+  "Vessel","House #","Shipped","ETD",
   "EST EXF","EST IHD","EXF","ETA","IHD","CXL Date","Assign Date","Notes"
 ];
 
 const COLUMN_WIDTHS = [
-  120, 130, 130, 120, 100, 80, 80, 80, 80, 100, 100, 60, 60, 60, 100,
+  36, 36,
+  130, 120, 130, 120, 100, 80, 80, 80, 80, 100, 100, 60, 60, 60, 100,
+  100, 80, 80, 80,
   80, 80, 80, 80, 80, 80, 80, 200
 ];
+
+const COLUMN_LABELS = {
+  "Actual Qty": "Act Qty",
+  "Ctn Qty": "CTN",
+  "Assign Date": "Assigned",
+};
+
+const UI_ONLY_COLS = new Set(["Selected", "Flag"]);
+
+const ALWAYS_VISIBLE_COLUMNS = new Set(["Selected", "Flag", "Status"]);
+
+function getEditableColumnOptions() {
+  return COLUMNS.filter(col => !ALWAYS_VISIBLE_COLUMNS.has(col));
+}
+
+function ensureAlwaysVisibleColumns(cols) {
+  ALWAYS_VISIBLE_COLUMNS.forEach(col => cols.add(col));
+  return cols;
+}
+
+function getSelectableColumnsFromVisible(visible) {
+  return new Set([...visible].filter(col => !ALWAYS_VISIBLE_COLUMNS.has(col)));
+}
+
+function buildVisibleColumnsFromDraft(draft) {
+  return ensureAlwaysVisibleColumns(new Set(draft));
+}
+
+function getColumnLabel(col) {
+  return COLUMN_LABELS[col] ?? col;
+}
 
 const ROW_KEY_ALIASES = {
   "PO\nQty": "PO Qty",
@@ -45,7 +80,8 @@ function normalizeRow(row) {
   return out;
 }
 
-const COLUMN_VISIBILITY_KEY = "poTable.visibleColumns";
+/** Shared default column view — shipped with the app for all users/sessions. */
+const DEFAULT_VISIBLE_COLUMNS = [...COLUMNS];
 
 /** @type {Set<string>} */
 let visibleColumns = new Set(COLUMNS);
@@ -56,19 +92,65 @@ function visibleColumnCount() {
   return visibleColumns.size;
 }
 
-function loadColumnVisibility() {
-  try {
-    const raw = localStorage.getItem(COLUMN_VISIBILITY_KEY);
-    if (!raw) return;
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return;
-    const next = new Set(parsed.filter(col => COLUMNS.includes(col)));
-    if (next.size > 0) visibleColumns = next;
-  } catch {}
+function getDefaultVisibleColumnsSet() {
+  const ordered = COLUMNS.filter(col => DEFAULT_VISIBLE_COLUMNS.includes(col));
+  return ensureAlwaysVisibleColumns(new Set(ordered.length > 0 ? ordered : COLUMNS));
 }
 
-function saveColumnVisibility() {
-  localStorage.setItem(COLUMN_VISIBILITY_KEY, JSON.stringify([...visibleColumns]));
+function setProgramDefaultVisibleColumns(cols) {
+  const withFixed = buildVisibleColumnsFromDraft(cols);
+  const ordered = COLUMNS.filter(col => withFixed.has(col));
+  if (ordered.length === 0) return false;
+  DEFAULT_VISIBLE_COLUMNS.splice(0, DEFAULT_VISIBLE_COLUMNS.length, ...ordered);
+  return true;
+}
+
+function loadColumnVisibility() {
+  visibleColumns = getDefaultVisibleColumnsSet();
+}
+
+function applyDefaultColumnsFromServer(columns) {
+  if (!Array.isArray(columns) || columns.length === 0) return false;
+  const cols = ensureAlwaysVisibleColumns(new Set(columns.filter(col => COLUMNS.includes(col))));
+  if (cols.size === 0) return false;
+  setProgramDefaultVisibleColumns(cols);
+  visibleColumns = getDefaultVisibleColumnsSet();
+  applyColumnVisibility();
+  return true;
+}
+
+async function saveDefaultColumnVisibility() {
+  if (!setProgramDefaultVisibleColumns(columnVisibilityDraft)) return;
+
+  visibleColumns = getDefaultVisibleColumnsSet();
+  applyColumnVisibility();
+
+  if (APPS_SCRIPT_URL === "YOUR_APPS_SCRIPT_WEB_APP_URL_HERE") {
+    showIndicator("Default view saved", "success");
+    return;
+  }
+
+  try {
+    showIndicator(`Saving default${ELLIPSIS}`, "");
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "saveColumnDefault",
+        columns: [...DEFAULT_VISIBLE_COLUMNS],
+      }),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error);
+    showIndicator("Default view saved", "success");
+  } catch (err) {
+    showIndicator("Save default failed: " + err.message, "error");
+  }
+}
+
+function resetEditTableToDefault() {
+  columnVisibilityDraft = getSelectableColumnsFromVisible(getDefaultVisibleColumnsSet());
+  renderEditTableList();
+  showIndicator("Reset to default", "success");
 }
 
 function applyColumnVisibility() {
@@ -101,7 +183,7 @@ function renderEditTableList() {
   if (!list) return;
 
   list.innerHTML = "";
-  COLUMNS.forEach(col => {
+  getEditableColumnOptions().forEach(col => {
     const label = document.createElement("label");
     label.className = "column-filter-option";
 
@@ -115,7 +197,7 @@ function renderEditTableList() {
     });
 
     const span = document.createElement("span");
-    span.textContent = col;
+    span.textContent = getColumnLabel(col);
 
     label.appendChild(cb);
     label.appendChild(span);
@@ -136,7 +218,7 @@ function positionEditTablePopover(anchorBtn) {
 }
 
 function openEditTablePopover(anchorBtn) {
-  columnVisibilityDraft = new Set(visibleColumns);
+  columnVisibilityDraft = getSelectableColumnsFromVisible(visibleColumns);
   const pop = document.getElementById("editTablePopover");
   if (!pop) return;
 
@@ -151,18 +233,12 @@ function closeEditTablePopover() {
 }
 
 function setEditTableDraftSelectAll(selectAll) {
-  columnVisibilityDraft = selectAll ? new Set(COLUMNS) : new Set();
+  columnVisibilityDraft = selectAll ? new Set(getEditableColumnOptions()) : new Set();
   renderEditTableList();
 }
 
 function applyEditTableFromPopover() {
-  if (columnVisibilityDraft.size === 0) {
-    showIndicator("Show at least one column", "error");
-    return;
-  }
-
-  visibleColumns = new Set(columnVisibilityDraft);
-  saveColumnVisibility();
+  visibleColumns = buildVisibleColumnsFromDraft(columnVisibilityDraft);
   applyColumnVisibility();
   closeEditTablePopover();
 }
@@ -178,6 +254,8 @@ function initEditTable() {
 
   document.getElementById("editTableSelectAll")?.addEventListener("click", () => setEditTableDraftSelectAll(true));
   document.getElementById("editTableClearAll")?.addEventListener("click", () => setEditTableDraftSelectAll(false));
+  document.getElementById("editTableSaveDefault")?.addEventListener("click", saveDefaultColumnVisibility);
+  document.getElementById("editTableResetDefault")?.addEventListener("click", resetEditTableToDefault);
   document.getElementById("editTableOk")?.addEventListener("click", applyEditTableFromPopover);
   document.getElementById("editTableCancel")?.addEventListener("click", closeEditTablePopover);
 
@@ -201,6 +279,7 @@ function initEditTable() {
 }
 
 const EDITABLE = new Set([
+  "Selected","Flag",
   "PO Qty","Status","Ship Method","Ctn Qty","Vessel","House #",
   "Shipped","ETD","ETA","IHD","EST EXF","EXF","CXL Date","Assign Date","Notes",
   "FOB Cost","Price","OG","PROTO","FIT/PP","BULK","TOP","TRIM",
@@ -222,7 +301,7 @@ const MODAL_FIELD_SIZE = {
     "EST EXF", "EST IHD", "EXF", "CXL Date", "Assign Date",
   ]),
   medium: new Set([
-    "Division", "Buyer PO #", "Status", "Vendor", "Buyer",
+    "Division", "Buyer PO #", "Status", "Vendor", "Buyer", "Flag",
     "Vessel", "House #", "Ship Method",
     "Style #", "Color",
     "OG", "PROTO", "FIT/PP", "BULK", "TOP", "TRIM",
@@ -239,8 +318,8 @@ function getModalFieldSize(col) {
 }
 
 const MODAL_ORDER_ROWS = [
-  ["Division", "Vendor", "Buyer", "Status"],
-  ["PO Date", "Buyer PO #", "SO #", "Old PO #"],
+  ["Status", "Division", "Vendor", "Buyer"],
+  ["PO Date", "Buyer PO #", "SO #", "Old PO #", "Flag"],
 ];
 
 const MODAL_SHIPPING_ROWS = [
@@ -741,6 +820,7 @@ async function loadData() {
       const json = await res.json();
       if (!json.success) throw new Error(json.error);
       allRows = json.data.map(normalizeRow);
+      if (json.defaultColumns) applyDefaultColumnsFromServer(json.defaultColumns);
     }
     syncAllEstIhd(allRows);
     updateColumnFilterHeaderStates();
@@ -952,6 +1032,111 @@ function syncAllEstIhd(rows) {
   rows.forEach(syncEstIhdForRow);
 }
 
+function isTruthy(val) {
+  if (val === true || val === 1) return true;
+  const s = String(val ?? "").trim().toLowerCase();
+  return s === "true" || s === "yes" || s === "1" || s === "x";
+}
+
+function toSheetBool(val) {
+  return !!val;
+}
+
+function toggleRowSelected(row, selected) {
+  const next = toSheetBool(selected);
+  if (isTruthy(row["Selected"]) === next) return;
+  row["Selected"] = next;
+  saveUpdate(row["PO #"], { Selected: next });
+  updateSelectAllHeader();
+}
+
+function updateModalIfOpen() {
+  if (!modalRow || !document.getElementById("modalOverlay")?.classList.contains("open")) return;
+  renderModalContent(modalRow);
+}
+
+function toggleRowFlag(row) {
+  const next = !isTruthy(row["Flag"]);
+  row["Flag"] = next;
+  saveUpdate(row["PO #"], { Flag: next });
+  renderTable();
+  updateModalIfOpen();
+}
+
+function setAllFilteredSelected(selected) {
+  const next = toSheetBool(selected);
+  const changed = [];
+  filteredRows.forEach(row => {
+    if (isTruthy(row["Selected"]) === next) return;
+    row["Selected"] = next;
+    changed.push(row["PO #"]);
+  });
+  if (changed.length === 0) return;
+  renderTable();
+  changed.forEach(poNumber => saveUpdate(poNumber, { Selected: next }));
+}
+
+function updateSelectAllHeader() {
+  const cb = document.getElementById("selectAllRowsCheckbox");
+  if (!cb) return;
+
+  if (filteredRows.length === 0) {
+    cb.checked = false;
+    cb.indeterminate = false;
+    cb.disabled = true;
+    return;
+  }
+
+  cb.disabled = false;
+  const selectedCount = filteredRows.filter(row => isTruthy(row["Selected"])).length;
+  cb.checked = selectedCount === filteredRows.length;
+  cb.indeterminate = selectedCount > 0 && selectedCount < filteredRows.length;
+}
+
+function initRowSelection() {
+  const cb = document.getElementById("selectAllRowsCheckbox");
+  cb?.addEventListener("click", e => {
+    e.stopPropagation();
+    setAllFilteredSelected(cb.checked);
+  });
+}
+
+const FLAG_ICON_SVG =
+  `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" ` +
+  `fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">` +
+  `<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>` +
+  `<line x1="4" y1="22" x2="4" y2="15"/></svg>`;
+
+function renderSelectedCell(td, row) {
+  td.className = "td-select-cell readonly-no-select";
+  const cb = document.createElement("input");
+  cb.type = "checkbox";
+  cb.className = "po-select-checkbox";
+  cb.checked = isTruthy(row["Selected"]);
+  cb.setAttribute("aria-label", `Select PO ${row["PO #"] ?? ""}`);
+  cb.addEventListener("click", e => {
+    e.stopPropagation();
+    toggleRowSelected(row, cb.checked);
+  });
+  td.appendChild(cb);
+}
+
+function renderFlagCell(td, row) {
+  td.className = "td-flag-cell readonly-no-select";
+  const flagged = isTruthy(row["Flag"]);
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "po-flag-btn" + (flagged ? " is-flagged" : "");
+  btn.setAttribute("aria-label", flagged ? "Unflag PO" : "Flag PO");
+  btn.title = flagged ? "Unflag" : "Flag";
+  btn.innerHTML = FLAG_ICON_SVG;
+  btn.addEventListener("click", e => {
+    e.stopPropagation();
+    toggleRowFlag(row);
+  });
+  td.appendChild(btn);
+}
+
 function renderTable() {
   closeCellSelectDropdown(false);
   const tbody = document.getElementById("tableBody");
@@ -971,11 +1156,24 @@ function renderTable() {
     tr.dataset.po = row["PO #"];
 
     tr.className = "clickable-row";
+    if (isTruthy(row["Flag"])) tr.classList.add("row-flagged");
     tr.ondblclick = () => openPODetail(row);
 
     COLUMNS.forEach(col => {
       const td = document.createElement("td");
       td.dataset.col = col;
+
+      if (col === "Selected") {
+        renderSelectedCell(td, row);
+        tr.appendChild(td);
+        return;
+      }
+      if (col === "Flag") {
+        renderFlagCell(td, row);
+        tr.appendChild(td);
+        return;
+      }
+
       const editable = EDITABLE.has(col);
       const val = col === "EST IHD"
         ? calculateEstIhd(row["Ship Method"], row["EST EXF"])
@@ -1016,6 +1214,7 @@ function renderTable() {
   });
 
   applyColumnVisibility();
+  updateSelectAllHeader();
 }
 
 function renderStatus(val) {
@@ -1208,11 +1407,6 @@ function createCellInput(col, val) {
   return input;
 }
 
-function updateModalIfOpen() {
-  if (!modalRow || !document.getElementById("modalOverlay")?.classList.contains("open")) return;
-  renderModalContent(modalRow);
-}
-
 function getEditorComparableValue(col, val) {
   if (DATE_FIELDS.has(col)) return normalizeToYmd(val) || "";
   return String(val ?? "").trim();
@@ -1310,6 +1504,11 @@ function startEdit(td, col, row) {
 function bindFieldInteractions(fieldEl, col, row) {
   fieldEl.dataset.col = col;
 
+  if (col === "Flag") {
+    fieldEl.classList.add("readonly", "readonly-no-select");
+    return;
+  }
+
   if (EDITABLE.has(col)) {
     if (SELECT_EDIT_COLS.has(col)) {
       fieldEl.classList.add("editable", "select-cell");
@@ -1351,6 +1550,8 @@ function setFieldDisplayContent(fieldEl, col, row) {
 
   if (col === "Status") {
     fieldEl.innerHTML = renderStatus(val);
+  } else if (col === "Flag") {
+    renderFlagCell(fieldEl, row);
   } else if (DATE_FIELDS.has(col)) {
     applyDateCellDisplay(fieldEl, col, row, { context: "modal" });
   } else if (isEmptyValue(val)) {
@@ -1369,7 +1570,7 @@ function createModalField(col, row) {
 
   const labelEl = document.createElement("label");
   labelEl.className = "modal-field-label";
-  labelEl.textContent = col;
+  labelEl.textContent = getColumnLabel(col);
 
   const valueEl = document.createElement("div");
   valueEl.className = "modal-field-value";
@@ -1613,6 +1814,7 @@ initColumnFilterHeaders();
 initCellSelectDropdown();
 initPagination();
 initEditTable();
+initRowSelection();
 updateSortHeaders();
 updateColumnFilterHeaderStates();
 applyColumnVisibility();

@@ -328,7 +328,7 @@ table {
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
-  min-width: 2400px;
+  min-width: 2800px;
 }
 
 thead {
@@ -339,6 +339,7 @@ thead {
 }
 
 th {
+  position: relative;
   padding: 8px 10px;
   text-align: center;
   font-weight: 600;
@@ -354,6 +355,23 @@ th {
   user-select: none;
   cursor: pointer;
 }
+
+th:not(.th-filterable).sorted-asc,
+th:not(.th-filterable).sorted-desc {
+  padding-right: 22px;
+}
+
+th:not(.th-filterable).sorted-asc::after,
+th:not(.th-filterable).sorted-desc::after {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-weight: 600;
+}
+
+th:not(.th-filterable).sorted-asc::after { content: '↑'; }
+th:not(.th-filterable).sorted-desc::after { content: '↓'; }
 
 th.col-leading,
 td.col-leading {
@@ -384,14 +402,27 @@ th[data-col="CXL Date"]:hover {
   background: #dedad2;
 }
 
-th.sorted-asc::after { content: ' ↑'; }
-th.sorted-desc::after { content: ' ↓'; }
-
 th.th-filterable {
   cursor: pointer;
   padding-right: 26px;
-  position: relative;
 }
+
+th.th-filterable.sorted-asc,
+th.th-filterable.sorted-desc {
+  padding-right: 40px;
+}
+
+th.th-filterable.sorted-asc::before,
+th.th-filterable.sorted-desc::before {
+  position: absolute;
+  top: 50%;
+  right: 26px;
+  transform: translateY(-50%);
+  font-weight: 600;
+}
+
+th.th-filterable.sorted-asc::before { content: '↑'; }
+th.th-filterable.sorted-desc::before { content: '↓'; }
 
 th.th-filterable::after,
 td.select-cell.select-cell-hover::after {
@@ -462,6 +493,10 @@ th.th-filterable.filter-active {
 }
 
 th.th-filterable .th-label {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   cursor: pointer;
   text-decoration: underline dotted transparent;
 }
@@ -469,14 +504,6 @@ th.th-filterable .th-label {
 th.th-filterable .th-label:hover {
   text-decoration-color: var(--text-muted);
 }
-
-th.th-filterable.sorted-asc::after,
-th.th-filterable.sorted-desc::after {
-  content: '';
-}
-
-th.th-filterable.sorted-asc .th-label::after { content: ' ↑'; }
-th.th-filterable.sorted-desc .th-label::after { content: ' ↓'; }
 
 /* ── Cell select dropdown ── */
 .cell-select-dropdown {
@@ -596,17 +623,33 @@ td.select-cell.select-cell-open {
   max-width: 420px;
 }
 
+.edit-table-header {
+  margin-bottom: 8px;
+}
+
 .edit-table-title {
+  display: block;
   font-size: 12px;
   font-weight: 600;
   color: var(--text);
+  margin-bottom: 4px;
+}
+
+.edit-table-toolbar-links,
+.edit-table-default-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.edit-table-default-actions {
+  margin-bottom: 10px;
 }
 
 .edit-table-list {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  max-height: 320px;
-  overflow-y: auto;
   margin-bottom: 10px;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -744,6 +787,88 @@ td.readonly-copy {
   -webkit-user-select: none;
 }
 
+th.th-select-col,
+td.td-select-cell,
+th.th-flag-col,
+td.td-flag-cell {
+  padding-left: 6px;
+  padding-right: 6px;
+  text-align: center;
+}
+
+th.th-select-col,
+th.th-flag-col {
+  cursor: default;
+}
+
+th.th-select-col input[type="checkbox"],
+.po-select-checkbox {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
+.th-flag-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+}
+
+.po-flag-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.po-flag-btn:hover {
+  background: var(--row-hover);
+  color: var(--text);
+}
+
+.po-flag-btn.is-flagged {
+  color: var(--warning);
+}
+
+.po-flag-btn.is-flagged:hover {
+  background: var(--row-hover);
+  color: #854f0b;
+}
+
+tr.row-flagged td {
+  background: #ffebeb;
+}
+
+tr.row-flagged:hover td {
+  background: rgb(249, 237, 237)
+}
+
+tr.row-flagged:has(.po-select-checkbox:checked) td {
+  background: #ffefcf;
+}
+
+tr.row-flagged:has(.po-select-checkbox:checked):hover td {
+  background: #ffe8bc !important;
+}
+
+tr:has(.po-select-checkbox:checked):not(.row-flagged) td {
+  background: #faf9f6;
+}
+
+tr:has(.po-select-checkbox:checked):not(.row-flagged):hover td {
+  background: #f3f2ed !important;
+}
+
 td.readonly-copy,
 .modal-po-num.readonly-copy,
 .modal-field-value.readonly-copy {
@@ -808,9 +933,11 @@ td.editable:hover { background: var(--accent-light) !important; }
 }
 
 /* ── Column widths ── */
-.col-division    { width: 100px; }
-.col-status      { width: 100px; }
-.col-vendor      { width: 80px; }
+.col-select      { width: 36px; }
+.col-flag        { width: 36px; }
+.col-division    { width: 120px; }
+.col-status      { width: 130px; }
+.col-vendor      { width: 130px; }
 .col-buyer       { width: 120px; }
 .col-buyer-po    { width: 100px; }
 .col-so          { width: 80px; }
@@ -823,6 +950,10 @@ td.editable:hover { background: var(--accent-light) !important; }
 .col-actual-qty  { width: 60px; }
 .col-ctn-qty     { width: 60px; }
 .col-ship-method { width: 100px; }
+.col-vessel      { width: 100px; }
+.col-house       { width: 80px; }
+.col-shipped     { width: 80px; }
+.col-etd         { width: 80px; }
 .col-est-exf     { width: 80px; }
 .col-est-ihd     { width: 80px; }
 .col-exf         { width: 80px; }

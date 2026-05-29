@@ -61,19 +61,30 @@
   <div class="table-scroll-x">
   <table id="poTable">
     <colgroup>
-      <col class="col-division" /><col class="col-status" /><col class="col-vendor" />
+      <col class="col-select" /><col class="col-flag" />
+      <col class="col-status" /><col class="col-division" /><col class="col-vendor" />
       <col class="col-buyer" /><col class="col-buyer-po" />
       <col class="col-so" /><col class="col-po-date" /><col class="col-po" />
       <col class="col-old-po" /><col class="col-style" /><col class="col-color" />
       <col class="col-po-qty" /><col class="col-actual-qty" /><col class="col-ctn-qty" />
-      <col class="col-ship-method" /><col class="col-est-exf" /><col class="col-est-ihd" />
-      <col class="col-exf" /><col class="col-eta" /><col class="col-ihd" />
+      <col class="col-ship-method" /><col class="col-vessel" /><col class="col-house" />
+      <col class="col-shipped" /><col class="col-etd" />
+      <col class="col-est-exf" /><col class="col-est-ihd" /><col class="col-exf" />
+      <col class="col-eta" /><col class="col-ihd" />
       <col class="col-cxl" /><col class="col-assign" /><col class="col-notes" />
     </colgroup>
     <thead>
       <tr>
-        <th data-col="Division" onclick="sortBy('Division')">Division</th>
+        <th class="th-select-col" data-col="Selected">
+          <input type="checkbox" id="selectAllRowsCheckbox" aria-label="Select all filtered rows" />
+        </th>
+        <th class="th-flag-col" data-col="Flag" aria-label="Flag">
+          <span class="th-flag-icon" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+          </span>
+        </th>
         <th data-col="Status" onclick="sortBy('Status')">Status</th>
+        <th data-col="Division" onclick="sortBy('Division')">Division</th>
         <th class="th-filterable" data-col="Vendor"><span class="th-label">Vendor</span></th>
         <th class="th-filterable" data-col="Buyer"><span class="th-label">Buyer</span></th>
         <th data-col="Buyer PO #" onclick="sortBy('Buyer PO #')">Buyer PO #</th>
@@ -84,35 +95,45 @@
         <th data-col="Style #" onclick="sortBy('Style #')">Style #</th>
         <th data-col="Color" onclick="sortBy('Color')">Color</th>
         <th data-col="PO Qty" onclick="sortBy('PO Qty')">PO Qty</th>
-        <th data-col="Actual Qty" onclick="sortBy('Actual Qty')">Actual Qty</th>
-        <th data-col="Ctn Qty" onclick="sortBy('Ctn Qty')">Ctn Qty</th>
+        <th data-col="Actual Qty" onclick="sortBy('Actual Qty')">Act Qty</th>
+        <th data-col="Ctn Qty" onclick="sortBy('Ctn Qty')">CTN</th>
         <th class="th-filterable" data-col="Ship Method"><span class="th-label">Ship Method</span></th>
+        <th data-col="Vessel" onclick="sortBy('Vessel')">Vessel</th>
+        <th data-col="House #" onclick="sortBy('House #')">House #</th>
+        <th data-col="Shipped" onclick="sortBy('Shipped')">Shipped</th>
+        <th data-col="ETD" onclick="sortBy('ETD')">ETD</th>
         <th class="th-filterable" data-col="EST EXF"><span class="th-label">EST EXF</span></th>
         <th class="th-filterable" data-col="EST IHD"><span class="th-label">EST IHD</span></th>
         <th class="th-filterable" data-col="EXF"><span class="th-label">EXF</span></th>
         <th class="th-filterable" data-col="ETA"><span class="th-label">ETA</span></th>
         <th class="th-filterable" data-col="IHD"><span class="th-label">IHD</span></th>
         <th class="th-filterable" data-col="CXL Date"><span class="th-label">CXL Date</span></th>
-        <th class="th-filterable" data-col="Assign Date"><span class="th-label">Assign Date</span></th>
+        <th class="th-filterable" data-col="Assign Date"><span class="th-label">Assigned</span></th>
         <th data-col="Notes" onclick="sortBy('Notes')">Notes</th>
       </tr>
     </thead>
     <tbody id="tableBody">
-      <tr class="state-row"><td colspan="23">Loading POs…</td></tr>
+      <tr class="state-row"><td colspan="29">Loading POs…</td></tr>
     </tbody>
   </table>
   </div>
 </div>
 
 <div id="editTablePopover" class="column-filter-popover edit-table-popover" hidden>
-  <div class="column-filter-toolbar">
+  <div class="edit-table-header">
     <span class="edit-table-title">Show columns</span>
-    <span class="column-filter-sep">|</span>
-    <button type="button" class="column-filter-link" id="editTableSelectAll">Select all</button>
-    <span class="column-filter-sep">|</span>
-    <button type="button" class="column-filter-link" id="editTableClearAll">Clear all</button>
+    <div class="edit-table-toolbar-links">
+      <button type="button" class="column-filter-link" id="editTableSelectAll">Select all</button>
+      <span class="column-filter-sep">|</span>
+      <button type="button" class="column-filter-link" id="editTableClearAll">Clear all</button>
+    </div>
   </div>
   <div class="edit-table-list" id="editTableColumnList"></div>
+  <div class="edit-table-default-actions">
+    <button type="button" class="column-filter-link" id="editTableSaveDefault">Save as default</button>
+    <span class="column-filter-sep">|</span>
+    <button type="button" class="column-filter-link" id="editTableResetDefault">Reset to default</button>
+  </div>
   <div class="column-filter-footer">
     <button type="button" class="btn btn-primary column-filter-ok" id="editTableOk">OK</button>
     <button type="button" class="btn column-filter-cancel" id="editTableCancel">Cancel</button>
