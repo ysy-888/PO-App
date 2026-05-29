@@ -626,7 +626,7 @@ th.th-filterable.filter-active::after {
 
 th.th-filterable.filter-active {
   background: var(--accent-light);
-  color: var(--accent);
+  color: var(--text);
 }
 
 th.th-filterable .th-label {
@@ -737,6 +737,21 @@ td.select-cell.select-cell-open {
 }
 
 .column-filter-option:hover { background: var(--row-hover); }
+
+.column-filter-group-heading {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  padding: 8px 10px 4px;
+}
+
+.column-filter-group-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
 
 .column-filter-option input {
   flex-shrink: 0;

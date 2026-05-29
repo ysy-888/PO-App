@@ -557,6 +557,21 @@ const DEFAULT_SORT_COLUMNS = ["Status", "CXL Date", "Buyer", "Buyer PO #"];
 
 const DIVISIONS = ["Elevator Disco", "Freesia"];
 
+const DIVISION_BUYERS = {
+  "Elevator Disco": [
+    "Anthropologie",
+    "Bloomingdale's",
+    "Urban Outfitters",
+    "Nuuly",
+    "Specialty",
+  ],
+  "Freesia": [
+    "Lulu's",
+    "12th Tribe",
+    "Short Story",
+  ],
+};
+
 let activeDivision = "";
 let activeStatus = STATUS_FILTER_OPEN;
 
@@ -618,6 +633,15 @@ function setDivisionFilter(division) {
   document.querySelectorAll("#divisionFilters .filter-btn").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.division === division);
   });
+  pruneBuyerColumnFilter();
+  if (openFilterCol === "Buyer") {
+    filterDraft = getEffectiveFilterSelection("Buyer");
+    renderColumnFilterList();
+    const buyerHeader = document.querySelector('th.th-filterable[data-col="Buyer"]');
+    if (buyerHeader) {
+      requestAnimationFrame(() => positionColumnFilterPopover(buyerHeader));
+    }
+  }
   applyFilters();
 }
 
@@ -678,7 +702,39 @@ function compareFilterValues(a, b, col) {
   return a.localeCompare(b, undefined, { numeric: !DATE_FILTER_COLS.has(col) });
 }
 
+function getBuyerFilterValues() {
+  if (activeDivision && DIVISION_BUYERS[activeDivision]) {
+    return [...DIVISION_BUYERS[activeDivision]];
+  }
+  return [
+    ...DIVISION_BUYERS["Elevator Disco"],
+    ...DIVISION_BUYERS["Freesia"],
+  ];
+}
+
+function pruneBuyerColumnFilter() {
+  const allowed = new Set(getBuyerFilterValues());
+  const selected = columnFilters["Buyer"];
+  if (selected == null) return;
+
+  const next = new Set([...selected].filter(value => allowed.has(value)));
+  if (next.size === selected.size) return;
+
+  if (next.size === 0) {
+    columnFilters["Buyer"] = new Set();
+  } else if (next.size === allowed.size) {
+    columnFilters["Buyer"] = null;
+  } else {
+    columnFilters["Buyer"] = next;
+  }
+  updateColumnFilterHeaderStates();
+}
+
 function getUniqueColumnValues(col) {
+  if (col === "Buyer") {
+    return getBuyerFilterValues();
+  }
+
   const values = new Set();
   const sourceRows = DATE_FILTER_COLS.has(col)
     ? allRows.filter(isOpenRow)
@@ -731,30 +787,60 @@ function updateColumnFilterHeaderStates() {
   });
 }
 
+function createColumnFilterOption(value, col) {
+  const label = document.createElement("label");
+  label.className = "column-filter-option";
+
+  const cb = document.createElement("input");
+  cb.type = "checkbox";
+  cb.value = value;
+  cb.checked = filterDraft.has(value);
+  cb.addEventListener("change", () => {
+    if (cb.checked) filterDraft.add(value);
+    else filterDraft.delete(value);
+  });
+
+  const span = document.createElement("span");
+  span.textContent = getFilterValueLabel(col, value);
+
+  label.appendChild(cb);
+  label.appendChild(span);
+  return label;
+}
+
+function renderGroupedBuyerFilterList(list) {
+  DIVISIONS.forEach((division, index) => {
+    if (index > 0) {
+      const divider = document.createElement("div");
+      divider.className = "column-filter-group-divider";
+      divider.setAttribute("aria-hidden", "true");
+      list.appendChild(divider);
+    }
+
+    const heading = document.createElement("div");
+    heading.className = "column-filter-group-heading";
+    heading.textContent = division;
+    list.appendChild(heading);
+
+    DIVISION_BUYERS[division].forEach(value => {
+      list.appendChild(createColumnFilterOption(value, "Buyer"));
+    });
+  });
+}
+
 function renderColumnFilterList() {
   const list = document.getElementById("columnFilterList");
   if (!list || !openFilterCol) return;
 
   list.innerHTML = "";
+
+  if (openFilterCol === "Buyer" && !activeDivision) {
+    renderGroupedBuyerFilterList(list);
+    return;
+  }
+
   getUniqueColumnValues(openFilterCol).forEach(value => {
-    const label = document.createElement("label");
-    label.className = "column-filter-option";
-
-    const cb = document.createElement("input");
-    cb.type = "checkbox";
-    cb.value = value;
-    cb.checked = filterDraft.has(value);
-    cb.addEventListener("change", () => {
-      if (cb.checked) filterDraft.add(value);
-      else filterDraft.delete(value);
-    });
-
-    const span = document.createElement("span");
-    span.textContent = getFilterValueLabel(openFilterCol, value);
-
-    label.appendChild(cb);
-    label.appendChild(span);
-    list.appendChild(label);
+    list.appendChild(createColumnFilterOption(value, openFilterCol));
   });
 }
 
