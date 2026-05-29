@@ -555,7 +555,7 @@ td.select-cell.select-cell-open {
 }
 
 .column-filter-list {
-  max-height: 240px;
+  max-height: 420px;
   overflow-y: auto;
   margin-bottom: 10px;
   border: 1px solid var(--border);
