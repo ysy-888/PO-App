@@ -28,14 +28,12 @@ const PO_SYNC_FROM_SHIPMENT_FIELDS = [
 
 const EDITABLE_FIELDS = [
   "Flag",
-  "PO Qty", "Actual Qty", "Status", "Ship Method", "Ctn Qty",
+  "PO Qty", "Status", "Ship Method",
   "Vessel", "House #", "Shipped", "ETD", "ETA", "IHD",
   "EST EXF", "EST IHD", "EXF", "CXL Date", "Assign Date", "Notes",
   "Size",
   "PO Unit 1", "PO Unit 2", "PO Unit 3", "PO Unit 4",
-  "PO Unit 5", "PO Unit 6", "PO Unit 7", "PO Unit 8",
-  "Act Unit 1", "Act Unit 2", "Act Unit 3", "Act Unit 4",
-  "Act Unit 5", "Act Unit 6", "Act Unit 7", "Act Unit 8"
+  "PO Unit 5", "PO Unit 6", "PO Unit 7", "PO Unit 8"
 ];
 
 const SHIPMENT_EDITABLE_FIELDS = SHIPMENT_DATA_FIELDS.slice();
@@ -237,6 +235,19 @@ function generatePackingListId_(packingLists) {
   return formatPackingListId_(max + 1);
 }
 
+function getNextPackingListId_(packingListsSheet) {
+  const rows = packingListsSheet.getDataRange().getValues();
+  if (rows.length < 2) return formatPackingListId_(1);
+  const headers = rows[0].map(h => String(h ?? "").trim());
+  const idCol = headers.indexOf(PACKING_LIST_ID_FIELD);
+  if (idCol === -1) return formatPackingListId_(1);
+  let max = 0;
+  for (let i = 1; i < rows.length; i++) {
+    max = Math.max(max, parsePackingListIdSequence_(rows[i][idCol]));
+  }
+  return formatPackingListId_(max + 1);
+}
+
 function pickChargebackData_(source) {
   const out = {};
   CHARGEBACK_EDITABLE_FIELDS.forEach(field => {
@@ -320,54 +331,42 @@ function normalizePackingCartons_(cartons) {
   });
 }
 
-function computePackingTotalsByUnit_(cartons) {
-  const totals = {};
-  PACKING_UNIT_FIELDS.forEach(field => { totals[field] = 0; });
-  cartons.forEach(carton => {
-    PACKING_UNIT_FIELDS.forEach(field => {
-      totals[field] += toPackingQty_(carton[field]);
-    });
-  });
-  return totals;
+function rewritePackingCartonsForList_(cartonsSheet, packingListId, cartons) {
+  const data = cartonsSheet.getDataRange().getValues();
+  if (data.length === 0) return;
+  const headers = data[0].map(h => String(h ?? "").trim());
+  const idCol = headers.indexOf(PACKING_LIST_ID_FIELD);
+  if (idCol === -1) throw new Error("Packing List ID column not found in cartons sheet.");
+
+  const key = String(packingListId);
+  const keptRows = [];
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][idCol]) !== key) keptRows.push(data[i]);
+  }
+
+  const normalized = normalizePackingCartons_(cartons || []);
+  const newRows = normalized.map(carton =>
+    headers.map(h => {
+      if (h === PACKING_LIST_ID_FIELD) return key;
+      return carton[h] !== undefined ? carton[h] : "";
+    })
+  );
+
+  const outRows = [data[0]].concat(keptRows, newRows);
+  const lastCol = headers.length;
+  const oldLastRow = Math.max(cartonsSheet.getLastRow(), 1);
+  cartonsSheet.getRange(1, 1, outRows.length, lastCol).setValues(outRows);
+  if (oldLastRow > outRows.length) {
+    cartonsSheet.getRange(outRows.length + 1, 1, oldLastRow - outRows.length, lastCol).clearContent();
+  }
 }
 
 function deletePackingCartons_(cartonsSheet, packingListId) {
-  const rows = cartonsSheet.getDataRange().getValues();
-  if (rows.length < 2) return;
-  const headers = rows[0].map(h => String(h ?? "").trim());
-  const idCol = headers.indexOf(PACKING_LIST_ID_FIELD);
-  if (idCol === -1) throw new Error("Packing List ID column not found in cartons sheet.");
-  const rowsToDelete = [];
-  for (let i = 1; i < rows.length; i++) {
-    if (String(rows[i][idCol]) === String(packingListId)) rowsToDelete.push(i + 1);
-  }
-  rowsToDelete.sort((a, b) => b - a);
-  rowsToDelete.forEach(rowIndex => cartonsSheet.deleteRow(rowIndex));
+  rewritePackingCartonsForList_(cartonsSheet, packingListId, []);
 }
 
-function appendPackingCartons_(cartonsSheet, packingListId, cartons) {
-  const headers = cartonsSheet.getRange(1, 1, 1, cartonsSheet.getLastColumn()).getValues()[0]
-    .map(h => String(h ?? "").trim());
-  if (cartons.length === 0) return;
-  const rows = cartons.map(carton => (
-    headers.map(h => {
-      if (h === PACKING_LIST_ID_FIELD) return packingListId;
-      return carton[h] !== undefined ? carton[h] : "";
-    })
-  ));
-  cartonsSheet.getRange(cartonsSheet.getLastRow() + 1, 1, rows.length, headers.length).setValues(rows);
-}
-
-function syncPoActualsFromPacking_(poSheet, poFound, cartons, extraUpdates) {
-  const totals = computePackingTotalsByUnit_(cartons);
+function writePoUpdatesFromPackingSave_(poSheet, poFound, extraUpdates) {
   const updates = Object.assign({}, extraUpdates || {});
-  let actualQty = 0;
-  PACKING_UNIT_FIELDS.forEach((field, index) => {
-    const qty = totals[field] || 0;
-    updates["Act Unit " + (index + 1)] = qty || "";
-    actualQty += qty;
-  });
-  updates["Actual Qty"] = actualQty;
   updates["Has Packing List"] = true;
   writePoFields_(poSheet, poFound.rowIndex, poFound.headers, updates);
   return updates;
@@ -667,11 +666,10 @@ function handleSavePackingList(payload) {
 
   const packingListsSheet = getPackingListsSheet_();
   const cartonsSheet = getPackingCartonsSheet_();
-  const existingLists = sheetToObjects_(packingListsSheet, PACKING_LIST_ID_FIELD);
   const existing = findPackingListForPo_(packingListsSheet, poNumber);
   const packingListId = existing
     ? String(existing.packingListId)
-    : generatePackingListId_(existingLists);
+    : getNextPackingListId_(packingListsSheet);
   const cartons = normalizePackingCartons_(payload.cartons || []);
   const now = new Date();
   const cartonCount = payload.packingList?.["Carton Count"] || cartons.length;
@@ -686,10 +684,10 @@ function handleSavePackingList(payload) {
   }
 
   if (existing) {
-    existing.headers.forEach((field, colIndex) => {
-      if (field === "Carton Count") packingListsSheet.getRange(existing.rowIndex, colIndex + 1).setValue(cartonCount);
-      if (field === "Notes") packingListsSheet.getRange(existing.rowIndex, colIndex + 1).setValue(notes);
-      if (field === "Updated At") packingListsSheet.getRange(existing.rowIndex, colIndex + 1).setValue(now);
+    writePoFields_(packingListsSheet, existing.rowIndex, existing.headers, {
+      "Carton Count": cartonCount,
+      "Notes": notes,
+      "Updated At": now,
     });
   } else {
     const headers = packingListsSheet.getRange(1, 1, 1, packingListsSheet.getLastColumn()).getValues()[0]
@@ -705,9 +703,8 @@ function handleSavePackingList(payload) {
     packingListsSheet.appendRow(row);
   }
 
-  deletePackingCartons_(cartonsSheet, packingListId);
-  appendPackingCartons_(cartonsSheet, packingListId, cartons);
-  const combinedPoUpdates = syncPoActualsFromPacking_(poSheet, poFound, cartons, poEditUpdates);
+  rewritePackingCartonsForList_(cartonsSheet, packingListId, cartons);
+  const combinedPoUpdates = writePoUpdatesFromPackingSave_(poSheet, poFound, poEditUpdates);
 
   return corsResponse({
     success: true,
@@ -734,9 +731,7 @@ function handleDeletePackingList(payload) {
     const poSheet = getSheet();
     const poFound = findPoRowIndex_(poSheet, poNumber);
     if (poFound) {
-      const updates = { "Has Packing List": false, "Actual Qty": "" };
-      for (let i = 1; i <= 8; i++) updates["Act Unit " + i] = "";
-      writePoFields_(poSheet, poFound.rowIndex, poFound.headers, updates);
+      writePoFields_(poSheet, poFound.rowIndex, poFound.headers, { "Has Packing List": false });
     }
   }
 

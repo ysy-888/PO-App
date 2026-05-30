@@ -2465,7 +2465,24 @@ td.editable:not(.select-cell):hover .editable-preview {
 .packing-list-actions {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.packing-list-editor-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text);
+}
+
+.packing-list-controls-right {
+  display: flex;
+  align-items: center;
   gap: 8px;
+  margin-left: auto;
 }
 
 .packing-list-count-label {
@@ -2480,9 +2497,9 @@ td.editable:not(.select-cell):hover .editable-preview {
 }
 
 .packing-list-count-input {
-  width: 64px;
+  width: 44px;
   height: 28px;
-  padding: 0 8px;
+  padding: 0 6px;
   border: 1px solid var(--border-strong);
   border-radius: 6px;
   font-family: var(--font);
@@ -2494,107 +2511,123 @@ td.editable:not(.select-cell):hover .editable-preview {
   color: var(--text);
 }
 
-.packing-list-table-wrap {
+.packing-list-grid-panel {
   flex: 1;
   min-height: 0;
-  max-height: 520px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+}
+
+.packing-list-grid-scroll {
+  flex: 1;
+  min-height: 0;
+  max-height: 480px;
+  overflow: auto;
+  min-width: 0;
+}
+
+.packing-list-grid {
+  --packing-rowhead-width: 36px;
+  --packing-unit-width: 40px;
+  --packing-total-width: 44px;
+  --packing-gap: 4px;
+  display: grid;
+  grid-template-columns:
+    var(--packing-rowhead-width)
+    repeat(var(--size-col-count), minmax(0, var(--packing-unit-width)))
+    var(--packing-total-width);
+  gap: 5px var(--packing-gap);
+  align-items: center;
   width: max-content;
   max-width: 100%;
-  overflow: auto;
-  border: 1px solid var(--border);
-  border-radius: 8px;
 }
 
-.packing-list-table {
-  width: auto;
-  min-width: max-content;
-  border-collapse: collapse;
-  table-layout: fixed;
-}
-
-.packing-list-table th,
-.packing-list-table td {
-  width: 34px;
-  min-width: 34px;
-  padding: 4px 5px;
+.packing-list-grid--head {
+  flex-shrink: 0;
+  padding-bottom: 6px;
+  margin-bottom: 2px;
   border-bottom: 1px solid var(--border);
-  border-right: 1px solid var(--border);
+}
+
+.packing-list-rowhead {
+  min-width: 0;
+  padding-right: 2px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.packing-list-rowhead--carton {
+  padding-right: 0;
   text-align: center;
-  vertical-align: middle;
-  cursor: default;
-}
-
-.packing-list-table th:first-child,
-.packing-list-table td:first-child {
-  width: 58px;
-  min-width: 58px;
-}
-
-.packing-list-table thead th {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  background: #f2f3f5;
   font-size: 10px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text);
+  letter-spacing: 0.02em;
 }
 
-.packing-list-table th:hover {
-  background: inherit;
-  color: inherit;
+.packing-list-rowhead--blank {
+  align-self: stretch;
 }
 
-.packing-list-table thead th:hover {
-  background: #f2f3f5;
-  color: var(--text);
-}
-
-.packing-list-table tfoot th:hover,
-.packing-list-table tfoot td:hover {
-  background: var(--accent-light);
-  color: var(--text);
-}
-
-.packing-list-table tfoot th,
-.packing-list-table tfoot td {
-  position: sticky;
-  bottom: 0;
-  z-index: 1;
-  background: var(--accent-light);
-  border-top: 2px solid var(--border-strong);
-  font-size: 12px;
+.packing-list-colhead,
+.packing-list-totalhead {
+  min-width: 0;
+  text-align: center;
+  font-size: 11px;
   font-weight: 700;
   color: var(--text);
 }
 
-.packing-list-table tfoot th:first-child {
-  border-left: 1px solid var(--border-strong);
+.packing-list-totalhead {
+  font-size: 10px;
 }
 
-.packing-list-table tfoot td:last-child {
-  border-right: 1px solid var(--border-strong);
+.packing-list-static {
+  width: 100%;
+  min-width: 0;
+  min-height: 28px;
+  box-sizing: border-box;
+  padding: 6px 4px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
 }
 
+.packing-list-total,
 .packing-list-row-total,
 .packing-list-total-cell,
 .packing-list-grand-total {
+  min-width: 0;
+  text-align: center;
+  font-size: 12px;
   font-weight: 700;
   color: var(--text);
 }
 
 .packing-list-input {
   width: 100%;
-  height: 26px;
+  min-width: 0;
+  height: 28px;
+  box-sizing: border-box;
   border: 1px solid transparent;
   border-radius: 6px;
   background: #fff;
-  color: var(--text);
   font-family: var(--font);
   font-size: 12px;
   text-align: center;
+  color: var(--text);
+  transition: border-color 0.12s ease, background 0.12s ease;
   -moz-appearance: textfield;
   appearance: textfield;
 }

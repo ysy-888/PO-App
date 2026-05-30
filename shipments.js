@@ -793,10 +793,20 @@ async function demoCreateShipment(poNumbers, shipment) {
 }
 
 function formatShipmentLinkedPoCell(col, row) {
-  const val = row[col];
+  let val = row[col];
+  if (col === "Actual Qty" && typeof getPackingActualQtyForRow === "function") {
+    val = getPackingActualQtyForRow(row);
+  }
+  if (col === "Ctn Qty" && typeof getPackingCtnQtyForRow === "function") {
+    val = getPackingCtnQtyForRow(row);
+  }
   if (col === "CXL Date") {
     if (isEmptyValue(val)) return EMPTY_DISPLAY;
     return formatDateForDisplay(val);
+  }
+  if (col === "Actual Qty" || col === "Ctn Qty") {
+    if (toQtyNumber(val) <= 0) return EMPTY_DISPLAY;
+    return String(val);
   }
   if (isEmptyValue(val)) return EMPTY_DISPLAY;
   return String(val);
