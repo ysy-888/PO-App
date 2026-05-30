@@ -1,8 +1,10 @@
 const SHEET_NAME = "POs";
 const SHIPMENTS_SHEET_NAME = "Shipments";
+const CHARGEBACKS_SHEET_NAME = "Chargebacks";
 const COLUMN_DEFAULT_KEY = "defaultVisibleColumns";
 const STATUS_DEFAULT_KEY = "defaultStatusFilter";
 const SHIPMENT_ID_FIELD = "Shipment ID";
+const CHARGEBACK_ID_FIELD = "Chargeback ID";
 
 /*
   POs sheet row 1 headers (see po-table.js COLUMNS). Add column: Shipment ID
@@ -35,6 +37,14 @@ const EDITABLE_FIELDS = [
 
 const SHIPMENT_EDITABLE_FIELDS = SHIPMENT_DATA_FIELDS.slice();
 
+const CHARGEBACK_DATA_FIELDS = [
+  "PO #", "Amount", "Reason", "Status", "Date", "Notes", "Created At", "Updated At"
+];
+
+const CHARGEBACK_EDITABLE_FIELDS = [
+  "Amount", "Reason", "Status", "Notes"
+];
+
 function getSheet() {
   return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
 }
@@ -46,6 +56,18 @@ function getShipmentsSheet_() {
     sheet = ss.insertSheet(SHIPMENTS_SHEET_NAME);
     sheet.getRange(1, 1, 1, SHIPMENT_DATA_FIELDS.length + 1).setValues([[
       SHIPMENT_ID_FIELD, ...SHIPMENT_DATA_FIELDS
+    ]]);
+  }
+  return sheet;
+}
+
+function getChargebacksSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(CHARGEBACKS_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(CHARGEBACKS_SHEET_NAME);
+    sheet.getRange(1, 1, 1, CHARGEBACK_DATA_FIELDS.length + 1).setValues([[
+      CHARGEBACK_ID_FIELD, ...CHARGEBACK_DATA_FIELDS
     ]]);
   }
   return sheet;
@@ -139,6 +161,59 @@ function generateShipmentId_(shipments) {
     max = Math.max(max, parseShipmentIdSequence_(s[SHIPMENT_ID_FIELD]));
   });
   return formatShipmentId_(max + 1);
+}
+
+function parseChargebackIdSequence_(id) {
+  const s = String(id ?? "").trim();
+  const m = /^CB-(\d+)$/.exec(s);
+  return m ? Number(m[1]) : 0;
+}
+
+function formatChargebackId_(sequence) {
+  return "CB-" + String(sequence).padStart(4, "0");
+}
+
+function generateChargebackId_(chargebacks) {
+  let max = 0;
+  chargebacks.forEach(chargeback => {
+    max = Math.max(max, parseChargebackIdSequence_(chargeback[CHARGEBACK_ID_FIELD]));
+  });
+  return formatChargebackId_(max + 1);
+}
+
+function pickChargebackData_(source) {
+  const out = {};
+  CHARGEBACK_EDITABLE_FIELDS.forEach(field => {
+    if (source && source[field] !== undefined) out[field] = source[field];
+  });
+  return out;
+}
+
+function findChargebackRowIndex_(chargebacksSheet, chargebackId) {
+  const rows = chargebacksSheet.getDataRange().getValues();
+  const headers = rows[0].map(h => String(h ?? "").trim());
+  const idCol = headers.indexOf(CHARGEBACK_ID_FIELD);
+  if (idCol === -1) throw new Error("Chargeback ID column not found.");
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][idCol]) === String(chargebackId)) {
+      return { rowIndex: i + 1, headers: headers };
+    }
+  }
+  return null;
+}
+
+function appendChargebackRow_(chargebacksSheet, chargebackId, poNumber, chargebackData) {
+  const headers = chargebacksSheet.getRange(1, 1, 1, chargebacksSheet.getLastColumn()).getValues()[0]
+    .map(h => String(h ?? "").trim());
+  const now = new Date();
+  const row = headers.map(h => {
+    if (h === CHARGEBACK_ID_FIELD) return chargebackId;
+    if (h === "PO #") return poNumber;
+    if (h === "Date") return now;
+    if (h === "Created At" || h === "Updated At") return now;
+    return chargebackData[h] !== undefined ? chargebackData[h] : "";
+  });
+  chargebacksSheet.appendRow(row);
 }
 
 function pickShipmentData_(source) {
@@ -343,6 +418,82 @@ function handleDeleteShipment(payload) {
   return corsResponse({ success: true, deleted: rowsToDelete.length });
 }
 
+function handleCreateChargeback(payload) {
+  const poNumber = String(payload.poNumber ?? "").trim();
+  if (!poNumber) {
+    return corsResponse({ success: false, error: "PO # is required." });
+  }
+
+  const poSheet = getSheet();
+  const poFound = findPoRowIndex_(poSheet, poNumber);
+  if (!poFound) {
+    return corsResponse({ success: false, error: "PO # not found: " + poNumber });
+  }
+
+  const chargebackData = pickChargebackData_(payload.chargeback || {});
+  const chargebacksSheet = getChargebacksSheet_();
+  const existing = sheetToObjects_(chargebacksSheet, CHARGEBACK_ID_FIELD);
+  const chargebackId = generateChargebackId_(existing);
+
+  appendChargebackRow_(chargebacksSheet, chargebackId, poNumber, chargebackData);
+  return corsResponse({ success: true, chargebackId: chargebackId });
+}
+
+function handleUpdateChargeback(payload) {
+  const chargebackId = String(payload.chargebackId ?? "").trim();
+  if (!chargebackId) {
+    return corsResponse({ success: false, error: "Chargeback ID is required." });
+  }
+
+  const updates = pickChargebackData_(payload.chargeback || {});
+  const invalidFields = Object.keys(payload.chargeback || {}).filter(f => !CHARGEBACK_EDITABLE_FIELDS.includes(f));
+  if (invalidFields.length > 0) {
+    return corsResponse({
+      success: false,
+      error: "Not allowed to edit chargeback field(s): " + invalidFields.join(", ")
+    });
+  }
+
+  const chargebacksSheet = getChargebacksSheet_();
+  const found = findChargebackRowIndex_(chargebacksSheet, chargebackId);
+  if (!found) {
+    return corsResponse({ success: false, error: "Chargeback not found: " + chargebackId });
+  }
+
+  found.headers.forEach((field, colIndex) => {
+    if (updates[field] !== undefined) {
+      chargebacksSheet.getRange(found.rowIndex, colIndex + 1).setValue(updates[field]);
+    }
+    if (field === "Updated At") {
+      chargebacksSheet.getRange(found.rowIndex, colIndex + 1).setValue(new Date());
+    }
+  });
+
+  return corsResponse({ success: true, chargebackId: chargebackId });
+}
+
+function handleDeleteChargeback(payload) {
+  const rawIds = payload.chargebackIds || payload.chargebackId;
+  const ids = Array.isArray(rawIds) ? rawIds : [rawIds];
+  if (ids.length === 0 || ids.every(id => !String(id ?? "").trim())) {
+    return corsResponse({ success: false, error: "Chargeback ID is required." });
+  }
+
+  const chargebacksSheet = getChargebacksSheet_();
+  const rowsToDelete = [];
+  ids.forEach(rawId => {
+    const chargebackId = String(rawId ?? "").trim();
+    if (!chargebackId) return;
+    const found = findChargebackRowIndex_(chargebacksSheet, chargebackId);
+    if (found) rowsToDelete.push(found.rowIndex);
+  });
+
+  rowsToDelete.sort((a, b) => b - a);
+  rowsToDelete.forEach(rowIndex => chargebacksSheet.deleteRow(rowIndex));
+
+  return corsResponse({ success: true, deleted: rowsToDelete.length });
+}
+
 function handleUpdate(payload) {
   const { poNumber, updates } = payload;
 
@@ -368,13 +519,16 @@ function doGet(e) {
   try {
     const poSheet = getSheet();
     const shipmentsSheet = getShipmentsSheet_();
+    const chargebacksSheet = getChargebacksSheet_();
     const data = sheetToObjects_(poSheet, "PO #");
     const shipments = sheetToObjects_(shipmentsSheet, SHIPMENT_ID_FIELD);
+    const chargebacks = sheetToObjects_(chargebacksSheet, CHARGEBACK_ID_FIELD);
 
     return corsResponse({
       success: true,
       data: data,
       shipments: shipments,
+      chargebacks: chargebacks,
       defaultColumns: getDefaultColumns_(),
       defaultStatusFilter: getDefaultStatusFilter_(),
     });
@@ -393,6 +547,9 @@ function doPost(e) {
     if (action === "createShipment") return handleCreateShipment(payload);
     if (action === "updateShipment") return handleUpdateShipment(payload);
     if (action === "deleteShipment") return handleDeleteShipment(payload);
+    if (action === "createChargeback") return handleCreateChargeback(payload);
+    if (action === "updateChargeback") return handleUpdateChargeback(payload);
+    if (action === "deleteChargeback") return handleDeleteChargeback(payload);
 
     return corsResponse({ success: false, error: "Unknown action: " + action });
   } catch (err) {

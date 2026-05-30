@@ -10,8 +10,10 @@
 
 <header class="app-header">
   <nav class="app-title-nav" role="tablist" aria-label="Main views">
+    <span class="app-logo-text">Elevator Disco</span>
     <button type="button" class="app-title-tab is-active" id="navTabPo" role="tab" aria-selected="true">Purchase Orders</button>
     <button type="button" class="app-title-tab" id="navTabShipments" role="tab" aria-selected="false">Shipments</button>
+    <button type="button" class="app-title-tab" id="navTabChargebacks" role="tab" aria-selected="false">Chargebacks</button>
   </nav>
   <div class="header-right">
     <button type="button" class="btn btn-primary" onclick="loadData()">
@@ -64,6 +66,17 @@
   <div class="toolbar-end">
     <button type="button" class="btn btn-danger" id="deleteShipmentBtn" hidden>Delete shipment</button>
     <div class="counter" id="shipmentRowCounter">— shipments</div>
+  </div>
+</div>
+
+<div id="chargebackToolbar" class="toolbar" hidden>
+  <div class="search-wrap">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    <input type="search" id="chargebackSearchInput" placeholder="Search chargebacks" />
+  </div>
+  <div class="toolbar-end">
+    <button type="button" class="btn btn-danger" id="deleteChargebackBtn" hidden>Delete chargeback</button>
+    <div class="counter" id="chargebackRowCounter">— chargebacks</div>
   </div>
 </div>
 
@@ -168,6 +181,64 @@
     </thead>
     <tbody id="shipmentTableBody">
       <tr class="state-row"><td colspan="12">Loading shipments…</td></tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<div id="chargebackTableWrap" class="table-scroll-y" hidden>
+  <div class="table-scroll-x">
+  <table id="chargebackTable">
+    <colgroup>
+      <col class="col-select" />
+      <col class="col-date" />
+      <col class="col-po" />
+      <col class="col-so" />
+      <col class="col-style" />
+      <col class="col-color" />
+      <col class="col-buyer" />
+      <col class="col-buyer-po" />
+      <col class="col-po-date" />
+      <col class="col-cxl" />
+      <col class="col-po-qty" />
+      <col class="col-actual-qty" />
+      <col class="col-exf" />
+      <col class="col-ihd" />
+      <col class="col-reason" />
+      <col class="col-amount" />
+      <col class="col-notes" />
+      <col class="col-status" />
+      <col class="col-date" />
+      <col class="col-chargeback-id" />
+    </colgroup>
+    <thead>
+      <tr>
+        <th class="th-select-col">
+          <input type="checkbox" id="selectAllChargebacksCheckbox" aria-label="Select all filtered chargebacks" />
+        </th>
+        <th>Chargeback Date</th>
+        <th>PO #</th>
+        <th>SO #</th>
+        <th>Style #</th>
+        <th>Color</th>
+        <th>Buyer</th>
+        <th>Buyer PO #</th>
+        <th>PO Date</th>
+        <th>CXL Date</th>
+        <th>PO Qty</th>
+        <th>Actual Qty</th>
+        <th>EXF</th>
+        <th>IHD</th>
+        <th>Reason</th>
+        <th>Amount</th>
+        <th>Notes</th>
+        <th>Status</th>
+        <th>Updated At</th>
+        <th>Chargeback ID</th>
+      </tr>
+    </thead>
+    <tbody id="chargebackTableBody">
+      <tr class="state-row"><td colspan="20">Loading chargebacks…</td></tr>
     </tbody>
   </table>
   </div>
@@ -298,6 +369,7 @@
     </div>
     <div class="modal-body" id="modalBody"></div>
     <div class="modal-footer">
+      <div id="modalFooterMessage" class="modal-footer-message" role="status" aria-live="polite" hidden></div>
       <button type="button" class="btn" id="modalCancelBtn">Cancel</button>
       <button type="button" class="btn btn-primary" id="modalSaveBtn" disabled>Save</button>
     </div>

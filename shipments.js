@@ -53,8 +53,24 @@ const SHIPMENT_PO_CLEAR_FIELDS = [
 
 const SHIPMENT_TABLE_COLSPAN = SHIPMENT_TABLE_COLUMNS.length + 1;
 
+const CHARGEBACK_PO_COLUMNS = [
+  "PO #", "SO #", "Style #", "Color", "Buyer", "Buyer PO #",
+  "PO Date", "CXL Date", "PO Qty", "Actual Qty", "EXF", "IHD"
+];
+
+const CHARGEBACK_TABLE_COLUMNS = [
+  "Created At", ...CHARGEBACK_PO_COLUMNS,
+  "Reason", "Amount", "Notes", "Status", "Updated At",
+  "Chargeback ID"
+];
+
+const CHARGEBACK_DATE_FIELDS = new Set(["Date", "Created At", "Updated At", "PO Date", "CXL Date", "EXF", "IHD"]);
+const CHARGEBACK_AMOUNT_FIELDS = new Set(["Amount"]);
+const CHARGEBACK_TABLE_COLSPAN = CHARGEBACK_TABLE_COLUMNS.length + 1;
+
 let allShipments = [];
 let filteredShipments = [];
+let filteredChargebacks = [];
 let shipmentModalRow = null;
 let createShipmentPoNumbers = [];
 let currentAppView = "po";
@@ -115,6 +131,14 @@ function getFilteredShipmentSelectedCount() {
   return filteredShipments.filter(shipment => isTruthy(shipment["Selected"])).length;
 }
 
+function getCheckedFilteredChargebacks() {
+  return filteredChargebacks.filter(chargeback => isTruthy(chargeback["Selected"]));
+}
+
+function getFilteredChargebackSelectedCount() {
+  return filteredChargebacks.filter(chargeback => isTruthy(chargeback["Selected"])).length;
+}
+
 function toggleShipmentSelected(shipment, selected) {
   const next = toSheetBool(selected);
   if (isTruthy(shipment["Selected"]) === next) return;
@@ -167,6 +191,72 @@ function updateDeleteShipmentButton() {
   btn.textContent = count === 1 ? "Delete shipment" : `Delete shipments (${count})`;
 }
 
+function toggleChargebackSelected(chargeback, selected) {
+  const next = toSheetBool(selected);
+  if (isTruthy(chargeback["Selected"]) === next) return;
+  chargeback["Selected"] = next;
+  renderChargebacksTable();
+  updateChargebackSelectAllHeader();
+  updateDeleteChargebackButton();
+}
+
+function setAllFilteredChargebacksSelected(selected) {
+  const next = toSheetBool(selected);
+  let changed = false;
+  filteredChargebacks.forEach(chargeback => {
+    if (isTruthy(chargeback["Selected"]) === next) return;
+    chargeback["Selected"] = next;
+    changed = true;
+  });
+  if (!changed) return;
+  renderChargebacksTable();
+  updateChargebackSelectAllHeader();
+  updateDeleteChargebackButton();
+}
+
+function updateChargebackSelectAllHeader() {
+  const cb = document.getElementById("selectAllChargebacksCheckbox");
+  if (!cb) return;
+
+  if (filteredChargebacks.length === 0) {
+    cb.checked = false;
+    cb.indeterminate = false;
+    cb.disabled = true;
+    updateChargebackRowCounter();
+    return;
+  }
+
+  cb.disabled = false;
+  const selectedCount = getFilteredChargebackSelectedCount();
+  cb.checked = selectedCount === filteredChargebacks.length;
+  cb.indeterminate = selectedCount > 0 && selectedCount < filteredChargebacks.length;
+  updateChargebackRowCounter();
+}
+
+function updateDeleteChargebackButton() {
+  const btn = document.getElementById("deleteChargebackBtn");
+  if (!btn) return;
+  const count = getCheckedFilteredChargebacks().length;
+  const show = currentAppView === "chargebacks" && count > 0;
+  btn.hidden = !show;
+  if (!show) return;
+  btn.textContent = count === 1 ? "Delete chargeback" : `Delete chargebacks (${count})`;
+}
+
+function renderChargebackSelectedCell(td, chargeback) {
+  td.className = "td-select-cell readonly-no-select";
+  const cb = document.createElement("input");
+  cb.type = "checkbox";
+  cb.className = "po-select-checkbox";
+  cb.checked = isTruthy(chargeback["Selected"]);
+  cb.setAttribute("aria-label", `Select chargeback ${chargeback[CHARGEBACK_ID_FIELD] ?? ""}`);
+  cb.addEventListener("click", e => {
+    e.stopPropagation();
+    toggleChargebackSelected(chargeback, cb.checked);
+  });
+  td.appendChild(cb);
+}
+
 function renderShipmentSelectedCell(td, shipment) {
   td.className = "td-select-cell readonly-no-select";
   const cb = document.createElement("input");
@@ -204,15 +294,20 @@ function switchAppView(view) {
   currentAppView = view;
   const poToolbar = document.getElementById("poToolbar");
   const shipmentToolbar = document.getElementById("shipmentToolbar");
+  const chargebackToolbar = document.getElementById("chargebackToolbar");
   const poTableWrap = document.getElementById("poTableWrap");
   const shipmentTableWrap = document.getElementById("shipmentTableWrap");
+  const chargebackTableWrap = document.getElementById("chargebackTableWrap");
   const poTab = document.getElementById("navTabPo");
   const shipTab = document.getElementById("navTabShipments");
+  const chargebackTab = document.getElementById("navTabChargebacks");
 
   if (poToolbar) poToolbar.hidden = view !== "po";
   if (shipmentToolbar) shipmentToolbar.hidden = view !== "shipments";
+  if (chargebackToolbar) chargebackToolbar.hidden = view !== "chargebacks";
   if (poTableWrap) poTableWrap.hidden = view !== "po";
   if (shipmentTableWrap) shipmentTableWrap.hidden = view !== "shipments";
+  if (chargebackTableWrap) chargebackTableWrap.hidden = view !== "chargebacks";
   const poFooterEnd = document.getElementById("poFooterEnd");
   if (poFooterEnd) poFooterEnd.hidden = view !== "po";
   if (typeof updateHeaderMenuSelectionModeCheck === "function") {
@@ -222,9 +317,13 @@ function switchAppView(view) {
   poTab?.setAttribute("aria-selected", view === "po" ? "true" : "false");
   shipTab?.classList.toggle("is-active", view === "shipments");
   shipTab?.setAttribute("aria-selected", view === "shipments" ? "true" : "false");
+  chargebackTab?.classList.toggle("is-active", view === "chargebacks");
+  chargebackTab?.setAttribute("aria-selected", view === "chargebacks" ? "true" : "false");
 
   if (view === "shipments") applyShipmentFilters();
+  if (view === "chargebacks") applyChargebackFilters();
   updateDeleteShipmentButton();
+  updateDeleteChargebackButton();
 }
 
 function applyShipmentFilters() {
@@ -309,9 +408,117 @@ function renderShipmentsTable() {
   updateDeleteShipmentButton();
 }
 
+function getChargebackPoRow(chargeback) {
+  return findRowByPo?.(chargeback["PO #"]) ?? null;
+}
+
+function getChargebackTableValue(chargeback, col) {
+  if (CHARGEBACK_PO_COLUMNS.includes(col)) {
+    return getChargebackPoRow(chargeback)?.[col] ?? "";
+  }
+  return chargeback[col] ?? "";
+}
+
+function formatChargebackTableCell(col, chargeback) {
+  const val = getChargebackTableValue(chargeback, col);
+  if (CHARGEBACK_AMOUNT_FIELDS.has(col)) return formatChargebackAmount(val);
+  if (CHARGEBACK_DATE_FIELDS.has(col)) return formatDateForDisplay(val);
+  if (isEmptyValue(val)) return EMPTY_DISPLAY;
+  if (col === "Notes") {
+    const s = String(val);
+    return s.length > 56 ? s.slice(0, 53) + "..." : s;
+  }
+  return String(val);
+}
+
+function applyChargebackFilters() {
+  const q = (document.getElementById("chargebackSearchInput")?.value ?? "").toLowerCase();
+  filteredChargebacks = allChargebacks.filter(chargeback => {
+    if (!q) return true;
+    const haystack = CHARGEBACK_TABLE_COLUMNS
+      .map(col => String(getChargebackTableValue(chargeback, col) ?? ""))
+      .join(" ")
+      .toLowerCase();
+    return haystack.includes(q);
+  });
+  filteredChargebacks.sort((a, b) => {
+    const dateCompare = normalizeToYmd(b["Created At"] || b["Date"])
+      .localeCompare(normalizeToYmd(a["Created At"] || a["Date"]));
+    if (dateCompare !== 0) return dateCompare;
+    return String(b[CHARGEBACK_ID_FIELD] ?? "").localeCompare(
+      String(a[CHARGEBACK_ID_FIELD] ?? ""),
+      undefined,
+      { numeric: true }
+    );
+  });
+  renderChargebacksTable();
+  updateChargebackRowCounter();
+  updateChargebackSelectAllHeader();
+  updateDeleteChargebackButton();
+}
+
+function updateChargebackRowCounter() {
+  const el = document.getElementById("chargebackRowCounter");
+  if (!el) return;
+  const total = filteredChargebacks.length;
+  const rowText = total === 1 ? "1 chargeback" : `${total} chargebacks`;
+  const selectedCount = getFilteredChargebackSelectedCount();
+  el.textContent = selectedCount >= 1
+    ? `${selectedCount} selected out of ${rowText}`
+    : rowText;
+}
+
+function renderChargebacksTable() {
+  const tbody = document.getElementById("chargebackTableBody");
+  if (!tbody) return;
+
+  if (filteredChargebacks.length === 0) {
+    tbody.innerHTML = `<tr class="state-row"><td colspan="${CHARGEBACK_TABLE_COLSPAN}">No chargebacks yet.</td></tr>`;
+    updateChargebackSelectAllHeader();
+    updateDeleteChargebackButton();
+    updateChargebackRowCounter();
+    return;
+  }
+
+  tbody.innerHTML = "";
+  filteredChargebacks.forEach(chargeback => {
+    const tr = document.createElement("tr");
+    tr.className = "clickable-row";
+    tr.dataset.chargebackId = chargeback[CHARGEBACK_ID_FIELD] ?? "";
+    const poRow = getChargebackPoRow(chargeback);
+    if (poRow) tr.ondblclick = () => openPODetail(poRow);
+
+    const selectTd = document.createElement("td");
+    renderChargebackSelectedCell(selectTd, chargeback);
+    tr.appendChild(selectTd);
+
+    CHARGEBACK_TABLE_COLUMNS.forEach(col => {
+      const td = document.createElement("td");
+      td.dataset.col = col;
+      const text = formatChargebackTableCell(col, chargeback);
+      if (text === EMPTY_DISPLAY) {
+        setDisplayText(td, EMPTY_DISPLAY);
+      } else {
+        td.textContent = text;
+      }
+      tr.appendChild(td);
+    });
+
+    tbody.appendChild(tr);
+  });
+  updateChargebackSelectAllHeader();
+  updateDeleteChargebackButton();
+  updateChargebackRowCounter();
+}
+
+function refreshChargebacksView() {
+  if (currentAppView === "chargebacks") applyChargebackFilters();
+}
+
 function refreshShipmentsView() {
   if (currentAppView === "shipments") applyShipmentFilters();
   updateCreateShipmentButton();
+  refreshChargebacksView();
 }
 
 function updateCreateShipmentButton() {
@@ -842,6 +1049,46 @@ async function deleteSelectedShipments() {
   }
 }
 
+async function deleteSelectedChargebacks() {
+  if (isAppSaving()) return;
+  const selected = getCheckedFilteredChargebacks();
+  if (selected.length === 0) {
+    showIndicator("Select chargebacks first", "error");
+    return;
+  }
+
+  const count = selected.length;
+  const noun = count === 1 ? "this chargeback" : `these ${count} chargebacks`;
+  if (!confirm(`Delete ${noun}?`)) return;
+
+  const chargebackIds = selected.map(chargeback => chargeback[CHARGEBACK_ID_FIELD]);
+  showIndicator(`Deleting${ELLIPSIS}`, "");
+
+  try {
+    if (APPS_SCRIPT_URL === "YOUR_APPS_SCRIPT_WEB_APP_URL_HERE") {
+      demoDeleteChargebacks(chargebackIds);
+    } else {
+      const json = await postAppsScript({
+        action: "deleteChargeback",
+        chargebackIds,
+      });
+      if (!json.success) throw new Error(json.error);
+      await loadData();
+    }
+
+    showIndicator(`Deleted ${CHECK_MARK}`, "success");
+  } catch (err) {
+    showIndicator("Delete failed: " + err.message, "error");
+  }
+}
+
+function demoDeleteChargebacks(chargebackIds) {
+  const idSet = new Set(chargebackIds.map(id => String(id).trim()));
+  allChargebacks = allChargebacks.filter(chargeback => !idSet.has(getChargebackId(chargeback)));
+  applyChargebackFilters();
+  updateModalIfOpen();
+}
+
 function demoDeleteShipments(shipmentIds) {
   const idSet = new Set(shipmentIds.map(id => String(id).trim()));
 
@@ -918,13 +1165,23 @@ function initShipmentSelection() {
     e.stopPropagation();
     setAllFilteredShipmentsSelected(cb.checked);
   });
+
+  const chargebackCb = document.getElementById("selectAllChargebacksCheckbox");
+  chargebackCb?.addEventListener("click", e => {
+    e.stopPropagation();
+    setAllFilteredChargebacksSelected(chargebackCb.checked);
+  });
+
   document.getElementById("deleteShipmentBtn")?.addEventListener("click", deleteSelectedShipments);
+  document.getElementById("deleteChargebackBtn")?.addEventListener("click", deleteSelectedChargebacks);
 }
 
 function initShipments() {
   document.getElementById("navTabPo")?.addEventListener("click", () => switchAppView("po"));
   document.getElementById("navTabShipments")?.addEventListener("click", () => switchAppView("shipments"));
+  document.getElementById("navTabChargebacks")?.addEventListener("click", () => switchAppView("chargebacks"));
   document.getElementById("shipmentSearchInput")?.addEventListener("input", applyShipmentFilters);
+  document.getElementById("chargebackSearchInput")?.addEventListener("input", applyChargebackFilters);
   document.getElementById("createShipmentBtn")?.addEventListener("click", openCreateShipmentFromSelection);
   document.getElementById("createShipmentSaveBtn")?.addEventListener("click", submitCreateShipment);
   document.getElementById("createShipmentCancelBtn")?.addEventListener("click", closeCreateShipmentModal);

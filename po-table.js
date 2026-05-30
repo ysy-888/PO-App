@@ -1,4 +1,4 @@
-﻿const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxSW8k68B3F0Jq0YIxRU2W_mOL353SCCMc8FdQY1lptix5Q-PuzykZkP-7UamXnap4PYA/exec";
+﻿const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz_xMbR1G_sQBrtzdTGTFIUciOvoZNkyWpNuCGAHDHiE1anJds2lsXG24ORYuWcmiHX4A/exec";
 
 const EMPTY_DISPLAY = "\u2014";
 const EN_DASH = "\u2013";
@@ -8,6 +8,19 @@ const CXL_COUNTDOWN_STORAGE_KEY = "poTable.cxlCountdown";
 const SELECTION_MODE_STORAGE_KEY = "poTable.selectionMode";
 const PAGE_SIZE_STORAGE_KEY = "poTable.pageSize";
 const DEFAULT_PAGE_SIZE = "60";
+const CHARGEBACK_ID_FIELD = "Chargeback ID";
+const CHARGEBACK_STATUSES = ["Open", "Approved", "Deducted", "Disputed"];
+const CHARGEBACK_REASONS = [
+  "Delayed",
+  "Damaged",
+  "Shortage",
+  "Overage",
+  "Wrong Packing",
+  "Wrong Ticketing/Labeling",
+  "No Packing List",
+  "Wrong Packing List Info",
+  "Other",
+];
 
 let cxlCountdownEnabled = false;
 let selectionModeEnabled = false;
@@ -1232,6 +1245,7 @@ function applyDateCellDisplay(el, col, row, { context = "table" } = {}) {
 
 let allRows = [];
 let filteredRows = [];
+let allChargebacks = [];
 let flagFilterActive = false;
 let sortCol = null;
 let sortDir = 1;
@@ -1246,8 +1260,52 @@ const DEMO_DATA = [
   { "Division":"Elevator Disco","Status":"Closed","Vendor":"Pacific Imports","Buyer":"NUULY","Buyer PO #":"BP-1005","SO #":"SO-2205","PO Date":"2023-12-01","PO #":"PO-10005","Old PO #":"PO-8005","Style #":"ST-501","Color":"Black","PO Qty":750,"Actual Qty":750,"Ctn Qty":75,"Size":"XXS-XXL","PO Unit 1":100,"PO Unit 2":100,"PO Unit 3":150,"PO Unit 4":150,"PO Unit 5":100,"PO Unit 6":100,"PO Unit 7":50,"Act Unit 1":100,"Act Unit 2":100,"Act Unit 3":150,"Act Unit 4":150,"Act Unit 5":100,"Act Unit 6":100,"Act Unit 7":50,"Ship Method":"Sea&Air","Vessel":"MSC Maya","House #":"H-099","Shipped":"2024-01-05","ETD":"2024-01-08","ETA":"2024-01-20","IHD":"2024-01-25","EST EXF":"2024-01-18","EST IHD":"2024-01-24","EXF":"2024-01-20","CXL Date":"2024-02-01","Assign Date":"2023-12-10","Notes":"Completed" },
 ];
 
+const DEMO_CHARGEBACKS = [
+  { "Chargeback ID": "CB-0001", "PO #": "PO-10001", "Amount": 125, "Reason": "Short shipment", "Status": "Open", "Date": "2024-02-26", "Notes": "Review actual units" },
+  { "Chargeback ID": "CB-0002", "PO #": "PO-10003", "Amount": 80, "Reason": "Late docs", "Status": "Approved", "Date": "2024-02-24", "Notes": "" },
+];
+
 function resetLocalSelectedState(rows) {
   rows.forEach(row => { row["Selected"] = false; });
+}
+
+function normalizeChargeback(row) {
+  return { ...row, Selected: false };
+}
+
+function getChargebackId(chargeback) {
+  return String(chargeback?.[CHARGEBACK_ID_FIELD] ?? "").trim();
+}
+
+function getChargebackPoNumber(chargeback) {
+  return String(chargeback?.["PO #"] ?? "").trim();
+}
+
+function getChargebacksForPo(poNumber) {
+  const key = String(poNumber ?? "").trim();
+  if (!key) return [];
+  return allChargebacks.filter(chargeback => getChargebackPoNumber(chargeback) === key);
+}
+
+function getChargebackTotalForPo(poNumber) {
+  return getChargebacksForPo(poNumber).reduce((sum, chargeback) => {
+    const n = Number(String(chargeback["Amount"] ?? "").replace(/[$,]/g, ""));
+    return sum + (Number.isFinite(n) ? n : 0);
+  }, 0);
+}
+
+function formatChargebackAmount(value) {
+  const n = Number(String(value ?? "").replace(/[$,]/g, ""));
+  if (!Number.isFinite(n)) return "$0.00";
+  return n.toLocaleString(undefined, { style: "currency", currency: "USD" });
+}
+
+function generateDemoChargebackId() {
+  const max = allChargebacks.reduce((highest, chargeback) => {
+    const m = /^CB-(\d+)$/.exec(getChargebackId(chargeback));
+    return Math.max(highest, m ? Number(m[1]) : 0);
+  }, 0);
+  return `CB-${String(max + 1).padStart(4, "0")}`;
 }
 
 async function postAppsScript(payload) {
@@ -1266,6 +1324,7 @@ async function loadData() {
   try {
     if (APPS_SCRIPT_URL === "YOUR_APPS_SCRIPT_WEB_APP_URL_HERE") {
       allRows = DEMO_DATA.map(row => ({ ...row }));
+      allChargebacks = DEMO_CHARGEBACKS.map(normalizeChargeback);
       window.__pendingShipments = [];
       if (typeof onShipmentsDataLoaded === "function") {
         onShipmentsDataLoaded([]);
@@ -1276,6 +1335,7 @@ async function loadData() {
       const json = await res.json();
       if (!json.success) throw new Error(json.error);
       allRows = json.data.map(normalizeRow);
+      allChargebacks = (json.chargebacks ?? []).map(normalizeChargeback);
       window.__pendingShipments = json.shipments ?? [];
       if (typeof onShipmentsDataLoaded === "function") {
         onShipmentsDataLoaded(window.__pendingShipments);
@@ -3056,6 +3116,255 @@ function createModalBlock(title) {
   return { block, content };
 }
 
+function createChargebackInput(field, value = "") {
+  let input;
+  if (field === "Status") {
+    input = document.createElement("select");
+    CHARGEBACK_STATUSES.forEach(status => {
+      const opt = document.createElement("option");
+      opt.value = status;
+      opt.textContent = status;
+      input.appendChild(opt);
+    });
+    input.value = value || CHARGEBACK_STATUSES[0];
+  } else if (field === "Reason") {
+    input = document.createElement("select");
+    CHARGEBACK_REASONS.forEach(reason => {
+      const opt = document.createElement("option");
+      opt.value = reason;
+      opt.textContent = reason;
+      input.appendChild(opt);
+    });
+    input.value = CHARGEBACK_REASONS.includes(value) ? value : CHARGEBACK_REASONS[0];
+  } else if (field === "Amount") {
+    input = document.createElement("input");
+    input.type = "number";
+    input.min = "0";
+    input.step = "0.01";
+    input.inputMode = "decimal";
+    input.value = isEmptyValue(value) ? "" : String(value);
+  } else {
+    input = document.createElement("input");
+    input.type = "text";
+    input.value = isEmptyValue(value) ? "" : String(value);
+  }
+
+  input.className = "chargeback-input";
+  input.dataset.field = field;
+  input.setAttribute("aria-label", field);
+  return input;
+}
+
+function readChargebackForm(rowEl) {
+  const data = {};
+  rowEl.querySelectorAll("[data-field]").forEach(input => {
+    data[input.dataset.field] = input.value.trim();
+  });
+  return data;
+}
+
+function isValidChargebackAmount(value) {
+  const n = Number(String(value ?? "").replace(/[$,]/g, ""));
+  return Number.isFinite(n) && n > 0;
+}
+
+function setChargebackError(sourceEl, message) {
+  const errorEl = document.getElementById("modalFooterMessage");
+  if (!errorEl) {
+    showIndicator(message, "error");
+    return;
+  }
+  errorEl.textContent = message || "";
+  errorEl.hidden = !message;
+}
+
+function validateChargebackForm(rowEl, chargeback) {
+  if (!isValidChargebackAmount(chargeback.Amount)) {
+    setChargebackError(rowEl, "Chargeback amount must be greater than $0");
+    return false;
+  }
+  setChargebackError(rowEl, "");
+  return true;
+}
+
+function createChargebackTextCell(field, value) {
+  const cell = document.createElement("div");
+  cell.className = `chargeback-text chargeback-text--${field.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+  if (field === "Amount") {
+    cell.textContent = formatChargebackAmount(value);
+  } else if (field === "Date") {
+    cell.textContent = isEmptyValue(value) ? EMPTY_DISPLAY : formatDateForDisplay(value);
+  } else {
+    cell.textContent = isEmptyValue(value) ? EMPTY_DISPLAY : String(value);
+  }
+  if (isEmptyValue(cell.textContent) || cell.textContent === EMPTY_DISPLAY) {
+    cell.classList.add("empty-display");
+  }
+  return cell;
+}
+
+function createChargebackBlankCell(field) {
+  const cell = document.createElement("div");
+  cell.className = `chargeback-text chargeback-text--${field.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+  return cell;
+}
+
+function getChargebacksBlockFromEl(el) {
+  return el.closest(".modal-block--chargebacks");
+}
+
+function isChargebackEditActive(block) {
+  return Boolean(block?.classList.contains("chargebacks--mutating"));
+}
+
+function setChargebackEditActive(block, active) {
+  block?.classList.toggle("chargebacks--mutating", active);
+}
+
+function createChargebackRow(chargeback, poNumber, { editing = false } = {}) {
+  const rowEl = document.createElement("div");
+  rowEl.className = "chargeback-row" + (editing ? " chargeback-row--editing" : "");
+  rowEl.dataset.chargebackId = getChargebackId(chargeback);
+
+  if (editing) {
+    rowEl.appendChild(createChargebackTextCell("Date", chargeback["Date"]));
+    ["Reason", "Amount", "Notes", "Status"].forEach(field => {
+      rowEl.appendChild(createChargebackInput(field, chargeback[field]));
+    });
+  } else {
+    ["Date", "Reason", "Amount", "Notes", "Status"].forEach(field => {
+      rowEl.appendChild(createChargebackTextCell(field, chargeback[field]));
+    });
+  }
+
+  const actions = document.createElement("div");
+  actions.className = "chargeback-actions";
+
+  if (editing) {
+    const saveBtn = document.createElement("button");
+    saveBtn.type = "button";
+    saveBtn.className = "btn btn-secondary chargeback-action-btn chargeback-save-btn";
+    saveBtn.textContent = "Save";
+    saveBtn.addEventListener("click", () => saveChargebackRow(rowEl, poNumber));
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.className = "btn btn-secondary chargeback-action-btn chargeback-cancel-btn";
+    cancelBtn.textContent = "Cancel";
+    cancelBtn.addEventListener("click", () => {
+      setChargebackError(rowEl, "");
+      refreshChargebacksForPo(poNumber);
+    });
+
+    actions.appendChild(saveBtn);
+    actions.appendChild(cancelBtn);
+  } else {
+    const editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.className = "btn btn-secondary chargeback-action-btn chargeback-edit-btn";
+    editBtn.textContent = "Edit";
+    editBtn.addEventListener("click", () => {
+      const block = getChargebacksBlockFromEl(rowEl);
+      if (isChargebackEditActive(block)) return;
+      setChargebackEditActive(block, true);
+      rowEl.replaceWith(createChargebackRow(chargeback, poNumber, { editing: true }));
+    });
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.className = "btn btn-secondary chargeback-action-btn chargeback-delete-btn";
+    deleteBtn.textContent = "Delete";
+    deleteBtn.addEventListener("click", () => deleteChargebackRow(rowEl, poNumber));
+
+    actions.appendChild(editBtn);
+    actions.appendChild(deleteBtn);
+  }
+  rowEl.appendChild(actions);
+  return rowEl;
+}
+
+function createChargebackAddRow(poNumber) {
+  const rowEl = document.createElement("div");
+  rowEl.className = "chargeback-row chargeback-row--new";
+  rowEl.appendChild(createChargebackBlankCell("Date"));
+  rowEl.appendChild(createChargebackInput("Reason", ""));
+  rowEl.appendChild(createChargebackInput("Amount", ""));
+  rowEl.appendChild(createChargebackInput("Notes", ""));
+  rowEl.appendChild(createChargebackBlankCell("Status"));
+
+  const actions = document.createElement("div");
+  actions.className = "chargeback-actions";
+  const addBtn = document.createElement("button");
+  addBtn.type = "button";
+  addBtn.className = "btn btn-secondary chargeback-action-btn chargeback-add-btn";
+  addBtn.textContent = "Save";
+  addBtn.addEventListener("click", () => addChargebackRow(rowEl, poNumber));
+  const cancelBtn = document.createElement("button");
+  cancelBtn.type = "button";
+  cancelBtn.className = "btn btn-secondary chargeback-action-btn chargeback-cancel-btn";
+  cancelBtn.textContent = "Cancel";
+  cancelBtn.addEventListener("click", () => {
+    const block = getChargebacksBlockFromEl(rowEl);
+    setChargebackError(rowEl, "");
+    rowEl.remove();
+    setChargebackEditActive(block, false);
+    block?.querySelector(".chargeback-new-btn")?.removeAttribute("hidden");
+  });
+  actions.appendChild(addBtn);
+  actions.appendChild(cancelBtn);
+  rowEl.appendChild(actions);
+  return rowEl;
+}
+
+function createModalChargebacksSection(row) {
+  const poNumber = String(row["PO #"] ?? "").trim();
+  const block = document.createElement("section");
+  block.className = "modal-block modal-block--chargebacks";
+
+  const header = document.createElement("div");
+  header.className = "chargebacks-header";
+  const title = document.createElement("h4");
+  title.className = "modal-section-title chargebacks-title";
+  title.textContent = "Chargebacks";
+
+  header.appendChild(title);
+  const chargebackTotal = getChargebackTotalForPo(poNumber);
+  if (chargebackTotal > 0) {
+    const total = document.createElement("span");
+    total.className = "chargebacks-total";
+    total.textContent = formatChargebackAmount(chargebackTotal);
+    header.appendChild(total);
+  }
+  block.appendChild(header);
+
+  const grid = document.createElement("div");
+  grid.className = "chargebacks-grid";
+  ["Date", "Reason", "Amount", "Notes", "Status", ""].forEach(label => {
+    const head = document.createElement("div");
+    head.className = "chargeback-grid-head";
+    head.textContent = label;
+    grid.appendChild(head);
+  });
+
+  getChargebacksForPo(poNumber).forEach(chargeback => {
+    grid.appendChild(createChargebackRow(chargeback, poNumber));
+  });
+
+  block.appendChild(grid);
+  const newBtn = document.createElement("button");
+  newBtn.type = "button";
+  newBtn.className = "btn btn-secondary chargeback-action-btn chargeback-new-btn";
+  newBtn.textContent = "+ New Chargeback";
+  newBtn.addEventListener("click", () => {
+    if (isChargebackEditActive(block)) return;
+    setChargebackEditActive(block, true);
+    grid.appendChild(createChargebackAddRow(poNumber));
+    newBtn.hidden = true;
+  });
+  block.appendChild(newBtn);
+  return block;
+}
+
 function createModalFieldRow(cols, row, options = {}) {
   const rowEl = document.createElement("div");
   rowEl.className = "modal-field-row";
@@ -3136,6 +3445,7 @@ function renderModalContent(row) {
 
   main.appendChild(createModalOrderProductSplit(row));
   main.appendChild(createModalStyleSection(row));
+  main.appendChild(createModalChargebacksSection(row));
 
   layout.appendChild(main);
   bodyEl.appendChild(layout);
@@ -3176,6 +3486,109 @@ function dismissModalOverlay() {
   modalSnapshot = null;
   document.getElementById("modalOverlay")?.classList.remove("open");
   updateModalSaveState();
+}
+
+function refreshChargebacksForPo(poNumber) {
+  if (!modalRow || String(modalRow["PO #"]) !== String(poNumber)) return;
+  updateModalIfOpen();
+  if (typeof refreshChargebacksView === "function") refreshChargebacksView();
+}
+
+async function addChargebackRow(rowEl, poNumber) {
+  if (isAppSaving()) return;
+  const chargeback = readChargebackForm(rowEl);
+  chargeback.Status = chargeback.Status || CHARGEBACK_STATUSES[0];
+  if (!validateChargebackForm(rowEl, chargeback)) return;
+  if (isEmptyValue(chargeback.Amount) && isEmptyValue(chargeback.Reason) && isEmptyValue(chargeback.Notes)) {
+    showIndicator("Add chargeback details first", "error");
+    return;
+  }
+
+  if (APPS_SCRIPT_URL === "YOUR_APPS_SCRIPT_WEB_APP_URL_HERE") {
+    allChargebacks.push({
+      [CHARGEBACK_ID_FIELD]: generateDemoChargebackId(),
+      "PO #": poNumber,
+      "Date": formatDateToYmd(new Date()),
+      ...chargeback,
+    });
+    showIndicator("Chargeback added", "success");
+    refreshChargebacksForPo(poNumber);
+    return;
+  }
+
+  setAppSaving(true, "Adding chargeback...");
+  try {
+    const json = await postAppsScript({ action: "createChargeback", poNumber, chargeback });
+    if (!json.success) throw new Error(json.error);
+    allChargebacks.push({
+      [CHARGEBACK_ID_FIELD]: json.chargebackId,
+      "PO #": poNumber,
+      "Date": formatDateToYmd(new Date()),
+      ...chargeback,
+    });
+    showIndicator("Chargeback added", "success");
+    refreshChargebacksForPo(poNumber);
+  } catch (err) {
+    showIndicator("Chargeback add failed: " + err.message, "error");
+  } finally {
+    setAppSaving(false);
+  }
+}
+
+async function saveChargebackRow(rowEl, poNumber) {
+  if (isAppSaving()) return;
+  const chargebackId = rowEl.dataset.chargebackId;
+  const chargeback = readChargebackForm(rowEl);
+  if (!chargebackId) return;
+  if (!validateChargebackForm(rowEl, chargeback)) return;
+
+  if (APPS_SCRIPT_URL === "YOUR_APPS_SCRIPT_WEB_APP_URL_HERE") {
+    const existing = allChargebacks.find(item => getChargebackId(item) === chargebackId);
+    if (existing) Object.assign(existing, chargeback);
+    showIndicator("Chargeback saved", "success");
+    refreshChargebacksForPo(poNumber);
+    return;
+  }
+
+  setAppSaving(true, "Saving chargeback...");
+  try {
+    const json = await postAppsScript({ action: "updateChargeback", chargebackId, chargeback });
+    if (!json.success) throw new Error(json.error);
+    const existing = allChargebacks.find(item => getChargebackId(item) === chargebackId);
+    if (existing) Object.assign(existing, chargeback);
+    showIndicator("Chargeback saved", "success");
+    refreshChargebacksForPo(poNumber);
+  } catch (err) {
+    showIndicator("Chargeback save failed: " + err.message, "error");
+  } finally {
+    setAppSaving(false);
+  }
+}
+
+async function deleteChargebackRow(rowEl, poNumber) {
+  if (isAppSaving()) return;
+  const chargebackId = rowEl.dataset.chargebackId;
+  if (!chargebackId) return;
+
+  if (APPS_SCRIPT_URL === "YOUR_APPS_SCRIPT_WEB_APP_URL_HERE") {
+    allChargebacks = allChargebacks.filter(item => getChargebackId(item) !== chargebackId);
+    showIndicator("Chargeback deleted", "success");
+    refreshChargebacksForPo(poNumber);
+    return;
+  }
+
+  setAppSaving(true, "Deleting chargeback...");
+  try {
+    const json = await postAppsScript({ action: "deleteChargeback", chargebackId });
+    if (!json.success) throw new Error(json.error);
+    allChargebacks = allChargebacks.filter(item => getChargebackId(item) !== chargebackId);
+    showIndicator("Chargeback deleted", "success");
+    refreshChargebacksForPo(poNumber);
+  } catch (err) {
+    showIndicator("Chargeback delete failed: " + err.message, "error");
+  } finally {
+    setAppSaving(false);
+  }
 }
 
 function cancelModalChanges() {

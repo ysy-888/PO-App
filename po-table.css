@@ -62,6 +62,16 @@ body {
   flex-shrink: 0;
 }
 
+.app-logo-text {
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  margin-right: 4px;
+  white-space: nowrap;
+}
+
 .app-title-tab {
   padding: 0;
   border: none;
@@ -306,12 +316,14 @@ select.filter-select:focus { border-color: var(--accent); }
 }
 
 #createShipmentBtn[hidden],
-#deleteShipmentBtn[hidden] {
+#deleteShipmentBtn[hidden],
+#deleteChargebackBtn[hidden] {
   display: none !important;
 }
 
 #poToolbar[hidden],
-#shipmentToolbar[hidden] {
+#shipmentToolbar[hidden],
+#chargebackToolbar[hidden] {
   display: none !important;
 }
 
@@ -547,6 +559,38 @@ table {
   border-collapse: collapse;
   table-layout: fixed;
   min-width: 2800px;
+}
+
+#chargebackTable {
+  min-width: 2140px;
+}
+
+#chargebackTable .col-date,
+#chargebackTable .col-po-date,
+#chargebackTable .col-cxl,
+#chargebackTable .col-exf,
+#chargebackTable .col-ihd {
+  width: 72px;
+}
+
+#chargebackTable .col-chargeback-id {
+  width: 96px;
+}
+
+#chargebackTable .col-po {
+  width: 68px;
+}
+
+#chargebackTable .col-so {
+  width: 68px;
+}
+
+#chargebackTable .col-amount {
+  width: 76px;
+}
+
+#chargebackTable .col-reason {
+  width: 128px;
 }
 
 thead {
@@ -1470,6 +1514,9 @@ td.editable:not(.select-cell):hover .editable-preview {
 
 #modalOverlay {
   --modal-field-height: 34px;
+  --po-modal-content-width: 900px;
+  --po-modal-photo-width: 142px;
+  --po-modal-section-gap: 12px;
 }
 
 #modalOverlay .modal-field-value {
@@ -1653,7 +1700,7 @@ td.editable:not(.select-cell):hover .editable-preview {
   flex-direction: column;
   gap: 10px;
   min-width: 0;
-  width: max-content;
+  width: var(--po-modal-content-width);
   max-width: 100%;
 }
 
@@ -1930,8 +1977,10 @@ td.editable:not(.select-cell):hover .editable-preview {
 .modal-top-split {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 14px;
+  gap: var(--po-modal-section-gap);
   align-items: start;
+  width: var(--po-modal-content-width);
+  max-width: 100%;
 }
 
 /* ── Top split: order (left) | shipping (right) ── */
@@ -1995,19 +2044,19 @@ td.editable:not(.select-cell):hover .editable-preview {
   background: var(--bg) !important;
 }
 
-.modal-production-inline .modal-field-row {
+#modalOverlay .modal-production-inline .modal-field-row {
   display: grid;
-  grid-template-columns: repeat(2, 72px);
+  grid-template-columns: repeat(2, 88px);
   gap: 6px 8px;
   align-items: end;
 }
 
-.modal-production-inline .modal-field--medium {
-  width: 72px;
+#modalOverlay .modal-production-inline .modal-field--medium {
+  width: 88px;
   min-width: 0;
 }
 
-.modal-production-inline .modal-field-value {
+#modalOverlay .modal-production-inline .modal-field-value {
   justify-content: center;
   text-align: center;
   font-size: 11px;
@@ -2075,7 +2124,7 @@ td.editable:not(.select-cell):hover .editable-preview {
 
 /* ── Style section: info (left) | size chart (right), visually distinct ── */
 #modalOverlay .modal-block--style-full {
-  width: max-content;
+  width: var(--po-modal-content-width);
   max-width: 100%;
   min-height: 224px;
   box-sizing: border-box;
@@ -2087,8 +2136,10 @@ td.editable:not(.select-cell):hover .editable-preview {
 
 .modal-style-section-grid {
   display: grid;
-  grid-template-columns: 168px minmax(0, 1fr) calc(168px * 2 + 8px);
-  gap: 16px;
+  grid-template-columns: 168px max-content calc((var(--po-modal-photo-width) * 2) + 8px);
+  justify-content: space-between;
+  column-gap: var(--po-modal-section-gap);
+  row-gap: 0;
   align-items: center;
   min-width: 0;
   max-width: 100%;
@@ -2105,13 +2156,152 @@ td.editable:not(.select-cell):hover .editable-preview {
 
 #modalOverlay .modal-block--style-full .modal-style-photos {
   flex-direction: row;
-  width: calc(168px * 2 + 8px);
+  width: calc((var(--po-modal-photo-width) * 2) + 8px);
   gap: 8px;
   align-self: center;
 }
 
 #modalOverlay .modal-block--style-full .modal-style-photo {
-  width: 168px;
+  width: var(--po-modal-photo-width);
+}
+
+#modalOverlay .modal-block--chargebacks {
+  width: var(--po-modal-content-width);
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.chargebacks-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-start;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.modal-footer-message {
+  margin-right: auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--danger);
+}
+
+.chargebacks-title {
+  margin: 0;
+  padding: 0;
+  border-bottom: none;
+}
+
+.chargebacks-total {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.chargebacks-grid {
+  display: grid;
+  grid-template-columns: 92px 170px 82px minmax(180px, 1fr) 104px 116px;
+  gap: 6px 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.chargeback-grid-head {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.chargeback-row {
+  display: contents;
+}
+
+.chargeback-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.chargeback-text--amount {
+  font-weight: 700;
+}
+
+.chargeback-input {
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  box-sizing: border-box;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 12px;
+}
+
+.chargeback-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.chargeback-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.chargeback-actions .btn {
+  height: 30px;
+  padding: 0 10px;
+  font-size: 11px;
+}
+
+.chargeback-action-btn,
+.chargeback-action-btn:hover {
+  border-color: var(--border-strong);
+  background: #fff;
+  color: var(--text);
+}
+
+.chargeback-delete-btn,
+.chargeback-delete-btn:hover {
+  color: var(--text);
+}
+
+.modal-block--chargebacks.chargebacks--mutating .chargeback-edit-btn,
+.modal-block--chargebacks.chargebacks--mutating .chargeback-delete-btn,
+.modal-block--chargebacks.chargebacks--mutating .chargeback-new-btn {
+  display: none;
+}
+
+.chargeback-row--new .chargeback-input {
+  border-style: dashed;
+  border-color: var(--border-strong);
+}
+
+.chargeback-row--new .chargeback-save-btn,
+.chargeback-row--new .chargeback-save-btn:hover {
+  background: var(--text);
+  border-color: var(--text);
+  color: #fff;
+}
+
+.chargeback-new-btn {
+  margin-top: 10px;
+  height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
 }
 
 #modalOverlay .modal-style-info .modal-field {
@@ -2130,24 +2320,24 @@ td.editable:not(.select-cell):hover .editable-preview {
   min-width: 0;
 }
 
-#modalOverlay .modal-block:not(.modal-block--order):not(.modal-block--product):not(.modal-block--shipping) {
+#modalOverlay .modal-block:not(.modal-block--order):not(.modal-block--product):not(.modal-block--shipping):not(.modal-block--chargebacks) {
   width: max-content;
   max-width: 100%;
 }
 
-#modalOverlay .modal-block:not(.modal-block--order):not(.modal-block--product):not(.modal-block--shipping) .modal-field-row {
+#modalOverlay .modal-block:not(.modal-block--order):not(.modal-block--product):not(.modal-block--shipping):not(.modal-block--chargebacks) .modal-field-row {
   display: grid;
   grid-template-columns: repeat(3, 72px);
   gap: 6px 8px;
   align-items: end;
 }
 
-#modalOverlay .modal-block:not(.modal-block--order):not(.modal-block--product):not(.modal-block--shipping) .modal-field--medium {
+#modalOverlay .modal-block:not(.modal-block--order):not(.modal-block--product):not(.modal-block--shipping):not(.modal-block--chargebacks) .modal-field--medium {
   width: 72px;
   min-width: 0;
 }
 
-#modalOverlay .modal-block:not(.modal-block--order):not(.modal-block--product):not(.modal-block--shipping) .modal-field-value {
+#modalOverlay .modal-block:not(.modal-block--order):not(.modal-block--product):not(.modal-block--shipping):not(.modal-block--chargebacks) .modal-field-value {
   justify-content: center;
   text-align: center;
   font-size: 11px;
@@ -2417,6 +2607,7 @@ td.editable:not(.select-cell):hover .editable-preview {
 .modal-footer {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   gap: 8px;
   margin-top: 12px;
   padding-top: 12px;
