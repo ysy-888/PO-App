@@ -1,4 +1,4 @@
-﻿const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz_xMbR1G_sQBrtzdTGTFIUciOvoZNkyWpNuCGAHDHiE1anJds2lsXG24ORYuWcmiHX4A/exec";
+﻿const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzRjQORF8XQoL-KGtqsrVtGNfYaTF6jRdHtoYZICdJBETFu73p19YOi7TEBCsFCf1sKFg/exec";
 
 const EMPTY_DISPLAY = "\u2014";
 const EN_DASH = "\u2013";
@@ -9,6 +9,7 @@ const SELECTION_MODE_STORAGE_KEY = "poTable.selectionMode";
 const PAGE_SIZE_STORAGE_KEY = "poTable.pageSize";
 const DEFAULT_PAGE_SIZE = "60";
 const CHARGEBACK_ID_FIELD = "Chargeback ID";
+const PACKING_LIST_ID_FIELD = "Packing List ID";
 const CHARGEBACK_STATUSES = ["Open", "Approved", "Deducted", "Disputed"];
 const CHARGEBACK_REASONS = [
   "Delayed",
@@ -282,7 +283,7 @@ function isEmptyValue(v) {
 }
 
 const COLUMNS = [
-  "Selected","Flag",
+  "Selected","Flag","Packing List",
   "Status","Division","Vendor","Buyer","Buyer PO #","SO #","PO Date","PO #",
   "Old PO #","Style #","Color","PO Qty","Actual Qty","Ctn Qty",
   "Vessel","House #","Shipped","ETD",
@@ -290,7 +291,7 @@ const COLUMNS = [
 ];
 
 const COLUMN_WIDTHS = [
-  52, 36,
+  52, 36, 36,
   130, 120, 130, 120, 100, 80, 80, 80, 80, 100, 100, 60, 60, 60,
   100, 80, 96, 80, 80, 80, 100, 80, 80, 80, 80, 80, 80, 200
 ];
@@ -301,11 +302,11 @@ const COLUMN_LABELS = {
   "Assign Date": "Assigned",
 };
 
-const UI_ONLY_COLS = new Set(["Selected", "Flag"]);
+const UI_ONLY_COLS = new Set(["Selected", "Flag", "Packing List"]);
 /** Session-local only — never read from or written to the sheet. */
-const LOCAL_ONLY_COLS = new Set(["Selected"]);
+const LOCAL_ONLY_COLS = new Set(["Selected", "Packing List"]);
 
-const ALWAYS_VISIBLE_COLUMNS = new Set(["Selected", "Flag", "Status"]);
+const ALWAYS_VISIBLE_COLUMNS = new Set(["Selected", "Flag", "Packing List", "Status"]);
 
 function getEditableColumnOptions() {
   return COLUMNS.filter(col => !ALWAYS_VISIBLE_COLUMNS.has(col));
@@ -1246,6 +1247,9 @@ function applyDateCellDisplay(el, col, row, { context = "table" } = {}) {
 let allRows = [];
 let filteredRows = [];
 let allChargebacks = [];
+let allPackingLists = [];
+let allPackingCartons = [];
+let packingListPanelOpen = false;
 let flagFilterActive = false;
 let sortCol = null;
 let sortDir = 1;
@@ -1265,6 +1269,9 @@ const DEMO_CHARGEBACKS = [
   { "Chargeback ID": "CB-0002", "PO #": "PO-10003", "Amount": 80, "Reason": "Late docs", "Status": "Approved", "Date": "2024-02-24", "Notes": "" },
 ];
 
+const DEMO_PACKING_LISTS = [];
+const DEMO_PACKING_CARTONS = [];
+
 function resetLocalSelectedState(rows) {
   rows.forEach(row => { row["Selected"] = false; });
 }
@@ -1273,12 +1280,92 @@ function normalizeChargeback(row) {
   return { ...row, Selected: false };
 }
 
+function normalizePackingList(row) {
+  return { ...row };
+}
+
+function normalizePackingCarton(row) {
+  return { ...row };
+}
+
 function getChargebackId(chargeback) {
   return String(chargeback?.[CHARGEBACK_ID_FIELD] ?? "").trim();
 }
 
 function getChargebackPoNumber(chargeback) {
   return String(chargeback?.["PO #"] ?? "").trim();
+}
+
+function getPackingListId(packingList) {
+  return String(packingList?.[PACKING_LIST_ID_FIELD] ?? "").trim();
+}
+
+function getPackingListPoNumber(packingList) {
+  return String(packingList?.["PO #"] ?? "").trim();
+}
+
+function getPackingListForPo(poNumber) {
+  const key = String(poNumber ?? "").trim();
+  if (!key) return null;
+  return allPackingLists.find(packingList => getPackingListPoNumber(packingList) === key) ?? null;
+}
+
+function hasPackingList(poNumber) {
+  return getPackingListForPo(poNumber) != null;
+}
+
+function getPackingCartonsForList(packingListId) {
+  const key = String(packingListId ?? "").trim();
+  if (!key) return [];
+  return allPackingCartons
+    .filter(carton => String(carton?.[PACKING_LIST_ID_FIELD] ?? "").trim() === key)
+    .sort((a, b) => Number(a["Carton #"] || 0) - Number(b["Carton #"] || 0));
+}
+
+function getPackingCartonsForPo(poNumber) {
+  const packingList = getPackingListForPo(poNumber);
+  return packingList ? getPackingCartonsForList(getPackingListId(packingList)) : [];
+}
+
+function generateDemoPackingListId() {
+  const max = allPackingLists.reduce((highest, packingList) => {
+    const m = /^PL-(\d+)$/.exec(getPackingListId(packingList));
+    return Math.max(highest, m ? Number(m[1]) : 0);
+  }, 0);
+  return `PL-${String(max + 1).padStart(4, "0")}`;
+}
+
+function computeCartonTotal(carton) {
+  return PO_UNIT_FIELDS.reduce((sum, _, index) => sum + toQtyNumber(carton[`Unit ${index + 1}`]), 0);
+}
+
+function computePackingTotalsByUnit(cartons) {
+  return Array.from({ length: QTY_UNIT_COUNT }, (_, index) =>
+    cartons.reduce((sum, carton) => sum + toQtyNumber(carton[`Unit ${index + 1}`]), 0)
+  );
+}
+
+function computePackingListTotal(cartons) {
+  return computePackingTotalsByUnit(cartons).reduce((sum, qty) => sum + qty, 0);
+}
+
+function buildActualUpdatesFromPackingCartons(cartons) {
+  const totals = computePackingTotalsByUnit(cartons);
+  const updates = {};
+  let actualQty = 0;
+  ACT_UNIT_FIELDS.forEach((field, index) => {
+    const qty = totals[index] || 0;
+    updates[field] = qty || "";
+    actualQty += qty;
+  });
+  updates["Actual Qty"] = actualQty;
+  return updates;
+}
+
+function buildClearActualQtyUpdates() {
+  const updates = { "Actual Qty": "" };
+  ACT_UNIT_FIELDS.forEach(field => { updates[field] = ""; });
+  return updates;
 }
 
 function getChargebacksForPo(poNumber) {
@@ -1325,6 +1412,8 @@ async function loadData() {
     if (APPS_SCRIPT_URL === "YOUR_APPS_SCRIPT_WEB_APP_URL_HERE") {
       allRows = DEMO_DATA.map(row => ({ ...row }));
       allChargebacks = DEMO_CHARGEBACKS.map(normalizeChargeback);
+      allPackingLists = DEMO_PACKING_LISTS.map(normalizePackingList);
+      allPackingCartons = DEMO_PACKING_CARTONS.map(normalizePackingCarton);
       window.__pendingShipments = [];
       if (typeof onShipmentsDataLoaded === "function") {
         onShipmentsDataLoaded([]);
@@ -1336,6 +1425,8 @@ async function loadData() {
       if (!json.success) throw new Error(json.error);
       allRows = json.data.map(normalizeRow);
       allChargebacks = (json.chargebacks ?? []).map(normalizeChargeback);
+      allPackingLists = (json.packingLists ?? []).map(normalizePackingList);
+      allPackingCartons = (json.packingCartons ?? []).map(normalizePackingCarton);
       window.__pendingShipments = json.shipments ?? [];
       if (typeof onShipmentsDataLoaded === "function") {
         onShipmentsDataLoaded(window.__pendingShipments);
@@ -2051,6 +2142,12 @@ const FLAG_ICON_SVG =
   `<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>` +
   `<line x1="4" y1="22" x2="4" y2="15"/></svg>`;
 
+const PACKING_LIST_ICON_SVG =
+  `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" ` +
+  `fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">` +
+  `<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>` +
+  `<path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h6"/></svg>`;
+
 function renderSelectedCell(td, row) {
   td.className = "td-select-cell readonly-no-select";
   const cb = document.createElement("input");
@@ -2084,6 +2181,18 @@ function renderFlagCell(td, row) {
   td.className = "td-flag-cell readonly-no-select";
   td.replaceChildren();
   td.appendChild(createPoFlagButton(row));
+}
+
+function renderPackingListIndicatorCell(td, row) {
+  td.className = "td-packing-list-cell readonly readonly-no-select";
+  td.replaceChildren();
+  if (!hasPackingList(row["PO #"])) return;
+  const icon = document.createElement("span");
+  icon.className = "po-packing-list-indicator";
+  icon.title = "Packing list exists";
+  icon.setAttribute("aria-label", "Packing list exists");
+  icon.innerHTML = PACKING_LIST_ICON_SVG;
+  td.appendChild(icon);
 }
 
 function renderTable() {
@@ -2126,6 +2235,11 @@ function renderTable() {
       }
       if (col === "Flag") {
         renderFlagCell(td, row);
+        tr.appendChild(td);
+        return;
+      }
+      if (col === "Packing List") {
+        renderPackingListIndicatorCell(td, row);
         tr.appendChild(td);
         return;
       }
@@ -2471,7 +2585,7 @@ function getModalPendingUpdates() {
 }
 
 function hasModalPendingChanges() {
-  return Object.keys(getModalPendingUpdates()).length > 0;
+  return Object.keys(getModalPendingUpdates()).length > 0 || packingListPanelOpen;
 }
 
 function updateModalSaveState() {
@@ -2887,6 +3001,17 @@ function buildSizeGridRow(chart, row, label, unitFields, colCount, rowType) {
 
   for (let i = 0; i < colCount; i++) {
     const field = unitFields[i];
+    if (rowType === "act") {
+      const cell = document.createElement("div");
+      cell.className = "modal-size-static";
+      cell.dataset.field = field;
+      cell.dataset.rowType = rowType;
+      const qty = toQtyNumber(row[field]);
+      cell.textContent = qty > 0 ? String(qty) : "";
+      chart.appendChild(cell);
+      continue;
+    }
+
     const input = document.createElement("input");
     input.type = "number";
     input.min = "0";
@@ -2932,8 +3057,8 @@ function refreshSizeGridTotals(row, poTotalCell, actTotalCell) {
 function setSizeVarianceCell(cell, value) {
   cell.classList.remove("modal-size-variance--ok", "modal-size-variance--warn");
   if (!Number.isFinite(value)) {
-    cell.textContent = EMPTY_DISPLAY;
-    cell.classList.add("empty-display");
+    cell.textContent = "";
+    cell.classList.remove("empty-display");
     return;
   }
 
@@ -2948,11 +3073,11 @@ function refreshSizeGridVariance(row, chartEl) {
     const value = computeQtyVariancePercent(row[PO_UNIT_FIELDS[index]], row[ACT_UNIT_FIELDS[index]]);
     setSizeVarianceCell(cell, value);
 
-    const actualInput = chartEl.querySelector(
-      `.modal-size-input[data-row-type="act"][data-field="${ACT_UNIT_FIELDS[index]}"]`
+    const actualCell = chartEl.querySelector(
+      `[data-row-type="act"][data-field="${ACT_UNIT_FIELDS[index]}"]`
     );
-    if (actualInput instanceof HTMLInputElement) {
-      actualInput.classList.toggle("modal-size-input--variance-warn", Number.isFinite(value) && value > 10);
+    if (actualCell) {
+      actualCell.classList.toggle("modal-size-input--variance-warn", Number.isFinite(value) && value > 10);
     }
   });
 
@@ -3333,6 +3458,210 @@ function removeChargebackGridHeadersIfEmpty(block) {
   grid.querySelectorAll(".chargeback-grid-head").forEach(head => head.remove());
 }
 
+function clonePackingCarton(carton, fallbackIndex) {
+  const out = { "Carton #": carton?.["Carton #"] || fallbackIndex + 1 };
+  for (let i = 1; i <= QTY_UNIT_COUNT; i++) {
+    out[`Unit ${i}`] = carton?.[`Unit ${i}`] ?? "";
+  }
+  return out;
+}
+
+function normalizePackingEditorCartons(cartons, count) {
+  const next = [];
+  for (let i = 0; i < count; i++) {
+    next.push(clonePackingCarton(cartons[i], i));
+  }
+  return next;
+}
+
+function setPackingEditorTotals(container, row, cartons) {
+  const totals = computePackingTotalsByUnit(cartons);
+  const totalQty = totals.reduce((sum, qty) => sum + qty, 0);
+  container.querySelectorAll(".packing-list-total-cell[data-index]").forEach(cell => {
+    const index = Number(cell.dataset.index);
+    cell.textContent = String(totals[index] || 0);
+  });
+  const grandTotal = container.querySelector(".packing-list-grand-total");
+  if (grandTotal) grandTotal.textContent = String(totalQty);
+}
+
+function createPackingListEditor(row, packingList, sourceCartons) {
+  const labels = getSizeUnitLabels(row["Size"]);
+  const editor = document.createElement("div");
+  editor.className = "packing-list-editor";
+  const initialCount = Math.max(1, Number(packingList?.["Carton Count"] || sourceCartons.length || 1));
+  let cartons = normalizePackingEditorCartons(sourceCartons, initialCount);
+
+  const controls = document.createElement("div");
+  controls.className = "packing-list-controls";
+
+  const countLabel = document.createElement("label");
+  countLabel.className = "packing-list-count-label";
+  countLabel.textContent = "Cartons";
+
+  const countInput = document.createElement("input");
+  countInput.type = "number";
+  countInput.min = "1";
+  countInput.step = "1";
+  countInput.className = "packing-list-count-input";
+  countInput.value = String(initialCount);
+  countLabel.appendChild(countInput);
+
+  controls.appendChild(countLabel);
+  if (packingList) {
+    const deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.className = "btn btn-secondary packing-list-delete-btn";
+    deleteBtn.textContent = "Delete Packing List";
+    deleteBtn.addEventListener("click", () => deletePackingListFromPanel(row, packingList));
+    controls.appendChild(deleteBtn);
+  }
+  editor.appendChild(controls);
+
+  const tableWrap = document.createElement("div");
+  tableWrap.className = "packing-list-table-wrap";
+  const table = document.createElement("table");
+  table.className = "packing-list-table";
+  tableWrap.appendChild(table);
+  editor.appendChild(tableWrap);
+
+  function renderTable() {
+    table.innerHTML = "";
+    const count = Math.max(1, Math.floor(Number(countInput.value) || 1));
+    countInput.value = String(count);
+    cartons = normalizePackingEditorCartons(cartons, count);
+
+    const thead = document.createElement("thead");
+    const headRow = document.createElement("tr");
+    const cartonHead = document.createElement("th");
+    cartonHead.textContent = "Carton #";
+    headRow.appendChild(cartonHead);
+    labels.forEach(label => {
+      const head = document.createElement("th");
+      head.textContent = label;
+      headRow.appendChild(head);
+    });
+    const totalHead = document.createElement("th");
+    totalHead.textContent = "Total";
+    headRow.appendChild(totalHead);
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement("tbody");
+    cartons.forEach((carton, cartonIndex) => {
+      const tr = document.createElement("tr");
+      const rowHead = document.createElement("th");
+      rowHead.textContent = String(cartonIndex + 1);
+      tr.appendChild(rowHead);
+
+      labels.forEach((_, unitIndex) => {
+        const field = `Unit ${unitIndex + 1}`;
+        const td = document.createElement("td");
+        const input = document.createElement("input");
+        input.type = "number";
+        input.min = "0";
+        input.inputMode = "numeric";
+        input.className = "packing-list-input";
+        input.placeholder = EN_DASH;
+        input.value = isEmptyValue(carton[field]) ? "" : String(carton[field]);
+        input.dataset.cartonIndex = String(cartonIndex);
+        input.dataset.field = field;
+        td.appendChild(input);
+        tr.appendChild(td);
+      });
+
+      const rowTotal = document.createElement("td");
+      rowTotal.className = "packing-list-row-total";
+      rowTotal.dataset.cartonIndex = String(cartonIndex);
+      rowTotal.textContent = String(computeCartonTotal(carton));
+      tr.appendChild(rowTotal);
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+
+    const tfoot = document.createElement("tfoot");
+    const footRow = document.createElement("tr");
+    const totalHeadRow = document.createElement("th");
+    totalHeadRow.textContent = "Totals";
+    footRow.appendChild(totalHeadRow);
+
+    labels.forEach((_, index) => {
+      const cell = document.createElement("td");
+      cell.className = "packing-list-total-cell";
+      cell.dataset.index = String(index);
+      footRow.appendChild(cell);
+    });
+
+    const grandTotal = document.createElement("td");
+    grandTotal.className = "packing-list-grand-total";
+    footRow.appendChild(grandTotal);
+    tfoot.appendChild(footRow);
+    table.appendChild(tfoot);
+    setPackingEditorTotals(editor, row, cartons);
+  }
+
+  countInput.addEventListener("change", renderTable);
+  countInput.addEventListener("input", updateModalSaveState);
+  table.addEventListener("input", e => {
+    const target = e.target;
+    if (!(target instanceof HTMLInputElement)) return;
+    setChargebackError(editor, "");
+    const cartonIndex = Number(target.dataset.cartonIndex);
+    const field = target.dataset.field;
+    if (!field || !Number.isFinite(cartonIndex)) return;
+    cartons[cartonIndex][field] = target.value.trim() === "" ? "" : String(toQtyNumber(target.value));
+    const rowTotal = table.querySelector(`.packing-list-row-total[data-carton-index="${cartonIndex}"]`);
+    if (rowTotal) rowTotal.textContent = String(computeCartonTotal(cartons[cartonIndex]));
+    setPackingEditorTotals(editor, row, cartons);
+    updateModalSaveState();
+  });
+  table.addEventListener("keydown", e => {
+    if (e.key !== "Enter") return;
+    const target = e.target;
+    if (!(target instanceof HTMLInputElement)) return;
+    e.preventDefault();
+    target.blur();
+  });
+
+  renderTable();
+  editor.__getPackingCartons = () => cartons;
+  editor.__packingList = packingList;
+  return editor;
+}
+
+function focusPackingListCartonInput() {
+  const cartonInput = document.querySelector("#modalOverlay .packing-list-side-panel .packing-list-count-input");
+  if (cartonInput instanceof HTMLInputElement) {
+    cartonInput.focus();
+    cartonInput.select();
+  }
+}
+
+function updateModalPackingListButton(row) {
+  const btn = document.getElementById("modalPackingListBtn");
+  if (!btn) return;
+  btn.hidden = packingListPanelOpen;
+  if (packingListPanelOpen) return;
+  const poNumber = String(row["PO #"] ?? "").trim();
+  btn.textContent = getPackingListForPo(poNumber) ? "Edit Packing List" : "Add Packing List";
+  btn.onclick = () => {
+    packingListPanelOpen = true;
+    updateModalIfOpen();
+    requestAnimationFrame(focusPackingListCartonInput);
+  };
+}
+
+function createPackingListSidePanel(row) {
+  const poNumber = String(row["PO #"] ?? "").trim();
+  const packingList = getPackingListForPo(poNumber);
+  const cartons = packingList ? getPackingCartonsForList(getPackingListId(packingList)) : [];
+
+  const panel = document.createElement("aside");
+  panel.className = "packing-list-side-panel";
+  panel.appendChild(createPackingListEditor(row, packingList, cartons));
+  return panel;
+}
+
 function createModalChargebacksSection(row) {
   const poNumber = String(row["PO #"] ?? "").trim();
   const block = document.createElement("section");
@@ -3448,11 +3777,13 @@ function renderModalContent(row) {
   if (typeof renderPoModalLinkedShipment === "function") {
     renderPoModalLinkedShipment(row);
   }
+  updateModalPackingListButton(row);
 
   bodyEl.innerHTML = "";
 
   const layout = document.createElement("div");
   layout.className = "modal-layout";
+  layout.classList.toggle("modal-layout--packing-open", packingListPanelOpen);
 
   const main = document.createElement("div");
   main.className = "modal-layout-main";
@@ -3462,6 +3793,9 @@ function renderModalContent(row) {
   main.appendChild(createModalChargebacksSection(row));
 
   layout.appendChild(main);
+  if (packingListPanelOpen) {
+    layout.appendChild(createPackingListSidePanel(row));
+  }
   bodyEl.appendChild(layout);
   updateModalSaveState();
 }
@@ -3478,6 +3812,7 @@ function shouldIgnoreRowDblClick(e) {
 function openPODetail(row) {
   if (isAppSaving()) return;
   closeCellSelectDropdown(false);
+  packingListPanelOpen = false;
   modalRow = snapshotModalRow(row);
   modalSnapshot = snapshotModalRow(row);
   renderModalContent(modalRow);
@@ -3498,6 +3833,7 @@ function dismissModalOverlay() {
   closeCellSelectDropdown(false);
   modalRow = null;
   modalSnapshot = null;
+  packingListPanelOpen = false;
   document.getElementById("modalOverlay")?.classList.remove("open");
   updateModalSaveState();
 }
@@ -3506,6 +3842,145 @@ function refreshChargebacksForPo(poNumber) {
   if (!modalRow || String(modalRow["PO #"]) !== String(poNumber)) return;
   updateModalIfOpen();
   if (typeof refreshChargebacksView === "function") refreshChargebacksView();
+}
+
+function upsertLocalPackingList(poNumber, packingListId, packingList, cartons) {
+  const now = formatDateToYmd(new Date());
+  const existing = allPackingLists.find(item => getPackingListPoNumber(item) === String(poNumber));
+  const nextPackingList = {
+    ...(existing || {}),
+    [PACKING_LIST_ID_FIELD]: packingListId,
+    "PO #": poNumber,
+    "Carton Count": packingList["Carton Count"],
+    "Notes": packingList["Notes"] || "",
+    "Created At": existing?.["Created At"] || now,
+    "Updated At": now,
+  };
+
+  if (existing) {
+    Object.assign(existing, nextPackingList);
+  } else {
+    allPackingLists.push(nextPackingList);
+  }
+
+  allPackingCartons = allPackingCartons.filter(carton =>
+    String(carton?.[PACKING_LIST_ID_FIELD] ?? "").trim() !== String(packingListId)
+  );
+  cartons.forEach(carton => {
+    allPackingCartons.push({ [PACKING_LIST_ID_FIELD]: packingListId, ...carton });
+  });
+}
+
+async function deletePackingListFromPanel(row, packingList) {
+  if (isAppSaving()) return;
+  const packingListId = getPackingListId(packingList);
+  const poNumber = String(row["PO #"] ?? "").trim();
+  if (!packingListId && !poNumber) return;
+  if (!confirm("Delete this packing list?")) return;
+
+  if (APPS_SCRIPT_URL === "YOUR_APPS_SCRIPT_WEB_APP_URL_HERE") {
+    allPackingLists = allPackingLists.filter(item => getPackingListId(item) !== packingListId);
+    allPackingCartons = allPackingCartons.filter(carton =>
+      String(carton?.[PACKING_LIST_ID_FIELD] ?? "").trim() !== packingListId
+    );
+    const clearUpdates = buildClearActualQtyUpdates();
+    Object.assign(row, clearUpdates);
+    applyModalUpdatesToTableRow(poNumber, clearUpdates);
+    packingListPanelOpen = false;
+    renderTable();
+    updateModalIfOpen();
+    showIndicator("Packing list deleted", "success");
+    return;
+  }
+
+  setAppSaving(true, "Deleting packing list...");
+  try {
+    const json = await postAppsScript({
+      action: "deletePackingList",
+      packingListId,
+      poNumber,
+    });
+    if (!json.success) throw new Error(json.error);
+    allPackingLists = allPackingLists.filter(item => getPackingListId(item) !== packingListId);
+    allPackingCartons = allPackingCartons.filter(carton =>
+      String(carton?.[PACKING_LIST_ID_FIELD] ?? "").trim() !== packingListId
+    );
+    const clearUpdates = buildClearActualQtyUpdates();
+    Object.assign(row, clearUpdates);
+    applyModalUpdatesToTableRow(poNumber, clearUpdates);
+    packingListPanelOpen = false;
+    renderTable();
+    updateModalIfOpen();
+    showIndicator("Packing list deleted", "success");
+  } catch (err) {
+    showIndicator("Packing list delete failed: " + err.message, "error");
+  } finally {
+    setAppSaving(false);
+  }
+}
+
+function normalizePackingCartonsForSave(editorCartons) {
+  return editorCartons.map((carton, index) => {
+    const out = { "Carton #": index + 1 };
+    for (let i = 1; i <= QTY_UNIT_COUNT; i++) {
+      const field = `Unit ${i}`;
+      const qty = toQtyNumber(carton[field]);
+      out[field] = qty || "";
+    }
+    out["Total Units"] = computeCartonTotal(out);
+    return out;
+  });
+}
+
+function getActivePackingListPayload() {
+  const editor = document.querySelector("#modalOverlay .packing-list-side-panel .packing-list-editor");
+  if (!packingListPanelOpen || !modalRow || !editor || typeof editor.__getPackingCartons !== "function") return null;
+  return {
+    editor,
+    row: modalRow,
+    existingPackingList: editor.__packingList || getPackingListForPo(modalRow["PO #"]),
+    cartons: normalizePackingCartonsForSave(editor.__getPackingCartons()),
+  };
+}
+
+async function persistPackingListPayload({ editor, row, existingPackingList, cartons }, poEditUpdates = {}) {
+  const poNumber = String(row["PO #"] ?? "").trim();
+  if (!poNumber) return null;
+
+  if (cartons.some(carton => computeCartonTotal(carton) <= 0)) {
+    setChargebackError(editor, "A carton quantity cannot be zero.");
+    return null;
+  }
+
+  const packingList = {
+    "Carton Count": cartons.length,
+    "Notes": existingPackingList?.["Notes"] || "",
+  };
+  const actualUpdates = buildActualUpdatesFromPackingCartons(cartons);
+  const combinedUpdates = { ...poEditUpdates, ...actualUpdates };
+
+  if (APPS_SCRIPT_URL === "YOUR_APPS_SCRIPT_WEB_APP_URL_HERE") {
+    const packingListId = getPackingListId(existingPackingList) || generateDemoPackingListId();
+    upsertLocalPackingList(poNumber, packingListId, packingList, cartons);
+    Object.assign(row, combinedUpdates);
+    applyModalUpdatesToTableRow(poNumber, combinedUpdates);
+    return combinedUpdates;
+  }
+
+  const json = await postAppsScript({
+    action: "savePackingList",
+    poNumber,
+    packingList,
+    cartons,
+    updates: poEditUpdates,
+  });
+  if (!json.success) throw new Error(json.error);
+  const packingListId = json.packingListId || getPackingListId(existingPackingList);
+  upsertLocalPackingList(poNumber, packingListId, packingList, cartons);
+  const poUpdates = json.poUpdates || combinedUpdates;
+  Object.assign(row, poUpdates);
+  applyModalUpdatesToTableRow(poNumber, poUpdates);
+  return poUpdates;
 }
 
 async function addChargebackRow(rowEl, poNumber) {
@@ -3622,20 +4097,32 @@ async function saveModalChanges() {
   commitActiveModalEditor();
 
   const updates = getModalPendingUpdates();
-  if (Object.keys(updates).length === 0) {
+  const packingPayload = getActivePackingListPayload();
+  if (Object.keys(updates).length === 0 && !packingPayload) {
     dismissModalOverlay();
     return;
   }
 
   const poNumber = modalRow["PO #"];
-  dismissModalOverlay();
   setAppSaving(true, "Saving…");
   try {
+    if (packingPayload) {
+      const savedPackingUpdates = await persistPackingListPayload(packingPayload, updates);
+      if (!savedPackingUpdates) return;
+      applyModalUpdatesToTableRow(poNumber, savedPackingUpdates);
+      renderTable();
+      dismissModalOverlay();
+      return;
+    }
+
     const ok = await saveUpdate(poNumber, updates);
     if (ok) {
       applyModalUpdatesToTableRow(poNumber, updates);
       renderTable();
+      dismissModalOverlay();
     }
+  } catch (err) {
+    showIndicator("Save failed: " + err.message, "error");
   } finally {
     setAppSaving(false);
   }

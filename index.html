@@ -84,7 +84,7 @@
   <div class="table-scroll-x">
   <table id="poTable">
     <colgroup>
-      <col class="col-select" /><col class="col-flag" />
+      <col class="col-select" /><col class="col-flag" /><col class="col-packing-list" />
       <col class="col-status" /><col class="col-division" /><col class="col-vendor" />
       <col class="col-buyer" /><col class="col-buyer-po" />
       <col class="col-so" /><col class="col-po-date" /><col class="col-po" />
@@ -107,6 +107,7 @@
             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
           </span>
         </th>
+        <th class="th-packing-list-col" data-col="Packing List" aria-label="Packing List"></th>
         <th data-col="Status" onclick="sortBy('Status')">Status</th>
         <th data-col="Division" onclick="sortBy('Division')">Division</th>
         <th class="th-filterable" data-col="Vendor"><span class="th-label">Vendor</span></th>
@@ -138,7 +139,7 @@
       </tr>
     </thead>
     <tbody id="tableBody">
-      <tr class="state-row"><td colspan="29">Loading POs…</td></tr>
+      <tr class="state-row"><td colspan="30">Loading POs…</td></tr>
     </tbody>
   </table>
   </div>
@@ -364,6 +365,7 @@
       </div>
       <div class="modal-header-actions">
         <div id="modalLinkedShipment" class="modal-linked-shipment-slot" hidden></div>
+        <button type="button" class="btn btn-secondary packing-list-header-btn" id="modalPackingListBtn">Add Packing List</button>
         <button type="button" class="btn-close" id="modalCloseBtn" aria-label="Close">✕</button>
       </div>
     </div>

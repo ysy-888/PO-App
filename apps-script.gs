@@ -1,10 +1,13 @@
 const SHEET_NAME = "POs";
 const SHIPMENTS_SHEET_NAME = "Shipments";
 const CHARGEBACKS_SHEET_NAME = "Chargebacks";
+const PACKING_LISTS_SHEET_NAME = "Packing Lists";
+const PACKING_CARTONS_SHEET_NAME = "Packing List Cartons";
 const COLUMN_DEFAULT_KEY = "defaultVisibleColumns";
 const STATUS_DEFAULT_KEY = "defaultStatusFilter";
 const SHIPMENT_ID_FIELD = "Shipment ID";
 const CHARGEBACK_ID_FIELD = "Chargeback ID";
+const PACKING_LIST_ID_FIELD = "Packing List ID";
 
 /*
   POs sheet row 1 headers (see po-table.js COLUMNS). Add column: Shipment ID
@@ -45,6 +48,19 @@ const CHARGEBACK_EDITABLE_FIELDS = [
   "Amount", "Reason", "Status", "Notes"
 ];
 
+const PACKING_UNIT_FIELDS = [
+  "Unit 1", "Unit 2", "Unit 3", "Unit 4",
+  "Unit 5", "Unit 6", "Unit 7", "Unit 8"
+];
+
+const PACKING_LIST_DATA_FIELDS = [
+  "PO #", "Carton Count", "Notes", "Created At", "Updated At"
+];
+
+const PACKING_CARTON_DATA_FIELDS = [
+  PACKING_LIST_ID_FIELD, "Carton #", ...PACKING_UNIT_FIELDS, "Total Units"
+];
+
 function getSheet() {
   return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
 }
@@ -69,6 +85,28 @@ function getChargebacksSheet_() {
     sheet.getRange(1, 1, 1, CHARGEBACK_DATA_FIELDS.length + 1).setValues([[
       CHARGEBACK_ID_FIELD, ...CHARGEBACK_DATA_FIELDS
     ]]);
+  }
+  return sheet;
+}
+
+function getPackingListsSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(PACKING_LISTS_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(PACKING_LISTS_SHEET_NAME);
+    sheet.getRange(1, 1, 1, PACKING_LIST_DATA_FIELDS.length + 1).setValues([[
+      PACKING_LIST_ID_FIELD, ...PACKING_LIST_DATA_FIELDS
+    ]]);
+  }
+  return sheet;
+}
+
+function getPackingCartonsSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(PACKING_CARTONS_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(PACKING_CARTONS_SHEET_NAME);
+    sheet.getRange(1, 1, 1, PACKING_CARTON_DATA_FIELDS.length).setValues([PACKING_CARTON_DATA_FIELDS]);
   }
   return sheet;
 }
@@ -181,6 +219,24 @@ function generateChargebackId_(chargebacks) {
   return formatChargebackId_(max + 1);
 }
 
+function parsePackingListIdSequence_(id) {
+  const s = String(id ?? "").trim();
+  const m = /^PL-(\d+)$/.exec(s);
+  return m ? Number(m[1]) : 0;
+}
+
+function formatPackingListId_(sequence) {
+  return "PL-" + String(sequence).padStart(4, "0");
+}
+
+function generatePackingListId_(packingLists) {
+  let max = 0;
+  packingLists.forEach(packingList => {
+    max = Math.max(max, parsePackingListIdSequence_(packingList[PACKING_LIST_ID_FIELD]));
+  });
+  return formatPackingListId_(max + 1);
+}
+
 function pickChargebackData_(source) {
   const out = {};
   CHARGEBACK_EDITABLE_FIELDS.forEach(field => {
@@ -216,6 +272,107 @@ function appendChargebackRow_(chargebacksSheet, chargebackId, poNumber, chargeba
   chargebacksSheet.appendRow(row);
 }
 
+function findPackingListRowIndex_(packingListsSheet, packingListId) {
+  const rows = packingListsSheet.getDataRange().getValues();
+  const headers = rows[0].map(h => String(h ?? "").trim());
+  const idCol = headers.indexOf(PACKING_LIST_ID_FIELD);
+  if (idCol === -1) throw new Error("Packing List ID column not found.");
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][idCol]) === String(packingListId)) {
+      return { rowIndex: i + 1, headers: headers };
+    }
+  }
+  return null;
+}
+
+function findPackingListForPo_(packingListsSheet, poNumber) {
+  const rows = packingListsSheet.getDataRange().getValues();
+  if (rows.length < 2) return null;
+  const headers = rows[0].map(h => String(h ?? "").trim());
+  const poCol = headers.indexOf("PO #");
+  const idCol = headers.indexOf(PACKING_LIST_ID_FIELD);
+  if (poCol === -1 || idCol === -1) throw new Error("Packing Lists sheet is missing required columns.");
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][poCol]) === String(poNumber)) {
+      return { rowIndex: i + 1, headers: headers, packingListId: rows[i][idCol] };
+    }
+  }
+  return null;
+}
+
+function toPackingQty_(value) {
+  const n = Number(String(value ?? "").trim());
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+function normalizePackingCartons_(cartons) {
+  const list = Array.isArray(cartons) ? cartons : [];
+  return list.map((carton, index) => {
+    const out = { "Carton #": carton["Carton #"] || index + 1 };
+    let total = 0;
+    PACKING_UNIT_FIELDS.forEach(field => {
+      const qty = toPackingQty_(carton[field]);
+      out[field] = qty || "";
+      total += qty;
+    });
+    out["Total Units"] = total;
+    return out;
+  });
+}
+
+function computePackingTotalsByUnit_(cartons) {
+  const totals = {};
+  PACKING_UNIT_FIELDS.forEach(field => { totals[field] = 0; });
+  cartons.forEach(carton => {
+    PACKING_UNIT_FIELDS.forEach(field => {
+      totals[field] += toPackingQty_(carton[field]);
+    });
+  });
+  return totals;
+}
+
+function deletePackingCartons_(cartonsSheet, packingListId) {
+  const rows = cartonsSheet.getDataRange().getValues();
+  if (rows.length < 2) return;
+  const headers = rows[0].map(h => String(h ?? "").trim());
+  const idCol = headers.indexOf(PACKING_LIST_ID_FIELD);
+  if (idCol === -1) throw new Error("Packing List ID column not found in cartons sheet.");
+  const rowsToDelete = [];
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][idCol]) === String(packingListId)) rowsToDelete.push(i + 1);
+  }
+  rowsToDelete.sort((a, b) => b - a);
+  rowsToDelete.forEach(rowIndex => cartonsSheet.deleteRow(rowIndex));
+}
+
+function appendPackingCartons_(cartonsSheet, packingListId, cartons) {
+  const headers = cartonsSheet.getRange(1, 1, 1, cartonsSheet.getLastColumn()).getValues()[0]
+    .map(h => String(h ?? "").trim());
+  if (cartons.length === 0) return;
+  const rows = cartons.map(carton => (
+    headers.map(h => {
+      if (h === PACKING_LIST_ID_FIELD) return packingListId;
+      return carton[h] !== undefined ? carton[h] : "";
+    })
+  ));
+  cartonsSheet.getRange(cartonsSheet.getLastRow() + 1, 1, rows.length, headers.length).setValues(rows);
+}
+
+function syncPoActualsFromPacking_(poSheet, poFound, cartons, extraUpdates) {
+  const totals = computePackingTotalsByUnit_(cartons);
+  const updates = Object.assign({}, extraUpdates || {});
+  let actualQty = 0;
+  PACKING_UNIT_FIELDS.forEach((field, index) => {
+    const qty = totals[field] || 0;
+    updates["Act Unit " + (index + 1)] = qty || "";
+    actualQty += qty;
+  });
+  updates["Actual Qty"] = actualQty;
+  updates["Has Packing List"] = true;
+  writePoFields_(poSheet, poFound.rowIndex, poFound.headers, updates);
+  return updates;
+}
+
 function pickShipmentData_(source) {
   const out = {};
   SHIPMENT_DATA_FIELDS.forEach(field => {
@@ -236,10 +393,12 @@ function findPoRowIndex_(poSheet, poNumber) {
 }
 
 function writePoFields_(poSheet, rowIndex, headers, updates) {
+  const rowValues = poSheet.getRange(rowIndex, 1, 1, headers.length).getValues()[0];
   Object.entries(updates).forEach(([field, value]) => {
     const colIndex = headers.indexOf(field);
-    if (colIndex !== -1) poSheet.getRange(rowIndex, colIndex + 1).setValue(value);
+    if (colIndex !== -1) rowValues[colIndex] = value;
   });
+  poSheet.getRange(rowIndex, 1, 1, headers.length).setValues([rowValues]);
 }
 
 function syncPosFromShipment_(poSheet, shipmentId, shipmentData, poNumbers) {
@@ -494,6 +653,96 @@ function handleDeleteChargeback(payload) {
   return corsResponse({ success: true, deleted: rowsToDelete.length });
 }
 
+function handleSavePackingList(payload) {
+  const poNumber = String(payload.poNumber ?? "").trim();
+  if (!poNumber) {
+    return corsResponse({ success: false, error: "PO # is required." });
+  }
+
+  const poSheet = getSheet();
+  const poFound = findPoRowIndex_(poSheet, poNumber);
+  if (!poFound) {
+    return corsResponse({ success: false, error: "PO # not found: " + poNumber });
+  }
+
+  const packingListsSheet = getPackingListsSheet_();
+  const cartonsSheet = getPackingCartonsSheet_();
+  const existingLists = sheetToObjects_(packingListsSheet, PACKING_LIST_ID_FIELD);
+  const existing = findPackingListForPo_(packingListsSheet, poNumber);
+  const packingListId = existing
+    ? String(existing.packingListId)
+    : generatePackingListId_(existingLists);
+  const cartons = normalizePackingCartons_(payload.cartons || []);
+  const now = new Date();
+  const cartonCount = payload.packingList?.["Carton Count"] || cartons.length;
+  const notes = payload.packingList?.["Notes"] || "";
+  const poEditUpdates = payload.updates || {};
+  const invalidFields = Object.keys(poEditUpdates).filter(f => !EDITABLE_FIELDS.includes(f));
+  if (invalidFields.length > 0) {
+    return corsResponse({
+      success: false,
+      error: "Not allowed to edit: " + invalidFields.join(", ")
+    });
+  }
+
+  if (existing) {
+    existing.headers.forEach((field, colIndex) => {
+      if (field === "Carton Count") packingListsSheet.getRange(existing.rowIndex, colIndex + 1).setValue(cartonCount);
+      if (field === "Notes") packingListsSheet.getRange(existing.rowIndex, colIndex + 1).setValue(notes);
+      if (field === "Updated At") packingListsSheet.getRange(existing.rowIndex, colIndex + 1).setValue(now);
+    });
+  } else {
+    const headers = packingListsSheet.getRange(1, 1, 1, packingListsSheet.getLastColumn()).getValues()[0]
+      .map(h => String(h ?? "").trim());
+    const row = headers.map(h => {
+      if (h === PACKING_LIST_ID_FIELD) return packingListId;
+      if (h === "PO #") return poNumber;
+      if (h === "Carton Count") return cartonCount;
+      if (h === "Notes") return notes;
+      if (h === "Created At" || h === "Updated At") return now;
+      return "";
+    });
+    packingListsSheet.appendRow(row);
+  }
+
+  deletePackingCartons_(cartonsSheet, packingListId);
+  appendPackingCartons_(cartonsSheet, packingListId, cartons);
+  const combinedPoUpdates = syncPoActualsFromPacking_(poSheet, poFound, cartons, poEditUpdates);
+
+  return corsResponse({
+    success: true,
+    packingListId: packingListId,
+    poUpdates: combinedPoUpdates
+  });
+}
+
+function handleDeletePackingList(payload) {
+  const packingListId = String(payload.packingListId ?? "").trim();
+  const poNumber = String(payload.poNumber ?? "").trim();
+  const packingListsSheet = getPackingListsSheet_();
+  const cartonsSheet = getPackingCartonsSheet_();
+  const found = packingListId
+    ? findPackingListRowIndex_(packingListsSheet, packingListId)
+    : findPackingListForPo_(packingListsSheet, poNumber);
+  if (!found) return corsResponse({ success: true, deleted: 0 });
+
+  const id = String(found.packingListId || packingListId);
+  deletePackingCartons_(cartonsSheet, id);
+  packingListsSheet.deleteRow(found.rowIndex);
+
+  if (poNumber) {
+    const poSheet = getSheet();
+    const poFound = findPoRowIndex_(poSheet, poNumber);
+    if (poFound) {
+      const updates = { "Has Packing List": false, "Actual Qty": "" };
+      for (let i = 1; i <= 8; i++) updates["Act Unit " + i] = "";
+      writePoFields_(poSheet, poFound.rowIndex, poFound.headers, updates);
+    }
+  }
+
+  return corsResponse({ success: true, deleted: 1 });
+}
+
 function handleUpdate(payload) {
   const { poNumber, updates } = payload;
 
@@ -520,15 +769,21 @@ function doGet(e) {
     const poSheet = getSheet();
     const shipmentsSheet = getShipmentsSheet_();
     const chargebacksSheet = getChargebacksSheet_();
+    const packingListsSheet = getPackingListsSheet_();
+    const packingCartonsSheet = getPackingCartonsSheet_();
     const data = sheetToObjects_(poSheet, "PO #");
     const shipments = sheetToObjects_(shipmentsSheet, SHIPMENT_ID_FIELD);
     const chargebacks = sheetToObjects_(chargebacksSheet, CHARGEBACK_ID_FIELD);
+    const packingLists = sheetToObjects_(packingListsSheet, PACKING_LIST_ID_FIELD);
+    const packingCartons = sheetToObjects_(packingCartonsSheet, PACKING_LIST_ID_FIELD);
 
     return corsResponse({
       success: true,
       data: data,
       shipments: shipments,
       chargebacks: chargebacks,
+      packingLists: packingLists,
+      packingCartons: packingCartons,
       defaultColumns: getDefaultColumns_(),
       defaultStatusFilter: getDefaultStatusFilter_(),
     });
@@ -550,6 +805,8 @@ function doPost(e) {
     if (action === "createChargeback") return handleCreateChargeback(payload);
     if (action === "updateChargeback") return handleUpdateChargeback(payload);
     if (action === "deleteChargeback") return handleDeleteChargeback(payload);
+    if (action === "savePackingList") return handleSavePackingList(payload);
+    if (action === "deletePackingList") return handleDeletePackingList(payload);
 
     return corsResponse({ success: false, error: "Unknown action: " + action });
   } catch (err) {
