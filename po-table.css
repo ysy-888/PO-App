@@ -1893,12 +1893,38 @@ td.editable:not(.select-cell):hover .editable-preview {
   box-shadow: 0 0 0 1px var(--accent);
 }
 
+.modal-size-input--variance-warn {
+  color: var(--danger);
+  font-weight: 700;
+}
+
 .modal-size-total {
   min-width: 0;
   text-align: center;
   font-size: 12px;
   font-weight: 700;
   color: var(--text);
+}
+
+.modal-size-rowhead--variance,
+.modal-size-variance {
+  padding-top: 2px;
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.modal-size-variance {
+  min-width: 0;
+  text-align: center;
+  font-weight: 700;
+}
+
+.modal-size-variance--ok {
+  color: var(--success);
+}
+
+.modal-size-variance--warn {
+  color: var(--danger);
 }
 
 .modal-top-split {

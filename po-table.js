@@ -625,6 +625,19 @@ function computeActualQtyFromUnits(row) {
   return sumUnitFields(row, ACT_UNIT_FIELDS);
 }
 
+function computeQtyVariancePercent(poQty, actualQty) {
+  const po = toQtyNumber(poQty);
+  const actual = toQtyNumber(actualQty);
+  if (po <= 0) return null;
+  return Math.abs(actual - po) / po * 100;
+}
+
+function formatQtyVariancePercent(value) {
+  if (!Number.isFinite(value)) return EMPTY_DISPLAY;
+  const rounded = Math.round(value * 10) / 10;
+  return `${Number.isInteger(rounded) ? rounded : rounded.toFixed(1)}%`;
+}
+
 /** Keep the PO Qty / Actual Qty totals in sync with their per-size unit fields. */
 function syncQtyTotalsForRow(row) {
   if (!row) return row;
@@ -2799,9 +2812,11 @@ function renderSizeGridBody(body, row) {
 
   const poTotalCell = buildSizeGridRow(chart, row, "PO Qty", PO_UNIT_FIELDS, colCount, "po");
   const actTotalCell = buildSizeGridRow(chart, row, "Actual Qty", ACT_UNIT_FIELDS, colCount, "act");
+  buildSizeVarianceRow(chart, colCount);
   body.appendChild(chart);
 
   refreshSizeGridTotals(row, poTotalCell, actTotalCell);
+  refreshSizeGridVariance(row, chart);
 }
 
 function buildSizeGridRow(chart, row, label, unitFields, colCount, rowType) {
@@ -2831,9 +2846,63 @@ function buildSizeGridRow(chart, row, label, unitFields, colCount, rowType) {
   return totalCell;
 }
 
+function buildSizeVarianceRow(chart, colCount) {
+  const head = document.createElement("div");
+  head.className = "modal-size-rowhead modal-size-rowhead--variance";
+  head.textContent = "Diff %";
+  chart.appendChild(head);
+
+  for (let i = 0; i < colCount; i++) {
+    const cell = document.createElement("div");
+    cell.className = "modal-size-variance";
+    cell.dataset.index = String(i);
+    chart.appendChild(cell);
+  }
+
+  const totalCell = document.createElement("div");
+  totalCell.className = "modal-size-variance modal-size-variance--total";
+  chart.appendChild(totalCell);
+}
+
 function refreshSizeGridTotals(row, poTotalCell, actTotalCell) {
   if (poTotalCell) poTotalCell.textContent = String(computePoQtyFromUnits(row));
   if (actTotalCell) actTotalCell.textContent = String(computeActualQtyFromUnits(row));
+}
+
+function setSizeVarianceCell(cell, value) {
+  cell.classList.remove("modal-size-variance--ok", "modal-size-variance--warn");
+  if (!Number.isFinite(value)) {
+    cell.textContent = EMPTY_DISPLAY;
+    cell.classList.add("empty-display");
+    return;
+  }
+
+  cell.classList.remove("empty-display");
+  cell.textContent = formatQtyVariancePercent(value);
+  cell.classList.add(value <= 10 ? "modal-size-variance--ok" : "modal-size-variance--warn");
+}
+
+function refreshSizeGridVariance(row, chartEl) {
+  chartEl.querySelectorAll(".modal-size-variance[data-index]").forEach(cell => {
+    const index = Number(cell.dataset.index);
+    const value = computeQtyVariancePercent(row[PO_UNIT_FIELDS[index]], row[ACT_UNIT_FIELDS[index]]);
+    setSizeVarianceCell(cell, value);
+
+    const actualInput = chartEl.querySelector(
+      `.modal-size-input[data-row-type="act"][data-field="${ACT_UNIT_FIELDS[index]}"]`
+    );
+    if (actualInput instanceof HTMLInputElement) {
+      actualInput.classList.toggle("modal-size-input--variance-warn", Number.isFinite(value) && value > 10);
+    }
+  });
+
+  const totalCell = chartEl.querySelector(".modal-size-variance--total");
+  if (totalCell) {
+    setSizeVarianceCell(
+      totalCell,
+      computeQtyVariancePercent(computePoQtyFromUnits(row), computeActualQtyFromUnits(row))
+    );
+  }
 }
 
 function handleSizeGridInput(target, row) {
@@ -2849,6 +2918,7 @@ function handleSizeGridInput(target, row) {
     const poTotal = chartEl.querySelector(".modal-size-total--po");
     const actTotal = chartEl.querySelector(".modal-size-total--act");
     refreshSizeGridTotals(row, poTotal, actTotal);
+    refreshSizeGridVariance(row, chartEl);
   }
   updateModalSaveState();
 }
