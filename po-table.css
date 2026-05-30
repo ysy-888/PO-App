@@ -1948,6 +1948,11 @@ td.editable:not(.select-cell):hover .editable-preview {
   width: 72px;
 }
 
+.modal-block--shipping .modal-field-row--ship-po-date .modal-field--date .modal-field-value {
+  justify-content: center;
+  text-align: center;
+}
+
 .modal-block--shipping .modal-field-label {
   font-size: 9px;
 }
@@ -2056,7 +2061,7 @@ td.editable:not(.select-cell):hover .editable-preview {
 
 .modal-style-section-grid {
   display: grid;
-  grid-template-columns: calc(168px * 2 + 8px) 168px minmax(0, 1fr);
+  grid-template-columns: 168px minmax(0, 1fr) calc(168px * 2 + 8px);
   gap: 16px;
   align-items: center;
   min-width: 0;

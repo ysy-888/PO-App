@@ -581,7 +581,7 @@ function getModalFieldSize(col) {
 
 const MODAL_ORDER_INFO_ROWS = [
   ["Status", "Division"],
-  ["Vendor", "Buyer"],
+  ["Buyer", "Vendor"],
   ["Buyer PO #", "SO #", "Old PO #"],
 ];
 
@@ -2682,9 +2682,9 @@ function createModalStyleSection(row) {
     { rowClass: "modal-field-row--style-costs" }
   ));
 
-  grid.appendChild(createStylePhotoPlaceholders());
   grid.appendChild(info);
   grid.appendChild(createModalSizeGrid(row));
+  grid.appendChild(createStylePhotoPlaceholders());
   content.appendChild(grid);
   return block;
 }
