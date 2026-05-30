@@ -332,6 +332,9 @@ function normalizeRow(row) {
   if ("Shipment ID" in out && isEmptyValue(out["Shipment ID"])) {
     out["Shipment ID"] = "";
   }
+  if (isEmptyValue(out["Size"])) {
+    out["Size"] = SIZE_OPTIONS[0];
+  }
   return out;
 }
 
@@ -529,13 +532,13 @@ function initEditTable() {
 
 const EDITABLE = new Set([
   "Flag",
-  "PO Qty","Status","Ship Method","Ctn Qty","Vessel","House #",
+  "Status","Ship Method","Ctn Qty",
   "IHD","EST EXF","CXL Date","Assign Date","Notes",
   "FOB Cost","Price","OG","PROTO","FIT/PP","BULK","TOP","TRIM",
 ]);
 
 /** Set on PO sheet; values come from the linked shipment. */
-const SHIPMENT_MANAGED_PO_FIELDS = new Set(["EXF", "Shipped", "ETD", "ETA"]);
+const SHIPMENT_MANAGED_PO_FIELDS = new Set(["Vessel", "House #", "EXF", "Shipped", "ETD", "ETA"]);
 
 function isPoFieldEditable(col, row) {
   if (!EDITABLE.has(col)) return false;
@@ -582,20 +585,66 @@ const MODAL_ORDER_INFO_ROWS = [
   ["Buyer PO #", "SO #", "Old PO #"],
 ];
 
-const MODAL_PRODUCT_ROWS = [
-  ["PO Qty", "Actual Qty", "Ctn Qty"],
-  ["FOB Cost", "Price"],
-];
-
 const MODAL_PRODUCTION_ROWS = [
   ["OG", "PROTO", "FIT/PP", "BULK", "TOP", "TRIM"],
 ];
+
+/** Number of size-breakdown unit slots stored per PO (PO Unit 1..8 / Act Unit 1..8). */
+const QTY_UNIT_COUNT = 8;
+
+const SIZE_OPTIONS = ["XS-XL", "XXS-XXL", "PL"];
+
+/** Size option → ordered size labels mapped to unit slots 1..N (left → right). */
+const SIZE_UNIT_LABELS = {
+  "XS-XL": ["XS", "S", "M", "L", "XL"],
+  "XXS-XXL": ["XXS", "XS", "S", "M", "L", "XL", "XXL"],
+  "PL": ["1x", "2x", "3x"],
+};
+
+const PO_UNIT_FIELDS = Array.from({ length: QTY_UNIT_COUNT }, (_, i) => `PO Unit ${i + 1}`);
+const ACT_UNIT_FIELDS = Array.from({ length: QTY_UNIT_COUNT }, (_, i) => `Act Unit ${i + 1}`);
+
+function getSizeUnitLabels(size) {
+  return SIZE_UNIT_LABELS[String(size ?? "").trim()] || [];
+}
+
+function toQtyNumber(val) {
+  const n = Number(String(val ?? "").trim());
+  return Number.isFinite(n) ? n : 0;
+}
+
+function sumUnitFields(row, fields) {
+  return fields.reduce((sum, field) => sum + toQtyNumber(row[field]), 0);
+}
+
+function computePoQtyFromUnits(row) {
+  return sumUnitFields(row, PO_UNIT_FIELDS);
+}
+
+function computeActualQtyFromUnits(row) {
+  return sumUnitFields(row, ACT_UNIT_FIELDS);
+}
+
+/** Keep the PO Qty / Actual Qty totals in sync with their per-size unit fields. */
+function syncQtyTotalsForRow(row) {
+  if (!row) return row;
+  if (PO_UNIT_FIELDS.some(field => field in row)) {
+    row["PO Qty"] = computePoQtyFromUnits(row);
+  }
+  if (ACT_UNIT_FIELDS.some(field => field in row)) {
+    row["Actual Qty"] = computeActualQtyFromUnits(row);
+  }
+  return row;
+}
+
+function syncAllQtyTotals(rows) {
+  rows.forEach(syncQtyTotalsForRow);
+}
 
 /** @type {Record<string, unknown> | null} */
 let modalRow = null;
 /** @type {Record<string, unknown> | null} */
 let modalSnapshot = null;
-let modalFreightExpanded = false;
 
 const EST_IHD_DAYS_BY_SHIP_METHOD = {
   "Air": 7,
@@ -1177,11 +1226,11 @@ let pageSize = 60;
 let currentPage = 1;
 
 const DEMO_DATA = [
-  { "Division":"Elevator Disco","Status":"Received","Vendor":"Acme Textiles","Buyer":"ANTHROPOLOGIE","Buyer PO #":"BP-1001","SO #":"SO-2201","PO Date":"2024-01-15","PO #":"PO-10001","Old PO #":"","Style #":"ST-100","Color":"Navy","PO Qty":500,"Actual Qty":498,"Ctn Qty":50,"Ship Method":"Sea&Air","Vessel":"Ever Given","House #":"H-001","Shipped":"2024-02-01","ETD":"2024-02-05","ETA":"2024-02-20","IHD":"2024-02-25","EST EXF":"2024-02-18","EST IHD":"2024-02-24","EXF":"2024-02-20","CXL Date":"2024-03-01","Assign Date":"2024-01-20","Notes":"Priority shipment" },
-  { "Division":"Freesia","Status":"WIP","Vendor":"Blue Fabrics","Buyer":"LULU'S","Buyer PO #":"BP-1002","SO #":"SO-2202","PO Date":"2024-01-18","PO #":"PO-10002","Old PO #":"PO-9002","Style #":"ST-200","Color":"Blush","PO Qty":300,"Actual Qty":0,"Ctn Qty":30,"Ship Method":"Air","Vessel":"","House #":"","Shipped":"","ETD":"2024-03-01","ETA":"2024-03-10","IHD":"2024-03-15","EST EXF":"2024-03-08","EST IHD":"2024-03-14","EXF":"","CXL Date":"2024-04-01","Assign Date":"2024-01-22","Notes":"" },
-  { "Division":"Elevator Disco","Status":"Shipped","Vendor":"Orient Mfg","Buyer":"URBAN OUTFITTERS","Buyer PO #":"BP-1003","SO #":"SO-2203","PO Date":"2024-01-20","PO #":"PO-10003","Old PO #":"","Style #":"ST-301","Color":"Ivory","PO Qty":1000,"Actual Qty":1000,"Ctn Qty":100,"Ship Method":"Matson","Vessel":"Matson Kona","House #":"H-202","Shipped":"2024-02-10","ETD":"2024-02-12","ETA":"2024-02-22","IHD":"2024-02-28","EST EXF":"2024-02-20","EST IHD":"2024-02-27","EXF":"2024-02-22","CXL Date":"2024-03-10","Assign Date":"2024-01-25","Notes":"Fragile - handle with care" },
-  { "Division":"Freesia","Status":"Hold","Vendor":"Summit Goods","Buyer":"12TH TRIBE","Buyer PO #":"BP-1004","SO #":"SO-2204","PO Date":"2024-02-01","PO #":"PO-10004","Old PO #":"","Style #":"ST-410","Color":"Sage","PO Qty":200,"Actual Qty":0,"Ctn Qty":20,"Ship Method":"Air","Vessel":"","House #":"","Shipped":"","ETD":"","ETA":"","IHD":"2024-04-01","EST EXF":"","EST IHD":"","EXF":"","CXL Date":"2024-04-15","Assign Date":"","Notes":"Awaiting quality approval" },
-  { "Division":"Elevator Disco","Status":"Closed","Vendor":"Pacific Imports","Buyer":"NUULY","Buyer PO #":"BP-1005","SO #":"SO-2205","PO Date":"2023-12-01","PO #":"PO-10005","Old PO #":"PO-8005","Style #":"ST-501","Color":"Black","PO Qty":750,"Actual Qty":750,"Ctn Qty":75,"Ship Method":"Sea&Air","Vessel":"MSC Maya","House #":"H-099","Shipped":"2024-01-05","ETD":"2024-01-08","ETA":"2024-01-20","IHD":"2024-01-25","EST EXF":"2024-01-18","EST IHD":"2024-01-24","EXF":"2024-01-20","CXL Date":"2024-02-01","Assign Date":"2023-12-10","Notes":"Completed" },
+  { "Division":"Elevator Disco","Status":"Received","Vendor":"Acme Textiles","Buyer":"ANTHROPOLOGIE","Buyer PO #":"BP-1001","SO #":"SO-2201","PO Date":"2024-01-15","PO #":"PO-10001","Old PO #":"","Style #":"ST-100","Color":"Navy","PO Qty":500,"Actual Qty":498,"Ctn Qty":50,"Size":"XS-XL","PO Unit 1":100,"PO Unit 2":100,"PO Unit 3":120,"PO Unit 4":100,"PO Unit 5":80,"Act Unit 1":99,"Act Unit 2":100,"Act Unit 3":120,"Act Unit 4":99,"Act Unit 5":80,"Ship Method":"Sea&Air","Vessel":"Ever Given","House #":"H-001","Shipped":"2024-02-01","ETD":"2024-02-05","ETA":"2024-02-20","IHD":"2024-02-25","EST EXF":"2024-02-18","EST IHD":"2024-02-24","EXF":"2024-02-20","CXL Date":"2024-03-01","Assign Date":"2024-01-20","Notes":"Priority shipment" },
+  { "Division":"Freesia","Status":"WIP","Vendor":"Blue Fabrics","Buyer":"LULU'S","Buyer PO #":"BP-1002","SO #":"SO-2202","PO Date":"2024-01-18","PO #":"PO-10002","Old PO #":"PO-9002","Style #":"ST-200","Color":"Blush","PO Qty":300,"Actual Qty":0,"Ctn Qty":30,"Size":"XXS-XXL","PO Unit 1":30,"PO Unit 2":40,"PO Unit 3":60,"PO Unit 4":60,"PO Unit 5":50,"PO Unit 6":40,"PO Unit 7":20,"Ship Method":"Air","Vessel":"","House #":"","Shipped":"","ETD":"2024-03-01","ETA":"2024-03-10","IHD":"2024-03-15","EST EXF":"2024-03-08","EST IHD":"2024-03-14","EXF":"","CXL Date":"2024-04-01","Assign Date":"2024-01-22","Notes":"" },
+  { "Division":"Elevator Disco","Status":"Shipped","Vendor":"Orient Mfg","Buyer":"URBAN OUTFITTERS","Buyer PO #":"BP-1003","SO #":"SO-2203","PO Date":"2024-01-20","PO #":"PO-10003","Old PO #":"","Style #":"ST-301","Color":"Ivory","PO Qty":1000,"Actual Qty":1000,"Ctn Qty":100,"Size":"PL","PO Unit 1":300,"PO Unit 2":400,"PO Unit 3":300,"Act Unit 1":300,"Act Unit 2":400,"Act Unit 3":300,"Ship Method":"Matson","Vessel":"Matson Kona","House #":"H-202","Shipped":"2024-02-10","ETD":"2024-02-12","ETA":"2024-02-22","IHD":"2024-02-28","EST EXF":"2024-02-20","EST IHD":"2024-02-27","EXF":"2024-02-22","CXL Date":"2024-03-10","Assign Date":"2024-01-25","Notes":"Fragile - handle with care" },
+  { "Division":"Freesia","Status":"Hold","Vendor":"Summit Goods","Buyer":"12TH TRIBE","Buyer PO #":"BP-1004","SO #":"SO-2204","PO Date":"2024-02-01","PO #":"PO-10004","Old PO #":"","Style #":"ST-410","Color":"Sage","PO Qty":200,"Actual Qty":0,"Ctn Qty":20,"Size":"XS-XL","PO Unit 1":40,"PO Unit 2":40,"PO Unit 3":40,"PO Unit 4":40,"PO Unit 5":40,"Ship Method":"Air","Vessel":"","House #":"","Shipped":"","ETD":"","ETA":"","IHD":"2024-04-01","EST EXF":"","EST IHD":"","EXF":"","CXL Date":"2024-04-15","Assign Date":"","Notes":"Awaiting quality approval" },
+  { "Division":"Elevator Disco","Status":"Closed","Vendor":"Pacific Imports","Buyer":"NUULY","Buyer PO #":"BP-1005","SO #":"SO-2205","PO Date":"2023-12-01","PO #":"PO-10005","Old PO #":"PO-8005","Style #":"ST-501","Color":"Black","PO Qty":750,"Actual Qty":750,"Ctn Qty":75,"Size":"XXS-XXL","PO Unit 1":100,"PO Unit 2":100,"PO Unit 3":150,"PO Unit 4":150,"PO Unit 5":100,"PO Unit 6":100,"PO Unit 7":50,"Act Unit 1":100,"Act Unit 2":100,"Act Unit 3":150,"Act Unit 4":150,"Act Unit 5":100,"Act Unit 6":100,"Act Unit 7":50,"Ship Method":"Sea&Air","Vessel":"MSC Maya","House #":"H-099","Shipped":"2024-01-05","ETD":"2024-01-08","ETA":"2024-01-20","IHD":"2024-01-25","EST EXF":"2024-01-18","EST IHD":"2024-01-24","EXF":"2024-01-20","CXL Date":"2024-02-01","Assign Date":"2023-12-10","Notes":"Completed" },
 ];
 
 function resetLocalSelectedState(rows) {
@@ -1225,6 +1274,7 @@ async function loadData() {
     resetLocalSelectedState(allRows);
     clearMiniSelection();
     syncAllEstIhd(allRows);
+    syncAllQtyTotals(allRows);
     updateColumnFilterHeaderStates();
     applyFilters();
     if (typeof onPoSelectionChanged === "function") onPoSelectionChanged();
@@ -2600,9 +2650,9 @@ function createModalOrderSection(row) {
 
   appendModalFieldRows(content, MODAL_ORDER_INFO_ROWS, row);
   content.appendChild(createModalFieldRow(
-    ["PO Date", "Notes"],
+    ["Notes"],
     row,
-    { rowClass: "modal-field-row--po-date-notes" }
+    { rowClass: "modal-field-row--notes" }
   ));
   return block;
 }
@@ -2610,20 +2660,225 @@ function createModalOrderSection(row) {
 function createModalOrderProductSplit(row) {
   const split = document.createElement("div");
   split.className = "modal-top-split";
-
   split.appendChild(createModalOrderSection(row));
-
-  const { block: productBlock, content: productContent } = createModalBlock(null);
-  productBlock.classList.add("modal-block--product");
-  productContent.appendChild(createModalFieldRow(
-    ["Style #", "Color"],
-    row,
-    { rowClass: "modal-field-row--style-color" }
-  ));
-  appendModalFieldRows(productContent, MODAL_PRODUCT_ROWS, row);
-  split.appendChild(productBlock);
-
+  split.appendChild(createModalShippingSection(row));
   return split;
+}
+
+function createModalStyleSection(row) {
+  const { block, content } = createModalBlock(null);
+  block.classList.add("modal-block--product", "modal-block--style-full");
+
+  const grid = document.createElement("div");
+  grid.className = "modal-style-section-grid";
+
+  const info = document.createElement("div");
+  info.className = "modal-style-info";
+  info.appendChild(createModalField("Style #", row));
+  info.appendChild(createModalField("Color", row));
+  info.appendChild(createModalFieldRow(
+    ["FOB Cost", "Price"],
+    row,
+    { rowClass: "modal-field-row--style-costs" }
+  ));
+
+  grid.appendChild(createStylePhotoPlaceholders());
+  grid.appendChild(info);
+  grid.appendChild(createModalSizeGrid(row));
+  content.appendChild(grid);
+  return block;
+}
+
+/**
+ * Size-breakdown grid: a Size selector, size labels as column headers, and two
+ * rows of editable unit inputs (PO Qty on top, Actual Qty underneath) with a
+ * computed total per row. Edits write directly to the modal row copy.
+ */
+function createModalSizeGrid(row) {
+  if (isEmptyValue(row["Size"])) {
+    row["Size"] = SIZE_OPTIONS[0];
+  }
+
+  const wrap = document.createElement("div");
+  wrap.className = "modal-size-grid";
+
+  const header = document.createElement("div");
+  header.className = "modal-size-grid-header";
+
+  const sizeLabel = document.createElement("label");
+  sizeLabel.className = "modal-field-label";
+  sizeLabel.textContent = "Size";
+
+  const sizeSelect = document.createElement("button");
+  sizeSelect.type = "button";
+  sizeSelect.className = "modal-size-select";
+  sizeSelect.textContent = String(row["Size"] ?? SIZE_OPTIONS[0]);
+
+  const sizeDropdown = document.createElement("div");
+  sizeDropdown.className = "cell-select-dropdown modal-size-dropdown";
+  sizeDropdown.hidden = true;
+  SIZE_OPTIONS.forEach(opt => {
+    const o = document.createElement("button");
+    o.type = "button";
+    o.className = "cell-select-option";
+    if (opt === row["Size"]) o.classList.add("selected");
+    o.textContent = opt;
+    o.addEventListener("click", e => {
+      e.stopPropagation();
+      row["Size"] = opt;
+      sizeSelect.textContent = opt;
+      sizeDropdown.querySelectorAll(".cell-select-option").forEach(btn => {
+        btn.classList.toggle("selected", btn === o);
+      });
+      syncQtyTotalsForRow(row);
+      renderSizeGridBody(body, row);
+      updateModalSaveState();
+      sizeDropdown.hidden = true;
+    });
+    sizeDropdown.appendChild(o);
+  });
+
+  const sizeControl = document.createElement("div");
+  sizeControl.className = "modal-size-control";
+  sizeControl.appendChild(sizeLabel);
+  sizeControl.appendChild(sizeSelect);
+  sizeControl.appendChild(sizeDropdown);
+  const body = document.createElement("div");
+  body.className = "modal-size-grid-body";
+  body.addEventListener("input", e => handleSizeGridInput(e.target, row));
+  body.addEventListener("keydown", handleSizeGridKeydown);
+  wrap.appendChild(body);
+
+  header.appendChild(sizeControl);
+  wrap.appendChild(header);
+
+  sizeSelect.addEventListener("click", e => {
+    e.stopPropagation();
+    sizeDropdown.hidden = !sizeDropdown.hidden;
+  });
+  document.addEventListener("click", e => {
+    if (!sizeControl.contains(e.target)) sizeDropdown.hidden = true;
+  });
+
+  renderSizeGridBody(body, row);
+  return wrap;
+}
+
+function renderSizeGridBody(body, row) {
+  body.innerHTML = "";
+  const labels = getSizeUnitLabels(row["Size"]);
+
+  if (labels.length === 0) {
+    const hint = document.createElement("p");
+    hint.className = "modal-size-grid-hint";
+    hint.textContent = "Select a size to enter quantities by unit.";
+    body.appendChild(hint);
+    return;
+  }
+
+  const colCount = labels.length;
+  const chart = document.createElement("div");
+  chart.className = "modal-size-chart";
+  chart.style.setProperty("--size-col-count", String(colCount));
+
+  const rowHead = document.createElement("div");
+  rowHead.className = "modal-size-rowhead modal-size-rowhead--blank";
+  chart.appendChild(rowHead);
+
+  labels.forEach(label => {
+    const head = document.createElement("div");
+    head.className = "modal-size-colhead";
+    head.textContent = label;
+    chart.appendChild(head);
+  });
+
+  const totalHead = document.createElement("div");
+  totalHead.className = "modal-size-totalhead";
+  totalHead.textContent = "Total";
+  chart.appendChild(totalHead);
+
+  const poTotalCell = buildSizeGridRow(chart, row, "PO Qty", PO_UNIT_FIELDS, colCount, "po");
+  const actTotalCell = buildSizeGridRow(chart, row, "Actual Qty", ACT_UNIT_FIELDS, colCount, "act");
+  body.appendChild(chart);
+
+  refreshSizeGridTotals(row, poTotalCell, actTotalCell);
+}
+
+function buildSizeGridRow(chart, row, label, unitFields, colCount, rowType) {
+  const head = document.createElement("div");
+  head.className = "modal-size-rowhead";
+  head.textContent = label;
+  chart.appendChild(head);
+
+  for (let i = 0; i < colCount; i++) {
+    const field = unitFields[i];
+    const input = document.createElement("input");
+    input.type = "number";
+    input.min = "0";
+    input.inputMode = "numeric";
+    input.className = "modal-size-input";
+    input.placeholder = "–";
+    input.value = isEmptyValue(row[field]) ? "" : String(row[field]);
+    input.dataset.field = field;
+    input.dataset.rowType = rowType;
+    chart.appendChild(input);
+  }
+
+  const totalCell = document.createElement("div");
+  totalCell.className = `modal-size-total modal-size-total--${rowType}`;
+  chart.appendChild(totalCell);
+
+  return totalCell;
+}
+
+function refreshSizeGridTotals(row, poTotalCell, actTotalCell) {
+  if (poTotalCell) poTotalCell.textContent = String(computePoQtyFromUnits(row));
+  if (actTotalCell) actTotalCell.textContent = String(computeActualQtyFromUnits(row));
+}
+
+function handleSizeGridInput(target, row) {
+  if (!(target instanceof HTMLInputElement)) return;
+  const field = target.dataset.field;
+  if (!field) return;
+  const raw = target.value.trim();
+  row[field] = raw === "" ? "" : String(toQtyNumber(raw));
+  syncQtyTotalsForRow(row);
+
+  const chartEl = target.closest(".modal-size-chart");
+  if (chartEl) {
+    const poTotal = chartEl.querySelector(".modal-size-total--po");
+    const actTotal = chartEl.querySelector(".modal-size-total--act");
+    refreshSizeGridTotals(row, poTotal, actTotal);
+  }
+  updateModalSaveState();
+}
+
+function handleSizeGridKeydown(e) {
+  if (e.key !== "Enter") return;
+  const target = e.target;
+  if (!(target instanceof HTMLInputElement)) return;
+
+  const rowType = target.dataset.rowType;
+  if (!rowType) return;
+
+  e.preventDefault();
+  const chartEl = target.closest(".modal-size-chart");
+  if (!chartEl) {
+    target.blur();
+    return;
+  }
+
+  const rowInputs = Array.from(
+    chartEl.querySelectorAll(`.modal-size-input[data-row-type="${rowType}"]`)
+  );
+  const currentIndex = rowInputs.indexOf(target);
+  const nextInput = rowInputs[currentIndex + 1];
+  if (nextInput instanceof HTMLInputElement) {
+    nextInput.focus();
+    nextInput.select();
+  } else {
+    target.blur();
+  }
 }
 
 function createModalActualDateRow(row) {
@@ -2643,103 +2898,72 @@ function createModalActualDateRow(row) {
   return actualRow;
 }
 
-function createModalShippingPairRow(leftContent, rightContent, { freightCell = false } = {}) {
+function createModalShippingTopRow(row) {
   const rowEl = document.createElement("div");
-  rowEl.className = "modal-shipping-row";
+  rowEl.className = "modal-field-row modal-field-row--ship-po-date";
+  rowEl.appendChild(createModalField("Ship Method", row));
+  rowEl.appendChild(createModalField("PO Date", row, { dateSlot: true }));
+  return rowEl;
+}
 
-  const leftCell = document.createElement("div");
-  leftCell.className = "modal-shipping-cell";
-  leftCell.appendChild(leftContent);
+function createModalStaticField(col, row) {
+  const fieldWrap = document.createElement("div");
+  fieldWrap.className = "modal-static-field";
+  fieldWrap.dataset.col = col;
 
-  const rightCell = document.createElement("div");
-  rightCell.className = "modal-freight-cell";
-  if (freightCell) {
-    rightCell.classList.add("modal-freight-cell--fields");
-    if (rightContent) rightCell.appendChild(rightContent);
+  const labelEl = document.createElement("span");
+  labelEl.className = "modal-static-label";
+  labelEl.textContent = getColumnLabel(col);
+
+  const valueEl = document.createElement("span");
+  valueEl.className = "modal-static-value";
+  if (isEmptyValue(row[col])) {
+    valueEl.textContent = EMPTY_DISPLAY;
+    valueEl.classList.add("empty-display");
+  } else {
+    valueEl.textContent = row[col];
   }
 
-  rowEl.appendChild(leftCell);
-  rowEl.appendChild(rightCell);
-  return { row: rowEl, rightCell };
+  fieldWrap.appendChild(labelEl);
+  fieldWrap.appendChild(valueEl);
+  return fieldWrap;
+}
+
+function createModalFreightInfo(row) {
+  const wrap = document.createElement("div");
+  wrap.className = "modal-freight-info";
+  ["Vessel", "House #", "Shipped", "ETD", "ETA"].forEach(col => {
+    wrap.appendChild(createModalStaticField(col, row));
+  });
+  return wrap;
 }
 
 function createModalShippingSection(row) {
   const block = document.createElement("section");
   block.className = "modal-block modal-block--shipping";
 
-  const headerRow = document.createElement("div");
-  headerRow.className = "modal-section-header-row";
-
-  const titleEl = document.createElement("h4");
-  titleEl.className = "modal-section-title";
-  titleEl.textContent = "Shipping";
-
-  const freightHeader = document.createElement("div");
-  freightHeader.className = "modal-freight-header";
-
-  const freightLabel = document.createElement("span");
-  freightLabel.className = "modal-freight-label";
-  freightLabel.textContent = "Freight";
-
-  const freightArrow = document.createElement("button");
-  freightArrow.type = "button";
-  freightArrow.className = "modal-freight-arrow";
-  freightArrow.setAttribute("aria-expanded", String(modalFreightExpanded));
-  freightArrow.setAttribute("aria-label", "Toggle freight fields");
-
-  const freightCells = [];
-
-  function setFreightVisible(visible) {
-    freightCells.forEach(cell => {
-      cell.hidden = !visible;
-    });
-  }
-
-  function toggleFreight() {
-    modalFreightExpanded = !modalFreightExpanded;
-    freightArrow.setAttribute("aria-expanded", String(modalFreightExpanded));
-    freightArrow.classList.toggle("is-open", modalFreightExpanded);
-    setFreightVisible(modalFreightExpanded);
-  }
-
-  freightArrow.addEventListener("click", toggleFreight);
-  freightArrow.classList.toggle("is-open", modalFreightExpanded);
-
-  freightHeader.appendChild(freightLabel);
-  freightHeader.appendChild(freightArrow);
-  headerRow.appendChild(titleEl);
-  headerRow.appendChild(freightHeader);
-  block.appendChild(headerRow);
-
   const content = document.createElement("div");
   content.className = "modal-block-content modal-shipping-body";
 
-  const shipMethodPair = createModalShippingPairRow(
-    createModalFieldRow(["Ship Method"], row, { rowClass: "modal-field-row--ship-method-full" }),
-    createModalFieldRow(["Vessel", "House #"], row),
-    { freightCell: true }
-  );
-  freightCells.push(shipMethodPair.rightCell);
-  content.appendChild(shipMethodPair.row);
+  const datesCol = document.createElement("div");
+  datesCol.className = "modal-shipping-dates";
+  datesCol.appendChild(createModalShippingTopRow(row));
+  datesCol.appendChild(createModalFieldRow(
+    ["EST EXF", "EST IHD", "CXL Date"],
+    row,
+    { dateSlot: true, rowClass: "modal-field-row--date-grid" }
+  ));
+  datesCol.appendChild(createModalActualDateRow(row));
 
-  const estDatesPair = createModalShippingPairRow(
-    createModalFieldRow(
-      ["EST EXF", "EST IHD", "CXL Date"],
-      row,
-      { dateSlot: true, rowClass: "modal-field-row--date-grid" }
-    ),
-    createModalFieldRow(["Shipped", "ETD", "ETA"], row),
-    { freightCell: true }
-  );
-  freightCells.push(estDatesPair.rightCell);
-  content.appendChild(estDatesPair.row);
+  const productionCol = document.createElement("div");
+  productionCol.className = "modal-production-inline";
+  appendModalFieldRows(productionCol, MODAL_PRODUCTION_ROWS, row);
 
-  content.appendChild(createModalShippingPairRow(
-    createModalActualDateRow(row),
-    null
-  ).row);
-
-  setFreightVisible(modalFreightExpanded);
+  const detailGrid = document.createElement("div");
+  detailGrid.className = "modal-shipping-production-grid";
+  detailGrid.appendChild(datesCol);
+  detailGrid.appendChild(productionCol);
+  content.appendChild(detailGrid);
 
   block.appendChild(content);
   return block;
@@ -2841,18 +3065,9 @@ function renderModalContent(row) {
   main.className = "modal-layout-main";
 
   main.appendChild(createModalOrderProductSplit(row));
-  main.appendChild(createModalShippingSection(row));
-
-  const { block: productionBlock, content: productionContent } = createModalBlock("Production");
-  appendModalFieldRows(productionContent, MODAL_PRODUCTION_ROWS, row);
-  main.appendChild(productionBlock);
-
-  const photosCol = document.createElement("div");
-  photosCol.className = "modal-layout-photos";
-  photosCol.appendChild(createStylePhotoPlaceholders());
+  main.appendChild(createModalStyleSection(row));
 
   layout.appendChild(main);
-  layout.appendChild(photosCol);
   bodyEl.appendChild(layout);
   updateModalSaveState();
 }
@@ -2869,9 +3084,6 @@ function shouldIgnoreRowDblClick(e) {
 function openPODetail(row) {
   if (isAppSaving()) return;
   closeCellSelectDropdown(false);
-  if (modalRow?.["PO #"] !== row["PO #"]) {
-    modalFreightExpanded = false;
-  }
   modalRow = snapshotModalRow(row);
   modalSnapshot = snapshotModalRow(row);
   renderModalContent(modalRow);

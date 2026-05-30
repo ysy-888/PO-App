@@ -23,9 +23,14 @@ const PO_SYNC_FROM_SHIPMENT_FIELDS = [
 
 const EDITABLE_FIELDS = [
   "Flag",
-  "PO Qty", "Status", "Ship Method", "Ctn Qty",
+  "PO Qty", "Actual Qty", "Status", "Ship Method", "Ctn Qty",
   "Vessel", "House #", "Shipped", "ETD", "ETA", "IHD",
-  "EST EXF", "EST IHD", "EXF", "CXL Date", "Assign Date", "Notes"
+  "EST EXF", "EST IHD", "EXF", "CXL Date", "Assign Date", "Notes",
+  "Size",
+  "PO Unit 1", "PO Unit 2", "PO Unit 3", "PO Unit 4",
+  "PO Unit 5", "PO Unit 6", "PO Unit 7", "PO Unit 8",
+  "Act Unit 1", "Act Unit 2", "Act Unit 3", "Act Unit 4",
+  "Act Unit 5", "Act Unit 6", "Act Unit 7", "Act Unit 8"
 ];
 
 const SHIPMENT_EDITABLE_FIELDS = SHIPMENT_DATA_FIELDS.slice();

@@ -1,24 +1,24 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
 
 :root {
-  --bg: #f5f4f0;
+  --bg: #f7f7f8;
   --surface: #ffffff;
-  --border: #e2e0d8;
-  --border-strong: #c8c5ba;
+  --border: #e5e7eb;
+  --border-strong: #cbd0d6;
   --text: #1a1a18;
-  --text-muted: #cbc8bd;
-  --filter-icon: #8f8b83;
-  --filter-icon-active: #8a7424;
+  --text-muted: #8b929c;
+  --filter-icon: #8b929c;
+  --filter-icon-active: #4b5563;
   --accent: #2d2d29;
-  --accent-light: #efeee9;
+  --accent-light: #eef0f3;
   --accent-medium: #ffffff;
-  --accent-heavy: #f4e695;
+  --accent-heavy: #e8ebef;
   --danger: #a32d2d;
   --success: #1a8e2f;
   --warning: #c60505;
-  --row-hover: #f9f8f5;
-  --edit-bg: #fffef7;
-  --editable-hover-border: #cfcbc2;
+  --row-hover: #f3f4f6;
+  --edit-bg: #f8fafc;
+  --editable-hover-border: #9aa1aa;
   --font: 'DM Sans', system-ui, sans-serif;
   --font-mono: 'DM Mono', monospace;
   --icon-caret-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M3.5 6.25 8 10.75l4.5-4.5' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
@@ -553,7 +553,7 @@ thead {
   position: sticky;
   top: 0px;
   z-index: 50;
-  background: #f0ede6;
+  background: #f2f3f5;
 }
 
 th {
@@ -604,14 +604,14 @@ th[data-col="Notes"] {
   text-align: left;
 }
 
-th:hover { background: #e8e4dc; color: var(--text); }
+th:hover { background: #e8eaed; color: var(--text); }
 
 th[data-col="EXF"],
 th[data-col="ETA"],
 th[data-col="IHD"],
 th[data-col="Ship Method"],
 th[data-col="Shipment ID"] {
-  background: #e8e4dc;
+  background: #e8eaed;
 }
 
 th[data-col="EXF"]:hover,
@@ -619,7 +619,7 @@ th[data-col="ETA"]:hover,
 th[data-col="IHD"]:hover,
 th[data-col="Ship Method"]:hover,
 th[data-col="Shipment ID"]:hover {
-  background: #dedad2;
+  background: #dde1e6;
 }
 
 th[data-col="CXL Date"] {
@@ -910,6 +910,7 @@ th.th-filterable .th-label:hover {
 td {
   padding: 7px 10px;
   text-align: center;
+  background: #fff;
   border-bottom: 1px solid var(--border);
   border-right: 1px solid var(--border);
   vertical-align: middle;
@@ -996,11 +997,11 @@ td.editable .empty-display {
 }
 
 .modal-field-value.date-proximity-warning {
-  background: #faeeda;
+  background: #fff;
 }
 
 .modal-field-value.date-proximity-danger {
-  background: #fcebeb;
+  background: #fff;
 }
 
 .cxl-countdown-stack {
@@ -1411,7 +1412,7 @@ td.editable:not(.select-cell):hover .editable-preview {
 /* Floating Card Layout Container */
 .modal-card {
   background: var(--surface);
-  width: calc(100vw - 40px);
+  width: fit-content;
   max-width: 1320px;
   border-radius: 12px;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
@@ -1425,16 +1426,17 @@ td.editable:not(.select-cell):hover .editable-preview {
 
 #modalOverlay .modal-card {
   font-family: var(--font);
-  max-width: 980px;
+  width: fit-content;
+  max-width: 1220px;
 }
 
 #modalOverlay .modal-layout {
-  grid-template-columns: minmax(0, 1fr) 168px;
-  gap: 14px;
+  grid-template-columns: max-content;
+  gap: 8px;
 }
 
 #modalOverlay .modal-layout-photos .modal-style-photos {
-  width: 168px;
+  width: calc(168px * 2 + 8px);
   gap: 8px;
 }
 
@@ -1641,8 +1643,8 @@ td.editable:not(.select-cell):hover .editable-preview {
 
 .modal-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 204px;
-  gap: 18px;
+  grid-template-columns: max-content;
+  gap: 8px;
   align-items: start;
 }
 
@@ -1651,6 +1653,8 @@ td.editable:not(.select-cell):hover .editable-preview {
   flex-direction: column;
   gap: 10px;
   min-width: 0;
+  width: max-content;
+  max-width: 100%;
 }
 
 .modal-layout-photos {
@@ -1659,8 +1663,8 @@ td.editable:not(.select-cell):hover .editable-preview {
 }
 
 .modal-layout-photos .modal-style-photos {
-  flex-direction: column;
-  width: 204px;
+  flex-direction: row;
+  width: calc(204px * 2 + 10px);
   gap: 10px;
 }
 
@@ -1721,6 +1725,182 @@ td.editable:not(.select-cell):hover .editable-preview {
   grid-column: span 2;
 }
 
+.modal-block--order .modal-field-row--notes > .modal-field {
+  grid-column: span 6;
+}
+
+/* ── Size breakdown chart (borderless) ── */
+.modal-size-grid {
+  --modal-size-rowhead-width: 58px;
+  --modal-size-unit-width: 40px;
+  --modal-size-total-width: 44px;
+  --modal-size-gap: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  width: max-content;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.modal-size-grid-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 2px;
+  width: 100%;
+  max-width: 100%;
+  padding-right: calc(var(--modal-size-total-width) + var(--modal-size-gap));
+}
+
+.modal-size-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+
+.modal-size-control .modal-field-label {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.modal-size-select {
+  height: auto;
+  min-width: 0;
+  padding: 0 18px 0 0;
+  border: none;
+  border-radius: 0;
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 600;
+  background-color: transparent;
+  color: var(--text);
+  cursor: pointer;
+  background-image: var(--icon-caret-down);
+  background-repeat: no-repeat;
+  background-position: right center;
+  background-size: 10px;
+}
+
+.modal-size-select:focus {
+  outline: none;
+  color: var(--accent);
+}
+
+.modal-size-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 92px;
+  z-index: 1200;
+}
+
+.modal-size-grid-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 4px 0;
+}
+
+.modal-size-grid-body {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.modal-size-chart {
+  display: grid;
+  grid-template-columns:
+    var(--modal-size-rowhead-width)
+    repeat(var(--size-col-count), minmax(0, var(--modal-size-unit-width)))
+    var(--modal-size-total-width);
+  gap: 5px var(--modal-size-gap);
+  align-items: center;
+  width: max-content;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.modal-size-rowhead {
+  min-width: 0;
+  padding-right: 4px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.modal-size-rowhead--blank {
+  align-self: stretch;
+}
+
+.modal-size-colhead,
+.modal-size-totalhead {
+  min-width: 0;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.modal-size-totalhead {
+  font-size: 10px;
+}
+
+.modal-size-input {
+  width: 100%;
+  min-width: 0;
+  height: 28px;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: #fff;
+  font-family: var(--font);
+  font-size: 12px;
+  text-align: center;
+  color: var(--text);
+  transition: border-color 0.12s ease, background 0.12s ease;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.modal-size-input::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+.modal-size-input::-webkit-outer-spin-button,
+.modal-size-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.modal-size-input:hover {
+  border-color: var(--border-strong);
+  background: #fff;
+}
+
+.modal-size-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: #fff;
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.modal-size-total {
+  min-width: 0;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+}
+
 .modal-top-split {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -1728,23 +1908,8 @@ td.editable:not(.select-cell):hover .editable-preview {
   align-items: start;
 }
 
-
-.modal-section-header-row {
-  --modal-shipping-col-width: 228px;
-  --modal-shipping-col-gap: 56px;
-  display: grid;
-  grid-template-columns: var(--modal-shipping-col-width) minmax(0, 1fr);
-  column-gap: var(--modal-shipping-col-gap);
-  align-items: center;
-  margin-bottom: 6px;
-  padding: 4px 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.modal-section-header-row .modal-section-title {
-  margin-bottom: 0;
-  padding-bottom: 0;
-  border-bottom: none;
+/* ── Top split: order (left) | shipping (right) ── */
+#modalOverlay .modal-top-split .modal-block--shipping {
   min-width: 0;
 }
 
@@ -1754,144 +1919,207 @@ td.editable:not(.select-cell):hover .editable-preview {
   gap: 8px;
 }
 
-.modal-shipping-row {
-  --modal-shipping-col-width: 228px;
-  --modal-shipping-col-gap: 56px;
+.modal-shipping-production-grid {
   display: grid;
-  grid-template-columns: var(--modal-shipping-col-width) minmax(0, 1fr);
-  column-gap: var(--modal-shipping-col-gap);
+  grid-template-columns: max-content max-content;
+  gap: 8px;
+  align-items: start;
+}
+
+.modal-shipping-dates {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.modal-block--shipping .modal-field-row--ship-po-date {
+  display: grid;
+  grid-template-columns: minmax(120px, 150px) 72px;
+  gap: 8px;
   align-items: end;
 }
 
-.modal-shipping-cell {
+.modal-block--shipping .modal-field-row--ship-po-date .modal-field--medium {
+  width: 100%;
   min-width: 0;
 }
 
-.modal-freight-cell {
-  min-width: 0;
-  padding-left: 8px;
-}
-
-.modal-freight-cell[hidden] {
-  display: none;
-}
-
-.modal-freight-header {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-  padding-left: 8px;
-}
-
-.modal-freight-label {
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text);
-  user-select: none;
-}
-
-.modal-freight-arrow {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--bg);
-  color: var(--text);
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.modal-freight-arrow:hover {
-  color: var(--accent);
-  border-color: var(--accent);
-  background: #fff;
-}
-
-.modal-freight-arrow::after {
-  content: '';
-  width: 14px;
-  height: 14px;
-  color: currentColor;
-  background-color: currentColor;
-  mask-image: var(--icon-caret-down);
-  mask-repeat: no-repeat;
-  mask-position: center;
-  mask-size: contain;
-  -webkit-mask-image: var(--icon-caret-down);
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  -webkit-mask-size: contain;
-  transition: transform 0.15s ease;
-}
-
-.modal-freight-arrow.is-open::after {
-  transform: rotate(180deg);
-}
-
-.modal-shipping-row .modal-field-row--date-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 72px);
-  gap: 4px 6px;
-  align-items: end;
-}
-
-.modal-shipping-row .modal-field--date,
-.modal-shipping-row .modal-field--date-slot,
-.modal-shipping-row .modal-field--date-spacer {
+.modal-block--shipping .modal-field-row--ship-po-date .modal-field--date {
   width: 72px;
 }
 
-.modal-shipping-row .modal-field--date-spacer {
+.modal-block--shipping .modal-field-label {
+  font-size: 9px;
+}
+
+.modal-block--shipping .modal-field-value {
+  font-size: 11px;
+}
+
+.modal-block--shipping .modal-field-row--date-grid .modal-field-value {
+  justify-content: center;
+}
+
+.modal-block--shipping .modal-field-row--date-grid .modal-field-value.editable:not(.select-cell):hover {
+  background: var(--bg) !important;
+}
+
+.modal-production-inline .modal-field-row {
+  display: grid;
+  grid-template-columns: repeat(2, 72px);
+  gap: 6px 8px;
+  align-items: end;
+}
+
+.modal-production-inline .modal-field--medium {
+  width: 72px;
+  min-width: 0;
+}
+
+.modal-production-inline .modal-field-value {
+  justify-content: center;
+  text-align: center;
+  font-size: 11px;
+}
+
+.modal-block--shipping .cxl-countdown-stack {
+  gap: 2px;
+}
+
+.modal-block--shipping .cxl-countdown-label {
+  font-size: 8px;
+}
+
+/* Shipment-controlled freight values: display-only text, not modal inputs. */
+.modal-freight-info {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px 12px;
+  margin-top: 2px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+
+.modal-static-field {
+  min-width: 0;
+}
+
+.modal-static-label {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+}
+
+.modal-static-value {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+/* All date textboxes share one width; date grids align in three columns */
+#modalOverlay .modal-field--date {
+  width: 72px;
+}
+
+.modal-field-row--date-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 72px);
+  gap: 4px 8px;
+  align-items: end;
+}
+
+.modal-field-row--date-grid .modal-field--date-spacer {
   visibility: hidden;
   pointer-events: none;
 }
 
-.modal-shipping-row .modal-field-label {
-  font-size: 9px;
+/* ── Style section: info (left) | size chart (right), visually distinct ── */
+#modalOverlay .modal-block--style-full {
+  width: max-content;
+  max-width: 100%;
+  min-height: 224px;
+  box-sizing: border-box;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
 }
 
-.modal-shipping-row .modal-field-value {
-  font-size: 11px;
+.modal-style-section-grid {
+  display: grid;
+  grid-template-columns: calc(168px * 2 + 8px) 168px minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.modal-style-info {
+  display: flex;
+  flex-direction: column;
   justify-content: center;
+  gap: 10px;
+  min-width: 0;
+  align-self: stretch;
 }
 
-.modal-shipping-row .modal-field-value.editable:not(.select-cell):hover {
-  background: var(--bg) !important;
+#modalOverlay .modal-block--style-full .modal-style-photos {
+  flex-direction: row;
+  width: calc(168px * 2 + 8px);
+  gap: 8px;
+  align-self: center;
 }
 
-.modal-shipping-row .cxl-countdown-stack {
-  gap: 2px;
+#modalOverlay .modal-block--style-full .modal-style-photo {
+  width: 168px;
 }
 
-.modal-shipping-row .cxl-countdown-label {
-  font-size: 8px;
+#modalOverlay .modal-style-info .modal-field {
+  width: 100%;
 }
 
-.modal-shipping-row .modal-field-row--ship-method-full {
-  display: flex;
-  align-items: flex-end;
+#modalOverlay .modal-style-info .modal-field-row--style-costs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
 }
 
-.modal-shipping-row .modal-field-row--ship-method-full .modal-field--medium {
-  width: 228px;
+#modalOverlay .modal-style-info .modal-field-row--style-costs .modal-field {
+  width: auto;
+  min-width: 0;
 }
 
-.modal-freight-cell .modal-field-row {
-  display: flex;
-  flex-wrap: wrap;
+#modalOverlay .modal-block:not(.modal-block--order):not(.modal-block--product):not(.modal-block--shipping) {
+  width: max-content;
+  max-width: 100%;
+}
+
+#modalOverlay .modal-block:not(.modal-block--order):not(.modal-block--product):not(.modal-block--shipping) .modal-field-row {
+  display: grid;
+  grid-template-columns: repeat(3, 72px);
   gap: 6px 8px;
-  align-items: flex-end;
+  align-items: end;
 }
 
-.modal-block--shipping .modal-block-content {
-  gap: 0;
+#modalOverlay .modal-block:not(.modal-block--order):not(.modal-block--product):not(.modal-block--shipping) .modal-field--medium {
+  width: 72px;
+  min-width: 0;
+}
+
+#modalOverlay .modal-block:not(.modal-block--order):not(.modal-block--product):not(.modal-block--shipping) .modal-field-value {
+  justify-content: center;
+  text-align: center;
+  font-size: 11px;
 }
 
 .modal-field-row {
@@ -2055,7 +2283,7 @@ td.editable:not(.select-cell):hover .editable-preview {
   padding: 7px 10px;
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: var(--bg);
+  background: #fff;
   color: var(--text);
   min-height: 34px;
   display: flex;
@@ -2078,7 +2306,8 @@ td.editable:not(.select-cell):hover .editable-preview {
 }
 
 .modal-field-value.editable:not(.select-cell):hover {
-  background: var(--bg) !important;
+  border-color: var(--editable-hover-border);
+  background: #fff !important;
 }
 
 .modal-field-value.editable:not(.select-cell):hover .editable-preview {
