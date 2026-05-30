@@ -588,6 +588,11 @@ function createShipmentFormField(col, value, { readOnly = false } = {}) {
     input = document.createElement("input");
     input.type = "date";
     input.value = normalizeToYmd(value);
+    input.classList.add("shipment-form-input--date");
+    input.classList.toggle("shipment-form-input--empty", isEmptyValue(input.value));
+    input.addEventListener("input", () => {
+      input.classList.toggle("shipment-form-input--empty", isEmptyValue(input.value));
+    });
   } else if (col === "Ship Method") {
     input = document.createElement("select");
     ["", ...SHIP_OPTIONS].forEach(opt => {
@@ -603,7 +608,7 @@ function createShipmentFormField(col, value, { readOnly = false } = {}) {
     input.value = isEmptyValue(value) ? "" : String(value);
   }
 
-  input.className = "shipment-form-input";
+  input.classList.add("shipment-form-input");
   input.dataset.field = col;
   if (readOnly) input.readOnly = true;
 

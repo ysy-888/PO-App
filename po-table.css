@@ -2869,6 +2869,37 @@ td.editable:not(.select-cell):hover .editable-preview {
   font-family: var(--font);
   font-size: 13px;
   background: #fff;
+  transition: background-color 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.shipment-form-input:hover {
+  border-color: var(--editable-hover-border);
+  background: #f8fafc;
+}
+
+.shipment-form-input:focus {
+  border-color: var(--text-muted);
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(139, 146, 156, 0.12);
+  outline: none;
+}
+
+.shipment-form-input--date.shipment-form-input--empty {
+  color: transparent;
+  caret-color: var(--text);
+}
+
+.shipment-form-input--date.shipment-form-input--empty:focus {
+  color: transparent;
+}
+
+.shipment-form-input--date::-webkit-calendar-picker-indicator {
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.shipment-form-input--date:hover::-webkit-calendar-picker-indicator {
+  opacity: 1;
 }
 
 .shipment-linked-pos {

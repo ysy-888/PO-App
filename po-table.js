@@ -3307,6 +3307,7 @@ function createChargebackAddRow(poNumber) {
     const block = getChargebacksBlockFromEl(rowEl);
     setChargebackError(rowEl, "");
     rowEl.remove();
+    removeChargebackGridHeadersIfEmpty(block);
     setChargebackEditActive(block, false);
     block?.querySelector(".chargeback-new-btn")?.removeAttribute("hidden");
   });
@@ -3314,6 +3315,22 @@ function createChargebackAddRow(poNumber) {
   actions.appendChild(cancelBtn);
   rowEl.appendChild(actions);
   return rowEl;
+}
+
+function appendChargebackGridHeaders(grid) {
+  if (!grid || grid.querySelector(".chargeback-grid-head")) return;
+  ["Date", "Reason", "Amount", "Notes", "Status", ""].forEach(label => {
+    const head = document.createElement("div");
+    head.className = "chargeback-grid-head";
+    head.textContent = label;
+    grid.appendChild(head);
+  });
+}
+
+function removeChargebackGridHeadersIfEmpty(block) {
+  const grid = block?.querySelector(".chargebacks-grid");
+  if (!grid || grid.querySelector(".chargeback-row")) return;
+  grid.querySelectorAll(".chargeback-grid-head").forEach(head => head.remove());
 }
 
 function createModalChargebacksSection(row) {
@@ -3339,14 +3356,10 @@ function createModalChargebacksSection(row) {
 
   const grid = document.createElement("div");
   grid.className = "chargebacks-grid";
-  ["Date", "Reason", "Amount", "Notes", "Status", ""].forEach(label => {
-    const head = document.createElement("div");
-    head.className = "chargeback-grid-head";
-    head.textContent = label;
-    grid.appendChild(head);
-  });
 
-  getChargebacksForPo(poNumber).forEach(chargeback => {
+  const poChargebacks = getChargebacksForPo(poNumber);
+  if (poChargebacks.length > 0) appendChargebackGridHeaders(grid);
+  poChargebacks.forEach(chargeback => {
     grid.appendChild(createChargebackRow(chargeback, poNumber));
   });
 
@@ -3358,6 +3371,7 @@ function createModalChargebacksSection(row) {
   newBtn.addEventListener("click", () => {
     if (isChargebackEditActive(block)) return;
     setChargebackEditActive(block, true);
+    appendChargebackGridHeaders(grid);
     grid.appendChild(createChargebackAddRow(poNumber));
     newBtn.hidden = true;
   });
