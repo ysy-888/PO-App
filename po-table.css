@@ -1015,6 +1015,10 @@ td.editable.empty-display,
   cursor: default;
 }
 
+table td.empty-display {
+  color: #cfd4da !important;
+}
+
 td.editable.empty-display,
 td.editable .empty-display {
   cursor: pointer;
