@@ -75,8 +75,6 @@ let shipmentModalRow = null;
 let createShipmentPoNumbers = [];
 let currentAppView = "po";
 let shipmentAddPoPanelOpen = false;
-/** @type {Set<string>} */
-let shipmentRequestedPanelSelection = new Set();
 
 function normalizeShipment(row) {
   return { ...row, Selected: false };
@@ -304,33 +302,38 @@ function switchAppView(view) {
   currentAppView = view;
   const poToolbar = document.getElementById("poToolbar");
   const shipmentToolbar = document.getElementById("shipmentToolbar");
+  const exfRequestListToolbar = document.getElementById("exfRequestListToolbar");
   const chargebackToolbar = document.getElementById("chargebackToolbar");
   const poTableWrap = document.getElementById("poTableWrap");
   const shipmentTableWrap = document.getElementById("shipmentTableWrap");
+  const exfRequestTableWrap = document.getElementById("exfRequestTableWrap");
   const chargebackTableWrap = document.getElementById("chargebackTableWrap");
   const poTab = document.getElementById("navTabPo");
+  const exfTab = document.getElementById("navTabExfRequests");
   const shipTab = document.getElementById("navTabShipments");
   const chargebackTab = document.getElementById("navTabChargebacks");
 
   if (poToolbar) poToolbar.hidden = view !== "po";
   if (shipmentToolbar) shipmentToolbar.hidden = view !== "shipments";
+  if (exfRequestListToolbar) exfRequestListToolbar.hidden = view !== "exfRequests";
   if (chargebackToolbar) chargebackToolbar.hidden = view !== "chargebacks";
   if (poTableWrap) poTableWrap.hidden = view !== "po";
   if (shipmentTableWrap) shipmentTableWrap.hidden = view !== "shipments";
+  if (exfRequestTableWrap) exfRequestTableWrap.hidden = view !== "exfRequests";
   if (chargebackTableWrap) chargebackTableWrap.hidden = view !== "chargebacks";
   const poFooterEnd = document.getElementById("poFooterEnd");
   if (poFooterEnd) poFooterEnd.hidden = view !== "po";
-  if (typeof updateHeaderMenuSelectionModeCheck === "function") {
-    updateHeaderMenuSelectionModeCheck();
-  }
   poTab?.classList.toggle("is-active", view === "po");
   poTab?.setAttribute("aria-selected", view === "po" ? "true" : "false");
+  exfTab?.classList.toggle("is-active", view === "exfRequests");
+  exfTab?.setAttribute("aria-selected", view === "exfRequests" ? "true" : "false");
   shipTab?.classList.toggle("is-active", view === "shipments");
   shipTab?.setAttribute("aria-selected", view === "shipments" ? "true" : "false");
   chargebackTab?.classList.toggle("is-active", view === "chargebacks");
   chargebackTab?.setAttribute("aria-selected", view === "chargebacks" ? "true" : "false");
 
   if (view === "shipments") applyShipmentFilters();
+  if (view === "exfRequests" && typeof applyExfRequestFilters === "function") applyExfRequestFilters();
   if (view === "chargebacks") applyChargebackFilters();
   updateDeleteShipmentButton();
   updateDeleteChargebackButton();

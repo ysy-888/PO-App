@@ -8,9 +8,14 @@ async function loadData() {
       allPackingLists = DEMO_PACKING_LISTS.map(normalizePackingList);
       allPackingCartons = DEMO_PACKING_CARTONS.map(normalizePackingCarton);
       window.__pendingShipments = DEMO_SHIPMENTS;
+      window.__pendingExfRequests = [];
       if (typeof onShipmentsDataLoaded === "function") {
         onShipmentsDataLoaded(DEMO_SHIPMENTS);
         window.__pendingShipments = null;
+      }
+      if (typeof onExfRequestsDataLoaded === "function") {
+        onExfRequestsDataLoaded([]);
+        window.__pendingExfRequests = null;
       }
       if (typeof onDeliveryPickupDataLoaded === "function") {
         onDeliveryPickupDataLoaded([], []);
@@ -24,11 +29,16 @@ async function loadData() {
       allPackingLists = (json.packingLists ?? []).map(normalizePackingList);
       allPackingCartons = (json.packingCartons ?? []).map(normalizePackingCarton);
       window.__pendingShipments = json.shipments ?? [];
+      window.__pendingExfRequests = json.exfRequests ?? [];
       window.__pendingDeliveryRequests = json.deliveryRequests ?? [];
       window.__pendingPickupRequests = json.pickupRequests ?? [];
       if (typeof onShipmentsDataLoaded === "function") {
         onShipmentsDataLoaded(window.__pendingShipments);
         window.__pendingShipments = null;
+      }
+      if (typeof onExfRequestsDataLoaded === "function") {
+        onExfRequestsDataLoaded(window.__pendingExfRequests);
+        window.__pendingExfRequests = null;
       }
       if (json.defaultColumns) applyDefaultColumnsFromServer(json.defaultColumns);
       applyDefaultStatusFilterFromServer(json.defaultStatusFilter);
@@ -49,6 +59,10 @@ async function loadData() {
       );
       window.__pendingDeliveryRequests = null;
       window.__pendingPickupRequests = null;
+    }
+    if (typeof onExfRequestsDataLoaded === "function" && window.__pendingExfRequests) {
+      onExfRequestsDataLoaded(window.__pendingExfRequests);
+      window.__pendingExfRequests = null;
     }
     await applyAutomaticStatusUpdates(allRows, allShipments ?? []);
     updateColumnFilterHeaderStates();

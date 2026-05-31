@@ -1,26 +1,27 @@
 
-async function saveUpdate(poNumber, updates) {
+async function saveUpdate(poNumber, updates, options = {}) {
+  const silent = Boolean(options.silent);
   const sheetUpdates = Object.fromEntries(
     Object.entries(updates).filter(([field]) => !LOCAL_ONLY_COLS.has(field))
   );
   if (Object.keys(sheetUpdates).length === 0) return true;
 
   if (isDemoMode()) {
-    showIndicator(`Demo mode ${EMPTY_DISPLAY} not saved to sheet`, "");
+    if (!silent) showIndicator(`Demo mode ${EMPTY_DISPLAY} not saved to sheet`, "");
     return true;
   }
   try {
-    showIndicator(`Saving${ELLIPSIS}`, "");
+    if (!silent) showIndicator(`Saving${ELLIPSIS}`, "");
     const res = await fetch(getAppsScriptUrl(), {
       method: "POST",
       body: JSON.stringify({ action: "update", poNumber, updates: sheetUpdates })
     });
     const json = await res.json();
     if (!json.success) throw new Error(json.error);
-    showIndicator(`Saved ${CHECK_MARK}`, "success");
+    if (!silent) showIndicator(`Saved ${CHECK_MARK}`, "success");
     return true;
   } catch (err) {
-    showIndicator("Save failed: " + err.message, "error");
+    if (!silent) showIndicator("Save failed: " + err.message, "error");
     return false;
   }
 }

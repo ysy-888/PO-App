@@ -108,7 +108,6 @@ function selectCellSelectOption(value) {
 }
 
 function openCellSelectDropdown(anchorEl, col, row) {
-  if (isSelectionModeEnabled()) return;
   if (isAppSaving()) return;
   if (!isPoFieldEditable(col, row)) return;
   if (openCellSelect?.anchor === anchorEl) {
@@ -319,7 +318,6 @@ function attachCellEditorHandlers(fieldEl, col, row, input, originalVal) {
 }
 
 function mountFieldEditor(fieldEl, col, row) {
-  if (isSelectionModeEnabled()) return;
   if (isAppSaving()) return;
   if (!isPoFieldEditable(col, row)) return;
   if (fieldEl.dataset.editing === "active") return;
@@ -340,7 +338,6 @@ function mountCellEditor(td, col, row) {
 }
 
 function bindSelectCellInteractions(anchorEl, col, row) {
-  if (isSelectionModeEnabled()) return;
   anchorEl.classList.add("select-cell");
 
   anchorEl.addEventListener("mouseenter", () => {
@@ -362,7 +359,6 @@ function bindSelectCellInteractions(anchorEl, col, row) {
 }
 
 function bindEditableCell(td, col, row) {
-  if (isSelectionModeEnabled()) return;
   if (!isPoFieldEditable(col, row)) return;
   if (SELECT_EDIT_COLS.has(col)) {
     bindSelectCellInteractions(td, col, row);
@@ -373,7 +369,6 @@ function bindEditableCell(td, col, row) {
 }
 
 function startEdit(td, col, row) {
-  if (isSelectionModeEnabled()) return;
   if (!isPoFieldEditable(col, row)) return;
   if (td.dataset.editing === "active") return;
   mountFieldEditor(td, col, row);

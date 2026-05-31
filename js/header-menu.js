@@ -1,5 +1,4 @@
 ﻿const CXL_COUNTDOWN_STORAGE_BASE = "cxlCountdown";
-const SELECTION_MODE_STORAGE_BASE = "selectionMode";
 const PAGE_SIZE_STORAGE_BASE = "pageSize";
 const DEFAULT_PAGE_SIZE = "60";
 
@@ -33,7 +32,6 @@ const CHARGEBACK_REASONS = [
 ];
 
 let cxlCountdownEnabled = false;
-let selectionModeEnabled = false;
 
 function loadCxlCountdownPreference() {
   try {
@@ -70,59 +68,9 @@ function toggleCxlCountdown() {
   setCxlCountdownEnabled(!cxlCountdownEnabled);
 }
 
-function loadSelectionModePreference() {
-  try {
-    selectionModeEnabled = localStorage.getItem(scopedStorageKey(SELECTION_MODE_STORAGE_BASE)) === "1";
-  } catch {
-    selectionModeEnabled = false;
-  }
-}
-
-function saveSelectionModePreference() {
-  try {
-    localStorage.setItem(scopedStorageKey(SELECTION_MODE_STORAGE_BASE), selectionModeEnabled ? "1" : "0");
-  } catch {
-    /* ignore storage failures */
-  }
-}
-
-function updateHeaderMenuSelectionModeCheck() {
-  const check = document.getElementById("headerMenuSelectionModeCheck");
-  const toggleBtn = document.getElementById("headerMenuToggleSelectionMode");
-  const banner = document.getElementById("selectionModeBanner");
-  const poViewActive = isPoTableViewActive();
-  if (check) check.hidden = !selectionModeEnabled;
-  if (toggleBtn) toggleBtn.setAttribute("aria-checked", selectionModeEnabled ? "true" : "false");
-  if (banner) banner.hidden = !selectionModeEnabled || !poViewActive;
-  document.body.classList.toggle("selection-mode-active", selectionModeEnabled && poViewActive);
-}
-
-function setSelectionModeEnabled(enabled) {
-  selectionModeEnabled = enabled;
-  saveSelectionModePreference();
-  updateHeaderMenuSelectionModeCheck();
-  closeCellSelectDropdown(false);
-  if (!selectionModeEnabled) clearMiniSelection();
-  renderTable();
-}
-
-function toggleSelectionMode() {
-  setSelectionModeEnabled(!selectionModeEnabled);
-}
-
 function isPoTableViewActive() {
   const wrap = document.getElementById("poTableWrap");
   return Boolean(wrap && !wrap.hidden);
-}
-
-function initSelectionModeKeyboard() {
-  document.addEventListener("keydown", e => {
-    if (e.key !== "s" || e.ctrlKey || e.metaKey || e.altKey) return;
-    if (isTypingInField(e.target)) return;
-    if (!isPoTableViewActive()) return;
-    e.preventDefault();
-    toggleSelectionMode();
-  });
 }
 
 function isPaginationKeyboardEnabled() {
@@ -182,7 +130,7 @@ function initToolbarKeyboard() {
 
     if (e.key === " " || e.code === "Space") {
       if (isTypingInField(e.target)) return;
-      if (isSelectionModeEnabled() && miniSelectedIndices.size > 0) return;
+      if (miniSelectedIndices.size > 0) return;
       e.preventDefault();
       focusPoSearch();
       return;
@@ -204,13 +152,8 @@ function initToolbarKeyboard() {
   });
 }
 
-function isSelectionModeEnabled() {
-  return selectionModeEnabled;
-}
-
 function updateHeaderMenuChecks() {
   updateHeaderMenuCountdownCheck();
-  updateHeaderMenuSelectionModeCheck();
   updateAppModeMenuLabel();
   updateTestModeBanner();
   updatePublishMenuItemVisibility();
@@ -335,11 +278,6 @@ function initHeaderMenu() {
   document.getElementById("headerMenuToggleCountdown")?.addEventListener("click", e => {
     e.stopPropagation();
     toggleCxlCountdown();
-  });
-
-  document.getElementById("headerMenuToggleSelectionMode")?.addEventListener("click", e => {
-    e.stopPropagation();
-    toggleSelectionMode();
   });
 
   document.addEventListener("click", e => {

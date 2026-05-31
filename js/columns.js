@@ -21,18 +21,18 @@ function isEmptyValue(v) {
 }
 
 const COLUMNS = [
-  "Selected","Flag","Packing List",
+  "Flag","Packing List","Selected",
   "Status","N41 Status","Division","Vendor","Buyer","Buyer PO #","SO #","PO Date","PO #",
   "Old PO #","Style #","Color","Style Category","PO Qty","Actual Qty","Ctn Qty","Received Qty","FOB Cost","PO Total Cost",
   "Vessel","House #","Shipped","ETD",
-  "EST EXF","EST IHD","Ship Method","Shipment ID","EXF Requested",
+  "EST EXF","EST IHD","Ship Method","Shipment ID","EXF Requested","EXF Request Date","EXF Memo",
   "Delivery Request ID","Pickup Request ID","EXF","ETA","IHD","CXL Date","Assign Date","Notes"
 ];
 
 const COLUMN_WIDTHS = [
-  52, 36, 36,
+  36, 36, 52,
   130, 100, 120, 130, 120, 100, 80, 80, 80, 80, 100, 100, 100, 60, 60, 60, 70, 70, 80,
-  100, 80, 96, 80, 80, 80, 100, 80, 72, 100, 100, 80, 80, 80, 80, 80, 80, 200
+  100, 80, 96, 80, 80, 80, 100, 80, 72, 80, 140, 100, 100, 80, 80, 80, 80, 80, 200
 ];
 
 const COLUMN_LABELS = {
@@ -41,6 +41,11 @@ const COLUMN_LABELS = {
   "Assign Date": "Assigned",
   "Style Category": "Category",
   "PO Total Cost": "PO Cost",
+  "EXF Requested": "EXF Req",
+  "EXF Request Date": "EXF Req Date",
+  "EXF Memo": "EXF Memo",
+  "Delivery Request ID": "Delivery",
+  "Pickup Request ID": "Pickup",
 };
 
 const UI_ONLY_COLS = new Set(["Selected", "Flag", "Packing List"]);

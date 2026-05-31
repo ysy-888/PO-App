@@ -25,12 +25,17 @@ let rowSelectPointerId = null;
 let rowSelectAnchorIndex = -1;
 let rowSelectRangeMode = false;
 let rowSelectToggleOff = false;
+let rowSelectPointerCaptured = false;
+let rowSelectStartX = 0;
+let rowSelectStartY = 0;
+
+const ROW_SELECT_DRAG_THRESHOLD = 4;
 
 function isRowMiniSelectBlocked(target) {
   if (!(target instanceof Element)) return true;
   return Boolean(target.closest(
     "input, textarea, select, button, .cell-select-dropdown, .po-flag-btn, " +
-    ".td-select-cell, .select-cell, .editable, .copyable-text, .shipment-id-link"
+    ".td-select-cell, .select-cell, .editable, .shipment-id-link"
   ));
 }
 
@@ -213,8 +218,23 @@ function initRowMiniSelection() {
   const tbody = document.getElementById("tableBody");
   if (!tbody) return;
 
+  tbody.addEventListener("dblclick", e => {
+    const tr = e.target.closest("tr[data-po]");
+    if (!tr) return;
+    if (e.target instanceof Element && e.target.closest(
+      "input, textarea, select, button, .po-flag-btn, .td-select-cell"
+    )) return;
+
+    const row = findRowByPo(tr.dataset.po);
+    if (!row) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    if (typeof closeCellSelectDropdown === "function") closeCellSelectDropdown(false);
+    openPODetail(row);
+  }, true);
+
   tbody.addEventListener("pointerdown", e => {
-    if (!isSelectionModeEnabled()) return;
     if (e.button !== 0) return;
     const tr = e.target.closest("tr[data-po]");
     if (!tr || isRowMiniSelectBlocked(e.target)) return;
@@ -237,46 +257,51 @@ function initRowMiniSelection() {
     rowSelectPointerId = e.pointerId;
     rowSelectAnchorIndex = idx;
     rowSelectRangeMode = false;
+    rowSelectPointerCaptured = false;
+    rowSelectStartX = e.clientX;
+    rowSelectStartY = e.clientY;
     rowSelectToggleOff = miniSelectedIndices.size === 1 && miniSelectedIndices.has(idx);
     if (!rowSelectToggleOff) {
       setMiniSelectionByIndexRange(idx, idx);
     }
-
-    tbody.setPointerCapture(e.pointerId);
-    document.body.classList.add("row-drag-selecting");
   });
 
   tbody.addEventListener("pointermove", e => {
-    if (!isSelectionModeEnabled()) return;
     if (e.pointerId !== rowSelectPointerId) return;
     if (!(e.buttons & 1)) return;
 
-    const currentIdx = getRowIndexAtPoint(e.clientX, e.clientY);
-    if (currentIdx === -1) return;
+    if (!rowSelectPointerCaptured) {
+      const dx = e.clientX - rowSelectStartX;
+      const dy = e.clientY - rowSelectStartY;
+      if (Math.hypot(dx, dy) < ROW_SELECT_DRAG_THRESHOLD) return;
 
-    if (currentIdx !== rowSelectAnchorIndex) {
+      rowSelectPointerCaptured = true;
       rowSelectRangeMode = true;
       rowSelectToggleOff = false;
+      tbody.setPointerCapture(e.pointerId);
+      document.body.classList.add("row-drag-selecting");
     }
 
-    if (rowSelectRangeMode) {
-      setMiniSelectionByIndexRange(rowSelectAnchorIndex, currentIdx);
-    }
+    const currentIdx = getRowIndexAtPoint(e.clientX, e.clientY);
+    if (currentIdx === -1) return;
+    setMiniSelectionByIndexRange(rowSelectAnchorIndex, currentIdx);
   });
 
   function endRowPointerSelect(e) {
     if (e.pointerId !== rowSelectPointerId) return;
 
-    if (!rowSelectRangeMode && rowSelectToggleOff) {
-      clearMiniSelection();
-    } else if (!rowSelectRangeMode && rowSelectAnchorIndex >= 0) {
-      setMiniSelectionByIndexRange(rowSelectAnchorIndex, rowSelectAnchorIndex);
-      miniSelectClickAnchorIndex = rowSelectAnchorIndex;
-    } else if (rowSelectRangeMode && rowSelectAnchorIndex >= 0) {
+    if (!rowSelectPointerCaptured) {
+      if (rowSelectToggleOff) {
+        clearMiniSelection();
+      } else if (rowSelectAnchorIndex >= 0) {
+        setMiniSelectionByIndexRange(rowSelectAnchorIndex, rowSelectAnchorIndex);
+        miniSelectClickAnchorIndex = rowSelectAnchorIndex;
+      }
+    } else if (rowSelectAnchorIndex >= 0) {
       miniSelectClickAnchorIndex = rowSelectAnchorIndex;
     }
 
-    if (tbody.hasPointerCapture(e.pointerId)) {
+    if (rowSelectPointerCaptured && tbody.hasPointerCapture(e.pointerId)) {
       tbody.releasePointerCapture(e.pointerId);
     }
 
@@ -284,6 +309,7 @@ function initRowMiniSelection() {
     rowSelectAnchorIndex = -1;
     rowSelectRangeMode = false;
     rowSelectToggleOff = false;
+    rowSelectPointerCaptured = false;
     document.body.classList.remove("row-drag-selecting");
   }
 
@@ -298,7 +324,6 @@ function initRowMiniSelection() {
   });
 
   document.addEventListener("keydown", e => {
-    if (!isSelectionModeEnabled()) return;
     if (e.key !== " " && e.code !== "Space") return;
     if (miniSelectedIndices.size === 0) return;
     if (isTypingInField(e.target)) return;

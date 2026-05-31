@@ -52,6 +52,25 @@ function openDeliveryRequestDetail(id) {
   renderDeliveryRequestModal(deliveryRequestPoNumbers, request);
 }
 
+function renderDeliveryRequestIdCell(td, row) {
+  td.className = "readonly readonly-no-select td-shipment-id-cell";
+  const id = String(row[DELIVERY_REQUEST_ID_FIELD] ?? "").trim();
+  if (!id) {
+    setDisplayText(td, EMPTY_DISPLAY);
+    return;
+  }
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "shipment-id-link";
+  btn.textContent = id;
+  btn.title = "Open delivery request";
+  btn.addEventListener("click", e => {
+    e.stopPropagation();
+    openDeliveryRequestDetail(id);
+  });
+  td.appendChild(btn);
+}
+
 function renderDeliveryRequestModal(poNumbers, request = {}) {
   const body = document.getElementById("deliveryRequestBody");
   const titleEl = document.getElementById("deliveryRequestModalTitle");

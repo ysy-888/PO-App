@@ -49,6 +49,25 @@ function openPickupRequestDetail(id) {
   renderPickupRequestModal(pickupRequestPoNumbers, request);
 }
 
+function renderPickupRequestIdCell(td, row) {
+  td.className = "readonly readonly-no-select td-shipment-id-cell";
+  const id = String(row[PICKUP_REQUEST_ID_FIELD] ?? "").trim();
+  if (!id) {
+    setDisplayText(td, EMPTY_DISPLAY);
+    return;
+  }
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "shipment-id-link";
+  btn.textContent = id;
+  btn.title = "Open pickup request";
+  btn.addEventListener("click", e => {
+    e.stopPropagation();
+    openPickupRequestDetail(id);
+  });
+  td.appendChild(btn);
+}
+
 function renderPickupRequestModal(poNumbers, request = {}) {
   const body = document.getElementById("pickupRequestBody");
   const titleEl = document.getElementById("pickupRequestModalTitle");
@@ -173,11 +192,11 @@ function initPickupRequests() {
 
 initPickupRequests();
 
-function renderAssignDateCell(td, row, { interactionLocked = false } = {}) {
+function renderAssignDateCell(td, row) {
   const pickupId = String(row[PICKUP_REQUEST_ID_FIELD] ?? "").trim();
   const dateVal = getPickupRequestDateForRow(row);
 
-  if (pickupId && !interactionLocked) {
+  if (pickupId) {
     td.className = "readonly readonly-no-select";
     if (isEmptyValue(dateVal)) {
       setDisplayText(td, EMPTY_DISPLAY);
@@ -196,7 +215,7 @@ function renderAssignDateCell(td, row, { interactionLocked = false } = {}) {
     return;
   }
 
-  if (isPoFieldEditable("Assign Date", row) && !interactionLocked) {
+  if (isPoFieldEditable("Assign Date", row)) {
     td.className = "editable";
     td.title = "Click to edit";
     bindEditableCell(td, "Assign Date", row);

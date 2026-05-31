@@ -1,7 +1,7 @@
 const EDITABLE = new Set([
   "Flag",
   "Status","N41 Status","Ship Method",
-  "IHD","EST EXF","CXL Date","Assign Date","Notes",
+  "IHD","EST EXF","CXL Date","Assign Date","Notes","EXF Memo",
   "FOB Cost","Price","PO Total Cost","OG","PROTO","FIT/PP","BULK","TOP","TRIM",
   "Received Qty",
 ]);
@@ -47,7 +47,7 @@ const MODAL_FIELD_SIZE = {
     "Style #", "Color", "Style Category",
     "OG", "PROTO", "FIT/PP", "BULK", "TOP", "TRIM",
   ]),
-  long: new Set(["Notes"]),
+  long: new Set(["Notes", "EXF Memo"]),
 };
 
 function getModalFieldSize(col) {

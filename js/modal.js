@@ -141,8 +141,8 @@ function createModalStyleSection(row) {
 
 /**
  * Size-breakdown grid: a Size selector, size labels as column headers, and two
- * rows of editable unit inputs (Actual Qty on top, PO Qty underneath) with a
- * computed total per row. Edits write directly to the modal row copy.
+ * rows of editable unit inputs (Actual Qty when a packing list exists, PO Qty
+ * underneath) with a computed total per row. Edits write directly to the modal row copy.
  */
 function createModalSizeGrid(row) {
   const wrap = document.createElement("div");
@@ -193,7 +193,9 @@ function renderSizeGridBody(body, row) {
 
   const packingActualUnits = getPackingUnitTotalsForPo(row["PO #"]);
   const showPackingVariance = hasPackingList(row["PO #"]);
-  const actTotalCell = buildSizeGridRow(chart, row, "Actual Qty", packingActualUnits, colCount, "act");
+  const actTotalCell = showPackingVariance
+    ? buildSizeGridRow(chart, row, "Actual Qty", packingActualUnits, colCount, "act")
+    : null;
   const poTotalCell = buildSizeGridRow(chart, row, "PO Qty", PO_UNIT_FIELDS, colCount, "po");
   if (showPackingVariance) buildSizeVarianceRow(chart, colCount);
   body.appendChild(chart);
@@ -635,8 +637,10 @@ function createChargebackAddRow(poNumber) {
   rowEl.appendChild(createChargebackBlankCell("Date"));
   rowEl.appendChild(createChargebackInput("Reason", ""));
   rowEl.appendChild(createChargebackInput("Amount", ""));
-  rowEl.appendChild(createChargebackInput("Notes", ""));
-  rowEl.appendChild(createChargebackBlankCell("Status"));
+
+  const notesWrap = document.createElement("div");
+  notesWrap.className = "chargeback-notes-actions";
+  notesWrap.appendChild(createChargebackInput("Notes", ""));
 
   const actions = document.createElement("div");
   actions.className = "chargeback-actions";
@@ -659,7 +663,10 @@ function createChargebackAddRow(poNumber) {
   });
   actions.appendChild(addBtn);
   actions.appendChild(cancelBtn);
-  rowEl.appendChild(actions);
+  notesWrap.appendChild(actions);
+  rowEl.appendChild(notesWrap);
+
+  rowEl.appendChild(createChargebackBlankCell("Status"));
   return rowEl;
 }
 
@@ -730,7 +737,18 @@ function createPackingListEditor(row, packingList, sourceCartons) {
 
   const countLabel = document.createElement("label");
   countLabel.className = "packing-list-count-label";
-  countLabel.textContent = "Cartons";
+  const countText = document.createElement("span");
+  countText.className = "packing-list-count-text";
+  countText.textContent = "Cartons";
+
+  const countStepper = document.createElement("div");
+  countStepper.className = "packing-list-count-stepper";
+
+  const countDecrease = document.createElement("button");
+  countDecrease.type = "button";
+  countDecrease.className = "packing-list-count-step packing-list-count-step--minus";
+  countDecrease.setAttribute("aria-label", "Fewer cartons");
+  countDecrease.textContent = "−";
 
   const countInput = document.createElement("input");
   countInput.type = "number";
@@ -738,7 +756,26 @@ function createPackingListEditor(row, packingList, sourceCartons) {
   countInput.step = "1";
   countInput.className = "packing-list-count-input";
   countInput.value = String(initialCount);
-  countLabel.appendChild(countInput);
+  countInput.setAttribute("aria-label", "Carton count");
+
+  const countIncrease = document.createElement("button");
+  countIncrease.type = "button";
+  countIncrease.className = "packing-list-count-step packing-list-count-step--plus";
+  countIncrease.setAttribute("aria-label", "More cartons");
+  countIncrease.textContent = "+";
+
+  countStepper.append(countDecrease, countInput, countIncrease);
+  countLabel.append(countText, countStepper);
+
+  function adjustCartonCount(delta) {
+    const next = Math.max(1, Math.floor(Number(countInput.value) || 1) + delta);
+    countInput.value = String(next);
+    renderGrid();
+    updateModalSaveState();
+  }
+
+  countDecrease.addEventListener("click", () => adjustCartonCount(-1));
+  countIncrease.addEventListener("click", () => adjustCartonCount(1));
 
   controlsRight.appendChild(countLabel);
   if (packingList) {
@@ -1359,20 +1396,23 @@ async function saveModalChanges() {
       const savedPackingUpdates = await persistPackingListPayload(packingPayload, updates);
       if (!savedPackingUpdates) return;
       applyModalUpdatesToTableRow(poNumber, savedPackingUpdates);
-      renderTable();
       modalSnapshot = snapshotModalRow(modalRow);
       refreshModalPackingQtyDisplay(modalRow);
       updateModalSaveState();
+      queuePoTableRefresh();
       showIndicator(`Saved ${CHECK_MARK}`, "success");
       return;
     }
 
-    const ok = await saveUpdate(poNumber, updates);
-    if (ok) {
-      applyModalUpdatesToTableRow(poNumber, updates);
-      renderTable();
-      dismissModalOverlay();
+    const ok = await saveUpdate(poNumber, updates, { silent: true });
+    if (!ok) {
+      showIndicator("Save failed", "error");
+      return;
     }
+    applyModalUpdatesToTableRow(poNumber, updates);
+    dismissModalOverlay();
+    queuePoTableRefresh();
+    showIndicator(`Saved ${CHECK_MARK}`, "success");
   } catch (err) {
     showIndicator("Save failed: " + err.message, "error");
   } finally {

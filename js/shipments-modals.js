@@ -24,9 +24,10 @@ function openShipmentDetail(shipmentOrId) {
 function closeShipmentModalForce() {
   shipmentModalRow = null;
   shipmentAddPoPanelOpen = false;
-  shipmentRequestedPanelSelection.clear();
+  clearShipmentFooterMessage("shipmentModalFooterMessage");
   const overlay = document.getElementById("shipmentModalOverlay");
   if (overlay) overlay.classList.remove("open");
+  setShipmentModalAddPanelClass(document.getElementById("shipmentModalBody"), false);
 }
 
 function openLinkedShipmentFromPo(row) {
@@ -40,6 +41,65 @@ function openPoFromShipment(poNumber) {
   if (!row) return;
   openPODetail(row);
   bringModalToFront(document.getElementById("modalOverlay"));
+}
+
+function formatShipmentDateInputValue(value) {
+  const ymd = normalizeToYmd(value);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
+  if (!m) return isEmptyValue(value) ? "" : String(value);
+  return `${m[2]}/${m[3]}/${m[1].slice(2)}`;
+}
+
+function parseShipmentDateDigits(digits) {
+  if (!/^\d{6}$/.test(digits)) return "";
+  const mm = Number(digits.slice(0, 2));
+  const dd = Number(digits.slice(2, 4));
+  const yy = Number(digits.slice(4, 6));
+  if (mm < 1 || mm > 12 || dd < 1) return "";
+
+  const yyyy = 2000 + yy;
+  const date = new Date(yyyy, mm - 1, dd);
+  if (
+    date.getFullYear() !== yyyy ||
+    date.getMonth() !== mm - 1 ||
+    date.getDate() !== dd
+  ) {
+    return "";
+  }
+
+  return `${yyyy}-${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
+}
+
+function normalizeShipmentDateInputValue(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+
+  const ymd = normalizeToYmd(raw);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return ymd;
+
+  const slash = /^(\d{1,2})\/(\d{1,2})\/(\d{2})$/.exec(raw);
+  if (slash) {
+    return parseShipmentDateDigits(
+      slash[1].padStart(2, "0") + slash[2].padStart(2, "0") + slash[3]
+    ) || raw;
+  }
+
+  const digits = raw.replace(/\D/g, "").slice(0, 6);
+  return parseShipmentDateDigits(digits) || raw;
+}
+
+function updateShipmentDateInputState(input) {
+  const digits = input.value.replace(/\D/g, "").slice(0, 6);
+  input.maxLength = input.value.includes("/") ? 8 : 6;
+  input.classList.toggle("shipment-form-input--empty", digits.length === 0);
+  input.dataset.normalizedValue = normalizeShipmentDateInputValue(input.value);
+}
+
+function handleShipmentDateInput(input) {
+  const digits = input.value.replace(/\D/g, "").slice(0, 6);
+  const parsed = parseShipmentDateDigits(digits);
+  input.value = parsed ? formatShipmentDateInputValue(parsed) : digits;
+  updateShipmentDateInputState(input);
 }
 
 function createShipmentFormField(col, value, { readOnly = false } = {}) {
@@ -56,12 +116,15 @@ function createShipmentFormField(col, value, { readOnly = false } = {}) {
     input.rows = 3;
   } else if (SHIPMENT_DATE_FIELDS.has(col)) {
     input = document.createElement("input");
-    input.type = "date";
-    input.value = normalizeToYmd(value);
+    input.type = "text";
+    input.inputMode = "numeric";
+    input.autocomplete = "off";
+    input.placeholder = "MMDDYY";
+    input.value = formatShipmentDateInputValue(value);
     input.classList.add("shipment-form-input--date");
-    input.classList.toggle("shipment-form-input--empty", isEmptyValue(input.value));
+    updateShipmentDateInputState(input);
     input.addEventListener("input", () => {
-      input.classList.toggle("shipment-form-input--empty", isEmptyValue(input.value));
+      handleShipmentDateInput(input);
     });
   } else if (col === "Ship Method") {
     input = document.createElement("select");
@@ -136,12 +199,16 @@ function buildShipmentModalLayout({ shipment = {}, formId, linkedSource, showAdd
   outer.appendChild(layout);
 
   if (showAddPanel) {
-    const available = getAvailableRequestedPos();
-    outer.appendChild(renderRequestedPoPickerPanel(available, shipmentRequestedPanelSelection));
+    const available = getRequestedPoPanelRows(linkedSource);
+    outer.appendChild(renderRequestedPoPickerPanel(available));
     outer.classList.add("shipment-modal-outer--add-panel-open");
   }
 
   return outer;
+}
+
+function setShipmentModalAddPanelClass(body, isOpen) {
+  body?.closest(".shipment-modal-card")?.classList.toggle("shipment-modal-card--add-panel-open", isOpen);
 }
 
 function getActiveShipmentModalButtons() {
@@ -149,43 +216,82 @@ function getActiveShipmentModalButtons() {
     return {
       addBtn: document.getElementById("shipmentAddPosBtn"),
       removeBtn: document.getElementById("shipmentRemovePosBtn"),
-      confirmAddBtn: document.getElementById("shipmentConfirmAddPosBtn"),
     };
   }
   if (document.getElementById("shipmentModalOverlay")?.classList.contains("open")) {
     return {
       addBtn: document.getElementById("shipmentDetailAddPosBtn"),
       removeBtn: document.getElementById("shipmentDetailRemovePosBtn"),
-      confirmAddBtn: document.getElementById("shipmentDetailConfirmAddPosBtn"),
     };
   }
-  return { addBtn: null, removeBtn: null, confirmAddBtn: null };
+  return { addBtn: null, removeBtn: null };
+}
+
+function getActiveShipmentModalScope() {
+  return document.querySelector("#createShipmentOverlay.open, #shipmentModalOverlay.open") ?? document;
+}
+
+function getActiveShipmentFooterMessageEl() {
+  if (document.getElementById("createShipmentOverlay")?.classList.contains("open")) {
+    return document.getElementById("createShipmentFooterMessage");
+  }
+  if (document.getElementById("shipmentModalOverlay")?.classList.contains("open")) {
+    return document.getElementById("shipmentModalFooterMessage");
+  }
+  return null;
+}
+
+function setShipmentFooterMessage(message = "") {
+  const el = getActiveShipmentFooterMessageEl();
+  if (!el) return;
+  el.textContent = message;
+  el.hidden = !message;
+}
+
+function clearShipmentFooterMessage(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = "";
+  el.hidden = true;
 }
 
 function updateShipmentModalActionButtons() {
-  const { addBtn, removeBtn, confirmAddBtn } = getActiveShipmentModalButtons();
-  if (!addBtn && !removeBtn) return;
+  const { addBtn, removeBtn } = getActiveShipmentModalButtons();
+  const scope = getActiveShipmentModalScope();
+  const footerAddBtn = scope.querySelector(".shipment-linked-po-footer-add");
+  const footerRemoveBtn = scope.querySelector(".shipment-linked-po-footer-remove");
+  if (!addBtn && !removeBtn && !footerAddBtn && !footerRemoveBtn) return;
 
   const linked = getLinkedPosFromModalTable();
   const linkedSelected = linked.filter(row => isTruthy(row["Selected"])).length;
+  const showAdd = !shipmentAddPoPanelOpen && linkedSelected === 0;
+  const showRemove = !shipmentAddPoPanelOpen && linkedSelected > 0;
 
-  if (addBtn) addBtn.hidden = shipmentAddPoPanelOpen || linkedSelected > 0;
-  if (removeBtn) removeBtn.hidden = shipmentAddPoPanelOpen || linkedSelected === 0;
-  if (confirmAddBtn) confirmAddBtn.hidden = !shipmentAddPoPanelOpen;
+  if (addBtn) addBtn.hidden = true;
+  if (removeBtn) removeBtn.hidden = true;
+  if (footerAddBtn) footerAddBtn.hidden = !showAdd;
+  if (footerRemoveBtn) footerRemoveBtn.hidden = !showRemove;
 }
 
 function openShipmentAddPoPanel() {
+  getLinkedPosFromModalTable().forEach(row => toggleRowSelected(row, false));
   shipmentAddPoPanelOpen = true;
-  clearRequestedPanelSelections();
   rerenderOpenShipmentModalBody();
   updateShipmentModalActionButtons();
 }
 
 function closeShipmentAddPoPanel() {
   shipmentAddPoPanelOpen = false;
-  clearRequestedPanelSelections();
   rerenderOpenShipmentModalBody();
   updateShipmentModalActionButtons();
+}
+
+function getRequestedPoPanelRows(linkedSource) {
+  const linkedPoNumbers = new Set(
+    getLinkedPoRows(linkedSource).map(row => String(row["PO #"] ?? ""))
+  );
+  return getAvailableRequestedPos()
+    .filter(row => !linkedPoNumbers.has(String(row["PO #"] ?? "")));
 }
 
 function rerenderOpenShipmentModalBody() {
@@ -206,6 +312,7 @@ function rerenderOpenShipmentModalBody() {
         linkedSource: pos,
         showAddPanel: shipmentAddPoPanelOpen,
       }));
+      setShipmentModalAddPanelClass(body, shipmentAddPoPanelOpen);
     }
     setShipmentModalPoCount(document.getElementById("createShipmentPoCount"), pos);
     return;
@@ -220,25 +327,33 @@ function rerenderOpenShipmentModalBody() {
       linkedSource: shipmentModalRow,
       showAddPanel: shipmentAddPoPanelOpen,
     }));
+    setShipmentModalAddPanelClass(detailBody, shipmentAddPoPanelOpen);
     setShipmentModalPoCount(document.getElementById("shipmentModalPoCount"), shipmentModalRow);
   }
 }
 
-async function confirmAddPosToShipment() {
-  if (shipmentRequestedPanelSelection.size === 0) {
-    showIndicator("Select POs to add", "error");
-    return;
-  }
+async function addRequestedPoToShipment(poNumber) {
+  if (isAppSaving()) return;
+  const po = String(poNumber ?? "").trim();
+  if (!po) return;
+  await addPosToShipment([po], { keepPanelOpen: true });
+}
 
-  const poNumbers = [...shipmentRequestedPanelSelection];
+async function addPosToShipment(poNumbers, { keepPanelOpen = false } = {}) {
   const createOverlay = document.getElementById("createShipmentOverlay");
 
   if (createOverlay?.classList.contains("open")) {
     const merged = new Set(createShipmentPoNumbers.map(String));
     poNumbers.forEach(po => merged.add(String(po)));
     createShipmentPoNumbers = [...merged];
-    closeShipmentAddPoPanel();
-    renderCreateShipmentModal(createShipmentPoNumbers);
+    if (keepPanelOpen) {
+      shipmentAddPoPanelOpen = true;
+      rerenderOpenShipmentModalBody();
+      updateShipmentModalActionButtons();
+    } else {
+      closeShipmentAddPoPanel();
+      renderCreateShipmentModal(createShipmentPoNumbers);
+    }
     return;
   }
 
@@ -246,7 +361,7 @@ async function confirmAddPosToShipment() {
   const shipmentId = shipmentModalRow[SHIPMENT_ID_FIELD];
   if (!shipmentId) return;
 
-  closeShipmentAddPoPanel();
+  if (!keepPanelOpen) closeShipmentAddPoPanel();
   setAppSaving(true, "Adding POs…");
   showIndicator(`Adding POs${ELLIPSIS}`, "");
 
@@ -261,9 +376,16 @@ async function confirmAddPosToShipment() {
       });
       if (!json.success) throw new Error(json.error);
       await loadData();
+      shipmentModalRow = getShipmentById(shipmentId) ?? shipmentModalRow;
+    }
+    if (keepPanelOpen) {
+      shipmentAddPoPanelOpen = true;
+      rerenderOpenShipmentModalBody();
+      updateShipmentModalActionButtons();
+    } else {
       openShipmentDetail(shipmentId);
     }
-    showIndicator(`POs added ${CHECK_MARK}`, "success");
+    showIndicator(`${poNumbers.length === 1 ? "PO" : "POs"} added ${CHECK_MARK}`, "success");
   } catch (err) {
     showIndicator("Add failed: " + err.message, "error");
   } finally {
@@ -344,7 +466,10 @@ function demoRemovePosFromShipment(shipmentId, poNumbers) {
 function readShipmentForm(container) {
   const data = {};
   container.querySelectorAll("[data-field]").forEach(el => {
-    data[el.dataset.field] = el.value ?? "";
+    const field = el.dataset.field;
+    data[field] = SHIPMENT_DATE_FIELDS.has(field)
+      ? normalizeShipmentDateInputValue(el.value)
+      : el.value ?? "";
   });
   return data;
 }
@@ -352,13 +477,14 @@ function readShipmentForm(container) {
 function renderCreateShipmentModal(poNumbers) {
   createShipmentPoNumbers = poNumbers.slice();
   shipmentAddPoPanelOpen = false;
-  shipmentRequestedPanelSelection.clear();
+  clearShipmentFooterMessage("createShipmentFooterMessage");
   const body = document.getElementById("createShipmentBody");
   if (!body) return;
 
   const pos = poNumbers
     .map(po => allRows.find(r => String(r["PO #"]) === String(po)))
     .filter(Boolean);
+  pos.forEach(row => { row["Selected"] = false; });
 
   body.innerHTML = "";
   body.appendChild(buildShipmentModalLayout({
@@ -367,17 +493,19 @@ function renderCreateShipmentModal(poNumbers) {
     linkedSource: pos,
     showAddPanel: false,
   }));
+  setShipmentModalAddPanelClass(body, false);
   setShipmentModalPoCount(document.getElementById("createShipmentPoCount"), pos);
-  updateShipmentModalActionButtons();
 
   bringModalToFront(document.getElementById("createShipmentOverlay"));
+  updateShipmentModalActionButtons();
 }
 
 function closeCreateShipmentModal() {
   createShipmentPoNumbers = [];
   shipmentAddPoPanelOpen = false;
-  shipmentRequestedPanelSelection.clear();
+  clearShipmentFooterMessage("createShipmentFooterMessage");
   document.getElementById("createShipmentOverlay")?.classList.remove("open");
+  setShipmentModalAddPanelClass(document.getElementById("createShipmentBody"), false);
 }
 
 async function submitCreateShipment() {
@@ -386,9 +514,10 @@ async function submitCreateShipment() {
   if (isAppSaving()) return;
 
   const shipment = readShipmentForm(form);
+  setShipmentFooterMessage("");
   const validationError = validateShipmentRequiredFields(shipment);
   if (validationError) {
-    showIndicator(validationError, "error");
+    setShipmentFooterMessage(validationError);
     return;
   }
 
@@ -502,7 +631,7 @@ function formatShipmentLinkedPoCell(col, row) {
   }
   if (col === "CXL Date") {
     if (isEmptyValue(val)) return EMPTY_DISPLAY;
-    return formatDateForDisplay(val);
+    return formatShipmentDateInputValue(val);
   }
   if (col === "Actual Qty" || col === "Ctn Qty") {
     if (toQtyNumber(val) <= 0) return EMPTY_DISPLAY;
@@ -519,15 +648,91 @@ function getLinkedPoRows(source) {
 
 function setShipmentModalPoCount(el, source) {
   if (!el) return;
-  const count = getLinkedPoRows(source).length;
-  const unit = count === 1 ? "PO" : "POs";
-  el.innerHTML =
-    `<span class="shipment-modal-po-count-num">${count}</span>` +
-    `<span class="shipment-modal-po-count-unit">${unit}</span>`;
+  el.textContent = "";
+}
+
+function formatShipmentLinkedPoTotal(value) {
+  const rounded = Math.round(value * 100) / 100;
+  return rounded.toLocaleString(undefined, {
+    maximumFractionDigits: Number.isInteger(rounded) ? 0 : 2,
+  });
+}
+
+function getShipmentLinkedPoTotals(pos) {
+  return pos.reduce((totals, row) => {
+    const ctnQty = typeof getPackingCtnQtyForRow === "function"
+      ? getPackingCtnQtyForRow(row)
+      : row["Ctn Qty"];
+
+    totals.orderQty += toQtyNumber(row["PO Qty"]);
+    totals.actualQty += toQtyNumber(row["Actual Qty"]);
+    totals.ctnQty += toQtyNumber(ctnQty);
+    return totals;
+  }, {
+    orderQty: 0,
+    actualQty: 0,
+    ctnQty: 0,
+  });
+}
+
+function renderShipmentLinkedPoFooter(pos) {
+  const totals = getShipmentLinkedPoTotals(pos);
+  const footer = document.createElement("footer");
+  footer.className = "shipment-linked-po-footer";
+
+  const actions = document.createElement("div");
+  actions.className = "shipment-linked-po-footer-actions";
+
+  const addBtn = document.createElement("button");
+  addBtn.type = "button";
+  addBtn.className = "btn shipment-linked-po-footer-btn shipment-linked-po-footer-add";
+  addBtn.textContent = "Add POs";
+  addBtn.addEventListener("click", openShipmentAddPoPanel);
+
+  const removeBtn = document.createElement("button");
+  removeBtn.type = "button";
+  removeBtn.className = "btn shipment-linked-po-footer-btn shipment-linked-po-footer-remove";
+  removeBtn.textContent = "Remove POs";
+  removeBtn.hidden = true;
+  removeBtn.addEventListener("click", removePosFromShipment);
+
+  actions.appendChild(addBtn);
+  actions.appendChild(removeBtn);
+  footer.appendChild(actions);
+
+  const totalsWrap = document.createElement("div");
+  totalsWrap.className = "shipment-linked-po-footer-totals";
+
+  [
+    ["Order Qty", totals.orderQty],
+    ["Actual Qty", totals.actualQty],
+    ["CTN Qty", totals.ctnQty],
+    ["PO Count", pos.length],
+  ].forEach(([label, value]) => {
+    const item = document.createElement("div");
+    item.className = "shipment-linked-po-footer-item";
+
+    const labelEl = document.createElement("span");
+    labelEl.className = "shipment-linked-po-footer-label";
+    labelEl.textContent = label;
+
+    const valueEl = document.createElement("span");
+    valueEl.className = "shipment-linked-po-footer-value";
+    valueEl.textContent = formatShipmentLinkedPoTotal(value);
+
+    item.appendChild(labelEl);
+    item.appendChild(valueEl);
+    totalsWrap.appendChild(item);
+  });
+
+  footer.appendChild(totalsWrap);
+
+  return footer;
 }
 
 function getLinkedPosFromModalTable() {
-  const tbody = document.querySelector(".shipment-linked-po-table tbody");
+  const tbody = getActiveShipmentModalScope()
+    .querySelector(".shipment-linked-po-table:not(.shipment-requested-po-table) tbody");
   if (!tbody) return [];
   return [...tbody.querySelectorAll("tr[data-po]")]
     .map(tr => findRowByPo(tr.dataset.po))
@@ -535,7 +740,8 @@ function getLinkedPosFromModalTable() {
 }
 
 function updateShipmentLinkedPoSelectAllHeader(pos) {
-  const cb = document.getElementById("shipmentLinkedPoSelectAll");
+  const cb = getActiveShipmentModalScope()
+    .querySelector(".shipment-linked-po-table:not(.shipment-requested-po-table) #shipmentLinkedPoSelectAll");
   if (!cb) return;
 
   if (pos.length === 0) {
@@ -552,7 +758,8 @@ function updateShipmentLinkedPoSelectAllHeader(pos) {
 }
 
 function syncLinkedPoTableCheckboxes(pos) {
-  const tbody = document.querySelector(".shipment-linked-po-table tbody");
+  const tbody = getActiveShipmentModalScope()
+    .querySelector(".shipment-linked-po-table:not(.shipment-requested-po-table) tbody");
   if (!tbody) return;
   pos.forEach(row => {
     const po = String(row["PO #"] ?? "");
@@ -564,10 +771,8 @@ function syncLinkedPoTableCheckboxes(pos) {
 }
 
 function setAllLinkedPosSelected(pos, selected) {
+  if (shipmentAddPoPanelOpen) return;
   let changed = false;
-  if (selected && shipmentAddPoPanelOpen) {
-    clearRequestedPanelSelections();
-  }
   pos.forEach(row => {
     if (toggleRowSelected(row, selected)) changed = true;
   });
@@ -580,6 +785,7 @@ function setAllLinkedPosSelected(pos, selected) {
 function renderShipmentLinkedPoSection(source) {
   const section = document.createElement("section");
   section.className = "shipment-linked-pos";
+  section.classList.toggle("shipment-linked-pos--selection-disabled", shipmentAddPoPanelOpen);
 
   const pos = getLinkedPoRows(source);
   const count = pos.length;
@@ -589,11 +795,12 @@ function renderShipmentLinkedPoSection(source) {
     empty.className = "shipment-linked-empty";
     empty.textContent = "No POs linked to this shipment.";
     section.appendChild(empty);
+    section.appendChild(renderShipmentLinkedPoFooter(pos));
     return section;
   }
 
   const wrap = document.createElement("div");
-  wrap.className = "shipment-linked-po-table-wrap";
+  wrap.className = "shipment-linked-po-table-wrap shipment-linked-po-table-wrap--with-footer";
 
   const table = document.createElement("table");
   table.className = "shipment-linked-po-table";
@@ -616,8 +823,10 @@ function renderShipmentLinkedPoSection(source) {
   const selectAllCb = document.createElement("input");
   selectAllCb.type = "checkbox";
   selectAllCb.id = "shipmentLinkedPoSelectAll";
+  selectAllCb.disabled = shipmentAddPoPanelOpen;
   selectAllCb.setAttribute("aria-label", "Select all linked POs");
   selectAllCb.addEventListener("change", () => {
+    if (shipmentAddPoPanelOpen) return;
     setAllLinkedPosSelected(pos, selectAllCb.checked);
   });
   selectTh.appendChild(selectAllCb);
@@ -640,10 +849,9 @@ function renderShipmentLinkedPoSection(source) {
     const selectTd = document.createElement("td");
     renderSelectedCell(selectTd, row);
     const linkedCb = selectTd.querySelector(".po-select-checkbox");
+    if (linkedCb) linkedCb.disabled = shipmentAddPoPanelOpen;
     linkedCb?.addEventListener("change", () => {
-      if (linkedCb.checked && shipmentAddPoPanelOpen) {
-        clearRequestedPanelSelections();
-      }
+      if (shipmentAddPoPanelOpen) return;
       updateShipmentModalActionButtons();
     });
     tr.appendChild(selectTd);
@@ -680,6 +888,7 @@ function renderShipmentLinkedPoSection(source) {
   table.appendChild(tbody);
   wrap.appendChild(table);
   section.appendChild(wrap);
+  section.appendChild(renderShipmentLinkedPoFooter(pos));
   updateShipmentLinkedPoSelectAllHeader(pos);
   return section;
 }
@@ -690,7 +899,7 @@ function renderShipmentModalContent(shipment) {
   if (!idEl || !body) return;
 
   shipmentAddPoPanelOpen = false;
-  shipmentRequestedPanelSelection.clear();
+  clearShipmentFooterMessage("shipmentModalFooterMessage");
   idEl.textContent = shipment[SHIPMENT_ID_FIELD] ?? EMPTY_DISPLAY;
   setShipmentModalPoCount(document.getElementById("shipmentModalPoCount"), shipment);
   body.innerHTML = "";
@@ -700,6 +909,7 @@ function renderShipmentModalContent(shipment) {
     linkedSource: shipment,
     showAddPanel: false,
   }));
+  setShipmentModalAddPanelClass(body, false);
   updateShipmentModalActionButtons();
 }
 
@@ -709,9 +919,10 @@ async function saveShipmentModal() {
   if (!form) return;
 
   const shipment = readShipmentForm(form);
+  setShipmentFooterMessage("");
   const validationError = validateShipmentRequiredFields(shipment);
   if (validationError) {
-    showIndicator(validationError, "error");
+    setShipmentFooterMessage(validationError);
     return;
   }
 

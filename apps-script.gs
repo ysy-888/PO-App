@@ -1,5 +1,7 @@
 const SHEET_NAME = "POs";
 const SHIPMENTS_SHEET_NAME = "Shipments";
+const EXF_REQUESTS_SHEET_NAME = "EXF Requests";
+const VENDORS_SHEET_NAME = "Vendors";
 const DELIVERY_REQUESTS_SHEET_NAME = "Delivery Requests";
 const PICKUP_REQUESTS_SHEET_NAME = "Pickup Requests";
 const CHARGEBACKS_SHEET_NAME = "Chargebacks";
@@ -8,14 +10,17 @@ const PACKING_CARTONS_SHEET_NAME = "Packing List Cartons";
 const COLUMN_DEFAULT_KEY = "defaultVisibleColumns";
 const STATUS_DEFAULT_KEY = "defaultStatusFilter";
 const SHIPMENT_ID_FIELD = "Shipment ID";
+const EXF_REQUEST_ID_FIELD = "EXF Request ID";
 const DELIVERY_REQUEST_ID_FIELD = "Delivery Request ID";
 const PICKUP_REQUEST_ID_FIELD = "Pickup Request ID";
 const EXF_REQUESTED_FIELD = "EXF Requested";
+const EXF_REQUEST_DATE_FIELD = "EXF Request Date";
+const EXF_MEMO_FIELD = "EXF Memo";
 const CHARGEBACK_ID_FIELD = "Chargeback ID";
 const PACKING_LIST_ID_FIELD = "Packing List ID";
 
 /*
-  POs sheet row 1 headers (see po-table.js COLUMNS). Add column: Shipment ID
+  POs sheet row 1 headers (see po-table.js COLUMNS). Add columns: Shipment ID, EXF Request Date, EXF Memo
 
   Shipments sheet row 1 headers (auto-created if missing):
     Shipment ID, Ship Method, Vessel, House #, EXF, Shipped, ETD, ETA, IHD, Notes
@@ -27,6 +32,11 @@ const SHIPMENT_DATA_FIELDS = [
   "Ship Method", "Vessel", "House #", "EXF", "Shipped", "ETD", "ETA", "IHD", "Notes"
 ];
 
+const EXF_REQUEST_DATA_FIELDS = [
+  "Request Date", "Vendor", "Vendor Email", "PO Numbers", "PO Count", "Total Qty",
+  "Email Status", "Email Sent At", "Email Error", "Last Email Attempt At", "Created At", "Updated At"
+];
+
 const DELIVERY_REQUEST_DATA_FIELDS = ["Request Date", "Location", "Notes"];
 const PICKUP_REQUEST_DATA_FIELDS = ["Request Date", "Location", "Notes"];
 
@@ -35,7 +45,7 @@ const EDITABLE_FIELDS = [
   "PO Qty", "Status", "N41 Status", "Ship Method",
   "Vessel", "House #", "Shipped", "ETD", "ETA", "IHD",
   "EST EXF", "EST IHD", "EXF", "CXL Date", "Assign Date", "Notes",
-  EXF_REQUESTED_FIELD, DELIVERY_REQUEST_ID_FIELD, PICKUP_REQUEST_ID_FIELD,
+  EXF_REQUESTED_FIELD, EXF_REQUEST_DATE_FIELD, EXF_MEMO_FIELD, DELIVERY_REQUEST_ID_FIELD, PICKUP_REQUEST_ID_FIELD,
   "FOB Cost", "Price", "PO Total Cost",
   "Received Qty", "Style Category",
   "OG", "PROTO", "FIT/PP", "BULK", "TOP", "TRIM",
@@ -74,6 +84,28 @@ function getShipmentsSheet_() {
     sheet.getRange(1, 1, 1, SHIPMENT_DATA_FIELDS.length + 1).setValues([[
       SHIPMENT_ID_FIELD, ...SHIPMENT_DATA_FIELDS
     ]]);
+  }
+  return sheet;
+}
+
+function getExfRequestsSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(EXF_REQUESTS_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(EXF_REQUESTS_SHEET_NAME);
+    sheet.getRange(1, 1, 1, EXF_REQUEST_DATA_FIELDS.length + 1).setValues([[
+      EXF_REQUEST_ID_FIELD, ...EXF_REQUEST_DATA_FIELDS
+    ]]);
+  }
+  return sheet;
+}
+
+function getVendorsSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(VENDORS_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(VENDORS_SHEET_NAME);
+    sheet.getRange(1, 1, 1, 3).setValues([["Vendor", "Email", "CC"]]);
   }
   return sheet;
 }
@@ -280,6 +312,24 @@ function generateShipmentId_(shipments) {
   return formatShipmentId_(max + 1);
 }
 
+function parseExfRequestIdSequence_(id) {
+  const s = String(id ?? "").trim();
+  const m = /^EXF-(\d+)$/.exec(s);
+  return m ? Number(m[1]) : 0;
+}
+
+function formatExfRequestId_(sequence) {
+  return "EXF-" + String(sequence).padStart(4, "0");
+}
+
+function generateExfRequestId_(requests) {
+  let max = 0;
+  requests.forEach(request => {
+    max = Math.max(max, parseExfRequestIdSequence_(request[EXF_REQUEST_ID_FIELD]));
+  });
+  return formatExfRequestId_(max + 1);
+}
+
 function parseChargebackIdSequence_(id) {
   const s = String(id ?? "").trim();
   const m = /^CB-(\d+)$/.exec(s);
@@ -413,33 +463,36 @@ function normalizePackingCartons_(cartons) {
 }
 
 function rewritePackingCartonsForList_(cartonsSheet, packingListId, cartons) {
-  const data = cartonsSheet.getDataRange().getValues();
-  if (data.length === 0) return;
-  const headers = data[0].map(h => String(h ?? "").trim());
+  const lastRow = cartonsSheet.getLastRow();
+  const lastCol = Math.max(cartonsSheet.getLastColumn(), 1);
+  if (lastRow < 1) return;
+
+  const headers = cartonsSheet.getRange(1, 1, 1, lastCol).getValues()[0]
+    .map(h => String(h ?? "").trim());
   const idCol = headers.indexOf(PACKING_LIST_ID_FIELD);
   if (idCol === -1) throw new Error("Packing List ID column not found in cartons sheet.");
 
   const key = String(packingListId);
-  const keptRows = [];
-  for (let i = 1; i < data.length; i++) {
-    if (String(data[i][idCol]) !== key) keptRows.push(data[i]);
+  if (lastRow >= 2) {
+    const idValues = cartonsSheet.getRange(2, idCol + 1, lastRow, 1).getValues();
+    const rowsToDelete = [];
+    for (let i = 0; i < idValues.length; i++) {
+      if (String(idValues[i][0]) === key) rowsToDelete.push(i + 2);
+    }
+    rowsToDelete.sort((a, b) => b - a).forEach(rowIndex => cartonsSheet.deleteRow(rowIndex));
   }
 
   const normalized = normalizePackingCartons_(cartons || []);
+  if (normalized.length === 0) return;
+
   const newRows = normalized.map(carton =>
     headers.map(h => {
       if (h === PACKING_LIST_ID_FIELD) return key;
       return carton[h] !== undefined ? carton[h] : "";
     })
   );
-
-  const outRows = [data[0]].concat(keptRows, newRows);
-  const lastCol = headers.length;
-  const oldLastRow = Math.max(cartonsSheet.getLastRow(), 1);
-  cartonsSheet.getRange(1, 1, outRows.length, lastCol).setValues(outRows);
-  if (oldLastRow > outRows.length) {
-    cartonsSheet.getRange(outRows.length + 1, 1, oldLastRow - outRows.length, lastCol).clearContent();
-  }
+  const startRow = cartonsSheet.getLastRow() + 1;
+  cartonsSheet.getRange(startRow, 1, startRow + newRows.length - 1, headers.length).setValues(newRows);
 }
 
 function deletePackingCartons_(cartonsSheet, packingListId) {
@@ -1159,6 +1212,146 @@ function appendRequestRow_(sheet, idField, requestId, dataFields, data) {
   sheet.appendRow(row);
 }
 
+function findRequestRowIndex_(sheet, idField, requestId) {
+  const rows = sheet.getDataRange().getValues();
+  if (rows.length < 1) return null;
+  const headers = rows[0].map(h => String(h ?? "").trim());
+  const idCol = headers.indexOf(idField);
+  if (idCol === -1) throw new Error(idField + " column not found.");
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][idCol]) === String(requestId)) {
+      return { rowIndex: i + 1, headers: headers, values: rows[i] };
+    }
+  }
+  return null;
+}
+
+function updateRequestRowFields_(sheet, rowIndex, headers, updates) {
+  const rowValues = sheet.getRange(rowIndex, 1, 1, headers.length).getValues()[0];
+  Object.entries(updates).forEach(([field, value]) => {
+    const colIndex = headers.indexOf(field);
+    if (colIndex !== -1) rowValues[colIndex] = sanitizeCellValue_(value);
+  });
+  sheet.getRange(rowIndex, 1, 1, headers.length).setValues([rowValues]);
+}
+
+function getPoObjectsByNumbers_(poSheet, poNumbers) {
+  const wanted = new Set((Array.isArray(poNumbers) ? poNumbers : []).map(po => String(po ?? "").trim()));
+  const rows = sheetToObjects_(poSheet, "PO #").filter(row => wanted.has(String(row["PO #"] ?? "").trim()));
+  if (rows.length !== wanted.size) {
+    const found = new Set(rows.map(row => String(row["PO #"] ?? "").trim()));
+    const missing = Array.from(wanted).filter(po => !found.has(po));
+    throw new Error("PO # not found: " + missing.join(", "));
+  }
+  return rows;
+}
+
+function normalizeVendorName_(value) {
+  return String(value ?? "").trim();
+}
+
+function assertSingleVendorForRows_(rows) {
+  if (!rows.length) throw new Error("Select at least one PO.");
+  const vendor = normalizeVendorName_(rows[0]["Vendor"]);
+  if (!vendor) throw new Error("Vendor is required on all EXF request POs.");
+  rows.forEach(row => {
+    if (normalizeVendorName_(row["Vendor"]) !== vendor) {
+      throw new Error("EXF Request POs must all have the same vendor.");
+    }
+  });
+  return vendor;
+}
+
+function getVendorEmailInfo_(vendor) {
+  const sheet = getVendorsSheet_();
+  const rows = sheet.getDataRange().getValues();
+  if (rows.length < 2) return { to: "", cc: "" };
+  const headers = rows[0].map(h => String(h ?? "").trim());
+  const vendorCol = headers.indexOf("Vendor");
+  const emailCol = headers.indexOf("Email") !== -1 ? headers.indexOf("Email") : headers.indexOf("Vendor Email");
+  const ccCol = headers.indexOf("CC");
+  if (vendorCol === -1 || emailCol === -1) return { to: "", cc: "" };
+  const vendorKey = normalizeVendorName_(vendor).toLowerCase();
+  for (let i = 1; i < rows.length; i++) {
+    if (normalizeVendorName_(rows[i][vendorCol]).toLowerCase() !== vendorKey) continue;
+    return {
+      to: String(rows[i][emailCol] ?? "").trim(),
+      cc: ccCol === -1 ? "" : String(rows[i][ccCol] ?? "").trim(),
+    };
+  }
+  return { to: "", cc: "" };
+}
+
+function escapeHtml_(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function formatEmailDate_(value) {
+  if (!value) return "";
+  if (Object.prototype.toString.call(value) === "[object Date]" && !isNaN(value.getTime())) {
+    return Utilities.formatDate(value, Session.getScriptTimeZone(), "MM/dd/yyyy");
+  }
+  return String(value);
+}
+
+function getExfRequestPoTotalQty_(rows) {
+  return rows.reduce((sum, row) => {
+    const n = Number(String(row["PO Qty"] ?? "").replace(/,/g, ""));
+    return sum + (Number.isFinite(n) ? n : 0);
+  }, 0);
+}
+
+function buildExfRequestEmailHtml_(requestId, vendor, rows, requestDate, memos, shipMethods) {
+  const bodyRows = rows.map(row => {
+    const po = String(row["PO #"] ?? "");
+    return "<tr>" +
+      "<td>" + escapeHtml_(po) + "</td>" +
+      "<td>" + escapeHtml_(row["Style #"]) + "</td>" +
+      "<td>" + escapeHtml_(row["Buyer"]) + "</td>" +
+      "<td>" + escapeHtml_(row["Buyer PO #"]) + "</td>" +
+      "<td style=\"text-align:right;\">" + escapeHtml_(row["PO Qty"]) + "</td>" +
+      "<td>" + escapeHtml_(shipMethods[po] ?? row["Ship Method"]) + "</td>" +
+      "<td>" + escapeHtml_(formatEmailDate_(row["CXL Date"])) + "</td>" +
+      "<td>" + escapeHtml_(memos[po] ?? row[EXF_MEMO_FIELD]) + "</td>" +
+    "</tr>";
+  }).join("");
+
+  return "<p>Hello,</p>" +
+    "<p>Please confirm EXF readiness for the POs below.</p>" +
+    "<p><strong>EXF Request:</strong> " + escapeHtml_(requestId) + "<br>" +
+    "<strong>Vendor:</strong> " + escapeHtml_(vendor) + "<br>" +
+    "<strong>Request Date:</strong> " + escapeHtml_(requestDate) + "</p>" +
+    "<table border=\"1\" cellpadding=\"6\" cellspacing=\"0\" style=\"border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px;\">" +
+      "<thead><tr>" +
+        "<th>PO #</th><th>Style #</th><th>Buyer</th><th>Buyer PO #</th>" +
+        "<th>Order Qty</th><th>Ship Method</th><th>CXL Date</th><th>EXF Memo</th>" +
+      "</tr></thead>" +
+      "<tbody>" + bodyRows + "</tbody>" +
+    "</table>" +
+    "<p>Thank you.</p>";
+}
+
+function sendExfRequestEmail_(requestId, vendor, vendorEmailInfo, rows, requestDate, memos, shipMethods) {
+  if (!vendorEmailInfo.to) {
+    throw new Error("No vendor email found for " + vendor + ". Add it to the Vendors sheet.");
+  }
+
+  const subject = "EXF Request " + requestId + " - " + vendor + " - " + requestDate;
+  const htmlBody = buildExfRequestEmailHtml_(requestId, vendor, rows, requestDate, memos, shipMethods);
+  const options = {
+    to: vendorEmailInfo.to,
+    subject: subject,
+    htmlBody: htmlBody,
+  };
+  if (vendorEmailInfo.cc) options.cc = vendorEmailInfo.cc;
+  MailApp.sendEmail(options);
+}
+
 function pickDeliveryRequestData_(raw) {
   const out = {};
   DELIVERY_REQUEST_DATA_FIELDS.forEach(field => {
@@ -1180,17 +1373,141 @@ function handleExfRequest(payload) {
   if (!Array.isArray(poNumbers) || poNumbers.length === 0) {
     return corsResponse({ success: false, error: "Select at least one PO." });
   }
+  const requestDate = String(payload.requestDate ?? "").trim();
+  if (!requestDate) {
+    return corsResponse({ success: false, error: "Request Date is required." });
+  }
+  const memos = payload.memos || {};
+  const shipMethods = payload.shipMethods || {};
   const poSheet = getSheet();
-  const notes = String(payload.notes ?? "").trim();
+  let poRows;
+  let vendor;
+  try {
+    poRows = getPoObjectsByNumbers_(poSheet, poNumbers);
+    vendor = assertSingleVendorForRows_(poRows);
+    poRows.forEach(row => {
+      const status = String(row["Status"] ?? "").trim();
+      if (status !== "WIP" || isTruthyCell_(row[EXF_REQUESTED_FIELD])) {
+        throw new Error("PO " + row["PO #"] + " must be WIP and not already EXF requested.");
+      }
+    });
+  } catch (err) {
+    return corsResponse({ success: false, error: err.message });
+  }
+
+  const exfRequestsSheet = getExfRequestsSheet_();
+  const existingRequests = sheetToObjects_(exfRequestsSheet, EXF_REQUEST_ID_FIELD);
+  const requestId = generateExfRequestId_(existingRequests);
+  const vendorEmailInfo = getVendorEmailInfo_(vendor);
+
   const items = poNumbers.map(poNumber => {
     const updates = {};
     updates[EXF_REQUESTED_FIELD] = true;
     updates["Status"] = "Requested";
-    if (notes) updates["Notes"] = notes;
+    updates[EXF_REQUEST_DATE_FIELD] = requestDate;
+    if (shipMethods[poNumber] !== undefined) updates["Ship Method"] = shipMethods[poNumber];
+    const memo = String(memos[poNumber] ?? "").trim();
+    if (memo) updates[EXF_MEMO_FIELD] = memo;
     return { poNumber: poNumber, updates: updates };
   });
   applyPoUpdatesBatch_(poSheet, items);
-  return corsResponse({ success: true });
+
+  const now = new Date();
+  appendRequestRow_(exfRequestsSheet, EXF_REQUEST_ID_FIELD, requestId, EXF_REQUEST_DATA_FIELDS, {
+    "Request Date": requestDate,
+    "Vendor": vendor,
+    "Vendor Email": vendorEmailInfo.to,
+    "PO Numbers": poNumbers.join(", "),
+    "PO Count": poNumbers.length,
+    "Total Qty": getExfRequestPoTotalQty_(poRows),
+    "Email Status": "Pending",
+    "Created At": now,
+    "Updated At": now,
+  });
+
+  const found = findRequestRowIndex_(exfRequestsSheet, EXF_REQUEST_ID_FIELD, requestId);
+  let emailSent = false;
+  let emailError = "";
+  try {
+    sendExfRequestEmail_(requestId, vendor, vendorEmailInfo, poRows, requestDate, memos, shipMethods);
+    emailSent = true;
+  } catch (err) {
+    emailError = err && err.message ? err.message : String(err);
+  }
+
+  updateRequestRowFields_(exfRequestsSheet, found.rowIndex, found.headers, {
+    "Email Status": emailSent ? "Sent" : "Failed",
+    "Email Sent At": emailSent ? new Date() : "",
+    "Email Error": emailError,
+    "Last Email Attempt At": new Date(),
+    "Updated At": new Date(),
+  });
+
+  return corsResponse({
+    success: true,
+    exfRequestId: requestId,
+    emailSent: emailSent,
+    emailError: emailError,
+  });
+}
+
+function handleResendExfRequestEmail(payload) {
+  const requestId = String(payload.exfRequestId ?? "").trim();
+  if (!requestId) return corsResponse({ success: false, error: "EXF Request ID is required." });
+
+  const exfRequestsSheet = getExfRequestsSheet_();
+  const found = findRequestRowIndex_(exfRequestsSheet, EXF_REQUEST_ID_FIELD, requestId);
+  if (!found) return corsResponse({ success: false, error: "EXF request not found: " + requestId });
+
+  const request = {};
+  found.headers.forEach((field, i) => { request[field] = found.values[i]; });
+  const poNumbers = String(request["PO Numbers"] ?? "")
+    .split(",")
+    .map(s => s.trim())
+    .filter(Boolean);
+  const requestDate = formatEmailDate_(request["Request Date"]);
+  const poSheet = getSheet();
+  let poRows;
+  let vendor;
+  try {
+    poRows = getPoObjectsByNumbers_(poSheet, poNumbers);
+    vendor = assertSingleVendorForRows_(poRows);
+  } catch (err) {
+    return corsResponse({ success: false, error: err.message });
+  }
+  const vendorEmailInfo = getVendorEmailInfo_(vendor);
+  const memos = {};
+  const shipMethods = {};
+  poRows.forEach(row => {
+    const po = String(row["PO #"] ?? "");
+    memos[po] = row[EXF_MEMO_FIELD] ?? "";
+    shipMethods[po] = row["Ship Method"] ?? "";
+  });
+
+  let emailSent = false;
+  let emailError = "";
+  try {
+    sendExfRequestEmail_(requestId, vendor, vendorEmailInfo, poRows, requestDate, memos, shipMethods);
+    emailSent = true;
+  } catch (err) {
+    emailError = err && err.message ? err.message : String(err);
+  }
+
+  updateRequestRowFields_(exfRequestsSheet, found.rowIndex, found.headers, {
+    "Vendor Email": vendorEmailInfo.to,
+    "Email Status": emailSent ? "Sent" : "Failed",
+    "Email Sent At": emailSent ? new Date() : request["Email Sent At"],
+    "Email Error": emailError,
+    "Last Email Attempt At": new Date(),
+    "Updated At": new Date(),
+  });
+
+  return corsResponse({
+    success: true,
+    exfRequestId: requestId,
+    emailSent: emailSent,
+    emailError: emailError,
+  });
 }
 
 function handleBatchUpdatePos(payload) {
@@ -1397,6 +1714,7 @@ function doGet(e) {
   try {
     const poSheet = getSheet();
     const shipmentsSheet = getShipmentsSheet_();
+    const exfRequestsSheet = getExfRequestsSheet_();
     const deliveryRequestsSheet = getDeliveryRequestsSheet_();
     const pickupRequestsSheet = getPickupRequestsSheet_();
     const chargebacksSheet = getChargebacksSheet_();
@@ -1404,6 +1722,7 @@ function doGet(e) {
     const packingCartonsSheet = getPackingCartonsSheet_();
     const data = sheetToObjects_(poSheet, "PO #");
     const shipments = sheetToObjects_(shipmentsSheet, SHIPMENT_ID_FIELD);
+    const exfRequests = sheetToObjects_(exfRequestsSheet, EXF_REQUEST_ID_FIELD);
     const deliveryRequests = sheetToObjects_(deliveryRequestsSheet, DELIVERY_REQUEST_ID_FIELD);
     const pickupRequests = sheetToObjects_(pickupRequestsSheet, PICKUP_REQUEST_ID_FIELD);
     const chargebacks = sheetToObjects_(chargebacksSheet, CHARGEBACK_ID_FIELD);
@@ -1414,6 +1733,7 @@ function doGet(e) {
       success: true,
       data: data,
       shipments: shipments,
+      exfRequests: exfRequests,
       deliveryRequests: deliveryRequests,
       pickupRequests: pickupRequests,
       chargebacks: chargebacks,
@@ -1448,6 +1768,7 @@ function doPost(e) {
     if (action === "addPosToShipment") return handleAddPosToShipment(payload);
     if (action === "removePosFromShipment") return handleRemovePosFromShipment(payload);
     if (action === "exfRequest") return handleExfRequest(payload);
+    if (action === "resendExfRequestEmail") return handleResendExfRequestEmail(payload);
     if (action === "batchUpdatePos") return handleBatchUpdatePos(payload);
     if (action === "createDeliveryRequest") return handleCreateDeliveryRequest(payload);
     if (action === "updateDeliveryRequest") return handleUpdateDeliveryRequest(payload);

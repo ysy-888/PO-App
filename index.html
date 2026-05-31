@@ -12,6 +12,7 @@
   <nav class="app-title-nav" role="tablist" aria-label="Main views">
     <span class="app-logo-text">Elevator Disco</span>
     <button type="button" class="app-title-tab is-active" id="navTabPo" role="tab" aria-selected="true">Purchase Orders</button>
+    <button type="button" class="app-title-tab" id="navTabExfRequests" role="tab" aria-selected="false">EXF Requests</button>
     <button type="button" class="app-title-tab" id="navTabShipments" role="tab" aria-selected="false">Shipments</button>
     <button type="button" class="app-title-tab" id="navTabChargebacks" role="tab" aria-selected="false">Chargebacks</button>
   </nav>
@@ -30,10 +31,6 @@
         <button type="button" class="header-menu-item header-menu-checkable" id="headerMenuToggleCountdown" role="menuitemcheckbox" aria-checked="false">
           <span>Toggle countdown</span>
           <span class="header-menu-check" id="headerMenuCountdownCheck" hidden aria-hidden="true">✓</span>
-        </button>
-        <button type="button" class="header-menu-item header-menu-checkable" id="headerMenuToggleSelectionMode" role="menuitemcheckbox" aria-checked="false">
-          <span>Toggle Selection Mode</span>
-          <span class="header-menu-check" id="headerMenuSelectionModeCheck" hidden aria-hidden="true">✓</span>
         </button>
         <button type="button" class="header-menu-item header-menu-item-separator" id="headerMenuToggleAppMode" role="menuitem">
           <span id="headerMenuAppModeLabel">Test Mode</span>
@@ -55,18 +52,25 @@
   </div>
 
 
-  <div class="filter-btn-group" id="divisionFilters" role="group" aria-label="Division"></div>
-
-  <div class="toolbar-status-row">
-    <div class="filter-btn-group status-filters" id="statusFilters" role="group" aria-label="Status"></div>
-    <div class="toolbar-end">
-      <button type="button" class="btn btn-secondary" id="exfRequestBtn" hidden>EXF Request</button>
-      <button type="button" class="btn btn-secondary" id="deliveryRequestBtn" hidden>Delivery Request</button>
-      <button type="button" class="btn btn-secondary" id="pickupRequestBtn" hidden>Pickup Request</button>
-      <button type="button" class="btn btn-secondary" id="createShipmentBtn" hidden>Create shipment</button>
-      <button type="button" class="clear-all-filters-btn" id="clearAllColumnFiltersBtn" hidden>Clear all filters</button>
-      <div class="counter" id="rowCounter">— rows</div>
+  <div class="toolbar-filter-cluster">
+    <div class="toolbar-filter-section">
+      <div class="filter-btn-group" id="divisionFilters" role="group" aria-label="Division"></div>
+      <div class="toolbar-filter-title">DIVISION</div>
     </div>
+    <div class="toolbar-filter-divider" aria-hidden="true"></div>
+    <div class="toolbar-filter-section">
+      <div class="filter-btn-group status-filters" id="statusFilters" role="group" aria-label="Status"></div>
+      <div class="toolbar-filter-title">STATUS</div>
+    </div>
+  </div>
+
+  <div class="toolbar-end">
+    <button type="button" class="btn btn-secondary" id="exfRequestBtn" hidden>EXF Request</button>
+    <button type="button" class="btn btn-secondary" id="deliveryRequestBtn" hidden>Delivery Request</button>
+    <button type="button" class="btn btn-secondary" id="pickupRequestBtn" hidden>Pickup Request</button>
+    <button type="button" class="btn btn-secondary" id="createShipmentBtn" hidden>Create shipment</button>
+    <button type="button" class="clear-all-filters-btn" id="clearAllColumnFiltersBtn" hidden>Clear all filters</button>
+    <div class="counter" id="rowCounter">— rows</div>
   </div>
 </div>
 
@@ -78,6 +82,16 @@
   <div class="toolbar-end">
     <button type="button" class="btn btn-danger" id="deleteShipmentBtn" hidden>Delete shipment</button>
     <div class="counter" id="shipmentRowCounter">— shipments</div>
+  </div>
+</div>
+
+<div id="exfRequestListToolbar" class="toolbar" hidden>
+  <div class="search-wrap">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    <input type="search" id="exfRequestSearchInput" placeholder="Search EXF requests" />
+  </div>
+  <div class="toolbar-end">
+    <div class="counter" id="exfRequestRowCounter">— EXF requests</div>
   </div>
 </div>
 
@@ -96,7 +110,7 @@
   <div class="table-scroll-x">
   <table id="poTable">
     <colgroup>
-      <col class="col-select" /><col class="col-flag" /><col class="col-packing-list" />
+      <col class="col-flag" /><col class="col-packing-list" /><col class="col-select" />
       <col class="col-status" /><col class="col-n41-status" /><col class="col-division" /><col class="col-vendor" />
       <col class="col-buyer" /><col class="col-buyer-po" />
       <col class="col-so" /><col class="col-po-date" /><col class="col-po" />
@@ -107,21 +121,23 @@
       <col class="col-shipped" /><col class="col-etd" />
       <col class="col-est-exf" /><col class="col-est-ihd" />
       <col class="col-ship-method" /><col class="col-shipment-id" />
+      <col class="col-exf-req" /><col class="col-exf-req-date" /><col class="col-exf-memo" />
+      <col class="col-delivery-req" /><col class="col-pickup-req" />
       <col class="col-exf" /><col class="col-eta" /><col class="col-ihd" />
       <col class="col-cxl" /><col class="col-assign" /><col class="col-notes" />
     </colgroup>
     <thead>
       <tr>
-        <th class="th-select-col" data-col="Selected">
-          <input type="checkbox" id="selectAllRowsCheckbox" aria-label="Select all filtered rows" />
-        </th>
         <th class="th-flag-col" data-col="Flag" aria-label="Flag">
           <span class="th-flag-icon" aria-hidden="true">
             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
           </span>
         </th>
         <th class="th-packing-list-col" data-col="Packing List" aria-label="Packing List"></th>
-        <th data-col="Status" onclick="sortBy('Status')">Status</th>
+        <th class="th-select-col" data-col="Selected">
+          <input type="checkbox" id="selectAllRowsCheckbox" aria-label="Select all filtered rows" />
+        </th>
+        <th class="th-filterable" data-col="Status"><span class="th-label">Status</span></th>
         <th data-col="N41 Status" onclick="sortBy('N41 Status')">N41 Status</th>
         <th data-col="Division" onclick="sortBy('Division')">Division</th>
         <th class="th-filterable" data-col="Vendor"><span class="th-label">Vendor</span></th>
@@ -148,6 +164,11 @@
         <th class="th-filterable" data-col="EST IHD"><span class="th-label">EST IHD</span></th>
         <th class="th-filterable" data-col="Ship Method"><span class="th-label">Ship Method</span></th>
         <th class="th-filterable" data-col="Shipment ID"><span class="th-label">Shipment</span></th>
+        <th class="th-filterable" data-col="EXF Requested"><span class="th-label">EXF Req</span></th>
+        <th class="th-filterable" data-col="EXF Request Date"><span class="th-label">EXF Req Date</span></th>
+        <th data-col="EXF Memo" onclick="sortBy('EXF Memo')">EXF Memo</th>
+        <th class="th-filterable" data-col="Delivery Request ID"><span class="th-label">Delivery</span></th>
+        <th class="th-filterable" data-col="Pickup Request ID"><span class="th-label">Pickup</span></th>
         <th class="th-filterable" data-col="EXF"><span class="th-label">EXF</span></th>
         <th class="th-filterable" data-col="ETA"><span class="th-label">ETA</span></th>
         <th class="th-filterable" data-col="IHD"><span class="th-label">IHD</span></th>
@@ -157,7 +178,7 @@
       </tr>
     </thead>
     <tbody id="tableBody">
-      <tr class="state-row"><td colspan="36">Loading POs…</td></tr>
+      <tr class="state-row"><td colspan="41">Loading POs…</td></tr>
     </tbody>
   </table>
   </div>
@@ -200,6 +221,44 @@
     </thead>
     <tbody id="shipmentTableBody">
       <tr class="state-row"><td colspan="12">Loading shipments…</td></tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<div id="exfRequestTableWrap" class="table-scroll-y" hidden>
+  <div class="table-scroll-x">
+  <table id="exfRequestTable">
+    <colgroup>
+      <col class="col-exf-request-id" />
+      <col class="col-date" />
+      <col class="col-vendor" />
+      <col class="col-email" />
+      <col class="col-po-count" />
+      <col class="col-po-qty" />
+      <col class="col-status" />
+      <col class="col-date" />
+      <col class="col-date" />
+      <col class="col-notes" />
+      <col class="col-actions" />
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Request ID</th>
+        <th>Request Date</th>
+        <th>Vendor</th>
+        <th>Vendor Email</th>
+        <th>PO Count</th>
+        <th>Total Qty</th>
+        <th>Email Status</th>
+        <th>Email Sent</th>
+        <th>Last Attempt</th>
+        <th>Email Error</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody id="exfRequestTableBody">
+      <tr class="state-row"><td colspan="11">Loading EXF requests…</td></tr>
     </tbody>
   </table>
   </div>
@@ -265,9 +324,6 @@
 
 <footer id="appFooter" class="app-footer">
   <div class="app-footer-message-slot">
-    <div id="selectionModeBanner" class="selection-mode-status" hidden role="status" aria-live="polite">
-      Selection Mode Enabled
-    </div>
     <div id="testModeBanner" class="test-mode-status" hidden role="status" aria-live="polite">
       Test Mode
     </div>
@@ -352,9 +408,9 @@
     </div>
     <div class="modal-body" id="createShipmentBody"></div>
     <div class="modal-footer">
+      <div id="createShipmentFooterMessage" class="modal-footer-message shipment-footer-message" role="status" aria-live="polite" hidden></div>
       <button type="button" class="btn btn-secondary" id="shipmentAddPosBtn">Add POs</button>
       <button type="button" class="btn btn-secondary" id="shipmentRemovePosBtn" hidden>Remove POs</button>
-      <button type="button" class="btn btn-primary" id="shipmentConfirmAddPosBtn" hidden>Add</button>
       <button type="button" class="btn btn-primary" id="createShipmentSaveBtn">Create</button>
       <button type="button" class="btn" data-dismiss="create-shipment">Cancel</button>
     </div>
@@ -374,9 +430,9 @@
     </div>
     <div class="modal-body" id="shipmentModalBody"></div>
     <div class="modal-footer">
+      <div id="shipmentModalFooterMessage" class="modal-footer-message shipment-footer-message" role="status" aria-live="polite" hidden></div>
       <button type="button" class="btn btn-secondary" id="shipmentDetailAddPosBtn">Add POs</button>
       <button type="button" class="btn btn-secondary" id="shipmentDetailRemovePosBtn" hidden>Remove POs</button>
-      <button type="button" class="btn btn-primary" id="shipmentDetailConfirmAddPosBtn" hidden>Add</button>
       <button type="button" class="btn btn-primary" id="shipmentModalSaveBtn">Save</button>
       <button type="button" class="btn" data-dismiss="shipment-modal">Close</button>
     </div>

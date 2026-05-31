@@ -72,6 +72,10 @@ function pruneBuyerColumnFilter() {
 }
 
 function getUniqueColumnValues(col) {
+  if (col === "Status") {
+    return getStatusFilterHeaderValues();
+  }
+
   if (col === "Buyer") {
     return getBuyerFilterValues();
   }
@@ -89,7 +93,9 @@ function isColumnFilterActive(col) {
 }
 
 function hasActiveColumnFilters() {
-  return flagFilterActive || COLUMN_FILTER_COLS.some(col => columnFilters[col] != null);
+  return flagFilterActive ||
+    isStatusHeaderFilterActive() ||
+    COLUMN_FILTER_COLS.some(col => columnFilters[col] != null);
 }
 
 function updateClearAllFiltersButton() {
@@ -99,8 +105,11 @@ function updateClearAllFiltersButton() {
 
 function clearAllColumnFilters() {
   flagFilterActive = false;
+  statusFilterSelection = null;
+  activeStatus = "";
   COLUMN_FILTER_COLS.forEach(col => { columnFilters[col] = null; });
   closeColumnFilterPopover();
+  syncStatusFilterToolbar();
   updateColumnFilterHeaderStates();
   updateFlagFilterHeaderState();
   applyFilters();
@@ -117,6 +126,9 @@ function rowPassesColumnFilters(row) {
 }
 
 function getEffectiveFilterSelection(col) {
+  if (col === "Status") {
+    return getEffectiveStatusFilterSelection();
+  }
   const selected = columnFilters[col];
   if (selected == null) return new Set(getUniqueColumnValues(col));
   return new Set(selected);
@@ -124,7 +136,12 @@ function getEffectiveFilterSelection(col) {
 
 function updateColumnFilterHeaderStates() {
   document.querySelectorAll("th.th-filterable").forEach(th => {
-    th.classList.toggle("filter-active", isColumnFilterActive(th.dataset.col));
+    const col = th.dataset.col;
+    if (col === "Status") {
+      th.classList.toggle("filter-active", isStatusHeaderFilterActive());
+    } else {
+      th.classList.toggle("filter-active", isColumnFilterActive(col));
+    }
   });
 }
 
@@ -142,7 +159,9 @@ function createColumnFilterOption(value, col) {
   });
 
   const span = document.createElement("span");
-  span.textContent = getFilterValueLabel(col, value);
+  span.textContent = col === "Status"
+    ? getStatusFilterHeaderLabel(value)
+    : getFilterValueLabel(col, value);
 
   label.appendChild(cb);
   label.appendChild(span);
@@ -169,11 +188,28 @@ function renderGroupedBuyerFilterList(list) {
   });
 }
 
+function renderStatusFilterHeaderList(list) {
+  getStatusFilterHeaderValues().forEach((value, index) => {
+    if (index === STATUS_FILTER_HEADER_GROUPS.length) {
+      const divider = document.createElement("div");
+      divider.className = "column-filter-group-divider";
+      divider.setAttribute("aria-hidden", "true");
+      list.appendChild(divider);
+    }
+    list.appendChild(createColumnFilterOption(value, "Status"));
+  });
+}
+
 function renderColumnFilterList() {
   const list = document.getElementById("columnFilterList");
   if (!list || !openFilterCol) return;
 
   list.innerHTML = "";
+
+  if (openFilterCol === "Status") {
+    renderStatusFilterHeaderList(list);
+    return;
+  }
 
   if (openFilterCol === "Buyer" && !activeDivision) {
     renderGroupedBuyerFilterList(list);
@@ -226,6 +262,13 @@ function applyColumnFilterFromPopover() {
   if (!openFilterCol) return;
 
   const col = openFilterCol;
+  if (col === "Status") {
+    applyStatusFilterFromPopover(filterDraft);
+    closeColumnFilterPopover();
+    updateColumnFilterHeaderStates();
+    return;
+  }
+
   const allValues = getUniqueColumnValues(col);
 
   if (filterDraft.size === 0) {
@@ -244,6 +287,7 @@ function applyColumnFilterFromPopover() {
 function initColumnFilterHeaders() {
   document.querySelectorAll("th.th-filterable").forEach(th => {
     const col = th.dataset.col;
+    if (col !== "Status" && !COLUMN_FILTER_COLS.includes(col)) return;
     const label = th.querySelector(".th-label");
     if (label) {
       label.addEventListener("click", e => {
@@ -287,7 +331,7 @@ const STATUS_BADGE = {
 };
 
 const DATE_FIELDS = new Set([
-  "PO Date","Shipped","ETD","ETA","IHD","EST EXF","EST IHD","EXF","CXL Date","Assign Date",
+  "PO Date","Shipped","ETD","ETA","IHD","EST EXF","EST IHD","EXF","CXL Date","Assign Date","EXF Request Date",
 ]);
 
 const COUNTDOWN_DATE_COLS = new Set([

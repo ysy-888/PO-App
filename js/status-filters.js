@@ -67,23 +67,12 @@ function isN41OpenRow(row) {
 }
 
 function rowMatchesStatusFilter(row) {
-  if (!activeStatus) return true;
-  const status = getRowWorkflowStatus(row);
-  if (activeStatus === STATUS_FILTER_OPEN) {
-    if (status) return OPEN_STATUSES.has(status);
-    return isN41OpenRow(row);
+  if (statusFilterSelection === null) return true;
+  if (statusFilterSelection.size === 0) return false;
+  for (const filter of statusFilterSelection) {
+    if (rowMatchesSingleStatusFilter(row, filter)) return true;
   }
-  if (activeStatus === STATUS_FILTER_SHIPPED) {
-    return rowMatchesShippedGroup(status);
-  }
-  if (activeStatus === STATUS_FILTER_EXF_REQ) {
-    return isExfRequested(row);
-  }
-  if (!status) {
-    const n41 = String(row["N41 Status"] ?? "").trim();
-    return activeStatus === n41;
-  }
-  return status === activeStatus;
+  return false;
 }
 
 function statusSortIndex(status) {
@@ -114,6 +103,9 @@ const DIVISION_BUYERS = {
 let activeDivision = "";
 let activeStatus = STATUS_FILTER_OPEN;
 
+/** null = all statuses; empty Set = none; otherwise match any selected filter. */
+let statusFilterSelection = new Set([STATUS_FILTER_OPEN]);
+
 const STATUS_FILTER_BUTTONS = [
   { label: "All", value: "" },
   { label: "Open", value: STATUS_FILTER_OPEN },
@@ -124,6 +116,46 @@ const STATUS_FILTER_BUTTONS = [
   { label: "OTW", value: "OTW" },
   { label: "Assigned", value: "Assigned" },
 ];
+
+const STATUS_FILTER_HEADER_GROUPS = [
+  { label: "All", value: "" },
+  { label: "Open", value: STATUS_FILTER_OPEN },
+  { label: "Shipped", value: STATUS_FILTER_SHIPPED },
+  { label: "EXF REQ", value: STATUS_FILTER_EXF_REQ },
+];
+
+function getStatusFilterHeaderValues() {
+  return [
+    ...STATUS_FILTER_HEADER_GROUPS.map(item => item.value),
+    ...STATUS_SORT_ORDER,
+  ];
+}
+
+function getStatusFilterHeaderLabel(value) {
+  const group = STATUS_FILTER_HEADER_GROUPS.find(item => item.value === value);
+  if (group) return group.label;
+  return value;
+}
+
+function rowMatchesSingleStatusFilter(row, filter) {
+  if (!filter) return true;
+  const status = getRowWorkflowStatus(row);
+  if (filter === STATUS_FILTER_OPEN) {
+    if (status) return OPEN_STATUSES.has(status);
+    return isN41OpenRow(row);
+  }
+  if (filter === STATUS_FILTER_SHIPPED) {
+    return rowMatchesShippedGroup(status);
+  }
+  if (filter === STATUS_FILTER_EXF_REQ) {
+    return isExfRequested(row);
+  }
+  if (!status) {
+    const n41 = String(row["N41 Status"] ?? "").trim();
+    return filter === n41;
+  }
+  return status === filter;
+}
 
 function initStatusFilters() {
   const group = document.getElementById("statusFilters");
@@ -141,17 +173,58 @@ function initStatusFilters() {
 
   group.innerHTML = "";
   STATUS_FILTER_BUTTONS.forEach(({ label, value }) => group.appendChild(makeBtn(label, value)));
+  syncStatusFilterToolbar();
+}
+
+function syncStatusFilterToolbar() {
   document.querySelectorAll("#statusFilters .filter-btn").forEach(btn => {
-    btn.classList.toggle("active", btn.dataset.status === activeStatus);
+    const value = btn.dataset.status;
+    const active = statusFilterSelection === null
+      ? value === ""
+      : statusFilterSelection.size === 1 && statusFilterSelection.has(value);
+    btn.classList.toggle("active", active);
   });
+  if (typeof updateColumnFilterHeaderStates === "function") updateColumnFilterHeaderStates();
+}
+
+function syncStatusFilterFromHeaderSelection() {
+  if (statusFilterSelection === null) {
+    activeStatus = "";
+  } else if (statusFilterSelection.size === 1) {
+    activeStatus = [...statusFilterSelection][0];
+  } else {
+    activeStatus = "";
+  }
+  syncStatusFilterToolbar();
 }
 
 function setStatusFilter(status) {
   activeStatus = status;
-  document.querySelectorAll("#statusFilters .filter-btn").forEach(btn => {
-    btn.classList.toggle("active", btn.dataset.status === status);
-  });
+  statusFilterSelection = status === "" ? null : new Set([status]);
+  syncStatusFilterToolbar();
   applyFilters();
+}
+
+function applyStatusFilterFromPopover(filterDraft) {
+  const allValues = getStatusFilterHeaderValues();
+  if (filterDraft.size === 0) {
+    statusFilterSelection = new Set();
+  } else if (filterDraft.size === allValues.length) {
+    statusFilterSelection = null;
+  } else {
+    statusFilterSelection = new Set(filterDraft);
+  }
+  syncStatusFilterFromHeaderSelection();
+  applyFilters();
+}
+
+function getEffectiveStatusFilterSelection() {
+  if (statusFilterSelection === null) return new Set(getStatusFilterHeaderValues());
+  return new Set(statusFilterSelection);
+}
+
+function isStatusHeaderFilterActive() {
+  return statusFilterSelection !== null;
 }
 
 function initDivisionFilters() {

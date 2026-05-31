@@ -1,7 +1,6 @@
 
 loadColumnVisibility();
 loadCxlCountdownPreference();
-loadSelectionModePreference();
 initDivisionFilters();
 initStatusFilters();
 initColumnFilterHeaders();
@@ -12,7 +11,6 @@ initPagination();
 initPaginationKeyboard();
 initHeaderMenu();
 initCsvImportSummary();
-initSelectionModeKeyboard();
 initEditTable();
 initRowSelection();
 initToolbarKeyboard();
