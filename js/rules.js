@@ -1,7 +1,7 @@
 const EDITABLE = new Set([
   "Flag",
   "Status","N41 Status","Ship Method",
-  "IHD","EST EXF","CXL Date","Assign Date","Notes","EXF Memo",
+  "IHD","EST EXF","CXL Date","Assign Date","Notes",
   "FOB Cost","Price","PO Total Cost","OG","PROTO","FIT/PP","BULK","TOP","TRIM",
   "Received Qty",
 ]);
@@ -116,8 +116,10 @@ const APPS_SCRIPT_EDITABLE_PO_FIELDS = new Set([
   "PO Qty", "Status", "N41 Status", "Ship Method",
   "Vessel", "House #", "Shipped", "ETD", "ETA", "IHD",
   "EST EXF", "EST IHD", "EXF", "CXL Date", "Assign Date", "Notes",
-  "EXF Requested", "EXF Request Date", "EXF Memo",
-  "ASN Request ID", "Delivery Request ID", "Pickup Request ID",
+  "EXF Requested", "EXF Date", "EXF Req Date", "EXF Request Date", "EXF Memo",
+  "ASN Requested", "ASN Date", "ASN Req Date", "ASN Request ID",
+  "Delivery Requested", "Delivery Date", "Delivery Req Date", "Delivery Request ID",
+  "Pickup Requested", "Pickup Date", "Pickup Req Date", "Pickup Request ID",
   "FOB Cost", "Price", "PO Total Cost",
   "Received Qty", "Style Category",
   "OG", "PROTO", "FIT/PP", "BULK", "TOP", "TRIM",

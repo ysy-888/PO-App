@@ -1,4 +1,90 @@
-/** Shared modal layout for EXF / delivery / pickup request modals. */
+/** Shared modal layout for EXF / ASN / delivery / pickup request modals. */
+
+const DEFAULT_WAREHOUSE_ENTITY = "FORERUNNER LOGISTICS";
+const DEFAULT_DELIVERY_TO_ENTITY = "ELEVATOR DISCO";
+
+function getLocationEntities() {
+  return (allLocationRows ?? []).map(r => String(r["Entity"] ?? "").trim()).filter(Boolean);
+}
+
+function getLocationAddress(entity) {
+  const row = (allLocationRows ?? []).find(r =>
+    String(r["Entity"] ?? "").trim().toLowerCase() === String(entity ?? "").trim().toLowerCase()
+  );
+  return String(row?.["Address"] ?? "").trim();
+}
+
+/**
+ * Creates a pair of form fields: an entity <select> and a read-only address <textarea>.
+ * Returns { wrap (contains both), selectEl, addressEl }.
+ */
+function createRequestLocationField(label, entityFieldName, addressFieldName, defaultEntity = "") {
+  const frag = document.createDocumentFragment();
+
+  // Entity select
+  const entityWrap = document.createElement("div");
+  entityWrap.className = "shipment-form-field";
+  const entityLbl = document.createElement("label");
+  entityLbl.className = "shipment-form-label";
+  entityLbl.textContent = label;
+
+  const select = document.createElement("select");
+  select.className = "shipment-form-input";
+  select.dataset.field = entityFieldName;
+
+  const entities = getLocationEntities();
+  if (!entities.includes("")) {
+    const blankOpt = document.createElement("option");
+    blankOpt.value = "";
+    blankOpt.textContent = "— Select —";
+    select.appendChild(blankOpt);
+  }
+  entities.forEach(entity => {
+    const opt = document.createElement("option");
+    opt.value = entity;
+    opt.textContent = entity;
+    if (entity === defaultEntity) opt.selected = true;
+    select.appendChild(opt);
+  });
+  if (defaultEntity && !entities.includes(defaultEntity)) {
+    const opt = document.createElement("option");
+    opt.value = defaultEntity;
+    opt.textContent = defaultEntity;
+    opt.selected = true;
+    select.appendChild(opt);
+  }
+
+  entityWrap.appendChild(entityLbl);
+  entityWrap.appendChild(select);
+
+  // Address textarea (read-only)
+  const addrWrap = document.createElement("div");
+  addrWrap.className = "shipment-form-field";
+  const addrLbl = document.createElement("label");
+  addrLbl.className = "shipment-form-label";
+  addrLbl.textContent = label === "From" ? "Pickup Address" : "Delivery Address";
+
+  const textarea = document.createElement("textarea");
+  textarea.className = "shipment-form-input";
+  textarea.dataset.field = addressFieldName;
+  textarea.rows = 3;
+  textarea.readOnly = true;
+  textarea.value = getLocationAddress(select.value);
+
+  select.addEventListener("change", () => {
+    textarea.value = getLocationAddress(select.value);
+  });
+
+  addrWrap.appendChild(addrLbl);
+  addrWrap.appendChild(textarea);
+
+  frag.appendChild(entityWrap);
+  frag.appendChild(addrWrap);
+
+  return { frag, selectEl: select, addressEl: textarea };
+}
+
+
 
 const REQUEST_LINKED_PO_COLUMNS = [
   { col: "PO #", label: "PO #", cellClass: "shipment-po-cell-id" },

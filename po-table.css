@@ -7,6 +7,7 @@
   --border-strong: #cbd0d6;
   --text: #1a1a18;
   --text-muted: #8b929c;
+  --empty-display: #d4d9df;
   --filter-icon: #8b929c;
   --filter-icon-active: #4b5563;
   --accent: #2d2d29;
@@ -18,6 +19,15 @@
   --success: #1a8e2f;
   --warning: #c60505;
   --row-hover: #f3f4f6;
+  --row-flagged-bg: #fff0f6;
+  --row-flagged-hover: #ffe0ef;
+  --row-flagged-accent: #ff2d7a;
+  --row-selected-bg: #f4f6fb;
+  --row-selected-hover: #e9eef8;
+  --row-flagged-selected-bg: #ffe5f8;
+  --row-flagged-selected-hover: #ffd0ef;
+  --flag-icon: #e91e8c;
+  --flag-icon-hover: #ff1493;
   --edit-bg: #f8fafc;
   --editable-hover-border: #9aa1aa;
   --font: 'Inter', system-ui, sans-serif;
@@ -360,9 +370,24 @@ select.filter-select:focus { border-color: var(--accent); }
 
 #poToolbar[hidden],
 #shipmentToolbar[hidden],
-#exfRequestListToolbar[hidden],
+#requestsToolbar[hidden],
 #chargebackToolbar[hidden] {
   display: none !important;
+}
+
+#requestsToolbar .requests-type-filter-cluster {
+  flex: 0 0 auto;
+}
+
+#requestsToolbar .request-type-filters .filter-btn.active {
+  background: var(--text);
+  color: #fff;
+  border-color: var(--text);
+}
+
+#requestsToolbar .request-type-filters .filter-btn.active:hover {
+  background: var(--text);
+  border-color: var(--text);
 }
 
 .btn-link {
@@ -699,10 +724,35 @@ th[data-col="Notes"] {
 th:hover { background: var(--accent-heavy); color: var(--text); }
 
 th.th-flag-col:hover,
-th.th-packing-list-col:hover,
 th.th-select-col:hover {
   background: transparent;
   color: var(--text);
+}
+
+/* Leading control cluster: Flag | Select | Status — no internal dividers */
+#poTable th.th-flag-col,
+#poTable td.td-flag-cell,
+#poTable th.th-select-col,
+#poTable td.td-select-cell,
+#poTable th[data-col="Status"],
+#poTable td[data-col="Status"] {
+  border-right: none;
+}
+
+#poTable th.th-flag-col,
+#poTable td.td-flag-cell {
+  padding-right: 2px;
+}
+
+#poTable th.th-select-col,
+#poTable td.td-select-cell {
+  padding-left: 2px;
+  padding-right: 2px;
+}
+
+#poTable th[data-col="Status"],
+#poTable td[data-col="Status"] {
+  padding-left: 4px;
 }
 
 th.th-flag-col.filter-active:hover {
@@ -713,7 +763,8 @@ th[data-col="EXF"],
 th[data-col="ETA"],
 th[data-col="IHD"],
 th[data-col="Ship Method"],
-th[data-col="Shipment ID"] {
+th[data-col="Shipment ID"],
+th.th-packing-list-col {
   background: var(--accent-heavy);
 }
 
@@ -721,7 +772,8 @@ th[data-col="EXF"]:hover,
 th[data-col="ETA"]:hover,
 th[data-col="IHD"]:hover,
 th[data-col="Ship Method"]:hover,
-th[data-col="Shipment ID"]:hover {
+th[data-col="Shipment ID"]:hover,
+th.th-packing-list-col:hover {
   background: var(--accent-light);
 }
 
@@ -841,6 +893,24 @@ th.th-filterable .th-label {
 
 th.th-filterable .th-label:hover {
   text-decoration-color: var(--text-muted);
+}
+
+.th-tooltip-card {
+  position: fixed;
+  z-index: 300;
+  max-width: 320px;
+  padding: 6px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateX(-50%);
 }
 
 /* ── Cell select dropdown ── */
@@ -968,21 +1038,52 @@ th.th-filterable .th-label:hover {
   font-size: 12px;
 }
 
-.edit-table-popover {
-  min-width: 300px;
-  max-width: 420px;
+.edit-table-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(1px);
+}
+
+.edit-table-backdrop[hidden] {
+  display: none;
+}
+
+.edit-table-modal {
+  width: min(720px, 100%);
+  max-height: min(80vh, 640px);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  padding: 16px;
 }
 
 .edit-table-header {
   margin-bottom: 8px;
+  flex-shrink: 0;
 }
 
 .edit-table-title {
   display: block;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text);
   margin-bottom: 4px;
+}
+
+.edit-table-subtitle {
+  margin: 0 0 8px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-muted);
 }
 
 .edit-table-toolbar-links,
@@ -995,15 +1096,136 @@ th.th-filterable .th-label:hover {
 
 .edit-table-default-actions {
   margin-bottom: 10px;
+  flex-shrink: 0;
 }
 
-.edit-table-list {
+.edit-table-panels {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  flex: 1 1 auto;
+  min-height: 0;
   margin-bottom: 10px;
+}
+
+.edit-table-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+
+.edit-table-panel-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  flex-shrink: 0;
+}
+
+.edit-table-picker-list,
+.edit-table-order-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 4px 0;
+  padding: 4px;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 200px;
+  max-height: min(52vh, 420px);
+}
+
+.edit-table-picker-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.edit-table-picker-option:hover {
+  background: var(--surface-hover, #f8fafc);
+}
+
+.edit-table-picker-option input[type="checkbox"] {
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.edit-table-picker-option input[type="checkbox"]:disabled {
+  cursor: default;
+}
+
+.edit-table-picker-option span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.edit-table-order-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: var(--surface);
+  font-size: 12px;
+  user-select: none;
+}
+
+.edit-table-order-item:not(.edit-table-order-item-fixed) {
+  cursor: grab;
+}
+
+.edit-table-order-item:not(.edit-table-order-item-fixed):hover {
+  background: var(--surface-hover, #f8fafc);
+}
+
+.edit-table-order-item-fixed {
+  color: var(--text-muted);
+  background: var(--surface-hover, #f8fafc);
+  cursor: default;
+}
+
+.edit-table-order-item.dragging {
+  opacity: 0.45;
+}
+
+.edit-table-order-item.drag-over {
+  background: var(--accent-light);
+}
+
+.edit-table-order-item-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.edit-table-order-item-merged .edit-table-order-item-label {
+  font-weight: 500;
+}
+
+.edit-table-drag-handle {
+  flex-shrink: 0;
+  width: 12px;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1;
+  letter-spacing: -2px;
+  cursor: grab;
+}
+
+.edit-table-order-item-fixed .edit-table-order-spacer {
+  flex-shrink: 0;
+  width: 12px;
 }
 
 .col-hidden {
@@ -1060,11 +1282,10 @@ td.select-cell {
 
 tr:hover td { background: var(--row-hover); }
 
-tr:hover td.td-flag-cell,
-tr:hover td.td-packing-list-cell,
-tr:hover td.td-select-cell {
-  background: #fff;
+tr:hover td.td-flag-cell.col-leading {
+  box-shadow: -100vw 0 0 0 var(--row-hover);
 }
+
 tr.editing td { background: var(--edit-bg); }
 
 td.readonly { color: var(--text); }
@@ -1074,14 +1295,12 @@ td.editable.empty-display,
 .modal-field-value.empty-display,
 .modal-po-num.empty-display,
 .empty-display {
-  color: var(--text-muted) !important;
+  color: var(--empty-display) !important;
+  font-weight: 400 !important;
+  font-size: 11px;
   user-select: none;
   -webkit-user-select: none;
   cursor: default;
-}
-
-table td.empty-display {
-  color: #cfd4da !important;
 }
 
 td.editable.empty-display,
@@ -1185,17 +1404,26 @@ td.readonly-no-select {
 
 th.th-select-col,
 td.td-select-cell {
-  padding-left: 6px;
-  padding-right: 8px;
-  text-align: left;
+  padding-left: 2px;
+  padding-right: 2px;
+  text-align: center;
+  max-width: none;
 }
 
 th.th-flag-col,
-td.td-flag-cell,
-th.th-packing-list-col,
-td.td-packing-list-cell {
+td.td-flag-cell {
   padding-left: 6px;
   padding-right: 6px;
+  text-align: center;
+  overflow: visible;
+  text-overflow: unset;
+  max-width: none;
+}
+
+th.th-packing-list-col,
+td.td-packing-list-cell {
+  padding-left: 2px;
+  padding-right: 2px;
   text-align: center;
   overflow: visible;
   text-overflow: unset;
@@ -1204,13 +1432,6 @@ td.td-packing-list-cell {
 th.th-flag-col.col-leading,
 td.td-flag-cell.col-leading {
   padding-left: 24px;
-}
-
-th.th-flag-col,
-td.td-flag-cell,
-th.th-packing-list-col,
-td.td-packing-list-cell {
-  border-right: none;
 }
 
 th.th-select-col {
@@ -1232,6 +1453,23 @@ th.th-select-col input[type="checkbox"],
   margin: 0;
   cursor: pointer;
   accent-color: var(--accent);
+  vertical-align: middle;
+  transition: transform 0.15s cubic-bezier(0.2, 0, 0, 1), filter 0.15s ease;
+}
+
+.po-select-checkbox:hover,
+th.th-select-col input[type="checkbox"]:hover {
+  transform: scale(1.18);
+  filter:
+    drop-shadow(0 0 0 2px rgba(45, 45, 41, 0.24))
+    drop-shadow(0 2px 6px rgba(45, 45, 41, 0.2));
+}
+
+.po-select-checkbox:checked:hover,
+th.th-select-col input[type="checkbox"]:checked:hover {
+  filter:
+    drop-shadow(0 0 0 2px rgba(45, 45, 41, 0.32))
+    drop-shadow(0 2px 6px rgba(45, 45, 41, 0.22));
 }
 
 .th-flag-icon {
@@ -1254,7 +1492,7 @@ th.th-flag-col.filter-active {
 }
 
 th.th-flag-col.filter-active .th-flag-icon {
-  color: var(--warning);
+  color: var(--flag-icon-hover);
 }
 
 th.th-flag-col.filter-active .th-flag-icon svg path {
@@ -1273,15 +1511,17 @@ th.th-flag-col.filter-active .th-flag-icon svg path {
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease, transform 0.14s ease;
 }
 
 .po-flag-btn:hover {
-  background: transparent;
+  background: var(--accent-light);
   color: var(--text);
+  transform: scale(1.06);
 }
 
 .po-flag-btn.is-flagged {
-  color: var(--warning);
+  color: var(--flag-icon);
 }
 
 .po-flag-btn.is-flagged svg path {
@@ -1289,17 +1529,18 @@ th.th-flag-col.filter-active .th-flag-icon svg path {
 }
 
 .po-flag-btn.is-flagged:hover {
-  background: transparent;
-  color: #f73636;
+  background: #ffe0f0;
+  color: var(--flag-icon-hover);
 }
 
 .po-packing-list-indicator {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  color: var(--text);
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  color: var(--text-muted);
 }
 
 .po-packing-list-indicator svg {
@@ -1307,27 +1548,47 @@ th.th-flag-col.filter-active .th-flag-icon svg path {
 }
 
 tr.row-flagged td {
-  background: #ffebeb;
+  background: var(--row-flagged-bg);
+}
+
+tr.row-flagged td.td-flag-cell {
+  box-shadow: inset 3px 0 0 var(--row-flagged-accent);
 }
 
 tr.row-flagged:hover td {
-  background: rgb(238, 214, 214)
+  background: var(--row-flagged-hover);
+}
+
+tr.row-flagged:hover td.td-flag-cell.col-leading {
+  box-shadow:
+    inset 3px 0 0 var(--row-flagged-accent),
+    -100vw 0 0 0 var(--row-flagged-hover);
 }
 
 tr.row-flagged:has(.po-select-checkbox:checked) td {
-  background: #f7dbf3;
+  background: var(--row-flagged-selected-bg);
 }
 
 tr.row-flagged:has(.po-select-checkbox:checked):hover td {
-  background: #fdc8fb !important;
+  background: var(--row-flagged-selected-hover);
+}
+
+tr.row-flagged:has(.po-select-checkbox:checked):hover td.td-flag-cell.col-leading {
+  box-shadow:
+    inset 3px 0 0 var(--row-flagged-accent),
+    -100vw 0 0 0 var(--row-flagged-selected-hover);
 }
 
 tr:has(.po-select-checkbox:checked):not(.row-flagged) td {
-  background: #eceafe;
+  background: var(--row-selected-bg);
 }
 
 tr:has(.po-select-checkbox:checked):not(.row-flagged):hover td {
-  background: #e1ddfa !important;
+  background: var(--row-selected-hover);
+}
+
+tr:has(.po-select-checkbox:checked):not(.row-flagged):hover td.td-flag-cell.col-leading {
+  box-shadow: -100vw 0 0 0 var(--row-selected-hover);
 }
 
 .mini-select-ants {
@@ -1363,28 +1624,8 @@ tr.row-mini-selected:hover td {
   background: rgba(25, 218, 144, 0.1) !important;
 }
 
-tr.row-flagged:hover td.td-flag-cell,
-tr.row-flagged:hover td.td-packing-list-cell,
-tr.row-flagged:hover td.td-select-cell {
-  background: #ffebeb;
-}
-
-tr.row-flagged:has(.po-select-checkbox:checked):hover td.td-flag-cell,
-tr.row-flagged:has(.po-select-checkbox:checked):hover td.td-packing-list-cell,
-tr.row-flagged:has(.po-select-checkbox:checked):hover td.td-select-cell {
-  background: #f7dbf3 !important;
-}
-
-tr:has(.po-select-checkbox:checked):not(.row-flagged):hover td.td-flag-cell,
-tr:has(.po-select-checkbox:checked):not(.row-flagged):hover td.td-packing-list-cell,
-tr:has(.po-select-checkbox:checked):not(.row-flagged):hover td.td-select-cell {
-  background: #eceafe !important;
-}
-
-tr.row-mini-selected:hover td.td-flag-cell,
-tr.row-mini-selected:hover td.td-packing-list-cell,
-tr.row-mini-selected:hover td.td-select-cell {
-  background: rgba(25, 218, 144, 0.1) !important;
+tr.row-mini-selected:hover td.td-flag-cell.col-leading {
+  box-shadow: -100vw 0 0 0 rgba(25, 218, 144, 0.1);
 }
 
 body.row-drag-selecting {
@@ -1643,8 +1884,8 @@ td.editable:not(.select-cell):hover .editable-preview {
 }
 
 /* ── Column widths ── */
-.col-select      { width: 52px; }
-.col-flag        { width: 36px; }
+.col-select      { width: 36px; }
+.col-flag        { width: 58px; }
 .col-packing-list { width: 36px; }
 .col-division    { width: 120px; }
 .col-status      { width: 130px; }
@@ -1664,6 +1905,8 @@ td.editable:not(.select-cell):hover .editable-preview {
 .col-vessel      { width: 100px; }
 .col-house       { width: 80px; }
 .col-shipment-id  { width: 96px; }
+#poTable col.col-ship-method + col.col-shipment-id { width: 36px; }
+#poTable col.col-shipment-id + col.col-packing-list { width: 36px; }
 .col-exf-req     { width: 72px; }
 .col-delivery-req { width: 100px; }
 .col-pickup-req  { width: 100px; }
@@ -3283,7 +3526,8 @@ td.editable:not(.select-cell):hover .editable-preview {
 }
 
 .modal-style-category-value.empty-display {
-  color: var(--text-muted);
+  color: var(--empty-display) !important;
+  font-weight: 400 !important;
 }
 
 .modal-style-photos {
@@ -3523,8 +3767,8 @@ td.editable:not(.select-cell):hover .editable-preview {
 }
 
 .available-po-static.empty-display {
-  color: var(--text-muted);
-  font-weight: 500;
+  color: var(--empty-display) !important;
+  font-weight: 400 !important;
 }
 
 .shipment-add-po-panel-header {
@@ -3892,12 +4136,12 @@ td.editable:not(.select-cell):hover .editable-preview {
 
 .shipment-linked-po-table tr:has(.po-select-checkbox:checked):not(.row-flagged) td,
 .shipment-linked-po-table tr:has(.po-select-checkbox:checked):not(.row-flagged):hover td {
-  background: #eceafe !important;
+  background: var(--row-selected-bg) !important;
 }
 
 .shipment-linked-po-table tr.row-flagged:has(.po-select-checkbox:checked) td,
 .shipment-linked-po-table tr.row-flagged:has(.po-select-checkbox:checked):hover td {
-  background: #f7dbf3 !important;
+  background: var(--row-flagged-selected-bg) !important;
 }
 
 .shipment-linked-po-table th:hover {
@@ -3915,7 +4159,8 @@ td.editable:not(.select-cell):hover .editable-preview {
 }
 
 .shipment-linked-po-table td.empty-display {
-  color: var(--text-muted);
+  color: var(--empty-display) !important;
+  font-weight: 400 !important;
 }
 
 .shipment-linked-po-footer {
@@ -4080,6 +4325,36 @@ td.editable:not(.select-cell):hover .editable-preview {
   white-space: nowrap;
 }
 
+#poTable th[data-col="Ship Method"],
+#poTable td[data-col="Ship Method"],
+#poTable th.th-shipment-id-col,
+#poTable td[data-col="Shipment ID"] {
+  border-right: none;
+}
+
+#poTable th.th-shipment-id-col,
+#poTable td[data-col="Shipment ID"],
+#poTable th.th-packing-list-col,
+#poTable td.td-packing-list-cell {
+  padding-left: 2px;
+  padding-right: 2px;
+  overflow: visible;
+  text-overflow: unset;
+}
+
+th.th-shipment-id-col {
+  cursor: pointer;
+}
+
+th.th-shipment-id-col.th-filterable {
+  padding-right: 20px;
+}
+
+th.th-shipment-id-col.th-filterable.sorted-asc,
+th.th-shipment-id-col.th-filterable.sorted-desc {
+  padding-right: 34px;
+}
+
 .td-shipment-id-cell {
   text-align: center;
   overflow: visible;
@@ -4105,4 +4380,25 @@ td.editable:not(.select-cell):hover .editable-preview {
   color: var(--text);
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+.shipment-id-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.shipment-id-icon-btn:hover {
+  background: var(--row-hover);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.shipment-id-icon-btn svg {
+  display: block;
 }

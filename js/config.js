@@ -20,7 +20,7 @@
 const APPS_SCRIPT_URL_LIVE =
   "https://script.google.com/macros/s/AKfycbzQHBgNmgRKO5zyKaFEkBfhnH1Rc5VRx-tFAK0Zv3G_pp2Y2mHHGSlA7GkIzpAQKiEjtg/exec";
 const APPS_SCRIPT_URL_TEST =
-  "https://script.google.com/macros/s/AKfycbyrjCF6Tgfi8wlYlej7gXCZiS-SRZ6X_LlFAALFAmpLSngnk4D_DonrZbaTsyTX8-xs/exec";
+  "https://script.google.com/macros/s/AKfycbz2zVIqrPFTRIFH-afAQkzaXBAMKfpzeiPKb7_7kHpymnUnGdbKx5vT0zTOV3YV6toA/exec";
 
 const APP_MODE_STORAGE_KEY = "poTable.appMode";
 const URL_PLACEHOLDER = "YOUR_APPS_SCRIPT_WEB_APP_URL_HERE";

@@ -136,7 +136,7 @@ function renderTable() {
 
     if (isTruthy(row["Flag"])) tr.classList.add("row-flagged");
 
-    COLUMNS.forEach(col => {
+    getColumnOrder().forEach(col => {
 
       const td = document.createElement("td");
 
@@ -182,7 +182,7 @@ function renderTable() {
 
           td.className = "readonly readonly-no-select";
 
-          setDisplayText(td, isEmptyValue(row[col]) ? EMPTY_DISPLAY : row[col]);
+          if (!isEmptyValue(row[col])) setDisplayText(td, row[col]);
 
         }
 

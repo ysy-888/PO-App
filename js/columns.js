@@ -21,18 +21,27 @@ function isEmptyValue(v) {
 }
 
 const COLUMNS = [
-  "Flag","Packing List","Selected",
+  "Flag","Selected",
   "Status","N41 Status","Division","Vendor","Buyer","Buyer PO #","SO #","PO Date","PO #",
   "Old PO #","Style #","Color","Style Category","PO Qty","Actual Qty","Ctn Qty","Received Qty","FOB Cost","PO Total Cost",
   "Vessel","House #","Shipped","ETD",
-  "EST EXF","EST IHD","Ship Method","Shipment ID","EXF Requested","EXF Request Date","EXF Memo",
-  "Delivery Request ID","Pickup Request ID","EXF","ETA","IHD","CXL Date","Assign Date","Notes"
+  "EST EXF","EST IHD","Ship Method","Shipment ID","Packing List",
+  "EXF Requested","EXF Date","EXF Req Date","EXF Memo",
+  "ASN Requested","ASN Date","ASN Req Date","ASN Request ID",
+  "Delivery Requested","Delivery Date","Delivery Req Date","Delivery Request ID",
+  "Pickup Requested","Pickup Date","Pickup Req Date","Pickup Request ID",
+  "EXF","ETA","IHD","CXL Date","Assign Date","Notes"
 ];
 
 const COLUMN_WIDTHS = [
-  36, 36, 52,
+  58, 36,
   130, 100, 120, 130, 120, 100, 80, 80, 80, 80, 100, 100, 100, 60, 60, 60, 70, 70, 80,
-  100, 80, 96, 80, 80, 80, 100, 80, 72, 80, 140, 100, 100, 80, 80, 80, 80, 80, 200
+  100, 80, 96, 80, 80, 80, 100, 36, 36,
+  72, 80, 80, 80,
+  72, 80, 80, 80,
+  80, 80, 80, 100,
+  80, 80, 80, 100,
+  80, 80, 80, 80, 80, 200
 ];
 
 const COLUMN_LABELS = {
@@ -42,9 +51,20 @@ const COLUMN_LABELS = {
   "Style Category": "Category",
   "PO Total Cost": "PO Cost",
   "EXF Requested": "EXF Req",
-  "EXF Request Date": "EXF Req Date",
+  "EXF Date": "EXF Date",
+  "EXF Req Date": "EXF Req Date",
   "EXF Memo": "EXF Memo",
+  "ASN Requested": "ASN Req",
+  "ASN Date": "ASN Date",
+  "ASN Req Date": "ASN Req Date",
+  "ASN Request ID": "ASN",
+  "Delivery Requested": "Dlv Req",
+  "Delivery Date": "Dlv Date",
+  "Delivery Req Date": "Dlv Req Date",
   "Delivery Request ID": "Delivery",
+  "Pickup Requested": "Pkp Req",
+  "Pickup Date": "Pkp Date",
+  "Pickup Req Date": "Pkp Req Date",
   "Pickup Request ID": "Pickup",
 };
 
@@ -54,8 +74,15 @@ const LOCAL_ONLY_COLS = new Set(["Selected", "Packing List"]);
 
 const ALWAYS_VISIBLE_COLUMNS = new Set(["Selected", "Flag", "Packing List", "Status"]);
 
+/** Merged table cells — always adjacent and move together in Edit Table. */
+const MERGED_COLUMN_GROUP = ["Ship Method", "Shipment ID", "Packing List"];
+const MERGED_GROUP_KEY = "__merged_shipment__";
+const MERGED_GROUP_LABEL = "Ship Method / Shipment / Packing List";
+const FIXED_LEADING_COLUMNS = ["Flag", "Selected", "Status"];
+const NON_TOGGLEABLE_COLUMNS = new Set(["Selected", "Flag", "Packing List", "Status"]);
+
 function getEditableColumnOptions() {
-  return COLUMNS.filter(col => !ALWAYS_VISIBLE_COLUMNS.has(col));
+  return COLUMNS.filter(col => !ALWAYS_VISIBLE_COLUMNS.has(col) && !MERGED_COLUMN_GROUP.includes(col));
 }
 
 function ensureAlwaysVisibleColumns(cols) {
@@ -73,6 +100,224 @@ function buildVisibleColumnsFromDraft(draft) {
 
 function getColumnLabel(col) {
   return COLUMN_LABELS[col] ?? col;
+}
+
+function getColumnWidth(col) {
+  const i = COLUMNS.indexOf(col);
+  return i >= 0 ? COLUMN_WIDTHS[i] : 80;
+}
+
+function normalizeColumnOrder(order) {
+  const seen = new Set();
+  const result = [];
+  for (const col of order) {
+    if (COLUMNS.includes(col) && !seen.has(col)) {
+      seen.add(col);
+      result.push(col);
+    }
+  }
+  for (const col of COLUMNS) {
+    if (!seen.has(col)) result.push(col);
+  }
+  return ensureFixedLeadingColumns(ensureMergedGroupTogether(result));
+}
+
+function ensureFixedLeadingColumns(order) {
+  const rest = order.filter(col => !FIXED_LEADING_COLUMNS.includes(col));
+  return [...FIXED_LEADING_COLUMNS, ...rest];
+}
+
+function ensureMergedGroupTogether(order) {
+  const without = order.filter(col => !MERGED_COLUMN_GROUP.includes(col));
+  const firstIdx = order.findIndex(col => MERGED_COLUMN_GROUP.includes(col));
+  if (firstIdx === -1) {
+    without.push(...MERGED_COLUMN_GROUP);
+    return without;
+  }
+  const insertAt = order.slice(0, firstIdx).filter(col => !MERGED_COLUMN_GROUP.includes(col)).length;
+  without.splice(insertAt, 0, ...MERGED_COLUMN_GROUP);
+  return without;
+}
+
+/** @type {string[]} */
+let columnOrder = [...COLUMNS];
+/** @type {string[]} */
+let columnOrderDraft = [...COLUMNS];
+/** @type {string[]} */
+const DEFAULT_COLUMN_ORDER = [...COLUMNS];
+
+function getColumnOrder() {
+  return columnOrder;
+}
+
+function indexTableColumns() {
+  const table = document.getElementById("poTable");
+  if (!table) return;
+  const cols = table.querySelectorAll("colgroup col");
+  COLUMNS.forEach((col, i) => cols[i]?.setAttribute("data-col", col));
+}
+
+function applyColumnOrder() {
+  const table = document.getElementById("poTable");
+  if (!table) return;
+
+  const colgroup = table.querySelector("colgroup");
+  const headerRow = table.querySelector("thead tr");
+  if (!colgroup || !headerRow) return;
+
+  getColumnOrder().forEach(col => {
+    const colEl = table.querySelector(`colgroup col[data-col="${CSS.escape(col)}"]`);
+    const thEl = table.querySelector(`thead th[data-col="${CSS.escape(col)}"]`);
+    if (colEl) colgroup.appendChild(colEl);
+    if (thEl) headerRow.appendChild(thEl);
+  });
+
+  table.querySelectorAll("tbody tr:not(.state-row)").forEach(tr => {
+    getColumnOrder().forEach(col => {
+      const td = tr.querySelector(`td[data-col="${CSS.escape(col)}"]`);
+      if (td) tr.appendChild(td);
+    });
+  });
+}
+
+function getEditTableOrderKeys(order) {
+  const keys = [];
+  const seenMerged = new Set();
+  for (const col of order) {
+    if (FIXED_LEADING_COLUMNS.includes(col)) continue;
+    if (MERGED_COLUMN_GROUP.includes(col)) {
+      if (!seenMerged.has(MERGED_GROUP_KEY)) {
+        seenMerged.add(MERGED_GROUP_KEY);
+        keys.push(MERGED_GROUP_KEY);
+      }
+    } else {
+      keys.push(col);
+    }
+  }
+  return keys;
+}
+
+function keysToColumnOrder(keys) {
+  return normalizeColumnOrder([...FIXED_LEADING_COLUMNS, ...expandEditTableKeys(keys)]);
+}
+
+function expandEditTableKeys(keys) {
+  const cols = [];
+  keys.forEach(key => {
+    if (key === MERGED_GROUP_KEY) cols.push(...MERGED_COLUMN_GROUP);
+    else cols.push(key);
+  });
+  return cols;
+}
+
+function moveEditTableKey(keys, fromIndex, toIndex) {
+  if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return keys;
+  const next = [...keys];
+  const [item] = next.splice(fromIndex, 1);
+  next.splice(toIndex, 0, item);
+  return next;
+}
+
+function isColumnShownInOrderList(col) {
+  if (NON_TOGGLEABLE_COLUMNS.has(col)) return true;
+  if (MERGED_COLUMN_GROUP.includes(col)) {
+    if (col === "Packing List") return true;
+    return columnVisibilityDraft.has(col);
+  }
+  return columnVisibilityDraft.has(col);
+}
+
+function isOrderKeyVisible(key) {
+  if (key === MERGED_GROUP_KEY) {
+    return MERGED_COLUMN_GROUP.some(col => isColumnShownInOrderList(col));
+  }
+  return isColumnShownInOrderList(key);
+}
+
+function getVisibleOrderKeys() {
+  return getEditTableOrderKeys(columnOrderDraft).filter(isOrderKeyVisible);
+}
+
+function getEditTablePickerItems() {
+  const mergedCols = new Set(MERGED_COLUMN_GROUP);
+  const items = COLUMNS
+    .filter(col => !mergedCols.has(col))
+    .map(col => ({ key: col, label: getColumnLabel(col), type: "column" }));
+  items.push({ key: MERGED_GROUP_KEY, label: MERGED_GROUP_LABEL, type: "merged" });
+  items.sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+  return items;
+}
+
+function isPickerItemChecked(key) {
+  if (key === MERGED_GROUP_KEY) return isMergedGroupVisible(columnVisibilityDraft);
+  if (NON_TOGGLEABLE_COLUMNS.has(key)) return true;
+  return columnVisibilityDraft.has(key);
+}
+
+function isPickerItemDisabled(key) {
+  return NON_TOGGLEABLE_COLUMNS.has(key);
+}
+
+function setPickerItemChecked(key, checked) {
+  if (key === MERGED_GROUP_KEY) {
+    setMergedGroupVisible(columnVisibilityDraft, checked);
+    if (checked) ensureOrderKeyPresent(MERGED_GROUP_KEY);
+    renderEditTableOrder();
+    return;
+  }
+  if (isPickerItemDisabled(key)) return;
+  if (checked) {
+    columnVisibilityDraft.add(key);
+    ensureOrderKeyPresent(key);
+  } else {
+    columnVisibilityDraft.delete(key);
+    removeOrderKey(key);
+  }
+  renderEditTableOrder();
+}
+
+function ensureOrderKeyPresent(key) {
+  const keys = getEditTableOrderKeys(columnOrderDraft);
+  if (keys.includes(key)) return;
+  columnOrderDraft = keysToColumnOrder([...keys, key]);
+}
+
+function removeOrderKey(key) {
+  const keys = getEditTableOrderKeys(columnOrderDraft).filter(k => k !== key);
+  columnOrderDraft = keysToColumnOrder(keys);
+}
+
+function syncOrderDraftWithVisibility() {
+  const visibleKeys = new Set();
+  getEditTablePickerItems().forEach(item => {
+    if (isPickerItemChecked(item.key)) visibleKeys.add(item.key);
+  });
+  visibleKeys.add(MERGED_GROUP_KEY);
+
+  const keys = getEditTableOrderKeys(columnOrderDraft).filter(k => visibleKeys.has(k));
+  for (const item of getEditTablePickerItems()) {
+    if (visibleKeys.has(item.key) && !keys.includes(item.key)) keys.push(item.key);
+  }
+  columnOrderDraft = keysToColumnOrder(keys);
+}
+
+function isMergedGroupVisible(draft) {
+  return draft.has("Ship Method") || draft.has("Shipment ID");
+}
+
+function getOrderKeyLabel(key) {
+  if (key === MERGED_GROUP_KEY) return MERGED_GROUP_LABEL;
+  return getColumnLabel(key);
+}
+
+function setMergedGroupVisible(draft, visible) {
+  if (visible) {
+    draft.add("Ship Method");
+    draft.add("Shipment ID");
+  } else {
+    draft.delete("Ship Method");
+    draft.delete("Shipment ID");
+  }
 }
 
 const ROW_KEY_ALIASES = {
@@ -116,36 +361,59 @@ function visibleColumnCount() {
 }
 
 function getDefaultVisibleColumnsSet() {
-  const ordered = COLUMNS.filter(col => DEFAULT_VISIBLE_COLUMNS.includes(col));
+  const ordered = DEFAULT_COLUMN_ORDER.filter(col => DEFAULT_VISIBLE_COLUMNS.includes(col));
   return ensureAlwaysVisibleColumns(new Set(ordered.length > 0 ? ordered : COLUMNS));
 }
 
-function setProgramDefaultVisibleColumns(cols) {
-  const withFixed = buildVisibleColumnsFromDraft(cols);
-  const ordered = COLUMNS.filter(col => withFixed.has(col));
-  if (ordered.length === 0) return false;
-  DEFAULT_VISIBLE_COLUMNS.splice(0, DEFAULT_VISIBLE_COLUMNS.length, ...ordered);
+function setProgramDefaultLayout(order, visibleDraft) {
+  const withFixed = buildVisibleColumnsFromDraft(visibleDraft);
+  const normalizedOrder = normalizeColumnOrder(order);
+  const visibleOrdered = normalizedOrder.filter(col => withFixed.has(col));
+  if (visibleOrdered.length === 0) return false;
+
+  DEFAULT_COLUMN_ORDER.splice(0, DEFAULT_COLUMN_ORDER.length, ...normalizedOrder);
+  DEFAULT_VISIBLE_COLUMNS.splice(0, DEFAULT_VISIBLE_COLUMNS.length, ...visibleOrdered);
   return true;
 }
 
 function loadColumnVisibility() {
+  columnOrder = normalizeColumnOrder([...DEFAULT_COLUMN_ORDER]);
   visibleColumns = getDefaultVisibleColumnsSet();
 }
 
-function applyDefaultColumnsFromServer(columns) {
-  if (!Array.isArray(columns) || columns.length === 0) return false;
-  const cols = ensureAlwaysVisibleColumns(new Set(columns.filter(col => COLUMNS.includes(col))));
-  if (cols.size === 0) return false;
-  setProgramDefaultVisibleColumns(cols);
+function applyDefaultColumnsFromServer(data) {
+  if (!data) return false;
+
+  if (Array.isArray(data)) {
+    if (data.length === 0) return false;
+    const cols = ensureAlwaysVisibleColumns(new Set(data.filter(col => COLUMNS.includes(col))));
+    if (cols.size === 0) return false;
+    const orderedVisible = data.filter(col => COLUMNS.includes(col));
+    const order = normalizeColumnOrder([...orderedVisible, ...COLUMNS]);
+    setProgramDefaultLayout(order, cols);
+  } else if (typeof data === "object") {
+    const order = Array.isArray(data.order) ? normalizeColumnOrder(data.order) : [...COLUMNS];
+    const visibleList = Array.isArray(data.visible) ? data.visible : order;
+    const cols = ensureAlwaysVisibleColumns(new Set(visibleList.filter(col => COLUMNS.includes(col))));
+    if (cols.size === 0) return false;
+    setProgramDefaultLayout(order, cols);
+  } else {
+    return false;
+  }
+
+  columnOrder = normalizeColumnOrder([...DEFAULT_COLUMN_ORDER]);
   visibleColumns = getDefaultVisibleColumnsSet();
+  applyColumnOrder();
   applyColumnVisibility();
   return true;
 }
 
 async function saveDefaultColumnVisibility() {
-  if (!setProgramDefaultVisibleColumns(columnVisibilityDraft)) return;
+  if (!setProgramDefaultLayout(columnOrderDraft, columnVisibilityDraft)) return;
 
+  columnOrder = normalizeColumnOrder([...DEFAULT_COLUMN_ORDER]);
   visibleColumns = getDefaultVisibleColumnsSet();
+  applyColumnOrder();
   applyColumnVisibility();
   setProgramDefaultStatusFilter(activeStatus);
 
@@ -161,6 +429,7 @@ async function saveDefaultColumnVisibility() {
       body: JSON.stringify({
         action: "saveColumnDefault",
         columns: [...DEFAULT_VISIBLE_COLUMNS],
+        columnOrder: [...DEFAULT_COLUMN_ORDER],
         statusFilter: defaultStatusFilter,
       }),
     });
@@ -174,6 +443,8 @@ async function saveDefaultColumnVisibility() {
 
 function resetEditTableToDefault() {
   columnVisibilityDraft = getSelectableColumnsFromVisible(getDefaultVisibleColumnsSet());
+  columnOrderDraft = normalizeColumnOrder([...DEFAULT_COLUMN_ORDER]);
+  syncOrderDraftWithVisibility();
   renderEditTableList();
   showIndicator("Reset to default", "success");
 }
@@ -184,17 +455,17 @@ function applyColumnVisibility() {
 
   let minWidth = 0;
   let leadingSet = false;
-  COLUMNS.forEach((col, i) => {
+  getColumnOrder().forEach(col => {
     const hidden = !visibleColumns.has(col);
-    if (!hidden) minWidth += COLUMN_WIDTHS[i];
+    if (!hidden) minWidth += getColumnWidth(col);
     const isLeading = !hidden && !leadingSet;
     if (isLeading) leadingSet = true;
 
-    table.querySelector(`colgroup col:nth-child(${i + 1})`)?.classList.toggle("col-hidden", hidden);
-    const thEl = table.querySelector(`thead th:nth-child(${i + 1})`);
+    table.querySelector(`colgroup col[data-col="${CSS.escape(col)}"]`)?.classList.toggle("col-hidden", hidden);
+    const thEl = table.querySelector(`thead th[data-col="${CSS.escape(col)}"]`);
     thEl?.classList.toggle("col-hidden", hidden);
     thEl?.classList.toggle("col-leading", isLeading);
-    table.querySelectorAll(`tbody tr:not(.state-row) td:nth-child(${i + 1})`).forEach(td => {
+    table.querySelectorAll(`tbody tr:not(.state-row) td[data-col="${CSS.escape(col)}"]`).forEach(td => {
       td.classList.toggle("col-hidden", hidden);
       td.classList.toggle("col-leading", isLeading);
     });
@@ -203,26 +474,27 @@ function applyColumnVisibility() {
   table.style.minWidth = `${Math.max(minWidth, 400)}px`;
 }
 
-function renderEditTableList() {
-  const list = document.getElementById("editTableColumnList");
+let editTableDragFromIndex = null;
+
+function renderEditTablePicker() {
+  const list = document.getElementById("editTableColumnPicker");
   if (!list) return;
 
   list.innerHTML = "";
-  getEditableColumnOptions().forEach(col => {
+  getEditTablePickerItems().forEach(item => {
     const label = document.createElement("label");
-    label.className = "column-filter-option";
+    label.className = "edit-table-picker-option";
 
     const cb = document.createElement("input");
     cb.type = "checkbox";
-    cb.value = col;
-    cb.checked = columnVisibilityDraft.has(col);
+    cb.checked = isPickerItemChecked(item.key);
+    cb.disabled = isPickerItemDisabled(item.key);
     cb.addEventListener("change", () => {
-      if (cb.checked) columnVisibilityDraft.add(col);
-      else columnVisibilityDraft.delete(col);
+      setPickerItemChecked(item.key, cb.checked);
     });
 
     const span = document.createElement("span");
-    span.textContent = getColumnLabel(col);
+    span.textContent = item.label;
 
     label.appendChild(cb);
     label.appendChild(span);
@@ -230,45 +502,130 @@ function renderEditTableList() {
   });
 }
 
-function positionEditTablePopover(anchorBtn) {
-  const pop = document.getElementById("editTablePopover");
-  if (!pop || !anchorBtn) return;
+function createEditTableOrderItem(key, { fixed = false } = {}) {
+  const item = document.createElement("div");
+  item.className = "edit-table-order-item";
+  item.dataset.key = key;
+  if (fixed) item.classList.add("edit-table-order-item-fixed");
+  if (key === MERGED_GROUP_KEY) item.classList.add("edit-table-order-item-merged");
 
-  const rect = anchorBtn.getBoundingClientRect();
-  const maxLeft = window.innerWidth - pop.offsetWidth - 8;
-  const left = Math.min(Math.max(8, rect.right - pop.offsetWidth), maxLeft);
+  if (fixed) {
+    const spacer = document.createElement("span");
+    spacer.className = "edit-table-order-spacer";
+    spacer.setAttribute("aria-hidden", "true");
+    item.appendChild(spacer);
+  } else {
+    const handle = document.createElement("span");
+    handle.className = "edit-table-drag-handle";
+    handle.textContent = "⋮⋮";
+    handle.setAttribute("aria-hidden", "true");
+    item.appendChild(handle);
+    item.draggable = true;
 
-  pop.style.top = `${rect.bottom + 4}px`;
-  pop.style.left = `${left}px`;
+    item.addEventListener("dragstart", e => {
+      editTableDragFromIndex = getEditTableOrderItemIndex(item);
+      item.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", key);
+    });
+
+    item.addEventListener("dragend", () => {
+      editTableDragFromIndex = null;
+      item.classList.remove("dragging");
+      document.querySelectorAll(".edit-table-order-item.drag-over").forEach(el => el.classList.remove("drag-over"));
+    });
+
+    item.addEventListener("dragover", e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      document.querySelectorAll(".edit-table-order-item.drag-over").forEach(el => el.classList.remove("drag-over"));
+      item.classList.add("drag-over");
+    });
+
+    item.addEventListener("dragleave", () => {
+      item.classList.remove("drag-over");
+    });
+
+    item.addEventListener("drop", e => {
+      e.preventDefault();
+      item.classList.remove("drag-over");
+      const fromIndex = editTableDragFromIndex;
+      const toIndex = getEditTableOrderItemIndex(item);
+      if (fromIndex === null || toIndex === null || fromIndex === toIndex) return;
+      const keys = getVisibleOrderKeys();
+      columnOrderDraft = keysToColumnOrder(moveEditTableKey(keys, fromIndex, toIndex));
+      renderEditTableOrder();
+    });
+  }
+
+  const span = document.createElement("span");
+  span.className = "edit-table-order-item-label";
+  span.textContent = getOrderKeyLabel(key);
+  item.appendChild(span);
+
+  return item;
 }
 
-function openEditTablePopover(anchorBtn) {
-  columnVisibilityDraft = getSelectableColumnsFromVisible(visibleColumns);
-  const pop = document.getElementById("editTablePopover");
-  if (!pop) return;
+function getEditTableOrderItemIndex(item) {
+  const list = document.getElementById("editTableColumnOrder");
+  if (!list || !item) return -1;
+  return [...list.querySelectorAll(".edit-table-order-item:not(.edit-table-order-item-fixed)")].indexOf(item);
+}
 
-  pop.hidden = false;
+function renderEditTableOrder() {
+  const list = document.getElementById("editTableColumnOrder");
+  if (!list) return;
+
+  list.innerHTML = "";
+  FIXED_LEADING_COLUMNS.forEach(col => {
+    list.appendChild(createEditTableOrderItem(col, { fixed: true }));
+  });
+
+  getVisibleOrderKeys().forEach(key => {
+    list.appendChild(createEditTableOrderItem(key));
+  });
+}
+
+function renderEditTableList() {
+  renderEditTablePicker();
+  renderEditTableOrder();
+}
+
+function openEditTablePopover() {
+  columnVisibilityDraft = getSelectableColumnsFromVisible(visibleColumns);
+  columnOrderDraft = normalizeColumnOrder([...columnOrder]);
+  syncOrderDraftWithVisibility();
+  const backdrop = document.getElementById("editTableBackdrop");
+  if (!backdrop) return;
+
+  backdrop.hidden = false;
   renderEditTableList();
-  requestAnimationFrame(() => positionEditTablePopover(anchorBtn));
+  document.getElementById("editTableOk")?.focus();
 }
 
 function closeEditTablePopover() {
-  const pop = document.getElementById("editTablePopover");
-  if (pop) pop.hidden = true;
+  const backdrop = document.getElementById("editTableBackdrop");
+  if (backdrop) backdrop.hidden = true;
 }
 
 function setEditTableDraftSelectAll(selectAll) {
   columnVisibilityDraft = selectAll ? new Set(getEditableColumnOptions()) : new Set();
+  if (selectAll) setMergedGroupVisible(columnVisibilityDraft, true);
+  syncOrderDraftWithVisibility();
   renderEditTableList();
 }
 
 function applyEditTableFromPopover() {
+  columnOrder = normalizeColumnOrder([...columnOrderDraft]);
   visibleColumns = buildVisibleColumnsFromDraft(columnVisibilityDraft);
+  applyColumnOrder();
   applyColumnVisibility();
   closeEditTablePopover();
 }
 
 function initEditTable() {
+  indexTableColumns();
+
   document.getElementById("editTableSelectAll")?.addEventListener("click", () => setEditTableDraftSelectAll(true));
   document.getElementById("editTableClearAll")?.addEventListener("click", () => setEditTableDraftSelectAll(false));
   document.getElementById("editTableSaveDefault")?.addEventListener("click", saveDefaultColumnVisibility);
@@ -276,21 +633,13 @@ function initEditTable() {
   document.getElementById("editTableOk")?.addEventListener("click", applyEditTableFromPopover);
   document.getElementById("editTableCancel")?.addEventListener("click", closeEditTablePopover);
 
-  document.addEventListener("click", e => {
-    const pop = document.getElementById("editTablePopover");
-    if (!pop || pop.hidden) return;
-    if (pop.contains(e.target) || e.target.closest("#headerMenuBtn") || e.target.closest("#headerMenuEditTable")) return;
-    closeEditTablePopover();
+  document.getElementById("editTableBackdrop")?.addEventListener("click", e => {
+    if (e.target.id === "editTableBackdrop") closeEditTablePopover();
   });
 
   document.addEventListener("keydown", e => {
+    const backdrop = document.getElementById("editTableBackdrop");
+    if (!backdrop || backdrop.hidden) return;
     if (e.key === "Escape") closeEditTablePopover();
-  });
-
-  window.addEventListener("resize", () => {
-    const pop = document.getElementById("editTablePopover");
-    if (pop && !pop.hidden) {
-      positionEditTablePopover(document.getElementById("headerMenuBtn"));
-    }
   });
 }

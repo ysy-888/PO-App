@@ -1,7 +1,9 @@
 const SHEET_NAME = "POs";
 const SHIPMENTS_SHEET_NAME = "Shipments";
 const EXF_REQUESTS_SHEET_NAME = "EXF Requests";
+const CONTACTS_SHEET_NAME = "Contacts";
 const VENDORS_SHEET_NAME = "Vendors";
+const LOCATIONS_SHEET_NAME = "Locations";
 const ASN_REQUESTS_SHEET_NAME = "ASN Requests";
 const DELIVERY_REQUESTS_SHEET_NAME = "Delivery Requests";
 const PICKUP_REQUESTS_SHEET_NAME = "Pickup Requests";
@@ -25,6 +27,23 @@ const EXF_REQ_CC_FIELD = "CC";
 const CHARGEBACK_ID_FIELD = "Chargeback ID";
 const PACKING_LIST_ID_FIELD = "Packing List ID";
 
+// PO per-request flag/date column names
+const ASN_REQUESTED_FIELD = "ASN Requested";
+const ASN_DATE_FIELD = "ASN Date";
+const ASN_REQ_DATE_FIELD = "ASN Req Date";
+const DELIVERY_REQUESTED_FIELD = "Delivery Requested";
+const DELIVERY_DATE_FIELD = "Delivery Date";
+const DELIVERY_REQ_DATE_FIELD = "Delivery Req Date";
+const PICKUP_REQUESTED_FIELD = "Pickup Requested";
+const PICKUP_DATE_FIELD = "Pickup Date";
+const PICKUP_REQ_DATE_FIELD = "Pickup Req Date";
+const EXF_REQ_DATE_FIELD = "EXF Req Date";
+
+// Request notes field names
+const ASN_REQ_NOTES_FIELD = "ASN Req Notes";
+const DELIVERY_REQ_NOTES_FIELD = "Delivery Req Notes";
+const PICKUP_REQ_NOTES_FIELD = "Pickup Req Notes";
+
 /*
   POs sheet row 1 headers (see po-table.js COLUMNS). Add columns: Shipment ID, EXF Request Date, EXF Memo
 
@@ -45,14 +64,23 @@ const EXF_REQUEST_DATA_FIELDS = [
 ];
 
 const ASN_REQUEST_DATA_FIELDS = [
-  "Request Date", "Notes"
+  ASN_DATE_FIELD, "Request Date", "Buyer", "Buyer Email", EXF_REQ_CC_FIELD,
+  "PO Numbers", "PO Count",
+  "Email Status", "Email Sent At", "Email Error", "Last Email Attempt At",
+  ASN_REQ_NOTES_FIELD, "Created At", "Updated At"
 ];
 
 const DELIVERY_REQUEST_DATA_FIELDS = [
-  "Request Date", "Location", "Email To", "Email CC", "Email Status", "Email Sent At", "Email Error", "Notes"
+  DELIVERY_DATE_FIELD, "Request Date",
+  "From", "Pickup Address", "To", "Delivery Address",
+  "Email To", "Email CC", "Email Status", "Email Sent At", "Email Error",
+  DELIVERY_REQ_NOTES_FIELD, "PO Numbers", "PO Count", "Created At", "Updated At"
 ];
 const PICKUP_REQUEST_DATA_FIELDS = [
-  "Request Date", "Location", "Email To", "Email CC", "Email Status", "Email Sent At", "Email Error", "Notes"
+  PICKUP_DATE_FIELD, "Request Date",
+  "From", "Pickup Address", "To", "Delivery Address",
+  "Email To", "Email CC", "Email Status", "Email Sent At", "Email Error",
+  PICKUP_REQ_NOTES_FIELD, "PO Numbers", "PO Count", "Created At", "Updated At"
 ];
 
 const EDITABLE_FIELDS = [
@@ -60,7 +88,11 @@ const EDITABLE_FIELDS = [
   "PO Qty", "Status", "N41 Status", "Ship Method",
   "Vessel", "House #", "Shipped", "ETD", "ETA", "IHD",
   "EST EXF", "EST IHD", "EXF", "CXL Date", "Assign Date", "Notes",
-  EXF_REQUESTED_FIELD, EXF_REQUEST_DATE_FIELD, EXF_MEMO_FIELD, ASN_REQUEST_ID_FIELD, DELIVERY_REQUEST_ID_FIELD, PICKUP_REQUEST_ID_FIELD,
+  EXF_REQUESTED_FIELD, EXF_REQUEST_DATE_FIELD, EXF_MEMO_FIELD,
+  EXF_DATE_FIELD, EXF_REQ_DATE_FIELD,
+  ASN_REQUEST_ID_FIELD, ASN_REQUESTED_FIELD, ASN_DATE_FIELD, ASN_REQ_DATE_FIELD,
+  DELIVERY_REQUEST_ID_FIELD, DELIVERY_REQUESTED_FIELD, DELIVERY_DATE_FIELD, DELIVERY_REQ_DATE_FIELD,
+  PICKUP_REQUEST_ID_FIELD, PICKUP_REQUESTED_FIELD, PICKUP_DATE_FIELD, PICKUP_REQ_DATE_FIELD,
   "FOB Cost", "Price", "PO Total Cost",
   "Received Qty", "Style Category",
   "OG", "PROTO", "FIT/PP", "BULK", "TOP", "TRIM",
@@ -116,12 +148,36 @@ function getExfRequestsSheet_() {
   return sheet;
 }
 
-function getVendorsSheet_() {
+function getContactsSheet_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName(VENDORS_SHEET_NAME);
+  // Prefer the renamed "Contacts" tab; fall back to legacy "Vendors"
+  let sheet = ss.getSheetByName(CONTACTS_SHEET_NAME) || ss.getSheetByName(VENDORS_SHEET_NAME);
   if (!sheet) {
-    sheet = ss.insertSheet(VENDORS_SHEET_NAME);
-    sheet.getRange(1, 1, 1, 3).setValues([["Vendor", "Email", "CC"]]);
+    sheet = ss.insertSheet(CONTACTS_SHEET_NAME);
+    sheet.getRange(1, 1, 1, 4).setValues([["Name", "Type", "Email", "CC"]]);
+  }
+  return sheet;
+}
+
+// Legacy alias kept for any existing callers
+function getVendorsSheet_() {
+  return getContactsSheet_();
+}
+
+function getLocationsSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(LOCATIONS_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(LOCATIONS_SHEET_NAME);
+    sheet.getRange(1, 1, 1, 2).setValues([["Entity", "Address"]]);
+    // Seed default warehouse and delivery destinations
+    sheet.getRange(2, 1, 5, 2).setValues([
+      ["FORERUNNER LOGISTICS", "4577 MAYWOOD AVE.\nVERNON, CA, 90058"],
+      ["ELEVATOR DISCO", "810 E PICO BLVD #B21\nLOS ANGELES, CA 90021"],
+      ["LULU'S", ""],
+      ["12TH TRIBE", ""],
+      ["URBAN OUTFITTERS", ""],
+    ]);
   }
   return sheet;
 }
@@ -129,9 +185,14 @@ function getVendorsSheet_() {
 function ensurePoWorkflowHeaders_() {
   const sheet = getSheet();
   ensureSheetHeaders_(sheet, [
-    ASN_REQUEST_ID_FIELD,
-    DELIVERY_REQUEST_ID_FIELD,
-    PICKUP_REQUEST_ID_FIELD,
+    // EXF
+    EXF_DATE_FIELD, EXF_REQ_DATE_FIELD, EXF_REQUESTED_FIELD,
+    // ASN
+    ASN_DATE_FIELD, ASN_REQ_DATE_FIELD, ASN_REQUESTED_FIELD, ASN_REQUEST_ID_FIELD,
+    // Delivery
+    DELIVERY_DATE_FIELD, DELIVERY_REQ_DATE_FIELD, DELIVERY_REQUESTED_FIELD, DELIVERY_REQUEST_ID_FIELD,
+    // Pickup
+    PICKUP_DATE_FIELD, PICKUP_REQ_DATE_FIELD, PICKUP_REQUESTED_FIELD, PICKUP_REQUEST_ID_FIELD,
     "Has Packing List",
   ]);
   return sheet;
@@ -317,13 +378,16 @@ function getDefaultColumns_() {
   }
 }
 
-function saveDefaultColumns_(columns) {
+function saveDefaultColumns_(columns, columnOrder) {
   if (!Array.isArray(columns) || columns.length === 0) {
     throw new Error("No columns provided");
   }
+  const payload = Array.isArray(columnOrder) && columnOrder.length > 0
+    ? { order: columnOrder, visible: columns }
+    : columns;
   PropertiesService.getScriptProperties().setProperty(
     COLUMN_DEFAULT_KEY,
-    JSON.stringify(columns)
+    JSON.stringify(payload)
   );
 }
 
@@ -339,7 +403,7 @@ function saveDefaultStatusFilter_(statusFilter) {
 }
 
 function handleSaveColumnDefault(payload) {
-  saveDefaultColumns_(payload.columns);
+  saveDefaultColumns_(payload.columns, payload.columnOrder);
   if (payload.statusFilter !== undefined) {
     saveDefaultStatusFilter_(payload.statusFilter);
   }
@@ -1432,30 +1496,52 @@ function assertSingleVendorForRows_(rows) {
   return vendor;
 }
 
-function getVendorEmailInfo_(vendor) {
-  const sheet = getVendorsSheet_();
+function getContactEmailInfo_(name) {
+  const sheet = getContactsSheet_();
   const rows = sheet.getDataRange().getValues();
   if (rows.length < 2) return { to: "", cc: "" };
   const headers = rows[0].map(h => String(h ?? "").trim());
   const headerIndex = function(names) {
-    const lowered = names.map(function(name) { return name.toLowerCase(); });
-    return headers.findIndex(function(header) {
-      return lowered.indexOf(header.toLowerCase()) !== -1;
+    const lowered = names.map(function(n) { return n.toLowerCase(); });
+    return headers.findIndex(function(h) {
+      return lowered.indexOf(h.toLowerCase()) !== -1;
     });
   };
-  const vendorCol = headerIndex(["Vendor", "Vendor Name", "Name"]);
+  const nameCol = headerIndex(["Name", "Vendor", "Vendor Name"]);
   const emailCol = headerIndex(["Email", "Vendor Email", "Email Address", "E-mail", "To"]);
   const ccCol = headerIndex(["CC", "Vendor CC", "Cc"]);
-  if (vendorCol === -1 || emailCol === -1) return { to: "", cc: "" };
-  const vendorKey = normalizeVendorName_(vendor).toLowerCase();
+  if (nameCol === -1 || emailCol === -1) return { to: "", cc: "" };
+  const key = String(name ?? "").trim().toLowerCase();
   for (let i = rows.length - 1; i >= 1; i--) {
-    if (normalizeVendorName_(rows[i][vendorCol]).toLowerCase() !== vendorKey) continue;
+    if (String(rows[i][nameCol] ?? "").trim().toLowerCase() !== key) continue;
     return {
       to: String(rows[i][emailCol] ?? "").trim(),
       cc: ccCol === -1 ? "" : String(rows[i][ccCol] ?? "").trim(),
     };
   }
   return { to: "", cc: "" };
+}
+
+// Legacy alias
+function getVendorEmailInfo_(vendor) {
+  return getContactEmailInfo_(vendor);
+}
+
+function getLocationAddress_(entityName) {
+  const sheet = getLocationsSheet_();
+  const rows = sheet.getDataRange().getValues();
+  if (rows.length < 2) return "";
+  const headers = rows[0].map(h => String(h ?? "").trim());
+  const nameCol = headers.indexOf("Entity");
+  const addrCol = headers.indexOf("Address");
+  if (nameCol === -1 || addrCol === -1) return "";
+  const key = String(entityName ?? "").trim().toLowerCase();
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][nameCol] ?? "").trim().toLowerCase() === key) {
+      return String(rows[i][addrCol] ?? "").trim();
+    }
+  }
+  return "";
 }
 
 function getExfRequestEmailInfo_(payload, vendor) {
@@ -1503,8 +1589,8 @@ function getDeliveryPickupEmailInfo_(requestData) {
   };
 }
 
-function buildDeliveryPickupRequestEmailHtml_(requestType, requestId, rows, requestData) {
-  const bodyRows = rows.map(row => {
+function buildPoTableRowsHtml_(rows) {
+  return rows.map(row => {
     return "<tr>" +
       "<td>" + escapeHtml_(row["PO #"]) + "</td>" +
       "<td>" + escapeHtml_(row["Status"]) + "</td>" +
@@ -1515,24 +1601,42 @@ function buildDeliveryPickupRequestEmailHtml_(requestType, requestId, rows, requ
       "<td style=\"text-align:right;\">" + escapeHtml_(row["PO Qty"]) + "</td>" +
     "</tr>";
   }).join("");
-  const notes = String(requestData["Notes"] ?? "").trim();
+}
+
+function buildPoTableHtml_(rows) {
+  return "<table border=\"1\" cellpadding=\"6\" cellspacing=\"0\" style=\"border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px;\">" +
+    "<thead><tr>" +
+      "<th>PO #</th><th>Status</th><th>Vendor</th><th>Buyer</th><th>Buyer PO #</th><th>Style #</th><th>Order Qty</th>" +
+    "</tr></thead>" +
+    "<tbody>" + buildPoTableRowsHtml_(rows) + "</tbody>" +
+    "</table>";
+}
+
+function buildDeliveryPickupRequestEmailHtml_(requestType, requestId, rows, requestData) {
+  const dateField = requestType === "Delivery" ? DELIVERY_DATE_FIELD : PICKUP_DATE_FIELD;
+  const notesField = requestType === "Delivery" ? DELIVERY_REQ_NOTES_FIELD : PICKUP_REQ_NOTES_FIELD;
+  const notes = String(requestData[notesField] ?? requestData["Notes"] ?? "").trim();
+  const from = String(requestData["From"] ?? "").trim();
+  const to = String(requestData["To"] ?? "").trim();
+  const pickupAddr = String(requestData["Pickup Address"] ?? "").trim();
+  const deliveryAddr = String(requestData["Delivery Address"] ?? "").trim();
 
   return "<p>Hello,</p>" +
     "<p>Please see the " + escapeHtml_(requestType.toLowerCase()) + " request below.</p>" +
     "<p><strong>" + escapeHtml_(requestType) + " Request:</strong> " + escapeHtml_(requestId) + "<br>" +
     "<strong>Request Date:</strong> " + escapeHtml_(formatEmailDate_(requestData["Request Date"])) + "<br>" +
-    "<strong>Location:</strong> " + escapeHtml_(requestData["Location"]) + "</p>" +
+    "<strong>" + escapeHtml_(requestType) + " Date:</strong> " + escapeHtml_(formatEmailDate_(requestData[dateField] ?? "")) + "<br>" +
+    (from ? "<strong>From:</strong> " + escapeHtml_(from) + (pickupAddr ? "<br><em>" + escapeHtml_(pickupAddr).replace(/\n/g, "<br>") + "</em>" : "") + "<br>" : "") +
+    (to ? "<strong>To:</strong> " + escapeHtml_(to) + (deliveryAddr ? "<br><em>" + escapeHtml_(deliveryAddr).replace(/\n/g, "<br>") + "</em>" : "") + "<br>" : "") +
+    "</p>" +
     (notes ? "<p><strong>Notes:</strong><br>" + escapeHtml_(notes).replace(/\n/g, "<br>") + "</p>" : "") +
-    "<table border=\"1\" cellpadding=\"6\" cellspacing=\"0\" style=\"border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px;\">" +
-      "<thead><tr>" +
-        "<th>PO #</th><th>Status</th><th>Vendor</th><th>Buyer</th><th>Buyer PO #</th><th>Style #</th><th>Order Qty</th>" +
-      "</tr></thead>" +
-      "<tbody>" + bodyRows + "</tbody>" +
-    "</table>" +
+    buildPoTableHtml_(rows) +
     "<p>Thank you.</p>";
 }
 
 function buildDeliveryPickupRequestEmailText_(requestType, requestId, rows, requestData) {
+  const dateField = requestType === "Delivery" ? DELIVERY_DATE_FIELD : PICKUP_DATE_FIELD;
+  const notesField = requestType === "Delivery" ? DELIVERY_REQ_NOTES_FIELD : PICKUP_REQ_NOTES_FIELD;
   const lines = [
     "Hello,",
     "",
@@ -1540,9 +1644,13 @@ function buildDeliveryPickupRequestEmailText_(requestType, requestId, rows, requ
     "",
     requestType + " Request: " + requestId,
     "Request Date: " + formatEmailDate_(requestData["Request Date"]),
-    "Location: " + String(requestData["Location"] ?? ""),
+    requestType + " Date: " + formatEmailDate_(requestData[dateField] ?? ""),
   ];
-  const notes = String(requestData["Notes"] ?? "").trim();
+  if (requestData["From"]) lines.push("From: " + String(requestData["From"]));
+  if (requestData["Pickup Address"]) lines.push("Pickup Address: " + String(requestData["Pickup Address"]));
+  if (requestData["To"]) lines.push("To: " + String(requestData["To"]));
+  if (requestData["Delivery Address"]) lines.push("Delivery Address: " + String(requestData["Delivery Address"]));
+  const notes = String(requestData[notesField] ?? requestData["Notes"] ?? "").trim();
   if (notes) lines.push("Notes: " + notes);
   lines.push("");
   rows.forEach(row => {
@@ -1563,14 +1671,74 @@ function buildDeliveryPickupRequestEmailText_(requestType, requestId, rows, requ
 
 function sendDeliveryPickupRequestEmail_(requestType, requestId, emailInfo, rows, requestData) {
   if (!emailInfo.to) return false;
-  const displayDate = formatEmailDate_(requestData["Request Date"]);
-  const location = String(requestData["Location"] ?? "").trim();
-  const subject = "[ELEVATOR DISCO] " + requestType + " Request - " + displayDate + (location ? " - " + location : "");
+  const dateField = requestType === "Delivery" ? DELIVERY_DATE_FIELD : PICKUP_DATE_FIELD;
+  const displayDate = formatEmailDate_(requestData[dateField] ?? requestData["Request Date"]);
+  const to = String(requestData["To"] ?? "").trim();
+  const subject = "[ELEVATOR DISCO] " + requestType + " Request - " + displayDate + (to ? " - " + to : "");
   const options = {
     to: emailInfo.to,
     subject: subject,
     body: buildDeliveryPickupRequestEmailText_(requestType, requestId, rows, requestData),
     htmlBody: buildDeliveryPickupRequestEmailHtml_(requestType, requestId, rows, requestData),
+  };
+  if (emailInfo.cc) options.cc = emailInfo.cc;
+  MailApp.sendEmail(options);
+  return true;
+}
+
+function buildAsnRequestEmailHtml_(requestId, rows, requestData) {
+  const notes = String(requestData[ASN_REQ_NOTES_FIELD] ?? "").trim();
+  return "<p>Hello,</p>" +
+    "<p>Please see the ASN request below.</p>" +
+    "<p><strong>ASN Request:</strong> " + escapeHtml_(requestId) + "<br>" +
+    "<strong>Request Date:</strong> " + escapeHtml_(formatEmailDate_(requestData["Request Date"])) + "<br>" +
+    "<strong>ASN Date:</strong> " + escapeHtml_(formatEmailDate_(requestData[ASN_DATE_FIELD] ?? "")) + "<br>" +
+    "<strong>Buyer:</strong> " + escapeHtml_(requestData["Buyer"] ?? "") + "</p>" +
+    (notes ? "<p><strong>Notes:</strong><br>" + escapeHtml_(notes).replace(/\n/g, "<br>") + "</p>" : "") +
+    buildPoTableHtml_(rows) +
+    "<p>Thank you.</p>";
+}
+
+function buildAsnRequestEmailText_(requestId, rows, requestData) {
+  const lines = [
+    "Hello,",
+    "",
+    "Please see the ASN request below.",
+    "",
+    "ASN Request: " + requestId,
+    "Request Date: " + formatEmailDate_(requestData["Request Date"]),
+    "ASN Date: " + formatEmailDate_(requestData[ASN_DATE_FIELD] ?? ""),
+    "Buyer: " + String(requestData["Buyer"] ?? ""),
+  ];
+  const notes = String(requestData[ASN_REQ_NOTES_FIELD] ?? "").trim();
+  if (notes) lines.push("Notes: " + notes);
+  lines.push("");
+  rows.forEach(row => {
+    lines.push(
+      "PO #: " + String(row["PO #"] ?? ""),
+      "Status: " + String(row["Status"] ?? ""),
+      "Vendor: " + String(row["Vendor"] ?? ""),
+      "Buyer: " + String(row["Buyer"] ?? ""),
+      "Buyer PO #: " + String(row["Buyer PO #"] ?? ""),
+      "Style #: " + String(row["Style #"] ?? ""),
+      "Order Qty: " + String(row["PO Qty"] ?? ""),
+      ""
+    );
+  });
+  lines.push("Thank you.");
+  return lines.join("\n");
+}
+
+function sendAsnRequestEmail_(requestId, emailInfo, rows, requestData) {
+  if (!emailInfo.to) return false;
+  const displayDate = formatEmailDate_(requestData[ASN_DATE_FIELD] ?? requestData["Request Date"]);
+  const buyer = String(requestData["Buyer"] ?? "").trim();
+  const subject = "[ELEVATOR DISCO] ASN Request - " + displayDate + (buyer ? " - " + buyer : "");
+  const options = {
+    to: emailInfo.to,
+    subject: subject,
+    body: buildAsnRequestEmailText_(requestId, rows, requestData),
+    htmlBody: buildAsnRequestEmailHtml_(requestId, rows, requestData),
   };
   if (emailInfo.cc) options.cc = emailInfo.cc;
   MailApp.sendEmail(options);
@@ -1762,28 +1930,24 @@ function markExfRequestPosRequested_(poSheet, poNumbers, exfDate, memos, shipMet
   applyPoUpdatesBatch_(poSheet, items);
 }
 
-function pickDeliveryRequestData_(raw) {
+function pickRequestData_(raw, fields) {
   const out = {};
-  DELIVERY_REQUEST_DATA_FIELDS.forEach(field => {
+  fields.forEach(field => {
     if (raw[field] !== undefined) out[field] = raw[field];
   });
   return out;
+}
+
+function pickDeliveryRequestData_(raw) {
+  return pickRequestData_(raw, DELIVERY_REQUEST_DATA_FIELDS);
 }
 
 function pickPickupRequestData_(raw) {
-  const out = {};
-  PICKUP_REQUEST_DATA_FIELDS.forEach(field => {
-    if (raw[field] !== undefined) out[field] = raw[field];
-  });
-  return out;
+  return pickRequestData_(raw, PICKUP_REQUEST_DATA_FIELDS);
 }
 
 function pickAsnRequestData_(raw) {
-  const out = {};
-  ASN_REQUEST_DATA_FIELDS.forEach(field => {
-    if (raw[field] !== undefined) out[field] = raw[field];
-  });
-  return out;
+  return pickRequestData_(raw, ASN_REQUEST_DATA_FIELDS);
 }
 
 function handleExfRequest(payload) {
@@ -1887,6 +2051,9 @@ function handleCreateAsnRequest(payload) {
   if (!requestData["Request Date"]) {
     return corsResponse({ success: false, error: "Request Date is required." });
   }
+  if (!requestData[ASN_DATE_FIELD]) {
+    return corsResponse({ success: false, error: "ASN Date is required." });
+  }
 
   const sheet = getAsnRequestsSheet_();
   const poSheet = ensurePoWorkflowHeaders_();
@@ -1898,19 +2065,73 @@ function handleCreateAsnRequest(payload) {
     return corsResponse({ success: false, error: err.message });
   }
 
+  // Determine buyer and email
+  const buyer = String(requestData["Buyer"] || (poRows.length ? poRows[0]["Buyer"] : "") || "").trim();
+  requestData["Buyer"] = buyer;
+  const storedEmailInfo = getContactEmailInfo_(buyer);
+  const emailInfo = {
+    to: normalizeEmailRecipients_(requestData["Buyer Email"] || storedEmailInfo.to),
+    cc: normalizeEmailRecipients_(requestData[EXF_REQ_CC_FIELD] || storedEmailInfo.cc),
+  };
+  requestData["Buyer Email"] = emailInfo.to;
+  requestData[EXF_REQ_CC_FIELD] = emailInfo.cc;
+  requestData["PO Numbers"] = poNumbers.join(", ");
+  requestData["PO Count"] = poNumbers.length;
+
   const existing = sheetToObjects_(sheet, ASN_REQUEST_ID_FIELD);
   const requestId = generateAsnRequestId_(existing);
+
+  let emailSent = false;
+  let emailError = "";
+  try {
+    emailSent = sendAsnRequestEmail_(requestId, emailInfo, poRows, requestData);
+  } catch (err) {
+    emailError = err && err.message ? err.message : String(err);
+  }
+
+  const now = new Date();
+  requestData["Email Status"] = emailInfo.to ? (emailSent ? "Sent" : "Failed") : "Not Sent";
+  requestData["Email Sent At"] = emailSent ? now : "";
+  requestData["Email Error"] = emailError;
+  requestData["Last Email Attempt At"] = now;
+  requestData["Created At"] = now;
+  requestData["Updated At"] = now;
+
   appendRequestRow_(sheet, ASN_REQUEST_ID_FIELD, requestId, ASN_REQUEST_DATA_FIELDS, requestData);
-  applyPoUpdatesBatch_(poSheet, poNumbers.map(poNumber => ({
-    poNumber: poNumber,
-    updates: {
-      [ASN_REQUEST_ID_FIELD]: requestId,
-    },
-  })));
+
+  // Only mark PO as ASN-complete if email succeeded (or no email address was provided)
+  if (emailSent || !emailInfo.to) {
+    applyPoUpdatesBatch_(poSheet, poNumbers.map(poNumber => ({
+      poNumber: poNumber,
+      updates: {
+        [ASN_REQUEST_ID_FIELD]: requestId,
+        [ASN_REQUESTED_FIELD]: true,
+        [ASN_DATE_FIELD]: requestData[ASN_DATE_FIELD],
+        [ASN_REQ_DATE_FIELD]: requestData["Request Date"],
+      },
+    })));
+  } else {
+    // Still store the request ID link even on failure so resend can find the PO set
+    applyPoUpdatesBatch_(poSheet, poNumbers.map(poNumber => ({
+      poNumber: poNumber,
+      updates: { [ASN_REQUEST_ID_FIELD]: requestId },
+    })));
+  }
+
+  if (!emailSent && emailInfo.to) {
+    return corsResponse({
+      success: false,
+      error: emailError || "ASN email failed to send.",
+      asnRequestId: requestId,
+      emailSent: false,
+      emailError: emailError,
+    });
+  }
 
   return corsResponse({
     success: true,
     asnRequestId: requestId,
+    emailSent: emailSent,
   });
 }
 
@@ -1930,6 +2151,166 @@ function handleResendExfRequestEmail(payload) {
     emailSent: result.emailSent,
     emailError: result.emailError,
   });
+}
+
+function handleResendAsnRequestEmail(payload) {
+  const requestId = String(payload.asnRequestId ?? "").trim();
+  if (!requestId) return corsResponse({ success: false, error: "ASN Request ID is required." });
+
+  const sheet = getAsnRequestsSheet_();
+  const found = findRequestRowIndex_(sheet, ASN_REQUEST_ID_FIELD, requestId);
+  if (!found) return corsResponse({ success: false, error: "ASN request not found: " + requestId });
+
+  const request = {};
+  found.headers.forEach((field, i) => { request[field] = found.values[i]; });
+
+  const buyer = String(request["Buyer"] ?? "").trim();
+  const emailInfo = {
+    to: normalizeEmailRecipients_(String(request["Buyer Email"] ?? "").trim()),
+    cc: normalizeEmailRecipients_(String(request[EXF_REQ_CC_FIELD] ?? "").trim()),
+  };
+  if (!emailInfo.to) return corsResponse({ success: false, error: "No Buyer Email on record for this ASN request." });
+
+  const poNumbers = String(request["PO Numbers"] ?? "").split(",").map(s => s.trim()).filter(Boolean);
+  const poSheet = ensurePoWorkflowHeaders_();
+  let poRows = [];
+  try { poRows = getPoObjectsByNumbers_(poSheet, poNumbers); } catch (e) { /* best effort */ }
+
+  let emailSent = false;
+  let emailError = "";
+  try {
+    emailSent = sendAsnRequestEmail_(requestId, emailInfo, poRows, request);
+  } catch (err) {
+    emailError = err && err.message ? err.message : String(err);
+  }
+
+  const now = new Date();
+  updateRequestRowFields_(sheet, found.rowIndex, found.headers, {
+    "Email Status": emailSent ? "Sent" : "Failed",
+    "Email Sent At": emailSent ? now : request["Email Sent At"],
+    "Email Error": emailError,
+    "Last Email Attempt At": now,
+    "Updated At": now,
+  });
+
+  if (emailSent && poNumbers.length > 0) {
+    applyPoUpdatesBatch_(poSheet, poNumbers.map(poNumber => ({
+      poNumber: poNumber,
+      updates: {
+        [ASN_REQUESTED_FIELD]: true,
+        [ASN_DATE_FIELD]: request[ASN_DATE_FIELD],
+        [ASN_REQ_DATE_FIELD]: request["Request Date"],
+      },
+    })));
+  }
+
+  return corsResponse({ success: true, asnRequestId: requestId, emailSent: emailSent, emailError: emailError });
+}
+
+function handleResendDeliveryRequestEmail(payload) {
+  const requestId = String(payload.deliveryRequestId ?? "").trim();
+  if (!requestId) return corsResponse({ success: false, error: "Delivery Request ID is required." });
+
+  const sheet = getDeliveryRequestsSheet_();
+  const found = findRequestRowIndex_(sheet, DELIVERY_REQUEST_ID_FIELD, requestId);
+  if (!found) return corsResponse({ success: false, error: "Delivery request not found: " + requestId });
+
+  const request = {};
+  found.headers.forEach((field, i) => { request[field] = found.values[i]; });
+
+  const emailInfo = getDeliveryPickupEmailInfo_(request);
+  if (!emailInfo.to) return corsResponse({ success: false, error: "No email address on record for this delivery request." });
+
+  const poNumbers = String(request["PO Numbers"] ?? "").split(",").map(s => s.trim()).filter(Boolean);
+  const poSheet = ensurePoWorkflowHeaders_();
+  let poRows = [];
+  try { poRows = getPoObjectsByNumbers_(poSheet, poNumbers); } catch (e) { /* best effort */ }
+
+  let emailSent = false;
+  let emailError = "";
+  try {
+    emailSent = sendDeliveryPickupRequestEmail_("Delivery", requestId, emailInfo, poRows, request);
+  } catch (err) {
+    emailError = err && err.message ? err.message : String(err);
+  }
+
+  const now = new Date();
+  updateRequestRowFields_(sheet, found.rowIndex, found.headers, {
+    "Email Status": emailSent ? "Sent" : "Failed",
+    "Email Sent At": emailSent ? now : request["Email Sent At"],
+    "Email Error": emailError,
+    "Updated At": now,
+  });
+
+  if (emailSent && poNumbers.length > 0) {
+    applyPoUpdatesBatch_(poSheet, poNumbers.map(poNumber => ({
+      poNumber: poNumber,
+      updates: {
+        [DELIVERY_REQUESTED_FIELD]: true,
+        [DELIVERY_DATE_FIELD]: request[DELIVERY_DATE_FIELD],
+        [DELIVERY_REQ_DATE_FIELD]: request["Request Date"],
+        "Status": "Scheduled",
+      },
+    })));
+  }
+
+  return corsResponse({ success: true, deliveryRequestId: requestId, emailSent: emailSent, emailError: emailError });
+}
+
+function handleResendPickupRequestEmail(payload) {
+  const requestId = String(payload.pickupRequestId ?? "").trim();
+  if (!requestId) return corsResponse({ success: false, error: "Pickup Request ID is required." });
+
+  const sheet = getPickupRequestsSheet_();
+  const found = findRequestRowIndex_(sheet, PICKUP_REQUEST_ID_FIELD, requestId);
+  if (!found) return corsResponse({ success: false, error: "Pickup request not found: " + requestId });
+
+  const request = {};
+  found.headers.forEach((field, i) => { request[field] = found.values[i]; });
+
+  const emailInfo = getDeliveryPickupEmailInfo_(request);
+  if (!emailInfo.to) return corsResponse({ success: false, error: "No email address on record for this pickup request." });
+
+  const poNumbers = String(request["PO Numbers"] ?? "").split(",").map(s => s.trim()).filter(Boolean);
+  const poSheet = ensurePoWorkflowHeaders_();
+  let poRows = [];
+  try { poRows = getPoObjectsByNumbers_(poSheet, poNumbers); } catch (e) { /* best effort */ }
+
+  let emailSent = false;
+  let emailError = "";
+  try {
+    emailSent = sendDeliveryPickupRequestEmail_("Pickup", requestId, emailInfo, poRows, request);
+  } catch (err) {
+    emailError = err && err.message ? err.message : String(err);
+  }
+
+  const now = new Date();
+  updateRequestRowFields_(sheet, found.rowIndex, found.headers, {
+    "Email Status": emailSent ? "Sent" : "Failed",
+    "Email Sent At": emailSent ? now : request["Email Sent At"],
+    "Email Error": emailError,
+    "Updated At": now,
+  });
+
+  if (emailSent && poNumbers.length > 0) {
+    applyPoUpdatesBatch_(poSheet, poNumbers.map(poNumber => {
+      const found2 = findPoRowIndex_(poSheet, poNumber);
+      const divCol = found2 ? found2.headers.indexOf("Division") : -1;
+      const division = (found2 && divCol !== -1)
+        ? String(poSheet.getRange(found2.rowIndex, divCol + 1).getValue() ?? "").trim()
+        : "";
+      const updates = {
+        [PICKUP_REQUESTED_FIELD]: true,
+        [PICKUP_DATE_FIELD]: request[PICKUP_DATE_FIELD],
+        [PICKUP_REQ_DATE_FIELD]: request["Request Date"],
+        "Assign Date": request[PICKUP_DATE_FIELD],
+      };
+      if (/^freesia$/i.test(division)) updates["Status"] = "Assigned";
+      return { poNumber: poNumber, updates: updates };
+    }));
+  }
+
+  return corsResponse({ success: true, pickupRequestId: requestId, emailSent: emailSent, emailError: emailError });
 }
 
 function handleBatchUpdatePos(payload) {
@@ -2002,8 +2383,8 @@ function handleCreateDeliveryRequest(payload) {
   if (!requestData["Request Date"]) {
     return corsResponse({ success: false, error: "Request Date is required." });
   }
-  if (!requestData["Location"]) {
-    return corsResponse({ success: false, error: "Location is required." });
+  if (!requestData[DELIVERY_DATE_FIELD]) {
+    return corsResponse({ success: false, error: "Delivery Date is required." });
   }
 
   const sheet = getDeliveryRequestsSheet_();
@@ -2015,6 +2396,7 @@ function handleCreateDeliveryRequest(payload) {
   } catch (err) {
     return corsResponse({ success: false, error: err.message });
   }
+
   const existing = sheetToObjects_(sheet, DELIVERY_REQUEST_ID_FIELD);
   const requestId = generateDeliveryRequestId_(existing);
   const emailInfo = getDeliveryPickupEmailInfo_(requestData);
@@ -2023,24 +2405,49 @@ function handleCreateDeliveryRequest(payload) {
 
   requestData["Email To"] = emailInfo.to;
   requestData["Email CC"] = emailInfo.cc;
+  requestData["PO Numbers"] = poNumbers.join(", ");
+  requestData["PO Count"] = poNumbers.length;
   try {
     emailSent = sendDeliveryPickupRequestEmail_("Delivery", requestId, emailInfo, poRows, requestData);
   } catch (err) {
     emailError = err && err.message ? err.message : String(err);
   }
+  const now = new Date();
   requestData["Email Status"] = emailInfo.to ? (emailSent ? "Sent" : "Failed") : "Not Sent";
-  requestData["Email Sent At"] = emailSent ? new Date() : "";
+  requestData["Email Sent At"] = emailSent ? now : "";
   requestData["Email Error"] = emailError;
+  requestData["Created At"] = now;
+  requestData["Updated At"] = now;
 
   appendRequestRow_(sheet, DELIVERY_REQUEST_ID_FIELD, requestId, DELIVERY_REQUEST_DATA_FIELDS, requestData);
 
-  applyPoUpdatesBatch_(poSheet, poNumbers.map(poNumber => ({
-    poNumber: poNumber,
-    updates: {
-      [DELIVERY_REQUEST_ID_FIELD]: requestId,
-      "Status": "Scheduled",
-    },
-  })));
+  if (emailSent || !emailInfo.to) {
+    applyPoUpdatesBatch_(poSheet, poNumbers.map(poNumber => ({
+      poNumber: poNumber,
+      updates: {
+        [DELIVERY_REQUEST_ID_FIELD]: requestId,
+        [DELIVERY_REQUESTED_FIELD]: true,
+        [DELIVERY_DATE_FIELD]: requestData[DELIVERY_DATE_FIELD],
+        [DELIVERY_REQ_DATE_FIELD]: requestData["Request Date"],
+        "Status": "Scheduled",
+      },
+    })));
+  } else {
+    applyPoUpdatesBatch_(poSheet, poNumbers.map(poNumber => ({
+      poNumber: poNumber,
+      updates: { [DELIVERY_REQUEST_ID_FIELD]: requestId },
+    })));
+  }
+
+  if (!emailSent && emailInfo.to) {
+    return corsResponse({
+      success: false,
+      error: emailError || "Delivery email failed to send.",
+      deliveryRequestId: requestId,
+      emailSent: false,
+      emailError: emailError,
+    });
+  }
 
   return corsResponse({
     success: true,
@@ -2080,8 +2487,8 @@ function handleCreatePickupRequest(payload) {
   if (!requestData["Request Date"]) {
     return corsResponse({ success: false, error: "Request Date is required." });
   }
-  if (!requestData["Location"]) {
-    return corsResponse({ success: false, error: "Location is required." });
+  if (!requestData[PICKUP_DATE_FIELD]) {
+    return corsResponse({ success: false, error: "Pickup Date is required." });
   }
 
   const sheet = getPickupRequestsSheet_();
@@ -2093,6 +2500,7 @@ function handleCreatePickupRequest(payload) {
   } catch (err) {
     return corsResponse({ success: false, error: err.message });
   }
+
   const existing = sheetToObjects_(sheet, PICKUP_REQUEST_ID_FIELD);
   const requestId = generatePickupRequestId_(existing);
   const emailInfo = getDeliveryPickupEmailInfo_(requestData);
@@ -2101,31 +2509,55 @@ function handleCreatePickupRequest(payload) {
 
   requestData["Email To"] = emailInfo.to;
   requestData["Email CC"] = emailInfo.cc;
+  requestData["PO Numbers"] = poNumbers.join(", ");
+  requestData["PO Count"] = poNumbers.length;
   try {
     emailSent = sendDeliveryPickupRequestEmail_("Pickup", requestId, emailInfo, poRows, requestData);
   } catch (err) {
     emailError = err && err.message ? err.message : String(err);
   }
+  const now = new Date();
   requestData["Email Status"] = emailInfo.to ? (emailSent ? "Sent" : "Failed") : "Not Sent";
-  requestData["Email Sent At"] = emailSent ? new Date() : "";
+  requestData["Email Sent At"] = emailSent ? now : "";
   requestData["Email Error"] = emailError;
+  requestData["Created At"] = now;
+  requestData["Updated At"] = now;
 
   appendRequestRow_(sheet, PICKUP_REQUEST_ID_FIELD, requestId, PICKUP_REQUEST_DATA_FIELDS, requestData);
 
-  poNumbers.forEach(poNumber => {
-    const found = findPoRowIndex_(poSheet, poNumber);
-    if (!found) throw new Error("PO # not found: " + poNumber);
-    const updates = {
-      [PICKUP_REQUEST_ID_FIELD]: requestId,
-      "Assign Date": requestData["Request Date"],
-    };
-    const divCol = found.headers.indexOf("Division");
-    const division = divCol === -1 ? "" : String(poSheet.getRange(found.rowIndex, divCol + 1).getValue() ?? "").trim();
-    if (/^freesia$/i.test(division)) {
-      updates["Status"] = "Assigned";
-    }
-    writePoFields_(poSheet, found.rowIndex, found.headers, updates);
-  });
+  if (emailSent || !emailInfo.to) {
+    applyPoUpdatesBatch_(poSheet, poNumbers.map(poNumber => {
+      const found = findPoRowIndex_(poSheet, poNumber);
+      const divCol = found ? found.headers.indexOf("Division") : -1;
+      const division = (found && divCol !== -1)
+        ? String(poSheet.getRange(found.rowIndex, divCol + 1).getValue() ?? "").trim()
+        : "";
+      const updates = {
+        [PICKUP_REQUEST_ID_FIELD]: requestId,
+        [PICKUP_REQUESTED_FIELD]: true,
+        [PICKUP_DATE_FIELD]: requestData[PICKUP_DATE_FIELD],
+        [PICKUP_REQ_DATE_FIELD]: requestData["Request Date"],
+        "Assign Date": requestData[PICKUP_DATE_FIELD],
+      };
+      if (/^freesia$/i.test(division)) updates["Status"] = "Assigned";
+      return { poNumber: poNumber, updates: updates };
+    }));
+  } else {
+    applyPoUpdatesBatch_(poSheet, poNumbers.map(poNumber => ({
+      poNumber: poNumber,
+      updates: { [PICKUP_REQUEST_ID_FIELD]: requestId },
+    })));
+  }
+
+  if (!emailSent && emailInfo.to) {
+    return corsResponse({
+      success: false,
+      error: emailError || "Pickup email failed to send.",
+      pickupRequestId: requestId,
+      emailSent: false,
+      emailError: emailError,
+    });
+  }
 
   return corsResponse({
     success: true,
@@ -2191,7 +2623,8 @@ function doGet(e) {
     const poSheet = ensurePoWorkflowHeaders_();
     const shipmentsSheet = getShipmentsSheet_();
     const exfRequestsSheet = getExfRequestsSheet_();
-    const vendorsSheet = getVendorsSheet_();
+    const contactsSheet = getContactsSheet_();
+    const locationsSheet = getLocationsSheet_();
     const asnRequestsSheet = getAsnRequestsSheet_();
     const deliveryRequestsSheet = getDeliveryRequestsSheet_();
     const pickupRequestsSheet = getPickupRequestsSheet_();
@@ -2201,7 +2634,8 @@ function doGet(e) {
     const data = sheetToObjects_(poSheet, "PO #");
     const shipments = sheetToObjects_(shipmentsSheet, SHIPMENT_ID_FIELD);
     const exfRequests = sheetToObjects_(exfRequestsSheet, EXF_REQUEST_ID_FIELD);
-    const vendors = sheetToObjects_(vendorsSheet, "Vendor");
+    const contacts = sheetToObjects_(contactsSheet, "Name");
+    const locations = sheetToObjects_(locationsSheet, "Entity");
     const asnRequests = sheetToObjects_(asnRequestsSheet, ASN_REQUEST_ID_FIELD);
     const deliveryRequests = sheetToObjects_(deliveryRequestsSheet, DELIVERY_REQUEST_ID_FIELD);
     const pickupRequests = sheetToObjects_(pickupRequestsSheet, PICKUP_REQUEST_ID_FIELD);
@@ -2214,7 +2648,10 @@ function doGet(e) {
       data: data,
       shipments: shipments,
       exfRequests: exfRequests,
-      vendors: vendors,
+      contacts: contacts,
+      locations: locations,
+      // legacy key kept for any cached clients
+      vendors: contacts,
       asnRequests: asnRequests,
       deliveryRequests: deliveryRequests,
       pickupRequests: pickupRequests,
@@ -2252,6 +2689,9 @@ function doPost(e) {
     if (action === "exfRequest") return handleExfRequest(payload);
     if (action === "createAsnRequest") return handleCreateAsnRequest(payload);
     if (action === "resendExfRequestEmail") return handleResendExfRequestEmail(payload);
+    if (action === "resendAsnRequestEmail") return handleResendAsnRequestEmail(payload);
+    if (action === "resendDeliveryRequestEmail") return handleResendDeliveryRequestEmail(payload);
+    if (action === "resendPickupRequestEmail") return handleResendPickupRequestEmail(payload);
     if (action === "batchUpdatePos") return handleBatchUpdatePos(payload);
     if (action === "createDeliveryRequest") return handleCreateDeliveryRequest(payload);
     if (action === "updateDeliveryRequest") return handleUpdateDeliveryRequest(payload);

@@ -4,13 +4,31 @@ let allChargebacks = [];
 let allPackingLists = [];
 let allPackingCartons = [];
 let allVendorEmailRows = [];
+let allContactRows = [];
+let allLocationRows = [];
 let allAsnRequests = [];
 let packingListPanelOpen = false;
 let flagFilterActive = false;
-let sortCol = null;
+let sortCol = "CXL Date";
 let sortDir = 1;
 let pageSize = 60;
 let currentPage = 1;
+
+const DEMO_CONTACTS = [
+  { Name: "Blue Fabrics", Type: "Vendor", Email: "demo@example.com", CC: "" },
+  { Name: "Summit Goods", Type: "Vendor", Email: "demo@example.com", CC: "" },
+  { Name: "Orient Mfg", Type: "Vendor", Email: "demo@example.com", CC: "" },
+  { Name: "LULU'S", Type: "Buyer", Email: "demo-buyer@example.com", CC: "" },
+  { Name: "12TH TRIBE", Type: "Buyer", Email: "demo-buyer@example.com", CC: "" },
+  { Name: "FORERUNNER LOGISTICS", Type: "Logistics", Email: "demo-logistics@example.com", CC: "" },
+];
+
+const DEMO_LOCATIONS = [
+  { Entity: "FORERUNNER LOGISTICS", Address: "4577 MAYWOOD AVE.\nVERNON, CA, 90058" },
+  { Entity: "ELEVATOR DISCO", Address: "810 E PICO BLVD #B21\nLOS ANGELES, CA 90021" },
+  { Entity: "LULU'S", Address: "" },
+  { Entity: "12TH TRIBE", Address: "" },
+];
 
 const DEMO_DATA = [
   { "Division":"Elevator Disco","Status":"OTW","EXF Requested":true,"Vendor":"Acme Textiles","Buyer":"ANTHROPOLOGIE","Buyer PO #":"BP-1001","SO #":"SO-2201","PO Date":"2024-01-15","PO #":"PO-10001","Old PO #":"","Style #":"ST-100","Color":"Navy","PO Qty":500,"Actual Qty":498,"Ctn Qty":50,"Size":"XS-XL","PO Unit 1":100,"PO Unit 2":100,"PO Unit 3":120,"PO Unit 4":100,"PO Unit 5":80,"Act Unit 1":99,"Act Unit 2":100,"Act Unit 3":120,"Act Unit 4":99,"Act Unit 5":80,"Ship Method":"Sea&Air","Vessel":"Ever Given","House #":"H-001","Shipped":"2024-02-01","ETD":"2024-02-05","ETA":"2024-02-20","IHD":"2024-02-25","EST EXF":"2024-02-18","EST IHD":"2024-02-24","EXF":"2024-02-20","CXL Date":"2024-03-01","Assign Date":"2024-01-20","Shipment ID":"SHP-0001","Notes":"Priority shipment" },

@@ -12,8 +12,8 @@
   <nav class="app-title-nav" role="tablist" aria-label="Main views">
     <span class="app-logo-text">Elevator Disco</span>
     <button type="button" class="app-title-tab is-active" id="navTabPo" role="tab" aria-selected="true">Purchase Orders</button>
-    <button type="button" class="app-title-tab" id="navTabExfRequests" role="tab" aria-selected="false">EXF Requests</button>
     <button type="button" class="app-title-tab" id="navTabShipments" role="tab" aria-selected="false">Shipments</button>
+    <button type="button" class="app-title-tab" id="navTabRequests" role="tab" aria-selected="false">Requests</button>
     <button type="button" class="app-title-tab" id="navTabChargebacks" role="tab" aria-selected="false">Chargebacks</button>
   </nav>
   <div class="header-right">
@@ -99,15 +99,28 @@
   </div>
 </div>
 
-<div id="exfRequestListToolbar" class="toolbar" hidden>
+<div id="requestsToolbar" class="toolbar" hidden>
   <div class="search-wrap">
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-    <input type="search" id="exfRequestSearchInput" placeholder="Search" />
+    <input type="search" id="requestsSearchInput" placeholder="Search" />
+  </div>
+  <div class="toolbar-filter-cluster requests-type-filter-cluster">
+    <div class="filter-btn-group request-type-filters" id="requestTypeFilters" role="group" aria-label="Request type">
+      <button type="button" class="filter-btn active" data-request-type="exf">EXF</button>
+      <button type="button" class="filter-btn" data-request-type="asn">ASN</button>
+      <button type="button" class="filter-btn" data-request-type="delivery">Delivery</button>
+      <button type="button" class="filter-btn" data-request-type="pickup">Pickup</button>
+    </div>
   </div>
   <div class="toolbar-end">
-    <div class="counter" id="exfRequestRowCounter">— EXF requests</div>
+    <div class="counter" id="requestsRowCounter">— requests</div>
   </div>
 </div>
+<!-- Legacy hidden inputs for per-type search (wired to their respective filters via JS) -->
+<input type="search" id="exfRequestSearchInput" style="display:none" aria-hidden="true" />
+<input type="search" id="asnRequestSearchInput" style="display:none" aria-hidden="true" />
+<input type="search" id="deliveryRequestSearchInput" style="display:none" aria-hidden="true" />
+<input type="search" id="pickupRequestSearchInput" style="display:none" aria-hidden="true" />
 
 <div id="chargebackToolbar" class="toolbar" hidden>
   <div class="search-wrap">
@@ -124,7 +137,7 @@
   <div class="table-scroll-x">
   <table id="poTable">
     <colgroup>
-      <col class="col-flag" /><col class="col-packing-list" /><col class="col-select" />
+      <col class="col-flag" /><col class="col-select" />
       <col class="col-status" /><col class="col-n41-status" /><col class="col-division" /><col class="col-vendor" />
       <col class="col-buyer" /><col class="col-buyer-po" />
       <col class="col-so" /><col class="col-po-date" /><col class="col-po" />
@@ -134,9 +147,11 @@
       <col class="col-vessel" /><col class="col-house" />
       <col class="col-shipped" /><col class="col-etd" />
       <col class="col-est-exf" /><col class="col-est-ihd" />
-      <col class="col-ship-method" /><col class="col-shipment-id" />
-      <col class="col-exf-req" /><col class="col-exf-req-date" /><col class="col-exf-memo" />
-      <col class="col-delivery-req" /><col class="col-pickup-req" />
+      <col class="col-ship-method" /><col class="col-shipment-id" /><col class="col-packing-list" />
+      <col class="col-exf-req" /><col class="col-date" /><col class="col-exf-req-date" /><col class="col-exf-memo" />
+      <col class="col-bool" /><col class="col-date" /><col class="col-date" /><col class="col-shipment-id" />
+      <col class="col-bool" /><col class="col-date" /><col class="col-date" /><col class="col-shipment-id" />
+      <col class="col-bool" /><col class="col-date" /><col class="col-date" /><col class="col-shipment-id" />
       <col class="col-exf" /><col class="col-eta" /><col class="col-ihd" />
       <col class="col-cxl" /><col class="col-assign" /><col class="col-notes" />
     </colgroup>
@@ -147,7 +162,6 @@
             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
           </span>
         </th>
-        <th class="th-packing-list-col" data-col="Packing List" aria-label="Packing List"></th>
         <th class="th-select-col" data-col="Selected">
           <input type="checkbox" id="selectAllRowsCheckbox" aria-label="Select all filtered rows" />
         </th>
@@ -177,11 +191,23 @@
         <th class="th-filterable" data-col="EST EXF"><span class="th-label">EST EXF</span></th>
         <th class="th-filterable" data-col="EST IHD"><span class="th-label">EST IHD</span></th>
         <th class="th-filterable" data-col="Ship Method"><span class="th-label">Ship Method</span></th>
-        <th class="th-filterable" data-col="Shipment ID"><span class="th-label">Shipment</span></th>
+        <th class="th-filterable th-shipment-id-col" data-col="Shipment ID" aria-label="Shipment"></th>
+        <th class="th-packing-list-col" data-col="Packing List" aria-label="Packing List"></th>
         <th class="th-filterable" data-col="EXF Requested"><span class="th-label">EXF Req</span></th>
-        <th class="th-filterable" data-col="EXF Request Date"><span class="th-label">EXF Req Date</span></th>
+        <th class="th-filterable" data-col="EXF Date"><span class="th-label">EXF Date</span></th>
+        <th class="th-filterable" data-col="EXF Req Date"><span class="th-label">EXF Req Date</span></th>
         <th data-col="EXF Memo" onclick="sortBy('EXF Memo')">EXF Memo</th>
+        <th class="th-filterable" data-col="ASN Requested"><span class="th-label">ASN Req</span></th>
+        <th class="th-filterable" data-col="ASN Date"><span class="th-label">ASN Date</span></th>
+        <th class="th-filterable" data-col="ASN Req Date"><span class="th-label">ASN Req Date</span></th>
+        <th class="th-filterable" data-col="ASN Request ID"><span class="th-label">ASN</span></th>
+        <th class="th-filterable" data-col="Delivery Requested"><span class="th-label">Dlv Req</span></th>
+        <th class="th-filterable" data-col="Delivery Date"><span class="th-label">Dlv Date</span></th>
+        <th class="th-filterable" data-col="Delivery Req Date"><span class="th-label">Dlv Req Date</span></th>
         <th class="th-filterable" data-col="Delivery Request ID"><span class="th-label">Delivery</span></th>
+        <th class="th-filterable" data-col="Pickup Requested"><span class="th-label">Pkp Req</span></th>
+        <th class="th-filterable" data-col="Pickup Date"><span class="th-label">Pkp Date</span></th>
+        <th class="th-filterable" data-col="Pickup Req Date"><span class="th-label">Pkp Req Date</span></th>
         <th class="th-filterable" data-col="Pickup Request ID"><span class="th-label">Pickup</span></th>
         <th class="th-filterable" data-col="EXF"><span class="th-label">EXF</span></th>
         <th class="th-filterable" data-col="ETA"><span class="th-label">ETA</span></th>
@@ -192,7 +218,7 @@
       </tr>
     </thead>
     <tbody id="tableBody">
-      <tr class="state-row"><td colspan="41">Loading POs…</td></tr>
+      <tr class="state-row"><td colspan="53">Loading POs…</td></tr>
     </tbody>
   </table>
   </div>
@@ -240,8 +266,10 @@
   </div>
 </div>
 
-<div id="exfRequestTableWrap" class="table-scroll-y" hidden>
-  <div class="table-scroll-x">
+<div id="requestsTableWrap" class="table-scroll-y" hidden>
+
+  <!-- EXF Requests sub-table -->
+  <div id="exfRequestTableWrap" class="table-scroll-x">
   <table id="exfRequestTable">
     <colgroup>
       <col class="col-exf-request-id" />
@@ -267,7 +295,7 @@
         <th>Vendor</th>
         <th>Vendor Email</th>
         <th>CC</th>
-        <th>ExfReqNotes</th>
+        <th>Notes</th>
         <th>PO Count</th>
         <th>Total Qty</th>
         <th>Email Status</th>
@@ -282,6 +310,130 @@
     </tbody>
   </table>
   </div>
+
+  <!-- ASN Requests sub-table -->
+  <div id="asnRequestTableWrap" class="table-scroll-x" hidden>
+  <table id="asnRequestTable">
+    <colgroup>
+      <col class="col-exf-request-id" />
+      <col class="col-date" />
+      <col class="col-date" />
+      <col class="col-buyer" />
+      <col class="col-email" />
+      <col class="col-email" />
+      <col class="col-notes" />
+      <col class="col-po-count" />
+      <col class="col-status" />
+      <col class="col-date" />
+      <col class="col-date" />
+      <col class="col-notes" />
+      <col class="col-actions" />
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Request ID</th>
+        <th>ASN Date</th>
+        <th>Request Date</th>
+        <th>Buyer</th>
+        <th>Buyer Email</th>
+        <th>CC</th>
+        <th>Notes</th>
+        <th>PO Count</th>
+        <th>Email Status</th>
+        <th>Email Sent</th>
+        <th>Last Attempt</th>
+        <th>Email Error</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody id="asnRequestTableBody">
+      <tr class="state-row"><td colspan="13">Loading ASN requests…</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <!-- Delivery Requests sub-table -->
+  <div id="deliveryRequestTableWrap" class="table-scroll-x" hidden>
+  <table id="deliveryRequestTable">
+    <colgroup>
+      <col class="col-exf-request-id" />
+      <col class="col-date" />
+      <col class="col-date" />
+      <col class="col-vendor" />
+      <col class="col-vendor" />
+      <col class="col-email" />
+      <col class="col-email" />
+      <col class="col-notes" />
+      <col class="col-po-count" />
+      <col class="col-status" />
+      <col class="col-date" />
+      <col class="col-notes" />
+      <col class="col-actions" />
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Request ID</th>
+        <th>Delivery Date</th>
+        <th>Request Date</th>
+        <th>From</th>
+        <th>To</th>
+        <th>Email</th>
+        <th>CC</th>
+        <th>Notes</th>
+        <th>PO Count</th>
+        <th>Email Status</th>
+        <th>Email Sent</th>
+        <th>Email Error</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody id="deliveryRequestTableBody">
+      <tr class="state-row"><td colspan="13">Loading delivery requests…</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <!-- Pickup Requests sub-table -->
+  <div id="pickupRequestTableWrap" class="table-scroll-x" hidden>
+  <table id="pickupRequestTable">
+    <colgroup>
+      <col class="col-exf-request-id" />
+      <col class="col-date" />
+      <col class="col-date" />
+      <col class="col-vendor" />
+      <col class="col-vendor" />
+      <col class="col-email" />
+      <col class="col-email" />
+      <col class="col-notes" />
+      <col class="col-po-count" />
+      <col class="col-status" />
+      <col class="col-date" />
+      <col class="col-notes" />
+      <col class="col-actions" />
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Request ID</th>
+        <th>Pickup Date</th>
+        <th>Request Date</th>
+        <th>From</th>
+        <th>To</th>
+        <th>Email</th>
+        <th>CC</th>
+        <th>Notes</th>
+        <th>PO Count</th>
+        <th>Email Status</th>
+        <th>Email Sent</th>
+        <th>Email Error</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody id="pickupRequestTableBody">
+      <tr class="state-row"><td colspan="13">Loading pickup requests…</td></tr>
+    </tbody>
+  </table>
+  </div>
+
 </div>
 
 <div id="chargebackTableWrap" class="table-scroll-y" hidden>
@@ -371,24 +523,36 @@
   </div>
 </footer>
 
-<div id="editTablePopover" class="column-filter-popover edit-table-popover" hidden>
-  <div class="edit-table-header">
-    <span class="edit-table-title">Show columns</span>
-    <div class="edit-table-toolbar-links">
-      <button type="button" class="column-filter-link" id="editTableSelectAll">Select all</button>
-      <span class="column-filter-sep">|</span>
-      <button type="button" class="column-filter-link" id="editTableClearAll">Clear all</button>
+<div id="editTableBackdrop" class="edit-table-backdrop" hidden>
+  <div id="editTablePopover" class="edit-table-modal" role="dialog" aria-labelledby="editTableTitle" aria-modal="true">
+    <div class="edit-table-header">
+      <span class="edit-table-title" id="editTableTitle">Edit table</span>
+      <p class="edit-table-subtitle">Choose columns on the left. Drag the list on the right to set display order.</p>
+      <div class="edit-table-toolbar-links">
+        <button type="button" class="column-filter-link" id="editTableSelectAll">Select all</button>
+        <span class="column-filter-sep">|</span>
+        <button type="button" class="column-filter-link" id="editTableClearAll">Clear all</button>
+      </div>
     </div>
-  </div>
-  <div class="edit-table-list" id="editTableColumnList"></div>
-  <div class="edit-table-default-actions">
-    <button type="button" class="column-filter-link" id="editTableSaveDefault">Save as default</button>
-    <span class="column-filter-sep">|</span>
-    <button type="button" class="column-filter-link" id="editTableResetDefault">Reset to default</button>
-  </div>
-  <div class="column-filter-footer">
-    <button type="button" class="btn btn-primary column-filter-ok" id="editTableOk">OK</button>
-    <button type="button" class="btn column-filter-cancel" id="editTableCancel">Cancel</button>
+    <div class="edit-table-panels">
+      <div class="edit-table-panel edit-table-panel-picker">
+        <div class="edit-table-panel-title">Columns</div>
+        <div class="edit-table-picker-list" id="editTableColumnPicker"></div>
+      </div>
+      <div class="edit-table-panel edit-table-panel-order">
+        <div class="edit-table-panel-title">Column order</div>
+        <div class="edit-table-order-list" id="editTableColumnOrder"></div>
+      </div>
+    </div>
+    <div class="edit-table-default-actions">
+      <button type="button" class="column-filter-link" id="editTableSaveDefault">Save as default</button>
+      <span class="column-filter-sep">|</span>
+      <button type="button" class="column-filter-link" id="editTableResetDefault">Reset to default</button>
+    </div>
+    <div class="column-filter-footer">
+      <button type="button" class="btn btn-primary column-filter-ok" id="editTableOk">OK</button>
+      <button type="button" class="btn column-filter-cancel" id="editTableCancel">Cancel</button>
+    </div>
   </div>
 </div>
 

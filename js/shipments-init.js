@@ -17,14 +17,28 @@ function initShipmentSelection() {
 
 function initShipments() {
   document.getElementById("navTabPo")?.addEventListener("click", () => switchAppView("po"));
-  document.getElementById("navTabExfRequests")?.addEventListener("click", () => switchAppView("exfRequests"));
+  document.getElementById("navTabRequests")?.addEventListener("click", () => switchAppView("requests"));
   document.getElementById("navTabShipments")?.addEventListener("click", () => switchAppView("shipments"));
   document.getElementById("navTabChargebacks")?.addEventListener("click", () => switchAppView("chargebacks"));
   document.getElementById("shipmentSearchInput")?.addEventListener("input", applyShipmentFilters);
-  document.getElementById("exfRequestSearchInput")?.addEventListener("input", () => {
-    if (typeof applyExfRequestFilters === "function") applyExfRequestFilters();
-  });
   document.getElementById("chargebackSearchInput")?.addEventListener("input", applyChargebackFilters);
+
+  // Unified requests search: routes to active type's filter
+  document.getElementById("requestsSearchInput")?.addEventListener("input", e => {
+    const q = e.target.value;
+    // Mirror to the type-specific hidden input so individual filters pick it up
+    const hiddenId = currentRequestType + "RequestSearchInput";
+    const hiddenEl = document.getElementById(hiddenId);
+    if (hiddenEl) hiddenEl.value = q;
+    switchRequestType(currentRequestType);
+  });
+
+  // Request type filter buttons
+  document.getElementById("requestTypeFilters")?.addEventListener("click", e => {
+    const btn = e.target.closest("[data-request-type]");
+    if (!btn) return;
+    switchRequestType(btn.dataset.requestType);
+  });
   document.getElementById("createShipmentBtn")?.addEventListener("click", openCreateShipmentFromSelection);
   document.getElementById("createShipmentSaveBtn")?.addEventListener("click", submitCreateShipment);
   document.getElementById("createShipmentCancelBtn")?.addEventListener("click", closeCreateShipmentModal);

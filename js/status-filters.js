@@ -87,7 +87,7 @@ function statusSortIndex(status) {
 }
 
 /** Default multi-column sort when no header sort is active (first = highest priority). */
-const DEFAULT_SORT_COLUMNS = ["Status", "CXL Date", "Buyer", "Buyer PO #"];
+const DEFAULT_SORT_COLUMNS = ["CXL Date", "Status", "Buyer", "Buyer PO #"];
 
 const DIVISIONS = ["Elevator Disco", "Freesia"];
 

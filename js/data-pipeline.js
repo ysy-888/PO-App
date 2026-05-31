@@ -8,10 +8,9 @@ async function loadData() {
       allAsnRequests = [];
       allPackingLists = DEMO_PACKING_LISTS.map(normalizePackingList);
       allPackingCartons = DEMO_PACKING_CARTONS.map(normalizePackingCarton);
-      allVendorEmailRows = [
-        { Vendor: "Blue Fabrics", Email: "demo@example.com", CC: "" },
-        { Vendor: "Summit Goods", Email: "demo@example.com", CC: "" },
-      ];
+      allContactRows = typeof DEMO_CONTACTS !== "undefined" ? DEMO_CONTACTS.map(r => ({ ...r })) : [];
+      allVendorEmailRows = allContactRows;
+      allLocationRows = typeof DEMO_LOCATIONS !== "undefined" ? DEMO_LOCATIONS.map(r => ({ ...r })) : [];
       window.__pendingShipments = DEMO_SHIPMENTS;
       window.__pendingExfRequests = [];
       window.__pendingAsnRequests = [];
@@ -41,7 +40,9 @@ async function loadData() {
       allAsnRequests = (json.asnRequests ?? []).map(row => ({ ...row }));
       allPackingLists = (json.packingLists ?? []).map(normalizePackingList);
       allPackingCartons = (json.packingCartons ?? []).map(normalizePackingCarton);
-      allVendorEmailRows = json.vendors ?? [];
+      allContactRows = json.contacts ?? json.vendors ?? [];
+      allVendorEmailRows = allContactRows;
+      allLocationRows = json.locations ?? [];
       window.__pendingShipments = json.shipments ?? [];
       window.__pendingExfRequests = json.exfRequests ?? [];
       window.__pendingAsnRequests = json.asnRequests ?? [];

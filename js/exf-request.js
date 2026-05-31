@@ -111,10 +111,7 @@ function applyExfRequestFilters() {
 }
 
 function updateExfRequestRowCounter() {
-  const el = document.getElementById("exfRequestRowCounter");
-  if (!el) return;
-  const total = filteredExfRequests.length;
-  el.textContent = total === 1 ? "1 EXF request" : `${total} EXF requests`;
+  if (typeof updateRequestsRowCounter === "function") updateRequestsRowCounter();
 }
 
 function formatExfRequestTableCell(col, request) {
@@ -412,7 +409,7 @@ function buildExfRequestModalLayout({ exfDate, vendor, linkedPos, showAddPanel =
   form.appendChild(createRequestFormField("Vendor", "Vendor", vendor, { readOnly: true }));
   form.appendChild(createRequestFormField("Vendor Email", "Vendor Email", exfRequestDraftEmail.email ?? vendorEmailInfo.email));
   form.appendChild(createRequestFormField("CC", EXF_REQ_CC_FIELD, exfRequestDraftEmail.cc ?? vendorEmailInfo.cc));
-  form.appendChild(createRequestFormField("ExfReqNotes", EXF_REQ_NOTES_FIELD, exfRequestDraftNotes, { type: "textarea" }));
+  form.appendChild(createRequestFormField("Notes", EXF_REQ_NOTES_FIELD, exfRequestDraftNotes, { type: "textarea" }));
   left.appendChild(form);
 
   const right = document.createElement("div");

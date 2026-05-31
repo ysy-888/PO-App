@@ -345,7 +345,11 @@ const STATUS_BADGE = {
 };
 
 const DATE_FIELDS = new Set([
-  "PO Date","Shipped","ETD","ETA","IHD","EST EXF","EST IHD","EXF","CXL Date","Assign Date","EXF Request Date",
+  "PO Date","Shipped","ETD","ETA","IHD","EST EXF","EST IHD","EXF","CXL Date","Assign Date",
+  "EXF Request Date","EXF Date","EXF Req Date",
+  "ASN Date","ASN Req Date",
+  "Delivery Date","Delivery Req Date",
+  "Pickup Date","Pickup Req Date",
 ]);
 
 const COUNTDOWN_DATE_COLS = new Set([

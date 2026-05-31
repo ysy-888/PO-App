@@ -12,7 +12,7 @@ function escapeHtml(value) {
     .replace(/'/g, "&#39;");
 }
 
-const EMPTY_DISPLAY = "\u2014";
+const EMPTY_DISPLAY = "\u2013";
 const EN_DASH = "\u2013";
 const ELLIPSIS = "\u2026";
 const CHECK_MARK = "\u2713";
@@ -242,6 +242,67 @@ function openHeaderMenu() {
   updateHeaderMenuChecks();
 }
 
+let thTooltipEl = null;
+
+function getThTooltipEl() {
+  if (thTooltipEl) return thTooltipEl;
+  thTooltipEl = document.createElement("div");
+  thTooltipEl.id = "thTooltipCard";
+  thTooltipEl.className = "th-tooltip-card";
+  thTooltipEl.hidden = true;
+  document.body.appendChild(thTooltipEl);
+  return thTooltipEl;
+}
+
+function hideThTooltip() {
+  const tooltip = getThTooltipEl();
+  tooltip.hidden = true;
+}
+
+function positionThTooltip(targetEl, text) {
+  const tooltip = getThTooltipEl();
+  tooltip.textContent = text;
+  tooltip.hidden = false;
+  const rect = targetEl.getBoundingClientRect();
+  tooltip.style.left = `${rect.left + rect.width / 2}px`;
+  tooltip.style.top = `${rect.bottom + 6}px`;
+}
+
+function isTextTruncated(el) {
+  return el.scrollWidth > el.clientWidth + 1;
+}
+
+function getThTooltipTarget(th) {
+  if (th.classList.contains("th-flag-col")
+    || th.classList.contains("th-packing-list-col")
+    || th.classList.contains("th-select-col")
+    || th.classList.contains("th-shipment-id-col")) {
+    return null;
+  }
+  const label = th.querySelector(".th-label");
+  if (label) return label;
+  if (th.querySelector("input, svg, button")) return null;
+  return th;
+}
+
+function initHeaderTooltips() {
+  document.querySelectorAll("table thead th").forEach(th => {
+    const target = getThTooltipTarget(th);
+    if (!target) return;
+    const text = target.textContent.trim();
+    if (!text) return;
+
+    target.addEventListener("mouseenter", () => {
+      if (!isTextTruncated(target)) return;
+      positionThTooltip(target, text);
+    });
+    target.addEventListener("mouseleave", hideThTooltip);
+  });
+
+  window.addEventListener("scroll", hideThTooltip, true);
+  window.addEventListener("resize", hideThTooltip);
+}
+
 function initHeaderMenu() {
   const btn = document.getElementById("headerMenuBtn");
   const menu = document.getElementById("headerMenuDropdown");
@@ -256,7 +317,7 @@ function initHeaderMenu() {
   document.getElementById("headerMenuEditTable")?.addEventListener("click", e => {
     e.stopPropagation();
     closeHeaderMenu();
-    openEditTablePopover(btn);
+    openEditTablePopover();
   });
 
   initCsvImport();

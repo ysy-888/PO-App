@@ -1145,7 +1145,15 @@ function createStylePhotoPlaceholders() {
   return wrap;
 }
 
+function syncPackingListPanelOpenForRow(row) {
+  if (hasPackingList(row?.["PO #"])) {
+    packingListPanelOpen = true;
+  }
+}
+
 function renderModalContent(row) {
+  syncPackingListPanelOpenForRow(row);
+
   const poNumEl = document.getElementById("modalPoNum");
   const flagEl = document.getElementById("modalFlagBtn");
   const bodyEl = document.getElementById("modalBody");
@@ -1200,7 +1208,7 @@ function shouldIgnoreRowDblClick(e) {
 function openPODetail(row) {
   if (isAppSaving()) return;
   closeCellSelectDropdown(false);
-  packingListPanelOpen = false;
+  packingListPanelOpen = hasPackingList(row?.["PO #"]);
   modalRow = snapshotModalRow(row);
   modalSnapshot = snapshotModalRow(row);
   renderModalContent(modalRow);
@@ -1500,7 +1508,6 @@ async function saveModalChanges() {
       if (!savedPackingUpdates) return;
       applyModalUpdatesToTableRow(poNumber, savedPackingUpdates);
       modalSnapshot = snapshotModalRow(modalRow);
-      packingListPanelOpen = false;
       renderModalContent(modalRow);
       updateModalSaveState();
       queuePoTableRefresh();

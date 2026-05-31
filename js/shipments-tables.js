@@ -279,18 +279,23 @@ function renderShipmentSelectedCell(td, shipment) {
   td.appendChild(cb);
 }
 
+const SHIPMENT_LINK_ICON_SVG =
+  `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">` +
+  `<path d="M3 7h11v10H3z"/><path d="M14 10h4l3 3v4h-7z"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>`;
+
 function renderShipmentIdCell(td, row) {
   td.className = "readonly readonly-no-select td-shipment-id-cell";
   const id = String(row[SHIPMENT_ID_FIELD] ?? "").trim();
   if (!id) {
-    setDisplayText(td, EMPTY_DISPLAY);
+    td.replaceChildren();
     return;
   }
   const btn = document.createElement("button");
   btn.type = "button";
-  btn.className = "shipment-id-link";
-  btn.textContent = id;
-  btn.title = "Open shipment";
+  btn.className = "shipment-id-link shipment-id-icon-btn";
+  btn.innerHTML = SHIPMENT_LINK_ICON_SVG;
+  btn.title = `Open shipment ${id}`;
+  btn.setAttribute("aria-label", `Open shipment ${id}`);
   btn.addEventListener("click", e => {
     e.stopPropagation();
     openShipmentDetail(id);
@@ -298,42 +303,95 @@ function renderShipmentIdCell(td, row) {
   td.appendChild(btn);
 }
 
+let currentRequestType = "exf"; // "exf" | "asn" | "delivery" | "pickup"
+
+function switchRequestType(type) {
+  currentRequestType = type;
+
+  ["exf", "asn", "delivery", "pickup"].forEach(t => {
+    const wrap = document.getElementById(t === "exf" ? "exfRequestTableWrap" : t + "RequestTableWrap");
+    if (wrap) wrap.hidden = t !== type;
+    const btn = document.querySelector(`[data-request-type="${t}"]`);
+    if (btn) btn.classList.toggle("active", t === type);
+  });
+
+  // Route the shared search input to the active type's filter function
+  const searchInput = document.getElementById("requestsSearchInput");
+  const q = (searchInput?.value ?? "").toLowerCase();
+  if (type === "exf" && typeof applyExfRequestFilters === "function") {
+    document.getElementById("exfRequestSearchInput").value = q;
+    applyExfRequestFilters();
+  } else if (type === "asn" && typeof applyAsnRequestFilters === "function") {
+    document.getElementById("asnRequestSearchInput").value = q;
+    applyAsnRequestFilters();
+  } else if (type === "delivery" && typeof applyDeliveryRequestFilters === "function") {
+    document.getElementById("deliveryRequestSearchInput").value = q;
+    applyDeliveryRequestFilters();
+  } else if (type === "pickup" && typeof applyPickupRequestFilters === "function") {
+    document.getElementById("pickupRequestSearchInput").value = q;
+    applyPickupRequestFilters();
+  }
+
+  updateRequestsRowCounter();
+}
+
+function updateRequestsRowCounter() {
+  const counterEl = document.getElementById("requestsRowCounter");
+  if (!counterEl) return;
+  let count = 0;
+  let label = "requests";
+  if (currentRequestType === "exf") {
+    count = typeof filteredExfRequests !== "undefined" ? filteredExfRequests.length : 0;
+    label = count === 1 ? "EXF request" : "EXF requests";
+  } else if (currentRequestType === "asn") {
+    count = typeof filteredAsnRequests !== "undefined" ? filteredAsnRequests.length : 0;
+    label = count === 1 ? "ASN request" : "ASN requests";
+  } else if (currentRequestType === "delivery") {
+    count = typeof filteredDeliveryRequests !== "undefined" ? filteredDeliveryRequests.length : 0;
+    label = count === 1 ? "delivery request" : "delivery requests";
+  } else if (currentRequestType === "pickup") {
+    count = typeof filteredPickupRequests !== "undefined" ? filteredPickupRequests.length : 0;
+    label = count === 1 ? "pickup request" : "pickup requests";
+  }
+  counterEl.textContent = `${count} ${label}`;
+}
+
 function switchAppView(view) {
   currentAppView = view;
   const poToolbar = document.getElementById("poToolbar");
   const shipmentToolbar = document.getElementById("shipmentToolbar");
-  const exfRequestListToolbar = document.getElementById("exfRequestListToolbar");
+  const requestsToolbar = document.getElementById("requestsToolbar");
   const chargebackToolbar = document.getElementById("chargebackToolbar");
   const poTableWrap = document.getElementById("poTableWrap");
   const shipmentTableWrap = document.getElementById("shipmentTableWrap");
-  const exfRequestTableWrap = document.getElementById("exfRequestTableWrap");
+  const requestsTableWrap = document.getElementById("requestsTableWrap");
   const chargebackTableWrap = document.getElementById("chargebackTableWrap");
   const poTab = document.getElementById("navTabPo");
-  const exfTab = document.getElementById("navTabExfRequests");
+  const requestsTab = document.getElementById("navTabRequests");
   const shipTab = document.getElementById("navTabShipments");
   const chargebackTab = document.getElementById("navTabChargebacks");
 
   if (poToolbar) poToolbar.hidden = view !== "po";
   if (shipmentToolbar) shipmentToolbar.hidden = view !== "shipments";
-  if (exfRequestListToolbar) exfRequestListToolbar.hidden = view !== "exfRequests";
+  if (requestsToolbar) requestsToolbar.hidden = view !== "requests";
   if (chargebackToolbar) chargebackToolbar.hidden = view !== "chargebacks";
   if (poTableWrap) poTableWrap.hidden = view !== "po";
   if (shipmentTableWrap) shipmentTableWrap.hidden = view !== "shipments";
-  if (exfRequestTableWrap) exfRequestTableWrap.hidden = view !== "exfRequests";
+  if (requestsTableWrap) requestsTableWrap.hidden = view !== "requests";
   if (chargebackTableWrap) chargebackTableWrap.hidden = view !== "chargebacks";
   const poFooterEnd = document.getElementById("poFooterEnd");
   if (poFooterEnd) poFooterEnd.hidden = view !== "po";
   poTab?.classList.toggle("is-active", view === "po");
   poTab?.setAttribute("aria-selected", view === "po" ? "true" : "false");
-  exfTab?.classList.toggle("is-active", view === "exfRequests");
-  exfTab?.setAttribute("aria-selected", view === "exfRequests" ? "true" : "false");
+  requestsTab?.classList.toggle("is-active", view === "requests");
+  requestsTab?.setAttribute("aria-selected", view === "requests" ? "true" : "false");
   shipTab?.classList.toggle("is-active", view === "shipments");
   shipTab?.setAttribute("aria-selected", view === "shipments" ? "true" : "false");
   chargebackTab?.classList.toggle("is-active", view === "chargebacks");
   chargebackTab?.setAttribute("aria-selected", view === "chargebacks" ? "true" : "false");
 
   if (view === "shipments") applyShipmentFilters();
-  if (view === "exfRequests" && typeof applyExfRequestFilters === "function") applyExfRequestFilters();
+  if (view === "requests") switchRequestType(currentRequestType);
   if (view === "chargebacks") applyChargebackFilters();
   updateDeleteShipmentButton();
   updateDeleteChargebackButton();
