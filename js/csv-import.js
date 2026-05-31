@@ -272,7 +272,7 @@ function showCsvImportSummary(result, skippedInFile = 0) {
 }
 
 function closeCsvImportSummary(event) {
-  if (event?.target?.id === "csvImportSummaryOverlay") {
+  if (isDirectBackdropClick(event, document.getElementById("csvImportSummaryOverlay"))) {
     document.getElementById("csvImportSummaryOverlay")?.classList.remove("open");
   }
 }
@@ -286,6 +286,7 @@ function initCsvImportSummary() {
   const dismiss = () => overlay.classList.remove("open");
   closeBtn?.addEventListener("click", dismiss);
   okBtn?.addEventListener("click", dismiss);
+  bindDirectBackdropDismiss(overlay, dismiss);
   document.addEventListener("keydown", e => {
     if (e.key === "Escape" && overlay.classList.contains("open")) dismiss();
   });

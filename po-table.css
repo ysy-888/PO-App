@@ -2477,6 +2477,14 @@ td.editable:not(.select-cell):hover .editable-preview {
   color: var(--danger);
 }
 
+.modal-footer-message.success {
+  color: var(--success);
+}
+
+.modal-footer-message.error {
+  color: var(--danger);
+}
+
 .chargebacks-title {
   margin: 0;
   padding: 0;

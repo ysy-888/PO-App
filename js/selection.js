@@ -268,7 +268,13 @@ function getVisiblePageRow(index) {
 }
 
 function findRowByPo(po) {
-  return allRows.find(row => String(row["PO #"]) === String(po));
+  const key = typeof normalizePoNumber === "function" ? normalizePoNumber(po) : String(po ?? "").trim();
+  return allRows.find(row => {
+    const rowKey = typeof normalizePoNumber === "function"
+      ? normalizePoNumber(row["PO #"])
+      : String(row["PO #"] ?? "").trim();
+    return rowKey === key;
+  });
 }
 
 function getMiniSelectedRows() {

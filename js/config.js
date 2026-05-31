@@ -18,9 +18,9 @@
 */
 
 const APPS_SCRIPT_URL_LIVE =
-  "https://script.google.com/macros/s/AKfycbwOVOjiSTihbI2lREpSWtT4pz9PlZ7RmbvJYWv5JfL2Kzj7dWBNiRz99jcQ0mk1-_VBEA/exec";
+  "https://script.google.com/macros/s/AKfycbzQHBgNmgRKO5zyKaFEkBfhnH1Rc5VRx-tFAK0Zv3G_pp2Y2mHHGSlA7GkIzpAQKiEjtg/exec";
 const APPS_SCRIPT_URL_TEST =
-  "https://script.google.com/macros/s/AKfycbz51bhxc3aigJvqFcOhjOZer7b1BGCRoqn8VU2prZM_QqtLQAmRB_o919pktaVarwDQ/exec";
+  "https://script.google.com/macros/s/AKfycbzjul6E9x2CUOgOe7vZgj_dTDnbRLT-6dZQFrNlSrcv_l2u30r0dnJyvmRRSsvDJN5t/exec";
 
 const APP_MODE_STORAGE_KEY = "poTable.appMode";
 const URL_PLACEHOLDER = "YOUR_APPS_SCRIPT_WEB_APP_URL_HERE";
@@ -53,4 +53,24 @@ function isTestUrlConfigured() {
 
 function scopedStorageKey(base) {
   return `poTable.${getAppMode()}.${base}`;
+}
+
+function isDirectBackdropClick(event, overlay = event?.currentTarget) {
+  return Boolean(
+    event &&
+    overlay &&
+    event.target === overlay &&
+    overlay.dataset.backdropPointerStarted === "true"
+  );
+}
+
+function bindDirectBackdropDismiss(overlay, dismiss) {
+  if (!overlay || typeof dismiss !== "function") return;
+  overlay.addEventListener("pointerdown", event => {
+    overlay.dataset.backdropPointerStarted = event.target === overlay ? "true" : "false";
+  });
+  overlay.addEventListener("click", event => {
+    if (isDirectBackdropClick(event, overlay)) dismiss(event);
+    overlay.dataset.backdropPointerStarted = "false";
+  });
 }

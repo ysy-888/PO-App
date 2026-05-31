@@ -246,31 +246,34 @@ function updateExfRequestButton() {
   const btn = document.getElementById("exfRequestBtn");
   if (!btn) return;
   const checked = getCheckedFilteredPos();
-  const eligible = checked.filter(isPoEligibleForExfRequest);
-  btn.hidden = currentAppView !== "po" || eligible.length === 0 || !rowsHaveSingleExfRequestVendor(checked);
+  btn.hidden = currentAppView !== "po" ||
+    checked.length === 0 ||
+    !checked.every(isPoEligibleForExfRequest) ||
+    !rowsHaveSingleExfRequestVendor(checked);
 }
 
 function setExfRequestFooterMessage(message = "") {
-  const el = document.getElementById("exfRequestFooterMessage");
-  if (!el) return;
-  el.textContent = message;
-  el.hidden = !message;
+  const overlay = document.getElementById("exfRequestOverlay");
+  if (!overlay) return;
+  clearModalFooterMessageForOverlay(overlay);
+  if (message) {
+    setModalFooterMessage(message, "error", { persist: true, overlay });
+  }
 }
 
 function openExfRequestFromSelection() {
   if (isAppSaving()) return;
   const checked = getCheckedFilteredPos();
-  const eligible = checked.filter(isPoEligibleForExfRequest);
-  if (eligible.length === 0) {
-    showIndicator("Select WIP POs first", "error");
+  if (checked.length === 0 || !checked.every(isPoEligibleForExfRequest)) {
+    showIndicator("Select WIP POs with packing lists first", "error");
     return;
   }
   if (!rowsHaveSingleExfRequestVendor(checked)) {
     showIndicator("Select POs from one vendor only", "error");
     return;
   }
-  exfRequestPoNumbers = eligible.map(row => row["PO #"]);
-  exfRequestVendor = getExfRequestVendorForRows(eligible);
+  exfRequestPoNumbers = checked.map(row => row["PO #"]);
+  exfRequestVendor = getExfRequestVendorForRows(checked);
   exfRequestDraftByPo = {};
   exfRequestDraftEmail = {};
   setExfRequestFooterMessage("");
@@ -831,10 +834,9 @@ async function submitExfRequest() {
   showIndicator(`Submitting EXF request${ELLIPSIS}`, "");
 
   try {
-    let emailSent = true;
-    let emailError = "";
     if (isDemoMode()) {
       demoExfRequest(poNumbers, requestDate, memos, shipMethods, data["Vendor Email"]);
+      showIndicator(`EXF requested and email sent ${CHECK_MARK}`, "success");
     } else {
       const json = await postAppsScript({
         action: "exfRequest",
@@ -846,14 +848,15 @@ async function submitExfRequest() {
         shipMethods,
       });
       if (!json.success) throw new Error(json.error);
-      emailSent = json.emailSent !== false;
-      emailError = json.emailError || "";
-      await loadData();
-    }
-    if (emailSent) {
-      showIndicator(`EXF requested and email sent ${CHECK_MARK}`, "success");
-    } else {
-      showIndicator(`EXF email not sent; POs remain WIP until resend succeeds: ${emailError || "Missing vendor email"}`, "error");
+      queueExfRequestLocally({
+        requestId: json.exfRequestId,
+        poNumbers,
+        requestDate,
+        vendorEmail: data["Vendor Email"],
+        memos,
+        shipMethods,
+      });
+      showIndicator(`EXF request queued; email will send in background ${CHECK_MARK}`, "success");
     }
   } catch (err) {
     showIndicator("EXF request failed: " + err.message, "error");
@@ -900,14 +903,47 @@ function demoExfRequest(poNumbers, requestDate, memos, shipMethods, vendorEmail 
   updateExfRequestButton();
 }
 
+function queueExfRequestLocally({ requestId, poNumbers, requestDate, vendorEmail, memos, shipMethods }) {
+  const rows = poNumbers
+    .map(poNumber => allRows.find(r => String(r["PO #"]) === String(poNumber)))
+    .filter(Boolean);
+  const vendor = getExfRequestVendorForRows(rows);
+  const now = formatDateToYmd(new Date());
+  allExfRequests.push({
+    [EXF_REQUEST_ID_FIELD]: requestId,
+    "Request Date": requestDate,
+    "Vendor": vendor,
+    "Vendor Email": vendorEmail,
+    "PO Numbers": poNumbers.join(", "),
+    "PO Count": poNumbers.length,
+    "Total Qty": rows.reduce((sum, row) => sum + toQtyNumber(row["PO Qty"]), 0),
+    "Email Status": "Queued",
+    "Email Sent At": "",
+    "Email Error": "",
+    "Last Email Attempt At": "",
+    "Created At": now,
+    "Updated At": now,
+  });
+  poNumbers.forEach(poNumber => {
+    const row = allRows.find(r => String(r["PO #"]) === String(poNumber));
+    if (!row) return;
+    row["Ship Method"] = shipMethods[poNumber] ?? shipMethods[String(poNumber)] ?? row["Ship Method"];
+    row["EST IHD"] = calculateEstIhd(row["Ship Method"], row["EST EXF"]);
+    const memo = String(memos[poNumber] ?? memos[String(poNumber)] ?? "").trim();
+    if (memo) row[EXF_MEMO_FIELD] = memo;
+  });
+  resetLocalSelectedState(allRows);
+  applyFilters();
+  applyExfRequestFilters();
+  updateExfRequestButton();
+}
+
 function initExfRequest() {
   document.getElementById("exfRequestBtn")?.addEventListener("click", openExfRequestFromSelection);
   document.getElementById("exfRequestSubmitBtn")?.addEventListener("click", submitExfRequest);
   document.getElementById("exfRequestCancelBtn")?.addEventListener("click", closeExfRequestModal);
   document.querySelector('[data-dismiss="exf-request"]')?.addEventListener("click", closeExfRequestModal);
-  document.getElementById("exfRequestOverlay")?.addEventListener("click", e => {
-    if (e.target.id === "exfRequestOverlay") closeExfRequestModal();
-  });
+  bindDirectBackdropDismiss(document.getElementById("exfRequestOverlay"), closeExfRequestModal);
 }
 
 initExfRequest();

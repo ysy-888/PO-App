@@ -337,6 +337,7 @@ function switchAppView(view) {
   if (view === "chargebacks") applyChargebackFilters();
   updateDeleteShipmentButton();
   updateDeleteChargebackButton();
+  updateToolbarRequestButtons();
 }
 
 function applyShipmentFilters() {
@@ -546,6 +547,7 @@ function updateCreateShipmentButton() {
 
 function updateToolbarRequestButtons() {
   if (typeof updateExfRequestButton === "function") updateExfRequestButton();
+  if (typeof updateAsnRequestButton === "function") updateAsnRequestButton();
   if (typeof updateDeliveryRequestButton === "function") updateDeliveryRequestButton();
   if (typeof updatePickupRequestButton === "function") updatePickupRequestButton();
   updateCreateShipmentButton();

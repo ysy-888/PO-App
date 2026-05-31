@@ -73,6 +73,10 @@
       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v10H3z"/><path d="M14 10h4l3 3v4h-7z"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>
       Delivery Request
     </button>
+    <button type="button" class="btn btn-secondary" id="asnRequestBtn" hidden>
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+      ASN Request
+    </button>
     <button type="button" class="btn btn-secondary" id="pickupRequestBtn" hidden>
       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10v10H4z"/><path d="M14 11h3l3 3v3h-6z"/><path d="M7 7V5h4v2"/><circle cx="8" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>
       Pickup Request
@@ -492,6 +496,29 @@
   </div>
 </div>
 
+<div id="asnRequestOverlay" class="modal-backdrop">
+  <div class="modal-card shipment-modal-card" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-header-main">
+        <h3 id="asnRequestModalTitle">ASN Request</h3>
+      </div>
+      <div class="modal-header-actions">
+        <span id="asnRequestPoCount" class="shipment-modal-po-count"></span>
+        <button type="button" class="btn-close" id="asnRequestCancelBtn" aria-label="Close">✕</button>
+      </div>
+    </div>
+    <div class="modal-body" id="asnRequestBody"></div>
+    <div class="modal-footer">
+      <div id="asnRequestFooterMessage" class="modal-footer-message shipment-footer-message" role="status" aria-live="polite" hidden></div>
+      <button type="button" class="btn btn-primary" id="asnRequestSubmitBtn">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+        Create
+      </button>
+      <button type="button" class="btn" data-dismiss="asn-request">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <div id="deliveryRequestOverlay" class="modal-backdrop">
   <div class="modal-card shipment-modal-card" onclick="event.stopPropagation()">
     <div class="modal-header">
@@ -505,6 +532,7 @@
     </div>
     <div class="modal-body" id="deliveryRequestBody"></div>
     <div class="modal-footer">
+      <div id="deliveryRequestFooterMessage" class="modal-footer-message shipment-footer-message" role="status" aria-live="polite" hidden></div>
       <button type="button" class="btn btn-primary" id="deliveryRequestSubmitBtn">
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v10H3z"/><path d="M14 10h4l3 3v4h-7z"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>
         Create
@@ -527,6 +555,7 @@
     </div>
     <div class="modal-body" id="pickupRequestBody"></div>
     <div class="modal-footer">
+      <div id="pickupRequestFooterMessage" class="modal-footer-message shipment-footer-message" role="status" aria-live="polite" hidden></div>
       <button type="button" class="btn btn-primary" id="pickupRequestSubmitBtn">
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10v10H4z"/><path d="M14 11h3l3 3v3h-6z"/><path d="M7 7V5h4v2"/><circle cx="8" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>
         Create
@@ -536,7 +565,7 @@
   </div>
 </div>
 
-<div id="csvImportSummaryOverlay" class="modal-backdrop" onclick="closeCsvImportSummary(event)">
+<div id="csvImportSummaryOverlay" class="modal-backdrop">
   <div class="modal-card csv-import-summary-card" onclick="event.stopPropagation()">
     <div class="modal-header">
       <div class="modal-header-main">
@@ -600,7 +629,7 @@
   </div>
 </div>
 
-<div id="modalOverlay" class="modal-backdrop" onclick="closeModal(event)">
+<div id="modalOverlay" class="modal-backdrop">
   <div class="modal-card" onclick="event.stopPropagation()">
     <div class="modal-header">
       <div class="modal-header-main">
@@ -642,6 +671,7 @@
 <script src="js/shipments-modals.js"></script>
 <script src="js/request-modals.js"></script>
 <script src="js/exf-request.js"></script>
+<script src="js/asn-requests.js"></script>
 <script src="js/delivery-requests.js"></script>
 <script src="js/pickup-requests.js"></script>
 <script src="js/shipments-init.js"></script>

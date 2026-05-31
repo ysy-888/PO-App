@@ -234,28 +234,22 @@ function getActiveShipmentModalScope() {
   return document.querySelector("#createShipmentOverlay.open, #shipmentModalOverlay.open") ?? document;
 }
 
-function getActiveShipmentFooterMessageEl() {
-  if (document.getElementById("createShipmentOverlay")?.classList.contains("open")) {
-    return document.getElementById("createShipmentFooterMessage");
-  }
-  if (document.getElementById("shipmentModalOverlay")?.classList.contains("open")) {
-    return document.getElementById("shipmentModalFooterMessage");
-  }
-  return null;
+function getActiveShipmentModalOverlay() {
+  return document.querySelector("#createShipmentOverlay.open, #shipmentModalOverlay.open");
 }
 
 function setShipmentFooterMessage(message = "") {
-  const el = getActiveShipmentFooterMessageEl();
-  if (!el) return;
-  el.textContent = message;
-  el.hidden = !message;
+  const overlay = getActiveShipmentModalOverlay();
+  if (!overlay) return;
+  clearModalFooterMessageForOverlay(overlay);
+  if (message) {
+    setModalFooterMessage(message, "error", { persist: true, overlay });
+  }
 }
 
 function clearShipmentFooterMessage(id) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.textContent = "";
-  el.hidden = true;
+  const overlay = document.getElementById(id)?.closest(".modal-backdrop");
+  clearModalFooterMessageForOverlay(overlay || id);
 }
 
 function updateShipmentModalActionButtons() {
@@ -408,7 +402,8 @@ async function removePosFromShipment() {
     const removeSet = new Set(linked.map(row => String(row["PO #"])));
     createShipmentPoNumbers = createShipmentPoNumbers.filter(po => !removeSet.has(String(po)));
     linked.forEach(row => toggleShipmentFormPoSelected(row, false));
-    renderCreateShipmentModal(createShipmentPoNumbers);
+    rerenderOpenShipmentModalBody();
+    updateShipmentModalActionButtons();
     return;
   }
 

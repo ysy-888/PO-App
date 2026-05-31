@@ -1,6 +1,7 @@
 /** Workflow status helpers — transitions, migration, and eligibility. */
 
 const EXF_REQUESTED_FIELD = "EXF Requested";
+const ASN_REQUEST_ID_FIELD = "ASN Request ID";
 const DELIVERY_REQUEST_ID_FIELD = "Delivery Request ID";
 const PICKUP_REQUEST_ID_FIELD = "Pickup Request ID";
 
@@ -9,6 +10,7 @@ const SHIPPED_GROUP_STATUSES = new Set([
 ]);
 
 const DELIVERY_REQUEST_ELIGIBLE_STATUSES = new Set(["OTW", "Arrived at Port"]);
+const ASN_REQUEST_BUYERS = new Set(["LULU'S", "12TH TRIBE"]);
 
 const SHIPMENT_REQUIRED_FIELDS = ["Ship Method", "Shipped", "ETD", "ETA", "IHD"];
 
@@ -85,7 +87,9 @@ function rowMatchesShippedGroup(status) {
 }
 
 function isPoEligibleForExfRequest(row) {
-  return getRowStatus(row) === "WIP" && !isExfRequested(row);
+  return getRowStatus(row) === "WIP" &&
+    !isExfRequested(row) &&
+    poHasPackingList(row);
 }
 
 function isPoEligibleForShipment(row) {
@@ -94,14 +98,96 @@ function isPoEligibleForShipment(row) {
     !poHasShipment(row);
 }
 
-function isPoEligibleForDeliveryRequest(row) {
+function poHasPackingList(row) {
+  return typeof hasPackingList === "function" && hasPackingList(row?.["PO #"]);
+}
+
+function isFreesiaPo(row) {
+  return String(row?.["Division"] ?? "").trim().toLowerCase() === "freesia";
+}
+
+function normalizeRequestRuleValue(value) {
+  return String(value ?? "").trim().toUpperCase();
+}
+
+function poHasAsnRequest(row) {
+  return !isEmptyValue(row?.[ASN_REQUEST_ID_FIELD]);
+}
+
+function poHasDeliveryOrPickupRequest(row) {
+  return !isEmptyValue(row?.[DELIVERY_REQUEST_ID_FIELD]) ||
+    !isEmptyValue(row?.[PICKUP_REQUEST_ID_FIELD]);
+}
+
+function isPoReadyForRequest(row) {
   return DELIVERY_REQUEST_ELIGIBLE_STATUSES.has(getRowStatus(row)) &&
-    isEmptyValue(row[DELIVERY_REQUEST_ID_FIELD]);
+    poHasPackingList(row);
+}
+
+function allRowsHaveSameEligibleAsnBuyer(rows) {
+  if (rows.length === 0) return false;
+  return [...ASN_REQUEST_BUYERS].some(buyer =>
+    rows.every(row => normalizeRequestRuleValue(row?.["Buyer"]) === buyer)
+  );
+}
+
+function allRowsAreElevatorDisco(rows) {
+  return rows.length > 0 &&
+    rows.every(row => normalizeRequestRuleValue(row?.["Division"]) === "ELEVATOR DISCO");
+}
+
+function selectedRowsAreReadyForRequests(rows) {
+  return rows.length > 0 && rows.every(isPoReadyForRequest);
+}
+
+function areRowsEligibleForAsnRequest(rows) {
+  return selectedRowsAreReadyForRequests(rows) &&
+    allRowsHaveSameEligibleAsnBuyer(rows) &&
+    rows.every(row =>
+      isEmptyValue(row[ASN_REQUEST_ID_FIELD]) &&
+      !poHasDeliveryOrPickupRequest(row)
+    );
+}
+
+function areRowsEligibleForPickupRequest(rows) {
+  return selectedRowsAreReadyForRequests(rows) &&
+    allRowsHaveSameEligibleAsnBuyer(rows) &&
+    rows.every(row =>
+      poHasAsnRequest(row) &&
+      isEmptyValue(row[PICKUP_REQUEST_ID_FIELD]) &&
+      isEmptyValue(row[DELIVERY_REQUEST_ID_FIELD])
+    );
+}
+
+function areRowsEligibleForDeliveryRequest(rows) {
+  return selectedRowsAreReadyForRequests(rows) &&
+    allRowsAreElevatorDisco(rows) &&
+    rows.every(row =>
+      isEmptyValue(row[DELIVERY_REQUEST_ID_FIELD]) &&
+      isEmptyValue(row[PICKUP_REQUEST_ID_FIELD])
+    );
+}
+
+function isPoEligibleForAsnRequest(row) {
+  return isPoReadyForRequest(row) &&
+    ASN_REQUEST_BUYERS.has(normalizeRequestRuleValue(row?.["Buyer"])) &&
+    !poHasDeliveryOrPickupRequest(row) &&
+    isEmptyValue(row[ASN_REQUEST_ID_FIELD]);
+}
+
+function isPoEligibleForDeliveryRequest(row) {
+  return isPoReadyForRequest(row) &&
+    normalizeRequestRuleValue(row?.["Division"]) === "ELEVATOR DISCO" &&
+    isEmptyValue(row[DELIVERY_REQUEST_ID_FIELD]) &&
+    isEmptyValue(row[PICKUP_REQUEST_ID_FIELD]);
 }
 
 function isPoEligibleForPickupRequest(row) {
-  return DELIVERY_REQUEST_ELIGIBLE_STATUSES.has(getRowStatus(row)) &&
-    isEmptyValue(row[PICKUP_REQUEST_ID_FIELD]);
+  return isPoReadyForRequest(row) &&
+    ASN_REQUEST_BUYERS.has(normalizeRequestRuleValue(row?.["Buyer"])) &&
+    poHasAsnRequest(row) &&
+    isEmptyValue(row[PICKUP_REQUEST_ID_FIELD]) &&
+    isEmptyValue(row[DELIVERY_REQUEST_ID_FIELD]);
 }
 
 function getAvailableRequestedPos() {

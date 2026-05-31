@@ -16,7 +16,13 @@ async function saveUpdate(poNumber, updates, options = {}) {
       method: "POST",
       body: JSON.stringify({ action: "update", poNumber, updates: sheetUpdates })
     });
-    const json = await res.json();
+    const text = await res.text();
+    let json = {};
+    try {
+      json = text ? JSON.parse(text) : {};
+    } catch (parseErr) {
+      throw new Error(text.trim() || parseErr.message);
+    }
     if (!json.success) throw new Error(json.error);
     if (!silent) showIndicator(`Saved ${CHECK_MARK}`, "success");
     return true;
@@ -47,12 +53,61 @@ function setAppSaving(active, message = "Saving…") {
 }
 
 let indicatorTimer;
+let modalFooterTimer;
+
+function getTopmostOpenModalOverlay() {
+  const open = [...document.querySelectorAll(".modal-backdrop.open")];
+  if (!open.length) return null;
+  return open.reduce((top, el) => {
+    const z = Number.parseInt(el.style.zIndex || "", 10) || 1000;
+    const topZ = Number.parseInt(top.style.zIndex || "", 10) || 1000;
+    return z >= topZ ? el : top;
+  });
+}
+
+function getModalFooterMessageEl(overlay) {
+  return overlay?.querySelector(".modal-footer-message") ?? null;
+}
+
+function clearModalFooterMessageEl(el) {
+  if (!el) return;
+  el.textContent = "";
+  el.hidden = true;
+  el.classList.remove("success", "error");
+}
+
+function clearModalFooterMessageForOverlay(overlayOrId) {
+  const overlay = typeof overlayOrId === "string"
+    ? document.getElementById(overlayOrId)
+    : overlayOrId;
+  clearModalFooterMessageEl(getModalFooterMessageEl(overlay));
+}
+
+function setModalFooterMessage(msg, type = "", options = {}) {
+  const overlay = options.overlay || getTopmostOpenModalOverlay();
+  const el = getModalFooterMessageEl(overlay);
+  if (!el) return false;
+
+  el.textContent = msg;
+  el.hidden = !msg;
+  el.classList.remove("success", "error");
+  if (type) el.classList.add(type);
+
+  clearTimeout(modalFooterTimer);
+  if (msg && type && !options.persist) {
+    modalFooterTimer = setTimeout(() => clearModalFooterMessageEl(el), 2500);
+  }
+  return true;
+}
+
 function showIndicator(msg, type) {
   const overlayMsg = document.getElementById("appSavingMessage");
   if (isAppSaving() && !type && overlayMsg) {
     overlayMsg.textContent = msg;
     return;
   }
+
+  if (setModalFooterMessage(msg, type)) return;
 
   const el = document.getElementById("saveIndicator");
   if (!el) return;

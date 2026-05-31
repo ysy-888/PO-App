@@ -1,3 +1,4 @@
+const latestPackingUnitTotalsByPo = new Map();
 
 function bindFieldInteractions(fieldEl, col, row) {
   fieldEl.dataset.col = col;
@@ -191,8 +192,9 @@ function renderSizeGridBody(body, row) {
   totalHead.textContent = "Total";
   chart.appendChild(totalHead);
 
-  const packingActualUnits = getPackingUnitTotalsForPo(row["PO #"]);
-  const showPackingVariance = hasPackingList(row["PO #"]);
+  const packingActualUnits = getPackingUnitsForStyleChart(row);
+  const hasPackingActualUnits = packingActualUnits.some(qty => toQtyNumber(qty) > 0);
+  const showPackingVariance = hasPackingActualUnits || hasPackingList(row["PO #"]);
   const actTotalCell = showPackingVariance
     ? buildSizeGridRow(chart, row, "Actual Qty", packingActualUnits, colCount, "act")
     : null;
@@ -245,7 +247,7 @@ function buildSizeGridRow(chart, row, label, unitFields, colCount, rowType) {
 function buildSizeVarianceRow(chart, colCount) {
   const head = document.createElement("div");
   head.className = "modal-size-rowhead modal-size-rowhead--variance";
-  head.textContent = "Diff %";
+  head.textContent = "Difference %";
   chart.appendChild(head);
 
   for (let i = 0; i < colCount; i++) {
@@ -265,7 +267,21 @@ function formatSizeGridTotal(qty) {
   return n > 0 ? String(n) : "";
 }
 
-function refreshSizeGridTotals(row, poTotalCell, actTotalCell, packingActualUnits = getPackingUnitTotalsForPo(row["PO #"])) {
+function getPackingUnitsForStyleChart(row) {
+  const poNumber = String(row?.["PO #"] ?? "").trim();
+  const activeEditor = document.querySelector("#modalOverlay .packing-list-side-panel .packing-list-editor");
+  if (
+    packingListPanelOpen &&
+    poNumber &&
+    String(modalRow?.["PO #"] ?? "").trim() === poNumber &&
+    typeof activeEditor?.__getPackingCartons === "function"
+  ) {
+    return computePackingTotalsByUnit(activeEditor.__getPackingCartons());
+  }
+  return latestPackingUnitTotalsByPo.get(poNumber) ?? getPackingUnitTotalsForPo(poNumber);
+}
+
+function refreshSizeGridTotals(row, poTotalCell, actTotalCell, packingActualUnits = getPackingUnitsForStyleChart(row)) {
   if (poTotalCell) poTotalCell.textContent = formatSizeGridTotal(computePoQtyFromUnits(row));
   if (actTotalCell) {
     actTotalCell.textContent = formatSizeGridTotal(
@@ -287,7 +303,7 @@ function setSizeVarianceCell(cell, value) {
   cell.classList.add(value <= 10 ? "modal-size-variance--ok" : "modal-size-variance--warn");
 }
 
-function refreshSizeGridVariance(row, chartEl, packingActualUnits = getPackingUnitTotalsForPo(row["PO #"])) {
+function refreshSizeGridVariance(row, chartEl, packingActualUnits = getPackingUnitsForStyleChart(row)) {
   chartEl.querySelectorAll(".modal-size-variance[data-index]").forEach(cell => {
     const index = Number(cell.dataset.index);
     const value = computeQtyVariancePercent(row[PO_UNIT_FIELDS[index]], packingActualUnits[index]);
@@ -517,13 +533,8 @@ function isValidChargebackAmount(value) {
 }
 
 function setChargebackError(sourceEl, message) {
-  const errorEl = document.getElementById("modalFooterMessage");
-  if (!errorEl) {
-    showIndicator(message, "error");
-    return;
-  }
-  errorEl.textContent = message || "";
-  errorEl.hidden = !message;
+  if (setModalFooterMessage(message, message ? "error" : "", { persist: Boolean(message) })) return;
+  if (message) showIndicator(message, "error");
 }
 
 function validateChargebackForm(rowEl, chargeback) {
@@ -1117,7 +1128,7 @@ function openPODetail(row) {
 }
 
 function closeModal(event) {
-  if (event.target.id === "modalOverlay") {
+  if (isDirectBackdropClick(event, document.getElementById("modalOverlay"))) {
     cancelModalChanges();
   }
 }
@@ -1127,6 +1138,7 @@ function dismissModalOverlay() {
   modalRow = null;
   modalSnapshot = null;
   packingListPanelOpen = false;
+  clearModalFooterMessageForOverlay("modalOverlay");
   document.getElementById("modalOverlay")?.classList.remove("open");
   updateModalSaveState();
 }
@@ -1232,7 +1244,7 @@ function getActivePackingListPayload() {
 }
 
 async function persistPackingListPayload({ editor, row, existingPackingList, cartons }, poEditUpdates = {}) {
-  const poNumber = String(row["PO #"] ?? "").trim();
+  const poNumber = normalizePoNumber(row["PO #"]);
   if (!poNumber) return null;
 
   if (cartons.some(carton => computeCartonTotal(carton) <= 0)) {
@@ -1240,17 +1252,21 @@ async function persistPackingListPayload({ editor, row, existingPackingList, car
     return null;
   }
 
+  const filteredPoUpdates = filterAppsScriptPoUpdates(poEditUpdates);
   const packingList = {
     "Carton Count": cartons.length,
     "Notes": existingPackingList?.["Notes"] || "",
   };
+  const packingPoUpdates = buildPackingPoUpdatesFromCartons(cartons, cartons.length);
 
   if (isDemoMode()) {
     const packingListId = getPackingListId(existingPackingList) || generateDemoPackingListId();
     upsertLocalPackingList(poNumber, packingListId, packingList, cartons);
-    Object.assign(row, poEditUpdates);
-    applyModalUpdatesToTableRow(poNumber, poEditUpdates);
-    return poEditUpdates;
+    latestPackingUnitTotalsByPo.set(poNumber, computePackingTotalsByUnit(cartons));
+    const mergedUpdates = { ...filteredPoUpdates, ...packingPoUpdates };
+    Object.assign(row, mergedUpdates);
+    applyModalUpdatesToTableRow(poNumber, mergedUpdates);
+    return mergedUpdates;
   }
 
   const json = await postAppsScript({
@@ -1258,12 +1274,13 @@ async function persistPackingListPayload({ editor, row, existingPackingList, car
     poNumber,
     packingList,
     cartons,
-    updates: poEditUpdates,
+    updates: filteredPoUpdates,
   });
   if (!json.success) throw new Error(json.error);
   const packingListId = json.packingListId || getPackingListId(existingPackingList);
   upsertLocalPackingList(poNumber, packingListId, packingList, cartons);
-  const poUpdates = json.poUpdates || poEditUpdates;
+  latestPackingUnitTotalsByPo.set(poNumber, computePackingTotalsByUnit(cartons));
+  const poUpdates = json.poUpdates || { ...filteredPoUpdates, ...packingPoUpdates };
   Object.assign(row, poUpdates);
   applyModalUpdatesToTableRow(poNumber, poUpdates);
   return poUpdates;
@@ -1397,7 +1414,8 @@ async function saveModalChanges() {
       if (!savedPackingUpdates) return;
       applyModalUpdatesToTableRow(poNumber, savedPackingUpdates);
       modalSnapshot = snapshotModalRow(modalRow);
-      refreshModalPackingQtyDisplay(modalRow);
+      packingListPanelOpen = false;
+      renderModalContent(modalRow);
       updateModalSaveState();
       queuePoTableRefresh();
       showIndicator(`Saved ${CHECK_MARK}`, "success");
@@ -1421,6 +1439,7 @@ async function saveModalChanges() {
 }
 
 function initPoModalActions() {
+  bindDirectBackdropDismiss(document.getElementById("modalOverlay"), cancelModalChanges);
   document.getElementById("modalSaveBtn")?.addEventListener("click", () => {
     saveModalChanges();
   });

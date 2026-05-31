@@ -220,9 +220,7 @@ function initPublishToProductionModal() {
   const dismiss = () => closePublishToProductionModal();
   closeBtn?.addEventListener("click", dismiss);
   okBtn?.addEventListener("click", dismiss);
-  overlay.addEventListener("click", e => {
-    if (e.target === overlay) dismiss();
-  });
+  bindDirectBackdropDismiss(overlay, dismiss);
   document.addEventListener("keydown", e => {
     if (e.key === "Escape" && overlay.classList.contains("open")) dismiss();
   });

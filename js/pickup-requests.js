@@ -1,6 +1,8 @@
 /** Pickup Request records and modals. */
 
-const PICKUP_REQUEST_DATA_FIELDS = ["Request Date", "Location", "Notes"];
+const PICKUP_REQUEST_DATA_FIELDS = [
+  "Request Date", "Location", "Email To", "Email CC", "Email Status", "Email Sent At", "Email Error", "Notes",
+];
 
 let allPickupRequests = [];
 let pickupRequestPoNumbers = [];
@@ -23,18 +25,19 @@ function onPickupRequestsDataLoaded(pickupRequests) {
 function updatePickupRequestButton() {
   const btn = document.getElementById("pickupRequestBtn");
   if (!btn) return;
-  const eligible = getCheckedFilteredPos().filter(isPoEligibleForPickupRequest);
-  btn.hidden = currentAppView !== "po" || eligible.length === 0;
+  const selected = getCheckedFilteredPos();
+  btn.hidden = currentAppView !== "po" ||
+    !areRowsEligibleForPickupRequest(selected);
 }
 
 function openPickupRequestFromSelection() {
   if (isAppSaving()) return;
-  const eligible = getCheckedFilteredPos().filter(isPoEligibleForPickupRequest);
-  if (eligible.length === 0) {
-    showIndicator("Select OTW or Arrived at Port POs first", "error");
+  const selected = getCheckedFilteredPos();
+  if (!areRowsEligibleForPickupRequest(selected)) {
+    showIndicator("Select LULU'S or 12TH TRIBE OTW or Arrived at Port POs with packing lists and ASN requests submitted", "error");
     return;
   }
-  pickupRequestPoNumbers = eligible.map(row => row["PO #"]);
+  pickupRequestPoNumbers = selected.map(row => row["PO #"]);
   pickupRequestModalRow = null;
   renderPickupRequestModal(pickupRequestPoNumbers);
 }
@@ -90,6 +93,8 @@ function renderPickupRequestModal(poNumbers, request = {}) {
     formFields: [
       createRequestFormField("Request Date", "Request Date", request["Request Date"] ?? "", { type: "date" }),
       createRequestFormField("Location", "Location", request["Location"] ?? ""),
+      createRequestFormField("Email To", "Email To", request["Email To"] ?? ""),
+      createRequestFormField("CC", "Email CC", request["Email CC"] ?? ""),
       createRequestFormField("Notes", "Notes", request["Notes"] ?? "", { type: "textarea" }),
     ],
     linkedPos: pos,
@@ -101,6 +106,7 @@ function renderPickupRequestModal(poNumbers, request = {}) {
 function closePickupRequestModal() {
   pickupRequestPoNumbers = [];
   pickupRequestModalRow = null;
+  clearModalFooterMessageForOverlay("pickupRequestOverlay");
   document.getElementById("pickupRequestOverlay")?.classList.remove("open");
 }
 
@@ -143,8 +149,12 @@ async function submitPickupRequest() {
       );
       if (!json.success) throw new Error(json.error);
       await loadData();
+      if (!savedRow && json.emailError) {
+        showIndicator("Saved, but email failed: " + json.emailError, "error");
+        return;
+      }
     }
-    showIndicator(`Saved ${CHECK_MARK}`, "success");
+    showIndicator(!savedRow && !isEmptyValue(data["Email To"]) ? `Saved and email sent ${CHECK_MARK}` : `Saved ${CHECK_MARK}`, "success");
   } catch (err) {
     showIndicator("Save failed: " + err.message, "error");
   } finally {
@@ -161,7 +171,13 @@ function demoCreateOrUpdatePickupRequest(poNumbers, data, existing) {
       if (m) max = Math.max(max, Number(m[1]));
     });
     requestId = `PR-${String(max + 1).padStart(4, "0")}`;
-    allPickupRequests.push({ [PICKUP_REQUEST_ID_FIELD]: requestId, ...data });
+    allPickupRequests.push({
+      [PICKUP_REQUEST_ID_FIELD]: requestId,
+      ...data,
+      "Email Status": !isEmptyValue(data["Email To"]) ? "Sent" : "Not Sent",
+      "Email Sent At": !isEmptyValue(data["Email To"]) ? formatDateToYmd(new Date()) : "",
+      "Email Error": "",
+    });
   } else {
     Object.assign(existing, data);
   }
@@ -177,7 +193,7 @@ function demoCreateOrUpdatePickupRequest(poNumbers, data, existing) {
   });
   resetLocalSelectedState(allRows);
   applyFilters();
-  updatePickupRequestButton();
+  if (typeof updateToolbarRequestButtons === "function") updateToolbarRequestButtons();
 }
 
 function initPickupRequests() {
@@ -185,9 +201,7 @@ function initPickupRequests() {
   document.getElementById("pickupRequestSubmitBtn")?.addEventListener("click", submitPickupRequest);
   document.getElementById("pickupRequestCancelBtn")?.addEventListener("click", closePickupRequestModal);
   document.querySelector('[data-dismiss="pickup-request"]')?.addEventListener("click", closePickupRequestModal);
-  document.getElementById("pickupRequestOverlay")?.addEventListener("click", e => {
-    if (e.target.id === "pickupRequestOverlay") closePickupRequestModal();
-  });
+  bindDirectBackdropDismiss(document.getElementById("pickupRequestOverlay"), closePickupRequestModal);
 }
 
 initPickupRequests();

@@ -4,6 +4,7 @@ let allChargebacks = [];
 let allPackingLists = [];
 let allPackingCartons = [];
 let allVendorEmailRows = [];
+let allAsnRequests = [];
 let packingListPanelOpen = false;
 let flagFilterActive = false;
 let sortCol = null;
@@ -83,7 +84,15 @@ function getPackingListId(packingList) {
 }
 
 function getPackingListPoNumber(packingList) {
-  return String(packingList?.["PO #"] ?? "").trim();
+  return normalizePoNumber(packingList?.["PO #"]);
+}
+
+function normalizePoNumber(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const n = Number(raw);
+  if (Number.isFinite(n)) return String(n);
+  return raw;
 }
 
 // Indexed lookups for packing lists/cartons. Rebuilt lazily after any change
@@ -118,7 +127,7 @@ function ensurePackingIndex_() {
 }
 
 function getPackingListForPo(poNumber) {
-  const key = String(poNumber ?? "").trim();
+  const key = normalizePoNumber(poNumber);
   if (!key) return null;
   ensurePackingIndex_();
   return packingListByPo.get(key) ?? null;
@@ -227,7 +236,14 @@ async function postAppsScript(payload, options = {}) {
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
-    return res.json();
+    const text = await res.text();
+    let json;
+    try {
+      json = text ? JSON.parse(text) : {};
+    } catch (_parseErr) {
+      throw new Error(text.trim() || `HTTP ${res.status}`);
+    }
+    return json;
   } catch (err) {
     if (err.name === "AbortError") {
       throw new Error("Request timed out");

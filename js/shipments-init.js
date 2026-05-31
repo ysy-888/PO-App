@@ -43,12 +43,8 @@ function initShipments() {
   document.getElementById("shipmentDetailAddPosBtn")?.addEventListener("click", openShipmentAddPoPanel);
   document.getElementById("shipmentDetailRemovePosBtn")?.addEventListener("click", removePosFromShipment);
 
-  document.getElementById("shipmentModalOverlay")?.addEventListener("click", e => {
-    if (e.target.id === "shipmentModalOverlay") closeShipmentModalForce();
-  });
-  document.getElementById("createShipmentOverlay")?.addEventListener("click", e => {
-    if (e.target.id === "createShipmentOverlay") closeCreateShipmentModal();
-  });
+  bindDirectBackdropDismiss(document.getElementById("shipmentModalOverlay"), closeShipmentModalForce);
+  bindDirectBackdropDismiss(document.getElementById("createShipmentOverlay"), closeCreateShipmentModal);
 
   initShipmentSelection();
   switchAppView("po");

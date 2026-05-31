@@ -5,6 +5,7 @@ async function loadData() {
     if (isDemoMode()) {
       allRows = DEMO_DATA.map(row => ({ ...row }));
       allChargebacks = DEMO_CHARGEBACKS.map(normalizeChargeback);
+      allAsnRequests = [];
       allPackingLists = DEMO_PACKING_LISTS.map(normalizePackingList);
       allPackingCartons = DEMO_PACKING_CARTONS.map(normalizePackingCarton);
       allVendorEmailRows = [
@@ -13,6 +14,7 @@ async function loadData() {
       ];
       window.__pendingShipments = DEMO_SHIPMENTS;
       window.__pendingExfRequests = [];
+      window.__pendingAsnRequests = [];
       if (typeof onShipmentsDataLoaded === "function") {
         onShipmentsDataLoaded(DEMO_SHIPMENTS);
         window.__pendingShipments = null;
@@ -24,6 +26,10 @@ async function loadData() {
       if (typeof onDeliveryPickupDataLoaded === "function") {
         onDeliveryPickupDataLoaded([], []);
       }
+      if (typeof onAsnRequestsDataLoaded === "function") {
+        onAsnRequestsDataLoaded([]);
+        window.__pendingAsnRequests = null;
+      }
     } else {
       const url = new URL(getAppsScriptUrl());
       url.searchParams.set("_", String(Date.now()));
@@ -32,11 +38,13 @@ async function loadData() {
       if (!json.success) throw new Error(json.error);
       allRows = json.data.map(normalizeRow);
       allChargebacks = (json.chargebacks ?? []).map(normalizeChargeback);
+      allAsnRequests = (json.asnRequests ?? []).map(row => ({ ...row }));
       allPackingLists = (json.packingLists ?? []).map(normalizePackingList);
       allPackingCartons = (json.packingCartons ?? []).map(normalizePackingCarton);
       allVendorEmailRows = json.vendors ?? [];
       window.__pendingShipments = json.shipments ?? [];
       window.__pendingExfRequests = json.exfRequests ?? [];
+      window.__pendingAsnRequests = json.asnRequests ?? [];
       window.__pendingDeliveryRequests = json.deliveryRequests ?? [];
       window.__pendingPickupRequests = json.pickupRequests ?? [];
       if (typeof onShipmentsDataLoaded === "function") {
@@ -66,6 +74,10 @@ async function loadData() {
       );
       window.__pendingDeliveryRequests = null;
       window.__pendingPickupRequests = null;
+    }
+    if (typeof onAsnRequestsDataLoaded === "function") {
+      onAsnRequestsDataLoaded(isDemoMode() ? [] : (window.__pendingAsnRequests ?? []));
+      window.__pendingAsnRequests = null;
     }
     if (typeof onExfRequestsDataLoaded === "function" && window.__pendingExfRequests) {
       onExfRequestsDataLoaded(window.__pendingExfRequests);

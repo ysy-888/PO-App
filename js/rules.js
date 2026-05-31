@@ -110,6 +110,39 @@ function formatQtyVariancePercent(value) {
   return `${Number.isInteger(rounded) ? rounded : rounded.toFixed(1)}%`;
 }
 
+/** Mirror apps-script.gs EDITABLE_FIELDS for PO update payloads. */
+const APPS_SCRIPT_EDITABLE_PO_FIELDS = new Set([
+  "Flag",
+  "PO Qty", "Status", "N41 Status", "Ship Method",
+  "Vessel", "House #", "Shipped", "ETD", "ETA", "IHD",
+  "EST EXF", "EST IHD", "EXF", "CXL Date", "Assign Date", "Notes",
+  "EXF Requested", "EXF Request Date", "EXF Memo",
+  "ASN Request ID", "Delivery Request ID", "Pickup Request ID",
+  "FOB Cost", "Price", "PO Total Cost",
+  "Received Qty", "Style Category",
+  "OG", "PROTO", "FIT/PP", "BULK", "TOP", "TRIM",
+  ...PO_UNIT_FIELDS,
+]);
+
+function filterAppsScriptPoUpdates(updates) {
+  return Object.fromEntries(
+    Object.entries(updates || {}).filter(([field]) => APPS_SCRIPT_EDITABLE_PO_FIELDS.has(field))
+  );
+}
+
+function buildPackingPoUpdatesFromCartons(cartons, cartonCount) {
+  const totals = computePackingTotalsByUnit(cartons);
+  const out = {
+    "Has Packing List": true,
+    "Ctn Qty": cartonCount,
+    "Actual Qty": totals.reduce((sum, qty) => sum + qty, 0),
+  };
+  totals.forEach((qty, index) => {
+    out[`Act Unit ${index + 1}`] = qty || "";
+  });
+  return out;
+}
+
 /** Keep the PO Qty total in sync with its per-size unit fields. */
 function syncQtyTotalsForRow(row) {
   if (!row) return row;
