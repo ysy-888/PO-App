@@ -81,7 +81,7 @@ const PACKING_LIST_DATA_FIELDS = [
 ];
 
 const PACKING_CARTON_DATA_FIELDS = [
-  PACKING_LIST_ID_FIELD, "Carton #", ...PACKING_UNIT_FIELDS, "Total Units"
+  PACKING_LIST_ID_FIELD, "Carton #", ...PACKING_UNIT_FIELDS, "Total Units", "Carton Weight"
 ];
 
 function getSheet() {
@@ -513,6 +513,8 @@ function normalizePackingCartons_(cartons) {
       total += qty;
     });
     out["Total Units"] = total;
+    const weight = Number(String(carton["Carton Weight"] ?? "").trim());
+    out["Carton Weight"] = Number.isFinite(weight) && weight > 0 ? weight : "";
     return out;
   });
 }

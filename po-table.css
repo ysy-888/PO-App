@@ -2646,18 +2646,32 @@ td.editable:not(.select-cell):hover .editable-preview {
 .packing-list-header-btn,
 .packing-list-header-btn:hover,
 .packing-list-cancel-btn,
-.packing-list-cancel-btn:hover,
-.packing-list-delete-btn,
-.packing-list-delete-btn:hover {
+.packing-list-cancel-btn:hover {
   background: #fff;
   border-color: var(--border-strong);
   color: var(--text);
 }
 
-.packing-list-delete-btn {
+.packing-list-editor-heading {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.packing-list-delete-icon-btn {
+  flex: 0 0 auto;
+  min-width: 28px;
   height: 28px;
-  padding: 0 10px;
-  font-size: 11px;
+  padding: 0 6px;
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-muted);
+}
+
+.packing-list-delete-icon-btn:hover {
+  color: var(--danger);
+  background: var(--danger-tint);
+  border-color: transparent;
 }
 
 .packing-list-header-btn[hidden] {
@@ -2737,9 +2751,25 @@ td.editable:not(.select-cell):hover .editable-preview {
 
 .packing-list-controls-right {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   margin-left: auto;
+}
+
+.packing-list-count-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+}
+
+.packing-list-weight-summary {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  line-height: 1.2;
+  min-height: 12px;
+  white-space: nowrap;
 }
 
 .packing-list-count-label {
@@ -2871,6 +2901,21 @@ td.editable:not(.select-cell):hover .editable-preview {
   flex-direction: column;
   gap: 0;
   overflow: hidden;
+  position: relative;
+}
+
+.packing-list-total-col-shade {
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: 4px;
+  background: rgba(45, 45, 41, 0.035);
+}
+
+.packing-list-grid-panel .packing-list-grid--head,
+.packing-list-grid-panel .packing-list-grid-scroll {
+  position: relative;
+  z-index: 1;
 }
 
 .packing-list-grid-scroll {
@@ -2885,12 +2930,14 @@ td.editable:not(.select-cell):hover .editable-preview {
   --packing-rowhead-width: 36px;
   --packing-unit-width: 40px;
   --packing-total-width: 44px;
+  --packing-weight-width: 58px;
   --packing-gap: 4px;
   display: grid;
   grid-template-columns:
     var(--packing-rowhead-width)
     repeat(var(--size-col-count), minmax(0, var(--packing-unit-width)))
-    var(--packing-total-width);
+    var(--packing-total-width)
+    var(--packing-weight-width);
   gap: 5px var(--packing-gap);
   align-items: center;
   width: max-content;
@@ -2920,6 +2967,69 @@ td.editable:not(.select-cell):hover .editable-preview {
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.02em;
+  color: var(--text);
+}
+
+.packing-list-grid--body .packing-list-input:not(.packing-list-weight-input) {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.packing-list-grid--body .packing-list-input:not(.packing-list-weight-input):focus {
+  color: var(--text);
+}
+
+.packing-list-totalhead--hidden,
+.packing-list-weighthead--hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.packing-list-weight-field {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 1px;
+  min-width: 0;
+  min-height: 28px;
+  padding-bottom: 4px;
+}
+
+.packing-list-weight-field .packing-list-weight-input {
+  width: auto;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 32px;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+}
+
+.packing-list-weight-field .packing-list-weight-input:hover,
+.packing-list-weight-field .packing-list-weight-input:focus {
+  border: none;
+  box-shadow: none;
+  outline: none;
+  background: transparent;
+}
+
+.packing-list-weight-field .packing-list-weight-input:focus {
+  box-shadow: inset 0 -1px 0 var(--accent);
+}
+
+.packing-list-weight-suffix {
+  flex: 0 0 auto;
+  font-size: 9px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 
 .packing-list-rowhead--blank {
@@ -2927,7 +3037,8 @@ td.editable:not(.select-cell):hover .editable-preview {
 }
 
 .packing-list-colhead,
-.packing-list-totalhead {
+.packing-list-totalhead,
+.packing-list-weighthead {
   min-width: 0;
   text-align: center;
   font-size: 11px;
@@ -2935,7 +3046,8 @@ td.editable:not(.select-cell):hover .editable-preview {
   color: var(--text);
 }
 
-.packing-list-totalhead {
+.packing-list-totalhead,
+.packing-list-weighthead {
   font-size: 10px;
 }
 

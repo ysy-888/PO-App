@@ -697,11 +697,19 @@ function removeChargebackGridHeadersIfEmpty(block) {
   grid.querySelectorAll(".chargeback-grid-head").forEach(head => head.remove());
 }
 
+const CARTON_WEIGHT_FIELD = "Carton Weight";
+
+const PACKING_LIST_DELETE_ICON_SVG =
+  `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">` +
+  `<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>` +
+  `<path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`;
+
 function clonePackingCarton(carton, fallbackIndex) {
   const out = { "Carton #": carton?.["Carton #"] || fallbackIndex + 1 };
   for (let i = 1; i <= QTY_UNIT_COUNT; i++) {
     out[`Unit ${i}`] = carton?.[`Unit ${i}`] ?? "";
   }
+  out[CARTON_WEIGHT_FIELD] = carton?.[CARTON_WEIGHT_FIELD] ?? "";
   return out;
 }
 
@@ -718,6 +726,15 @@ function formatPackingListTotal(qty) {
   return n > 0 ? String(n) : "";
 }
 
+function computePackingWeightTotal(cartons) {
+  return cartons.reduce((sum, carton) => sum + toQtyNumber(carton[CARTON_WEIGHT_FIELD]), 0);
+}
+
+function formatPackingWeightTotal(weight) {
+  const n = toQtyNumber(weight);
+  return n > 0 ? `${n} lbs` : "";
+}
+
 function setPackingEditorTotals(container, row, cartons) {
   const totals = computePackingTotalsByUnit(cartons);
   const totalQty = totals.reduce((sum, qty) => sum + qty, 0);
@@ -727,6 +744,8 @@ function setPackingEditorTotals(container, row, cartons) {
   });
   const grandTotal = container.querySelector(".packing-list-grand-total");
   if (grandTotal) grandTotal.textContent = formatPackingListTotal(totalQty);
+  const weightSummary = container.querySelector(".packing-list-weight-summary");
+  if (weightSummary) weightSummary.textContent = formatPackingWeightTotal(computePackingWeightTotal(cartons));
 }
 
 function createPackingListEditor(row, packingList, sourceCartons) {
@@ -739,9 +758,23 @@ function createPackingListEditor(row, packingList, sourceCartons) {
   const controls = document.createElement("div");
   controls.className = "packing-list-controls";
 
+  const headingWrap = document.createElement("div");
+  headingWrap.className = "packing-list-editor-heading";
+
   const heading = document.createElement("h4");
   heading.className = "packing-list-editor-title";
   heading.textContent = "Packing List";
+
+  headingWrap.appendChild(heading);
+  if (packingList) {
+    const deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.className = "btn btn-icon packing-list-delete-icon-btn";
+    deleteBtn.setAttribute("aria-label", "Delete packing list");
+    deleteBtn.innerHTML = PACKING_LIST_DELETE_ICON_SVG;
+    deleteBtn.addEventListener("click", () => deletePackingListFromPanel(row, packingList));
+    headingWrap.appendChild(deleteBtn);
+  }
 
   const controlsRight = document.createElement("div");
   controlsRight.className = "packing-list-controls-right";
@@ -778,6 +811,13 @@ function createPackingListEditor(row, packingList, sourceCartons) {
   countStepper.append(countDecrease, countInput, countIncrease);
   countLabel.append(countText, countStepper);
 
+  const countBlock = document.createElement("div");
+  countBlock.className = "packing-list-count-block";
+  const weightSummary = document.createElement("div");
+  weightSummary.className = "packing-list-weight-summary";
+  weightSummary.setAttribute("aria-live", "polite");
+  countBlock.append(countLabel, weightSummary);
+
   function adjustCartonCount(delta) {
     const next = Math.max(1, Math.floor(Number(countInput.value) || 1) + delta);
     countInput.value = String(next);
@@ -788,22 +828,18 @@ function createPackingListEditor(row, packingList, sourceCartons) {
   countDecrease.addEventListener("click", () => adjustCartonCount(-1));
   countIncrease.addEventListener("click", () => adjustCartonCount(1));
 
-  controlsRight.appendChild(countLabel);
-  if (packingList) {
-    const deleteBtn = document.createElement("button");
-    deleteBtn.type = "button";
-    deleteBtn.className = "btn btn-secondary packing-list-delete-btn";
-    deleteBtn.textContent = "Delete Packing List";
-    deleteBtn.addEventListener("click", () => deletePackingListFromPanel(row, packingList));
-    controlsRight.appendChild(deleteBtn);
-  }
+  controlsRight.appendChild(countBlock);
 
-  controls.appendChild(heading);
+  controls.appendChild(headingWrap);
   controls.appendChild(controlsRight);
   editor.appendChild(controls);
 
   const gridPanel = document.createElement("div");
   gridPanel.className = "packing-list-grid-panel";
+  const totalColShade = document.createElement("div");
+  totalColShade.className = "packing-list-total-col-shade";
+  totalColShade.setAttribute("aria-hidden", "true");
+  gridPanel.appendChild(totalColShade);
   const headGrid = document.createElement("div");
   headGrid.className = "packing-list-grid packing-list-grid--head";
   const bodyScroll = document.createElement("div");
@@ -814,6 +850,22 @@ function createPackingListEditor(row, packingList, sourceCartons) {
   gridPanel.appendChild(headGrid);
   gridPanel.appendChild(bodyScroll);
   editor.appendChild(gridPanel);
+
+  function updateTotalColShade() {
+    const topCell = headGrid.querySelector(".packing-list-grand-total");
+    if (!topCell) {
+      totalColShade.hidden = true;
+      return;
+    }
+    const panelRect = gridPanel.getBoundingClientRect();
+    const topRect = topCell.getBoundingClientRect();
+    const bottomRect = bodyScroll.getBoundingClientRect();
+    totalColShade.hidden = false;
+    totalColShade.style.left = `${topRect.left - panelRect.left}px`;
+    totalColShade.style.width = `${topRect.width}px`;
+    totalColShade.style.top = `${topRect.top - panelRect.top}px`;
+    totalColShade.style.height = `${Math.max(0, bottomRect.bottom - topRect.top)}px`;
+  }
 
   function renderGrid() {
     headGrid.innerHTML = "";
@@ -835,13 +887,18 @@ function createPackingListEditor(row, packingList, sourceCartons) {
       headGrid.appendChild(head);
     });
     const totalHead = document.createElement("div");
-    totalHead.className = "packing-list-totalhead";
-    totalHead.textContent = "Total";
+    totalHead.className = "packing-list-totalhead packing-list-totalhead--hidden";
+    totalHead.setAttribute("aria-hidden", "true");
     headGrid.appendChild(totalHead);
+
+    const weightHead = document.createElement("div");
+    weightHead.className = "packing-list-weighthead packing-list-weighthead--hidden";
+    weightHead.setAttribute("aria-hidden", "true");
+    headGrid.appendChild(weightHead);
 
     const totalsLabel = document.createElement("div");
     totalsLabel.className = "packing-list-rowhead packing-list-rowhead--carton";
-    totalsLabel.textContent = "ctn #";
+    totalsLabel.textContent = "ctn";
     headGrid.appendChild(totalsLabel);
     labels.forEach((_, index) => {
       const cell = document.createElement("div");
@@ -852,6 +909,10 @@ function createPackingListEditor(row, packingList, sourceCartons) {
     const grandTotal = document.createElement("div");
     grandTotal.className = "packing-list-total packing-list-grand-total";
     headGrid.appendChild(grandTotal);
+
+    const totalsWeightBlank = document.createElement("div");
+    totalsWeightBlank.className = "packing-list-weight-blank";
+    headGrid.appendChild(totalsWeightBlank);
 
     cartons.forEach((carton, cartonIndex) => {
       const rowHead = document.createElement("div");
@@ -878,9 +939,28 @@ function createPackingListEditor(row, packingList, sourceCartons) {
       rowTotal.dataset.cartonIndex = String(cartonIndex);
       rowTotal.textContent = formatPackingListTotal(computeCartonTotal(carton));
       bodyGrid.appendChild(rowTotal);
+
+      const weightField = document.createElement("div");
+      weightField.className = "packing-list-weight-field";
+      const weightInput = document.createElement("input");
+      weightInput.type = "number";
+      weightInput.min = "0";
+      weightInput.step = "0.01";
+      weightInput.inputMode = "decimal";
+      weightInput.className = "packing-list-input packing-list-weight-input";
+      weightInput.placeholder = EN_DASH;
+      weightInput.value = isEmptyValue(carton[CARTON_WEIGHT_FIELD]) ? "" : String(carton[CARTON_WEIGHT_FIELD]);
+      weightInput.dataset.cartonIndex = String(cartonIndex);
+      weightInput.dataset.field = CARTON_WEIGHT_FIELD;
+      const weightSuffix = document.createElement("span");
+      weightSuffix.className = "packing-list-weight-suffix";
+      weightSuffix.textContent = "lbs";
+      weightField.append(weightInput, weightSuffix);
+      bodyGrid.appendChild(weightField);
     });
 
     setPackingEditorTotals(editor, row, cartons);
+    requestAnimationFrame(updateTotalColShade);
   }
 
   countInput.addEventListener("change", renderGrid);
@@ -893,9 +973,13 @@ function createPackingListEditor(row, packingList, sourceCartons) {
     const field = target.dataset.field;
     if (!field || !Number.isFinite(cartonIndex)) return;
     cartons[cartonIndex][field] = target.value.trim() === "" ? "" : String(toQtyNumber(target.value));
-    const rowTotal = bodyGrid.querySelector(`.packing-list-row-total[data-carton-index="${cartonIndex}"]`);
-    if (rowTotal) rowTotal.textContent = formatPackingListTotal(computeCartonTotal(cartons[cartonIndex]));
-    setPackingEditorTotals(editor, row, cartons);
+    if (field === CARTON_WEIGHT_FIELD) {
+      setPackingEditorTotals(editor, row, cartons);
+    } else {
+      const rowTotal = bodyGrid.querySelector(`.packing-list-row-total[data-carton-index="${cartonIndex}"]`);
+      if (rowTotal) rowTotal.textContent = formatPackingListTotal(computeCartonTotal(cartons[cartonIndex]));
+      setPackingEditorTotals(editor, row, cartons);
+    }
     updateModalSaveState();
   });
   gridPanel.addEventListener("keydown", e => {
@@ -1228,6 +1312,8 @@ function normalizePackingCartonsForSave(editorCartons) {
       out[field] = qty || "";
     }
     out["Total Units"] = computeCartonTotal(out);
+    const weightRaw = String(carton[CARTON_WEIGHT_FIELD] ?? "").trim();
+    out[CARTON_WEIGHT_FIELD] = weightRaw === "" ? "" : String(toQtyNumber(weightRaw));
     return out;
   });
 }
