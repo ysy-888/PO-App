@@ -10,8 +10,6 @@ const PACKING_LISTS_SHEET_NAME = "Packing Lists";
 const PACKING_CARTONS_SHEET_NAME = "Packing List Cartons";
 const COLUMN_DEFAULT_KEY = "defaultVisibleColumns";
 const STATUS_DEFAULT_KEY = "defaultStatusFilter";
-const EXF_REQUEST_EMAIL_TRIGGER_HANDLER = "processPendingExfRequestEmails_";
-const EXF_REQUEST_EMAIL_TRIGGER_DELAY_MS = 60 * 1000;
 const SHIPMENT_ID_FIELD = "Shipment ID";
 const EXF_REQUEST_ID_FIELD = "EXF Request ID";
 const ASN_REQUEST_ID_FIELD = "ASN Request ID";
@@ -20,6 +18,10 @@ const PICKUP_REQUEST_ID_FIELD = "Pickup Request ID";
 const EXF_REQUESTED_FIELD = "EXF Requested";
 const EXF_REQUEST_DATE_FIELD = "EXF Request Date";
 const EXF_MEMO_FIELD = "EXF Memo";
+const EXF_REQ_SUBMIT_DATE_FIELD = "exfReqSubmitDate";
+const EXF_DATE_FIELD = "EXF Date";
+const EXF_REQ_NOTES_FIELD = "ExfReqNotes";
+const EXF_REQ_CC_FIELD = "CC";
 const CHARGEBACK_ID_FIELD = "Chargeback ID";
 const PACKING_LIST_ID_FIELD = "Packing List ID";
 
@@ -37,7 +39,8 @@ const SHIPMENT_DATA_FIELDS = [
 ];
 
 const EXF_REQUEST_DATA_FIELDS = [
-  "Request Date", "Vendor", "Vendor Email", "PO Numbers", "PO Count", "Total Qty",
+  EXF_DATE_FIELD, EXF_REQ_SUBMIT_DATE_FIELD, "Vendor", "Vendor Email", EXF_REQ_CC_FIELD, EXF_REQ_NOTES_FIELD,
+  "PO Numbers", "PO Count", "Total Qty",
   "Email Status", "Email Sent At", "Email Error", "Last Email Attempt At", "Created At", "Updated At"
 ];
 
@@ -109,6 +112,7 @@ function getExfRequestsSheet_() {
       EXF_REQUEST_ID_FIELD, ...EXF_REQUEST_DATA_FIELDS
     ]]);
   }
+  ensureSheetHeaders_(sheet, [EXF_REQUEST_ID_FIELD, ...EXF_REQUEST_DATA_FIELDS]);
   return sheet;
 }
 
@@ -1457,7 +1461,7 @@ function getVendorEmailInfo_(vendor) {
 function getExfRequestEmailInfo_(payload, vendor) {
   const stored = getVendorEmailInfo_(vendor);
   const submittedTo = String(payload.vendorEmail ?? "").trim();
-  const submittedCc = String(payload.vendorCc ?? "").trim();
+  const submittedCc = String(payload.vendorCc ?? payload.cc ?? "").trim();
   return {
     to: submittedTo || stored.to,
     cc: submittedCc || stored.cc,
@@ -1580,7 +1584,20 @@ function getExfRequestPoTotalQty_(rows) {
   }, 0);
 }
 
-function buildExfRequestEmailHtml_(requestId, vendor, rows, requestDate, memos, shipMethods) {
+function getExfDateFromRequestRecord_(request) {
+  return String(request[EXF_DATE_FIELD] ?? request["Request Date"] ?? "").trim();
+}
+
+function getExfReqNotesFromRequestRecord_(request) {
+  return String(request[EXF_REQ_NOTES_FIELD] ?? "").trim();
+}
+
+function getExfReqCcFromRequestRecord_(request, vendor) {
+  const stored = getVendorEmailInfo_(vendor);
+  return String(request[EXF_REQ_CC_FIELD] ?? request["Vendor CC"] ?? "").trim() || stored.cc;
+}
+
+function buildExfRequestEmailHtml_(requestId, vendor, rows, exfDate, exfReqNotes, memos, shipMethods) {
   const bodyRows = rows.map(row => {
     const po = String(row["PO #"] ?? "");
     return "<tr>" +
@@ -1599,7 +1616,8 @@ function buildExfRequestEmailHtml_(requestId, vendor, rows, requestDate, memos, 
     "<p>Please confirm EXF readiness for the POs below.</p>" +
     "<p><strong>EXF Request:</strong> " + escapeHtml_(requestId) + "<br>" +
     "<strong>Vendor:</strong> " + escapeHtml_(vendor) + "<br>" +
-    "<strong>Request Date:</strong> " + escapeHtml_(requestDate) + "</p>" +
+    "<strong>EXF Date:</strong> " + escapeHtml_(exfDate) + "</p>" +
+    (exfReqNotes ? "<p><strong>Notes:</strong><br>" + escapeHtml_(exfReqNotes).replace(/\n/g, "<br>") + "</p>" : "") +
     "<table border=\"1\" cellpadding=\"6\" cellspacing=\"0\" style=\"border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px;\">" +
       "<thead><tr>" +
         "<th>PO #</th><th>Style #</th><th>Buyer</th><th>Buyer PO #</th>" +
@@ -1610,7 +1628,7 @@ function buildExfRequestEmailHtml_(requestId, vendor, rows, requestDate, memos, 
     "<p>Thank you.</p>";
 }
 
-function buildExfRequestEmailText_(requestId, vendor, rows, requestDate, memos, shipMethods) {
+function buildExfRequestEmailText_(requestId, vendor, rows, exfDate, exfReqNotes, memos, shipMethods) {
   const lines = [
     "Hello,",
     "",
@@ -1618,9 +1636,10 @@ function buildExfRequestEmailText_(requestId, vendor, rows, requestDate, memos, 
     "",
     "EXF Request: " + requestId,
     "Vendor: " + vendor,
-    "Request Date: " + requestDate,
-    "",
+    "EXF Date: " + exfDate,
   ];
+  if (exfReqNotes) lines.push("Notes: " + exfReqNotes);
+  lines.push("");
   rows.forEach(row => {
     const po = String(row["PO #"] ?? "");
     lines.push(
@@ -1639,27 +1658,22 @@ function buildExfRequestEmailText_(requestId, vendor, rows, requestDate, memos, 
   return lines.join("\n");
 }
 
-function sendExfRequestEmail_(requestId, vendor, vendorEmailInfo, rows, requestDate, memos, shipMethods) {
+function sendExfRequestEmail_(requestId, vendor, vendorEmailInfo, rows, exfDate, exfReqNotes, memos, shipMethods) {
   if (!vendorEmailInfo.to) {
     throw new Error("No vendor email found for " + vendor + ". Add it to the Vendors sheet.");
   }
 
-  const displayDate = formatEmailDate_(requestDate);
+  const displayDate = formatEmailDate_(exfDate);
   const subject = "[ELEVATOR DISCO] EXF Request - " + displayDate + " - " + vendor;
-  const htmlBody = buildExfRequestEmailHtml_(requestId, vendor, rows, displayDate, memos, shipMethods);
+  const htmlBody = buildExfRequestEmailHtml_(requestId, vendor, rows, displayDate, exfReqNotes, memos, shipMethods);
   const options = {
     to: vendorEmailInfo.to,
     subject: subject,
-    body: buildExfRequestEmailText_(requestId, vendor, rows, displayDate, memos, shipMethods),
+    body: buildExfRequestEmailText_(requestId, vendor, rows, displayDate, exfReqNotes, memos, shipMethods),
     htmlBody: htmlBody,
   };
   if (vendorEmailInfo.cc) options.cc = vendorEmailInfo.cc;
   MailApp.sendEmail(options);
-}
-
-function isQueuedExfRequestEmailStatus_(status) {
-  const s = String(status ?? "").trim().toLowerCase();
-  return s === "queued" || s === "pending";
 }
 
 function getExfRequestPoNumbersFromRecord_(request) {
@@ -1669,45 +1683,14 @@ function getExfRequestPoNumbersFromRecord_(request) {
     .filter(Boolean);
 }
 
-function removeExfRequestEmailProcessingTriggers_() {
-  ScriptApp.getProjectTriggers().forEach(trigger => {
-    if (trigger.getHandlerFunction() === EXF_REQUEST_EMAIL_TRIGGER_HANDLER) {
-      ScriptApp.deleteTrigger(trigger);
-    }
-  });
-}
-
-function scheduleExfRequestEmailProcessing_() {
-  const alreadyScheduled = ScriptApp.getProjectTriggers().some(trigger =>
-    trigger.getHandlerFunction() === EXF_REQUEST_EMAIL_TRIGGER_HANDLER
-  );
-  if (alreadyScheduled) return;
-  ScriptApp.newTrigger(EXF_REQUEST_EMAIL_TRIGGER_HANDLER)
-    .timeBased()
-    .after(EXF_REQUEST_EMAIL_TRIGGER_DELAY_MS)
-    .create();
-}
-
-function hasQueuedExfRequestEmails_(exfRequestsSheet) {
-  const rows = exfRequestsSheet.getDataRange().getValues();
-  if (rows.length < 2) return false;
-  const headers = rows[0].map(h => String(h ?? "").trim());
-  const statusCol = headers.indexOf("Email Status");
-  const idCol = headers.indexOf(EXF_REQUEST_ID_FIELD);
-  if (statusCol === -1 || idCol === -1) return false;
-  for (let i = 1; i < rows.length; i++) {
-    if (rows[i][idCol] && isQueuedExfRequestEmailStatus_(rows[i][statusCol])) return true;
-  }
-  return false;
-}
-
 function sendAndFinalizeExfRequestEmail_(exfRequestsSheet, found) {
   const request = {};
   found.headers.forEach((field, i) => { request[field] = found.values[i]; });
 
   const requestId = String(request[EXF_REQUEST_ID_FIELD] ?? "").trim();
   const poNumbers = getExfRequestPoNumbersFromRecord_(request);
-  const requestDate = request["Request Date"];
+  const exfDate = getExfDateFromRequestRecord_(request);
+  const exfReqNotes = getExfReqNotesFromRequestRecord_(request);
   const poSheet = getSheet();
   let poRows;
   let vendor;
@@ -1723,7 +1706,7 @@ function sendAndFinalizeExfRequestEmail_(exfRequestsSheet, found) {
     const storedVendorEmailInfo = getVendorEmailInfo_(vendor);
     vendorEmailInfo = {
       to: String(request["Vendor Email"] ?? "").trim() || storedVendorEmailInfo.to,
-      cc: storedVendorEmailInfo.cc,
+      cc: getExfReqCcFromRequestRecord_(request, vendor),
     };
     poRows.forEach(row => {
       const po = String(row["PO #"] ?? "");
@@ -1731,8 +1714,8 @@ function sendAndFinalizeExfRequestEmail_(exfRequestsSheet, found) {
       shipMethods[po] = row["Ship Method"] ?? "";
     });
 
-    sendExfRequestEmail_(requestId, vendor, vendorEmailInfo, poRows, requestDate, memos, shipMethods);
-    markExfRequestPosRequested_(poSheet, poNumbers, requestDate, memos, shipMethods);
+    sendExfRequestEmail_(requestId, vendor, vendorEmailInfo, poRows, exfDate, exfReqNotes, memos, shipMethods);
+    markExfRequestPosRequested_(poSheet, poNumbers, exfDate, memos, shipMethods);
     emailSent = true;
   } catch (err) {
     emailError = err && err.message ? err.message : String(err);
@@ -1754,40 +1737,6 @@ function sendAndFinalizeExfRequestEmail_(exfRequestsSheet, found) {
   };
 }
 
-function processPendingExfRequestEmails_() {
-  const lock = LockService.getScriptLock();
-  try {
-    lock.waitLock(30000);
-    removeExfRequestEmailProcessingTriggers_();
-
-    const exfRequestsSheet = getExfRequestsSheet_();
-    const rows = exfRequestsSheet.getDataRange().getValues();
-    if (rows.length < 2) return;
-
-    const headers = rows[0].map(h => String(h ?? "").trim());
-    const idCol = headers.indexOf(EXF_REQUEST_ID_FIELD);
-    const statusCol = headers.indexOf("Email Status");
-    if (idCol === -1 || statusCol === -1) return;
-
-    for (let i = 1; i < rows.length; i++) {
-      if (!rows[i][idCol] || !isQueuedExfRequestEmailStatus_(rows[i][statusCol])) continue;
-      sendAndFinalizeExfRequestEmail_(exfRequestsSheet, {
-        rowIndex: i + 1,
-        headers: headers,
-        values: rows[i],
-      });
-    }
-
-    if (hasQueuedExfRequestEmails_(exfRequestsSheet)) {
-      scheduleExfRequestEmailProcessing_();
-    }
-  } catch (err) {
-    console.error(err && err.stack ? err.stack : err);
-  } finally {
-    if (lock.hasLock()) lock.releaseLock();
-  }
-}
-
 function applyExfRequestPoDraftFields_(poSheet, poNumbers, memos, shipMethods) {
   const items = poNumbers.map(poNumber => {
     const updates = {};
@@ -1799,12 +1748,12 @@ function applyExfRequestPoDraftFields_(poSheet, poNumbers, memos, shipMethods) {
   applyPoUpdatesBatch_(poSheet, items);
 }
 
-function markExfRequestPosRequested_(poSheet, poNumbers, requestDate, memos, shipMethods) {
+function markExfRequestPosRequested_(poSheet, poNumbers, exfDate, memos, shipMethods) {
   const items = poNumbers.map(poNumber => {
     const updates = {};
     updates[EXF_REQUESTED_FIELD] = true;
     updates["Status"] = "Requested";
-    updates[EXF_REQUEST_DATE_FIELD] = requestDate;
+    updates[EXF_REQUEST_DATE_FIELD] = exfDate;
     if (shipMethods[poNumber] !== undefined) updates["Ship Method"] = shipMethods[poNumber];
     const memo = String(memos[poNumber] ?? "").trim();
     if (memo) updates[EXF_MEMO_FIELD] = memo;
@@ -1842,10 +1791,11 @@ function handleExfRequest(payload) {
   if (!Array.isArray(poNumbers) || poNumbers.length === 0) {
     return corsResponse({ success: false, error: "Select at least one PO." });
   }
-  const requestDate = String(payload.requestDate ?? "").trim();
-  if (!requestDate) {
-    return corsResponse({ success: false, error: "Request Date is required." });
+  const exfDate = String(payload.exfDate ?? payload.requestDate ?? "").trim();
+  if (!exfDate) {
+    return corsResponse({ success: false, error: "EXF Date is required." });
   }
+  const exfReqNotes = String(payload.exfReqNotes ?? "").trim();
   const memos = payload.memos || {};
   const shipMethods = payload.shipMethods || {};
   const missingShipMethods = poNumbers.filter(function(poNumber) {
@@ -1859,7 +1809,6 @@ function handleExfRequest(payload) {
   let vendor;
   try {
     poRows = getPoObjectsByNumbers_(poSheet, poNumbers);
-    assertRowsHavePackingLists_(poRows);
     vendor = assertSingleVendorForRows_(poRows);
     poRows.forEach(row => {
       const status = String(row["Status"] ?? "").trim();
@@ -1882,33 +1831,50 @@ function handleExfRequest(payload) {
 
   applyExfRequestPoDraftFields_(poSheet, poNumbers, memos, shipMethods);
 
+  let emailSent = false;
+  let emailError = "";
+  try {
+    poRows = getPoObjectsByNumbers_(poSheet, poNumbers);
+    sendExfRequestEmail_(requestId, vendor, vendorEmailInfo, poRows, exfDate, exfReqNotes, memos, shipMethods);
+    markExfRequestPosRequested_(poSheet, poNumbers, exfDate, memos, shipMethods);
+    emailSent = true;
+  } catch (err) {
+    emailError = err && err.message ? err.message : String(err);
+  }
+
   const now = new Date();
   appendRequestRow_(exfRequestsSheet, EXF_REQUEST_ID_FIELD, requestId, EXF_REQUEST_DATA_FIELDS, {
-    "Request Date": requestDate,
+    [EXF_DATE_FIELD]: exfDate,
+    [EXF_REQ_SUBMIT_DATE_FIELD]: now,
     "Vendor": vendor,
     "Vendor Email": vendorEmailInfo.to,
+    [EXF_REQ_CC_FIELD]: vendorEmailInfo.cc,
+    [EXF_REQ_NOTES_FIELD]: exfReqNotes,
     "PO Numbers": poNumbers.join(", "),
     "PO Count": poNumbers.length,
     "Total Qty": getExfRequestPoTotalQty_(poRows),
-    "Email Status": "Queued",
+    "Email Status": emailSent ? "Sent" : "Failed",
+    "Email Sent At": emailSent ? now : "",
+    "Email Error": emailError,
+    "Last Email Attempt At": now,
     "Created At": now,
     "Updated At": now,
   });
 
-  try {
-    scheduleExfRequestEmailProcessing_();
-  } catch (err) {
+  if (!emailSent) {
     return corsResponse({
       success: false,
-      error: "EXF request was saved, but the background email job could not be scheduled. Use Resend from EXF Requests.",
+      error: emailError || "EXF email failed to send.",
       exfRequestId: requestId,
+      emailSent: false,
+      emailError: emailError,
     });
   }
 
   return corsResponse({
     success: true,
     exfRequestId: requestId,
-    emailQueued: true,
+    emailSent: true,
   });
 }
 

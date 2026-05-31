@@ -731,7 +731,7 @@ function renderShipmentLinkedPoFooter(pos) {
 
 function getLinkedPosFromModalTable() {
   const tbody = getActiveShipmentModalScope()
-    .querySelector(".shipment-linked-po-table:not(.shipment-requested-po-table) tbody");
+    .querySelector(".shipment-linked-po-table tbody");
   if (!tbody) return [];
   return [...tbody.querySelectorAll("tr[data-po]")]
     .map(tr => findRowByPo(tr.dataset.po))
@@ -740,7 +740,7 @@ function getLinkedPosFromModalTable() {
 
 function updateShipmentLinkedPoSelectAllHeader(pos) {
   const cb = getActiveShipmentModalScope()
-    .querySelector(".shipment-linked-po-table:not(.shipment-requested-po-table) #shipmentLinkedPoSelectAll");
+    .querySelector(".shipment-linked-po-table #shipmentLinkedPoSelectAll");
   if (!cb) return;
 
   if (pos.length === 0) {
@@ -758,7 +758,7 @@ function updateShipmentLinkedPoSelectAllHeader(pos) {
 
 function syncLinkedPoTableCheckboxes(pos) {
   const tbody = getActiveShipmentModalScope()
-    .querySelector(".shipment-linked-po-table:not(.shipment-requested-po-table) tbody");
+    .querySelector(".shipment-linked-po-table tbody");
   if (!tbody) return;
   pos.forEach(row => {
     const po = String(row["PO #"] ?? "");

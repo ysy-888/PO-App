@@ -55,12 +55,10 @@
   <div class="toolbar-filter-cluster">
     <div class="toolbar-filter-section">
       <div class="filter-btn-group" id="divisionFilters" role="group" aria-label="Division"></div>
-      <div class="toolbar-filter-title">DIVISION</div>
     </div>
     <div class="toolbar-filter-divider" aria-hidden="true"></div>
     <div class="toolbar-filter-section">
       <div class="filter-btn-group status-filters" id="statusFilters" role="group" aria-label="Status"></div>
-      <div class="toolbar-filter-title">STATUS</div>
     </div>
   </div>
 
@@ -248,8 +246,11 @@
     <colgroup>
       <col class="col-exf-request-id" />
       <col class="col-date" />
+      <col class="col-date" />
       <col class="col-vendor" />
       <col class="col-email" />
+      <col class="col-email" />
+      <col class="col-notes" />
       <col class="col-po-count" />
       <col class="col-po-qty" />
       <col class="col-status" />
@@ -261,9 +262,12 @@
     <thead>
       <tr>
         <th>Request ID</th>
+        <th>EXF Date</th>
         <th>Request Date</th>
         <th>Vendor</th>
         <th>Vendor Email</th>
+        <th>CC</th>
+        <th>ExfReqNotes</th>
         <th>PO Count</th>
         <th>Total Qty</th>
         <th>Email Status</th>
@@ -274,7 +278,7 @@
       </tr>
     </thead>
     <tbody id="exfRequestTableBody">
-      <tr class="state-row"><td colspan="11">Loading EXF requests…</td></tr>
+      <tr class="state-row"><td colspan="14">Loading EXF requests…</td></tr>
     </tbody>
   </table>
   </div>

@@ -189,15 +189,29 @@ function renderGroupedBuyerFilterList(list) {
 }
 
 function renderStatusFilterHeaderList(list) {
-  getStatusFilterHeaderValues().forEach((value, index) => {
-    if (index === STATUS_FILTER_HEADER_GROUPS.length) {
-      const divider = document.createElement("div");
-      divider.className = "column-filter-group-divider";
-      divider.setAttribute("aria-hidden", "true");
-      list.appendChild(divider);
-    }
-    list.appendChild(createColumnFilterOption(value, "Status"));
+  const appendDivider = () => {
+    const divider = document.createElement("div");
+    divider.className = "column-filter-group-divider";
+    divider.setAttribute("aria-hidden", "true");
+    list.appendChild(divider);
+  };
+
+  STATUS_FILTER_PRIMARY_GROUPS.forEach(item => {
+    list.appendChild(createColumnFilterOption(item.value, "Status"));
   });
+  appendDivider();
+  STATUS_FILTER_SECONDARY_GROUPS.forEach(item => {
+    list.appendChild(createColumnFilterOption(item.value, "Status"));
+  });
+
+  const groupValues = new Set(STATUS_FILTER_HEADER_GROUPS.map(item => item.value));
+  const remaining = STATUS_SORT_ORDER.filter(status => !groupValues.has(status));
+  if (remaining.length > 0) {
+    appendDivider();
+    remaining.forEach(value => {
+      list.appendChild(createColumnFilterOption(value, "Status"));
+    });
+  }
 }
 
 function renderColumnFilterList() {

@@ -9,11 +9,17 @@ const EST_IHD_DAYS_BY_SHIP_METHOD = {
   "Matson": 21,
 };
 
-// Single source of truth for status filter, cell editor, and default table sort.
-// Reorder entries to change sort priority (top = first). Add/remove statuses here only.
+// Single source of truth for status filter, cell editor, and filter popover order.
+// Table default sort uses STATUS_TABLE_SORT_ORDER below.
 const STATUS_SORT_ORDER = [
   "Pending", "WIP", "Requested", "OTW", "Arrived at Port", "Scheduled",
   "In Warehouse", "Assigned", "Closed", "Hold", "CXL",
+];
+
+/** Default Status column sort priority (top = first). */
+const STATUS_TABLE_SORT_ORDER = [
+  "Assigned", "In Warehouse", "Arrived at Port", "OTW", "Requested",
+  "Hold", "WIP", "Pending", "CXL", "Closed",
 ];
 
 const STATUS_FILTER_OPEN = "__open__";
@@ -76,8 +82,8 @@ function rowMatchesStatusFilter(row) {
 }
 
 function statusSortIndex(status) {
-  const i = STATUS_SORT_ORDER.indexOf(String(status ?? "").trim());
-  return i === -1 ? STATUS_SORT_ORDER.length : i;
+  const i = STATUS_TABLE_SORT_ORDER.indexOf(String(status ?? "").trim());
+  return i === -1 ? STATUS_TABLE_SORT_ORDER.length : i;
 }
 
 /** Default multi-column sort when no header sort is active (first = highest priority). */
@@ -106,28 +112,36 @@ let activeStatus = STATUS_FILTER_OPEN;
 /** null = all statuses; empty Set = none; otherwise match any selected filter. */
 let statusFilterSelection = new Set([STATUS_FILTER_OPEN]);
 
-const STATUS_FILTER_BUTTONS = [
+const STATUS_FILTER_PRIMARY_GROUPS = [
   { label: "All", value: "" },
   { label: "Open", value: STATUS_FILTER_OPEN },
-  { label: "Shipped", value: STATUS_FILTER_SHIPPED },
   { label: "Closed", value: "Closed" },
+];
+
+const STATUS_FILTER_SECONDARY_GROUPS = [
   { label: "WIP", value: "WIP" },
   { label: "EXF REQ", value: STATUS_FILTER_EXF_REQ },
-  { label: "OTW", value: "OTW" },
+  { label: "Shipped", value: STATUS_FILTER_SHIPPED },
+  { label: "In WH", value: "In Warehouse" },
   { label: "Assigned", value: "Assigned" },
 ];
 
+const STATUS_FILTER_BUTTONS = [
+  ...STATUS_FILTER_PRIMARY_GROUPS,
+  { divider: true },
+  ...STATUS_FILTER_SECONDARY_GROUPS,
+];
+
 const STATUS_FILTER_HEADER_GROUPS = [
-  { label: "All", value: "" },
-  { label: "Open", value: STATUS_FILTER_OPEN },
-  { label: "Shipped", value: STATUS_FILTER_SHIPPED },
-  { label: "EXF REQ", value: STATUS_FILTER_EXF_REQ },
+  ...STATUS_FILTER_PRIMARY_GROUPS,
+  ...STATUS_FILTER_SECONDARY_GROUPS,
 ];
 
 function getStatusFilterHeaderValues() {
+  const groupValues = new Set(STATUS_FILTER_HEADER_GROUPS.map(item => item.value));
   return [
     ...STATUS_FILTER_HEADER_GROUPS.map(item => item.value),
-    ...STATUS_SORT_ORDER,
+    ...STATUS_SORT_ORDER.filter(status => !groupValues.has(status)),
   ];
 }
 
@@ -148,7 +162,7 @@ function rowMatchesSingleStatusFilter(row, filter) {
     return rowMatchesShippedGroup(status);
   }
   if (filter === STATUS_FILTER_EXF_REQ) {
-    return isExfRequested(row);
+    return getRowWorkflowStatus(row) === "Requested";
   }
   if (!status) {
     const n41 = String(row["N41 Status"] ?? "").trim();
@@ -172,7 +186,16 @@ function initStatusFilters() {
   };
 
   group.innerHTML = "";
-  STATUS_FILTER_BUTTONS.forEach(({ label, value }) => group.appendChild(makeBtn(label, value)));
+  STATUS_FILTER_BUTTONS.forEach(item => {
+    if (item.divider) {
+      const divider = document.createElement("div");
+      divider.className = "filter-btn-group-divider";
+      divider.setAttribute("aria-hidden", "true");
+      group.appendChild(divider);
+      return;
+    }
+    group.appendChild(makeBtn(item.label, item.value));
+  });
   syncStatusFilterToolbar();
 }
 
