@@ -7,13 +7,22 @@ const EDITABLE = new Set([
 ]);
 
 /** Set on PO sheet; values come from the linked shipment. */
-const SHIPMENT_MANAGED_PO_FIELDS = new Set(["Vessel", "House #", "EXF", "Shipped", "ETD", "ETA"]);
+const SHIPMENT_MANAGED_PO_FIELDS = new Set([
+  "Vessel", "House #", "EXF", "Shipped", "ETD", "ETA", "IHD",
+]);
 
 function isPoFieldEditable(col, row) {
   if (!EDITABLE.has(col)) return false;
   if (SHIPMENT_MANAGED_PO_FIELDS.has(col)) return false;
   if (col === "Ship Method" && typeof poHasShipment === "function" && poHasShipment(row)) {
     return false;
+  }
+  if (col === "Status" && typeof isStatusManuallyEditable === "function" && !isStatusManuallyEditable(row)) {
+    return false;
+  }
+  if (col === "Assign Date") {
+    const pickupId = String(row[PICKUP_REQUEST_ID_FIELD] ?? "").trim();
+    if (pickupId) return false;
   }
   return true;
 }

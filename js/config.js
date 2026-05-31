@@ -18,9 +18,9 @@
 */
 
 const APPS_SCRIPT_URL_LIVE =
-  "https://script.google.com/macros/s/AKfycbwuIZYB7tFf8DUJYP4AQ335sjvPssgyeFvXCmoQbyD9h0ibDl-qw3G-fSNlsT1QqjZzQg/exec";
+  "https://script.google.com/macros/s/AKfycbxP-CYBfFEWsBWeDGM3d7xL8dJ1iKxI97H72uJUK4uZmlo4UWIn1Gk4h_buQZEbR6GLKw/exec";
 const APPS_SCRIPT_URL_TEST =
-  "https://script.google.com/macros/s/AKfycbz0tgiXfiFnAbvqHxESFRS9yOLl65Yx4Bm_tgHM7xeq0jnjVZUj2Vlf81iUXi-m2jA_/exec";
+  "https://script.google.com/macros/s/AKfycbxcOg4GhWQoQJJ5RF4ttzEOkFWfid9JqQFMESgU2vrf-Yh77ynxuEg3TQrk89e7rFpn/exec";
 
 const APP_MODE_STORAGE_KEY = "poTable.appMode";
 const URL_PLACEHOLDER = "YOUR_APPS_SCRIPT_WEB_APP_URL_HERE";

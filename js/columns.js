@@ -25,13 +25,14 @@ const COLUMNS = [
   "Status","N41 Status","Division","Vendor","Buyer","Buyer PO #","SO #","PO Date","PO #",
   "Old PO #","Style #","Color","Style Category","PO Qty","Actual Qty","Ctn Qty","Received Qty","FOB Cost","PO Total Cost",
   "Vessel","House #","Shipped","ETD",
-  "EST EXF","EST IHD","Ship Method","Shipment ID","EXF","ETA","IHD","CXL Date","Assign Date","Notes"
+  "EST EXF","EST IHD","Ship Method","Shipment ID","EXF Requested",
+  "Delivery Request ID","Pickup Request ID","EXF","ETA","IHD","CXL Date","Assign Date","Notes"
 ];
 
 const COLUMN_WIDTHS = [
   52, 36, 36,
   130, 100, 120, 130, 120, 100, 80, 80, 80, 80, 100, 100, 100, 60, 60, 60, 70, 70, 80,
-  100, 80, 96, 80, 80, 80, 100, 80, 80, 80, 80, 80, 80, 200
+  100, 80, 96, 80, 80, 80, 100, 80, 72, 100, 100, 80, 80, 80, 80, 80, 80, 200
 ];
 
 const COLUMN_LABELS = {

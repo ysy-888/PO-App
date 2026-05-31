@@ -14,6 +14,7 @@
   --accent-medium: #ffffff;
   --accent-heavy: #e8ebef;
   --danger: #a32d2d;
+  --danger-tint: #f5eaea;
   --success: #1a8e2f;
   --warning: #c60505;
   --row-hover: #f3f4f6;
@@ -626,7 +627,7 @@ thead {
   position: sticky;
   top: 0px;
   z-index: 50;
-  background: #f2f3f5;
+  background: var(--surface);
 }
 
 th {
@@ -677,14 +678,14 @@ th[data-col="Notes"] {
   text-align: left;
 }
 
-th:hover { background: #e8eaed; color: var(--text); }
+th:hover { background: var(--accent-heavy); color: var(--text); }
 
 th[data-col="EXF"],
 th[data-col="ETA"],
 th[data-col="IHD"],
 th[data-col="Ship Method"],
 th[data-col="Shipment ID"] {
-  background: #e8eaed;
+  background: var(--accent-heavy);
 }
 
 th[data-col="EXF"]:hover,
@@ -692,11 +693,11 @@ th[data-col="ETA"]:hover,
 th[data-col="IHD"]:hover,
 th[data-col="Ship Method"]:hover,
 th[data-col="Shipment ID"]:hover {
-  background: #dde1e6;
+  background: var(--accent-light);
 }
 
 th[data-col="CXL Date"] {
-  background: #f0e0e0;
+  background: var(--danger-tint);
 }
 
 th[data-col="CXL Date"]:hover {
@@ -1338,8 +1339,10 @@ td.editable:not(.select-cell):hover .editable-preview {
   white-space: nowrap;
 }
 
+.badge-pending     { background: #eef0f3; color: #4b5563; }
 .badge-received    { background: #e6f1fb; color: #185fa5; }
 .badge-port        { background: #faeeda; color: #854f0b; }
+.badge-scheduled   { background: #e8f4fd; color: #1565a8; }
 .badge-wh          { background: #eaf3de; color: #3b6d11; }
 .badge-assigned    { background: #eeedfe; color: #534ab7; }
 .badge-otw         { background: #e1f5ee; color: #0f6e56; }
@@ -3140,6 +3143,48 @@ td.editable:not(.select-cell):hover .editable-preview {
   overflow: hidden;
 }
 
+.shipment-modal-outer {
+  display: flex;
+  gap: 0;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
+.shipment-modal-outer--add-panel-open .shipment-modal-layout {
+  flex: 1 1 55%;
+  min-width: 0;
+}
+
+.shipment-add-po-panel {
+  flex: 0 0 320px;
+  min-width: 280px;
+  max-width: 360px;
+  border-left: 1px solid var(--border-strong);
+  padding-left: 12px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.shipment-add-po-panel-header h4 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.shipment-modal-card .modal-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.shipment-modal-card .modal-footer .btn-primary {
+  margin-left: auto;
+}
+
 .shipment-modal-layout {
   display: flex;
   gap: 16px;
@@ -3243,7 +3288,7 @@ td.editable:not(.select-cell):hover .editable-preview {
   text-transform: uppercase;
   letter-spacing: 0.02em;
   color: var(--text);
-  background: #f0ede6;
+  background: var(--surface);
   border-bottom: 1px solid var(--border-strong);
   border-right: 1px solid var(--border);
   vertical-align: bottom;

@@ -1,11 +1,16 @@
 const SHEET_NAME = "POs";
 const SHIPMENTS_SHEET_NAME = "Shipments";
+const DELIVERY_REQUESTS_SHEET_NAME = "Delivery Requests";
+const PICKUP_REQUESTS_SHEET_NAME = "Pickup Requests";
 const CHARGEBACKS_SHEET_NAME = "Chargebacks";
 const PACKING_LISTS_SHEET_NAME = "Packing Lists";
 const PACKING_CARTONS_SHEET_NAME = "Packing List Cartons";
 const COLUMN_DEFAULT_KEY = "defaultVisibleColumns";
 const STATUS_DEFAULT_KEY = "defaultStatusFilter";
 const SHIPMENT_ID_FIELD = "Shipment ID";
+const DELIVERY_REQUEST_ID_FIELD = "Delivery Request ID";
+const PICKUP_REQUEST_ID_FIELD = "Pickup Request ID";
+const EXF_REQUESTED_FIELD = "EXF Requested";
 const CHARGEBACK_ID_FIELD = "Chargeback ID";
 const PACKING_LIST_ID_FIELD = "Packing List ID";
 
@@ -22,11 +27,15 @@ const SHIPMENT_DATA_FIELDS = [
   "Ship Method", "Vessel", "House #", "EXF", "Shipped", "ETD", "ETA", "IHD", "Notes"
 ];
 
+const DELIVERY_REQUEST_DATA_FIELDS = ["Request Date", "Location", "Notes"];
+const PICKUP_REQUEST_DATA_FIELDS = ["Request Date", "Location", "Notes"];
+
 const EDITABLE_FIELDS = [
   "Flag",
   "PO Qty", "Status", "N41 Status", "Ship Method",
   "Vessel", "House #", "Shipped", "ETD", "ETA", "IHD",
   "EST EXF", "EST IHD", "EXF", "CXL Date", "Assign Date", "Notes",
+  EXF_REQUESTED_FIELD, DELIVERY_REQUEST_ID_FIELD, PICKUP_REQUEST_ID_FIELD,
   "FOB Cost", "Price", "PO Total Cost",
   "Received Qty", "Style Category",
   "OG", "PROTO", "FIT/PP", "BULK", "TOP", "TRIM",
@@ -64,6 +73,30 @@ function getShipmentsSheet_() {
     sheet = ss.insertSheet(SHIPMENTS_SHEET_NAME);
     sheet.getRange(1, 1, 1, SHIPMENT_DATA_FIELDS.length + 1).setValues([[
       SHIPMENT_ID_FIELD, ...SHIPMENT_DATA_FIELDS
+    ]]);
+  }
+  return sheet;
+}
+
+function getDeliveryRequestsSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(DELIVERY_REQUESTS_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(DELIVERY_REQUESTS_SHEET_NAME);
+    sheet.getRange(1, 1, 1, DELIVERY_REQUEST_DATA_FIELDS.length + 1).setValues([[
+      DELIVERY_REQUEST_ID_FIELD, ...DELIVERY_REQUEST_DATA_FIELDS
+    ]]);
+  }
+  return sheet;
+}
+
+function getPickupRequestsSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(PICKUP_REQUESTS_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(PICKUP_REQUESTS_SHEET_NAME);
+    sheet.getRange(1, 1, 1, PICKUP_REQUEST_DATA_FIELDS.length + 1).setValues([[
+      PICKUP_REQUEST_ID_FIELD, ...PICKUP_REQUEST_DATA_FIELDS
     ]]);
   }
   return sheet;
@@ -482,6 +515,7 @@ function applyPoUpdatesBatch_(poSheet, items) {
 function syncPosFromShipment_(poSheet, shipmentId, shipmentData, poNumbers) {
   const syncData = pickShipmentData_(shipmentData);
   syncData[SHIPMENT_ID_FIELD] = shipmentId;
+  syncData["Status"] = "OTW";
   const list = Array.isArray(poNumbers) ? poNumbers.map(String) : [];
   applyPoUpdatesBatch_(poSheet, list.map(poNumber => ({ poNumber: poNumber, updates: syncData })));
 }
@@ -507,7 +541,21 @@ function clearPoShipmentDataAtRow_(poSheet, rowIndex, headers) {
   SHIPMENT_DATA_FIELDS.forEach(field => {
     updates[field] = "";
   });
+  const exfCol = headers.indexOf(EXF_REQUESTED_FIELD);
+  const statusCol = headers.indexOf("Status");
+  if (exfCol !== -1) {
+    const exfRequested = poSheet.getRange(rowIndex, exfCol + 1).getValue();
+    if (isTruthyCell_(exfRequested) && statusCol !== -1) {
+      updates["Status"] = "Requested";
+    }
+  }
   writePoFields_(poSheet, rowIndex, headers, updates);
+}
+
+function isTruthyCell_(value) {
+  if (value === true) return true;
+  const s = String(value ?? "").trim().toLowerCase();
+  return s === "true" || s === "yes" || s === "1";
 }
 
 function findShipmentRowIndex_(shipmentsSheet, shipmentId) {
@@ -600,6 +648,7 @@ function handleCreateShipment(payload) {
 
   try {
     assertPosNotAssigned_(poSheet, poNumbers);
+    assertPosEligibleForShipment_(poSheet, poNumbers);
   } catch (err) {
     return corsResponse({ success: false, error: err.message });
   }
@@ -1067,6 +1116,262 @@ function handleBulkUpsertPos(payload) {
   });
 }
 
+function assertPosEligibleForShipment_(poSheet, poNumbers) {
+  const list = Array.isArray(poNumbers) ? poNumbers.map(String) : [];
+  list.forEach(poNumber => {
+    const found = findPoRowIndex_(poSheet, poNumber);
+    if (!found) throw new Error("PO # not found: " + poNumber);
+    const statusCol = found.headers.indexOf("Status");
+    const exfCol = found.headers.indexOf(EXF_REQUESTED_FIELD);
+    const status = statusCol === -1 ? "" : String(poSheet.getRange(found.rowIndex, statusCol + 1).getValue() ?? "").trim();
+    const exfRequested = exfCol === -1 ? false : isTruthyCell_(poSheet.getRange(found.rowIndex, exfCol + 1).getValue());
+    if (status !== "Requested" || !exfRequested) {
+      throw new Error("PO " + poNumber + " must be EXF Requested with Status Requested.");
+    }
+  });
+}
+
+function generateDeliveryRequestId_(existing) {
+  let max = 0;
+  existing.forEach(row => {
+    const m = /^DR-(\d+)$/.exec(String(row[DELIVERY_REQUEST_ID_FIELD] ?? ""));
+    if (m) max = Math.max(max, Number(m[1]));
+  });
+  return "DR-" + String(max + 1).padStart(4, "0");
+}
+
+function generatePickupRequestId_(existing) {
+  let max = 0;
+  existing.forEach(row => {
+    const m = /^PR-(\d+)$/.exec(String(row[PICKUP_REQUEST_ID_FIELD] ?? ""));
+    if (m) max = Math.max(max, Number(m[1]));
+  });
+  return "PR-" + String(max + 1).padStart(4, "0");
+}
+
+function appendRequestRow_(sheet, idField, requestId, dataFields, data) {
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+    .map(h => String(h ?? "").trim());
+  const row = headers.map(h => {
+    if (h === idField) return requestId;
+    return data[h] !== undefined ? sanitizeCellValue_(data[h]) : "";
+  });
+  sheet.appendRow(row);
+}
+
+function pickDeliveryRequestData_(raw) {
+  const out = {};
+  DELIVERY_REQUEST_DATA_FIELDS.forEach(field => {
+    if (raw[field] !== undefined) out[field] = raw[field];
+  });
+  return out;
+}
+
+function pickPickupRequestData_(raw) {
+  const out = {};
+  PICKUP_REQUEST_DATA_FIELDS.forEach(field => {
+    if (raw[field] !== undefined) out[field] = raw[field];
+  });
+  return out;
+}
+
+function handleExfRequest(payload) {
+  const poNumbers = payload.poNumbers || [];
+  if (!Array.isArray(poNumbers) || poNumbers.length === 0) {
+    return corsResponse({ success: false, error: "Select at least one PO." });
+  }
+  const poSheet = getSheet();
+  const notes = String(payload.notes ?? "").trim();
+  const items = poNumbers.map(poNumber => {
+    const updates = {};
+    updates[EXF_REQUESTED_FIELD] = true;
+    updates["Status"] = "Requested";
+    if (notes) updates["Notes"] = notes;
+    return { poNumber: poNumber, updates: updates };
+  });
+  applyPoUpdatesBatch_(poSheet, items);
+  return corsResponse({ success: true });
+}
+
+function handleBatchUpdatePos(payload) {
+  const items = payload.items || [];
+  if (!Array.isArray(items) || items.length === 0) {
+    return corsResponse({ success: false, error: "No updates provided." });
+  }
+  const poSheet = getSheet();
+  applyPoUpdatesBatch_(poSheet, items);
+  return corsResponse({ success: true });
+}
+
+function handleAddPosToShipment(payload) {
+  const shipmentId = String(payload.shipmentId ?? "").trim();
+  const poNumbers = payload.poNumbers || [];
+  if (!shipmentId) return corsResponse({ success: false, error: "Shipment ID is required." });
+  if (!Array.isArray(poNumbers) || poNumbers.length === 0) {
+    return corsResponse({ success: false, error: "Select at least one PO." });
+  }
+
+  const shipmentsSheet = getShipmentsSheet_();
+  const poSheet = getSheet();
+  const found = findShipmentRowIndex_(shipmentsSheet, shipmentId);
+  if (!found) return corsResponse({ success: false, error: "Shipment not found: " + shipmentId });
+
+  try {
+    assertPosNotAssigned_(poSheet, poNumbers);
+    assertPosEligibleForShipment_(poSheet, poNumbers);
+  } catch (err) {
+    return corsResponse({ success: false, error: err.message });
+  }
+
+  const shipmentData = {};
+  found.headers.forEach((field, colIndex) => {
+    if (field === SHIPMENT_ID_FIELD) return;
+    shipmentData[field] = shipmentsSheet.getRange(found.rowIndex, colIndex + 1).getValue();
+  });
+  syncPosFromShipment_(poSheet, shipmentId, shipmentData, poNumbers);
+  return corsResponse({ success: true, shipmentId: shipmentId });
+}
+
+function handleRemovePosFromShipment(payload) {
+  const shipmentId = String(payload.shipmentId ?? "").trim();
+  const poNumbers = payload.poNumbers || [];
+  if (!shipmentId) return corsResponse({ success: false, error: "Shipment ID is required." });
+  if (!Array.isArray(poNumbers) || poNumbers.length === 0) {
+    return corsResponse({ success: false, error: "Select at least one PO." });
+  }
+
+  const poSheet = getSheet();
+  poNumbers.forEach(poNumber => {
+    const found = findPoRowIndex_(poSheet, poNumber);
+    if (!found) throw new Error("PO # not found: " + poNumber);
+    const shipCol = found.headers.indexOf(SHIPMENT_ID_FIELD);
+    const currentShip = shipCol === -1 ? "" : String(poSheet.getRange(found.rowIndex, shipCol + 1).getValue() ?? "").trim();
+    if (currentShip !== shipmentId) {
+      throw new Error("PO " + poNumber + " is not on shipment " + shipmentId);
+    }
+    clearPoShipmentDataAtRow_(poSheet, found.rowIndex, found.headers);
+  });
+  return corsResponse({ success: true, shipmentId: shipmentId });
+}
+
+function handleCreateDeliveryRequest(payload) {
+  const poNumbers = payload.poNumbers || [];
+  if (!Array.isArray(poNumbers) || poNumbers.length === 0) {
+    return corsResponse({ success: false, error: "Select at least one PO." });
+  }
+  const requestData = pickDeliveryRequestData_(payload.request || {});
+  if (!requestData["Request Date"]) {
+    return corsResponse({ success: false, error: "Request Date is required." });
+  }
+  if (!requestData["Location"]) {
+    return corsResponse({ success: false, error: "Location is required." });
+  }
+
+  const sheet = getDeliveryRequestsSheet_();
+  const poSheet = getSheet();
+  const existing = sheetToObjects_(sheet, DELIVERY_REQUEST_ID_FIELD);
+  const requestId = generateDeliveryRequestId_(existing);
+  appendRequestRow_(sheet, DELIVERY_REQUEST_ID_FIELD, requestId, DELIVERY_REQUEST_DATA_FIELDS, requestData);
+
+  applyPoUpdatesBatch_(poSheet, poNumbers.map(poNumber => ({
+    poNumber: poNumber,
+    updates: {
+      [DELIVERY_REQUEST_ID_FIELD]: requestId,
+      "Status": "Scheduled",
+    },
+  })));
+
+  return corsResponse({ success: true, deliveryRequestId: requestId });
+}
+
+function handleUpdateDeliveryRequest(payload) {
+  const requestId = String(payload.deliveryRequestId ?? "").trim();
+  if (!requestId) return corsResponse({ success: false, error: "Delivery Request ID is required." });
+  const requestData = pickDeliveryRequestData_(payload.request || {});
+  const sheet = getDeliveryRequestsSheet_();
+  const rows = sheet.getDataRange().getValues();
+  const headers = rows[0].map(h => String(h ?? "").trim());
+  const idCol = headers.indexOf(DELIVERY_REQUEST_ID_FIELD);
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][idCol]) !== requestId) continue;
+    headers.forEach((field, colIndex) => {
+      if (field === DELIVERY_REQUEST_ID_FIELD) return;
+      if (requestData[field] !== undefined) {
+        sheet.getRange(i + 1, colIndex + 1).setValue(sanitizeCellValue_(requestData[field]));
+      }
+    });
+    return corsResponse({ success: true, deliveryRequestId: requestId });
+  }
+  return corsResponse({ success: false, error: "Delivery request not found: " + requestId });
+}
+
+function handleCreatePickupRequest(payload) {
+  const poNumbers = payload.poNumbers || [];
+  if (!Array.isArray(poNumbers) || poNumbers.length === 0) {
+    return corsResponse({ success: false, error: "Select at least one PO." });
+  }
+  const requestData = pickPickupRequestData_(payload.request || {});
+  if (!requestData["Request Date"]) {
+    return corsResponse({ success: false, error: "Request Date is required." });
+  }
+  if (!requestData["Location"]) {
+    return corsResponse({ success: false, error: "Location is required." });
+  }
+
+  const sheet = getPickupRequestsSheet_();
+  const poSheet = getSheet();
+  const existing = sheetToObjects_(sheet, PICKUP_REQUEST_ID_FIELD);
+  const requestId = generatePickupRequestId_(existing);
+  appendRequestRow_(sheet, PICKUP_REQUEST_ID_FIELD, requestId, PICKUP_REQUEST_DATA_FIELDS, requestData);
+
+  poNumbers.forEach(poNumber => {
+    const found = findPoRowIndex_(poSheet, poNumber);
+    if (!found) throw new Error("PO # not found: " + poNumber);
+    const updates = {
+      [PICKUP_REQUEST_ID_FIELD]: requestId,
+      "Assign Date": requestData["Request Date"],
+    };
+    const divCol = found.headers.indexOf("Division");
+    const division = divCol === -1 ? "" : String(poSheet.getRange(found.rowIndex, divCol + 1).getValue() ?? "").trim();
+    if (/^freesia$/i.test(division)) {
+      updates["Status"] = "Assigned";
+    }
+    writePoFields_(poSheet, found.rowIndex, found.headers, updates);
+  });
+
+  return corsResponse({ success: true, pickupRequestId: requestId });
+}
+
+function handleUpdatePickupRequest(payload) {
+  const requestId = String(payload.pickupRequestId ?? "").trim();
+  if (!requestId) return corsResponse({ success: false, error: "Pickup Request ID is required." });
+  const requestData = pickPickupRequestData_(payload.request || {});
+  const sheet = getPickupRequestsSheet_();
+  const poSheet = getSheet();
+  const rows = sheet.getDataRange().getValues();
+  const headers = rows[0].map(h => String(h ?? "").trim());
+  const idCol = headers.indexOf(PICKUP_REQUEST_ID_FIELD);
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][idCol]) !== requestId) continue;
+    headers.forEach((field, colIndex) => {
+      if (field === PICKUP_REQUEST_ID_FIELD) return;
+      if (requestData[field] !== undefined) {
+        sheet.getRange(i + 1, colIndex + 1).setValue(sanitizeCellValue_(requestData[field]));
+      }
+    });
+    if (requestData["Request Date"]) {
+      const allPos = sheetToObjects_(poSheet, "PO #");
+      allPos.filter(row => String(row[PICKUP_REQUEST_ID_FIELD] ?? "") === requestId).forEach(row => {
+        writePoFields_(poSheet, findPoRowIndex_(poSheet, row["PO #"]).rowIndex, findPoRowIndex_(poSheet, row["PO #"]).headers, {
+          "Assign Date": requestData["Request Date"],
+        });
+      });
+    }
+    return corsResponse({ success: true, pickupRequestId: requestId });
+  }
+  return corsResponse({ success: false, error: "Pickup request not found: " + requestId });
+}
+
 function handleUpdate(payload) {
   const { poNumber, updates } = payload;
 
@@ -1092,11 +1397,15 @@ function doGet(e) {
   try {
     const poSheet = getSheet();
     const shipmentsSheet = getShipmentsSheet_();
+    const deliveryRequestsSheet = getDeliveryRequestsSheet_();
+    const pickupRequestsSheet = getPickupRequestsSheet_();
     const chargebacksSheet = getChargebacksSheet_();
     const packingListsSheet = getPackingListsSheet_();
     const packingCartonsSheet = getPackingCartonsSheet_();
     const data = sheetToObjects_(poSheet, "PO #");
     const shipments = sheetToObjects_(shipmentsSheet, SHIPMENT_ID_FIELD);
+    const deliveryRequests = sheetToObjects_(deliveryRequestsSheet, DELIVERY_REQUEST_ID_FIELD);
+    const pickupRequests = sheetToObjects_(pickupRequestsSheet, PICKUP_REQUEST_ID_FIELD);
     const chargebacks = sheetToObjects_(chargebacksSheet, CHARGEBACK_ID_FIELD);
     const packingLists = sheetToObjects_(packingListsSheet, PACKING_LIST_ID_FIELD);
     const packingCartons = sheetToObjects_(packingCartonsSheet, PACKING_LIST_ID_FIELD);
@@ -1105,6 +1414,8 @@ function doGet(e) {
       success: true,
       data: data,
       shipments: shipments,
+      deliveryRequests: deliveryRequests,
+      pickupRequests: pickupRequests,
       chargebacks: chargebacks,
       packingLists: packingLists,
       packingCartons: packingCartons,
@@ -1134,6 +1445,14 @@ function doPost(e) {
     if (action === "createShipment") return handleCreateShipment(payload);
     if (action === "updateShipment") return handleUpdateShipment(payload);
     if (action === "deleteShipment") return handleDeleteShipment(payload);
+    if (action === "addPosToShipment") return handleAddPosToShipment(payload);
+    if (action === "removePosFromShipment") return handleRemovePosFromShipment(payload);
+    if (action === "exfRequest") return handleExfRequest(payload);
+    if (action === "batchUpdatePos") return handleBatchUpdatePos(payload);
+    if (action === "createDeliveryRequest") return handleCreateDeliveryRequest(payload);
+    if (action === "updateDeliveryRequest") return handleUpdateDeliveryRequest(payload);
+    if (action === "createPickupRequest") return handleCreatePickupRequest(payload);
+    if (action === "updatePickupRequest") return handleUpdatePickupRequest(payload);
     if (action === "createChargeback") return handleCreateChargeback(payload);
     if (action === "updateChargeback") return handleUpdateChargeback(payload);
     if (action === "deleteChargeback") return handleDeleteChargeback(payload);

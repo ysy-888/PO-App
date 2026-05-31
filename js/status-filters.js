@@ -12,12 +12,13 @@ const EST_IHD_DAYS_BY_SHIP_METHOD = {
 // Single source of truth for status filter, cell editor, and default table sort.
 // Reorder entries to change sort priority (top = first). Add/remove statuses here only.
 const STATUS_SORT_ORDER = [
-  "OTW", "Received", "Arrived at Port", "Arrived at WH", 
-  "Assigned", "WIP", "Requested", "Hold",  
-  "Shipped", "CXL", "Closed", 
+  "Pending", "WIP", "Requested", "OTW", "Arrived at Port", "Scheduled",
+  "In Warehouse", "Assigned", "Closed", "Hold", "CXL",
 ];
 
 const STATUS_FILTER_OPEN = "__open__";
+const STATUS_FILTER_SHIPPED = "__shipped__";
+const STATUS_FILTER_EXF_REQ = "__exf_req__";
 const OPEN_STATUSES = new Set(
   STATUS_SORT_ORDER.filter(status => status !== "CXL" && status !== "Closed")
 );
@@ -28,6 +29,8 @@ let defaultStatusFilter = STATUS_FILTER_OPEN;
 function isValidStatusFilter(value) {
   return value === "" ||
     value === STATUS_FILTER_OPEN ||
+    value === STATUS_FILTER_SHIPPED ||
+    value === STATUS_FILTER_EXF_REQ ||
     STATUS_SORT_ORDER.includes(value);
 }
 
@@ -70,6 +73,12 @@ function rowMatchesStatusFilter(row) {
     if (status) return OPEN_STATUSES.has(status);
     return isN41OpenRow(row);
   }
+  if (activeStatus === STATUS_FILTER_SHIPPED) {
+    return rowMatchesShippedGroup(status);
+  }
+  if (activeStatus === STATUS_FILTER_EXF_REQ) {
+    return isExfRequested(row);
+  }
   if (!status) {
     const n41 = String(row["N41 Status"] ?? "").trim();
     return activeStatus === n41;
@@ -105,6 +114,17 @@ const DIVISION_BUYERS = {
 let activeDivision = "";
 let activeStatus = STATUS_FILTER_OPEN;
 
+const STATUS_FILTER_BUTTONS = [
+  { label: "All", value: "" },
+  { label: "Open", value: STATUS_FILTER_OPEN },
+  { label: "Shipped", value: STATUS_FILTER_SHIPPED },
+  { label: "Closed", value: "Closed" },
+  { label: "WIP", value: "WIP" },
+  { label: "EXF REQ", value: STATUS_FILTER_EXF_REQ },
+  { label: "OTW", value: "OTW" },
+  { label: "Assigned", value: "Assigned" },
+];
+
 function initStatusFilters() {
   const group = document.getElementById("statusFilters");
   if (!group) return;
@@ -120,9 +140,7 @@ function initStatusFilters() {
   };
 
   group.innerHTML = "";
-  group.appendChild(makeBtn("All", ""));
-  group.appendChild(makeBtn("Open", STATUS_FILTER_OPEN));
-  STATUS_SORT_ORDER.forEach(s => group.appendChild(makeBtn(s, s)));
+  STATUS_FILTER_BUTTONS.forEach(({ label, value }) => group.appendChild(makeBtn(label, value)));
   document.querySelectorAll("#statusFilters .filter-btn").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.status === activeStatus);
   });

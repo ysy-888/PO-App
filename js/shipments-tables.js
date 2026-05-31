@@ -74,6 +74,9 @@ let filteredChargebacks = [];
 let shipmentModalRow = null;
 let createShipmentPoNumbers = [];
 let currentAppView = "po";
+let shipmentAddPoPanelOpen = false;
+/** @type {Set<string>} */
+let shipmentRequestedPanelSelection = new Set();
 
 function normalizeShipment(row) {
   return { ...row, Selected: false };
@@ -87,6 +90,9 @@ function clearPoShipmentData(row) {
   row[SHIPMENT_ID_FIELD] = "";
   SHIPMENT_PO_CLEAR_FIELDS.forEach(field => { row[field] = ""; });
   row["EST IHD"] = calculateEstIhd(row["Ship Method"], row["EST EXF"]);
+  if (isExfRequested(row)) {
+    row["Status"] = "Requested";
+  }
 }
 
 function getShipmentById(id) {
@@ -111,6 +117,10 @@ function getCheckedFilteredPos() {
 
 function getUnassignedCheckedFilteredPos() {
   return getCheckedFilteredPos().filter(row => !poHasShipment(row));
+}
+
+function getEligibleCheckedFilteredPosForShipment() {
+  return getCheckedFilteredPos().filter(isPoEligibleForShipment);
 }
 
 function getPoShipmentId(row) {
@@ -517,15 +527,22 @@ function refreshChargebacksView() {
 
 function refreshShipmentsView() {
   if (currentAppView === "shipments") applyShipmentFilters();
-  updateCreateShipmentButton();
+  updateToolbarRequestButtons();
   refreshChargebacksView();
 }
 
 function updateCreateShipmentButton() {
   const btn = document.getElementById("createShipmentBtn");
   if (!btn) return;
-  const eligible = getUnassignedCheckedFilteredPos();
+  const eligible = getEligibleCheckedFilteredPosForShipment();
   const count = eligible.length;
   const show = currentAppView === "po" && count > 0;
   btn.hidden = !show;
+}
+
+function updateToolbarRequestButtons() {
+  if (typeof updateExfRequestButton === "function") updateExfRequestButton();
+  if (typeof updateDeliveryRequestButton === "function") updateDeliveryRequestButton();
+  if (typeof updatePickupRequestButton === "function") updatePickupRequestButton();
+  updateCreateShipmentButton();
 }

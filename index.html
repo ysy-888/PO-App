@@ -60,6 +60,9 @@
   <div class="toolbar-status-row">
     <div class="filter-btn-group status-filters" id="statusFilters" role="group" aria-label="Status"></div>
     <div class="toolbar-end">
+      <button type="button" class="btn btn-secondary" id="exfRequestBtn" hidden>EXF Request</button>
+      <button type="button" class="btn btn-secondary" id="deliveryRequestBtn" hidden>Delivery Request</button>
+      <button type="button" class="btn btn-secondary" id="pickupRequestBtn" hidden>Pickup Request</button>
       <button type="button" class="btn btn-secondary" id="createShipmentBtn" hidden>Create shipment</button>
       <button type="button" class="clear-all-filters-btn" id="clearAllColumnFiltersBtn" hidden>Clear all filters</button>
       <div class="counter" id="rowCounter">— rows</div>
@@ -349,6 +352,9 @@
     </div>
     <div class="modal-body" id="createShipmentBody"></div>
     <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" id="shipmentAddPosBtn">Add POs</button>
+      <button type="button" class="btn btn-secondary" id="shipmentRemovePosBtn" hidden>Remove POs</button>
+      <button type="button" class="btn btn-primary" id="shipmentConfirmAddPosBtn" hidden>Add</button>
       <button type="button" class="btn btn-primary" id="createShipmentSaveBtn">Create</button>
       <button type="button" class="btn" data-dismiss="create-shipment">Cancel</button>
     </div>
@@ -368,8 +374,68 @@
     </div>
     <div class="modal-body" id="shipmentModalBody"></div>
     <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" id="shipmentDetailAddPosBtn">Add POs</button>
+      <button type="button" class="btn btn-secondary" id="shipmentDetailRemovePosBtn" hidden>Remove POs</button>
+      <button type="button" class="btn btn-primary" id="shipmentDetailConfirmAddPosBtn" hidden>Add</button>
       <button type="button" class="btn btn-primary" id="shipmentModalSaveBtn">Save</button>
       <button type="button" class="btn" data-dismiss="shipment-modal">Close</button>
+    </div>
+  </div>
+</div>
+
+<div id="exfRequestOverlay" class="modal-backdrop">
+  <div class="modal-card shipment-modal-card" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-header-main">
+        <h3>EXF Request</h3>
+      </div>
+      <div class="modal-header-actions">
+        <span id="exfRequestPoCount" class="shipment-modal-po-count"></span>
+        <button type="button" class="btn-close" id="exfRequestCancelBtn" aria-label="Close">✕</button>
+      </div>
+    </div>
+    <div class="modal-body" id="exfRequestBody"></div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-primary" id="exfRequestSubmitBtn">Submit</button>
+      <button type="button" class="btn" data-dismiss="exf-request">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div id="deliveryRequestOverlay" class="modal-backdrop">
+  <div class="modal-card shipment-modal-card" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-header-main">
+        <h3 id="deliveryRequestModalTitle">Delivery Request</h3>
+      </div>
+      <div class="modal-header-actions">
+        <span id="deliveryRequestPoCount" class="shipment-modal-po-count"></span>
+        <button type="button" class="btn-close" id="deliveryRequestCancelBtn" aria-label="Close">✕</button>
+      </div>
+    </div>
+    <div class="modal-body" id="deliveryRequestBody"></div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-primary" id="deliveryRequestSubmitBtn">Create</button>
+      <button type="button" class="btn" data-dismiss="delivery-request">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div id="pickupRequestOverlay" class="modal-backdrop">
+  <div class="modal-card shipment-modal-card" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-header-main">
+        <h3 id="pickupRequestModalTitle">Pickup Request</h3>
+      </div>
+      <div class="modal-header-actions">
+        <span id="pickupRequestPoCount" class="shipment-modal-po-count"></span>
+        <button type="button" class="btn-close" id="pickupRequestCancelBtn" aria-label="Close">✕</button>
+      </div>
+    </div>
+    <div class="modal-body" id="pickupRequestBody"></div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-primary" id="pickupRequestSubmitBtn">Create</button>
+      <button type="button" class="btn" data-dismiss="pickup-request">Cancel</button>
     </div>
   </div>
 </div>
@@ -463,8 +529,9 @@
 <script src="js/config.js"></script>
 <script src="js/header-menu.js"></script>
 <script src="js/columns.js"></script>
-<script src="js/rules.js"></script>
 <script src="js/status-filters.js"></script>
+<script src="js/status-transitions.js"></script>
+<script src="js/rules.js"></script>
 <script src="js/column-filters.js"></script>
 <script src="js/state-api.js"></script>
 <script src="js/csv-import.js"></script>
@@ -477,6 +544,10 @@
 <script src="js/main.js"></script>
 <script src="js/shipments-tables.js"></script>
 <script src="js/shipments-modals.js"></script>
+<script src="js/request-modals.js"></script>
+<script src="js/exf-request.js"></script>
+<script src="js/delivery-requests.js"></script>
+<script src="js/pickup-requests.js"></script>
 <script src="js/shipments-init.js"></script>
 </body>
 </html>

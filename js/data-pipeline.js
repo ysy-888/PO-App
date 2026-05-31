@@ -7,10 +7,13 @@ async function loadData() {
       allChargebacks = DEMO_CHARGEBACKS.map(normalizeChargeback);
       allPackingLists = DEMO_PACKING_LISTS.map(normalizePackingList);
       allPackingCartons = DEMO_PACKING_CARTONS.map(normalizePackingCarton);
-      window.__pendingShipments = [];
+      window.__pendingShipments = DEMO_SHIPMENTS;
       if (typeof onShipmentsDataLoaded === "function") {
-        onShipmentsDataLoaded([]);
+        onShipmentsDataLoaded(DEMO_SHIPMENTS);
         window.__pendingShipments = null;
+      }
+      if (typeof onDeliveryPickupDataLoaded === "function") {
+        onDeliveryPickupDataLoaded([], []);
       }
     } else {
       const res = await fetch(getAppsScriptUrl());
@@ -21,6 +24,8 @@ async function loadData() {
       allPackingLists = (json.packingLists ?? []).map(normalizePackingList);
       allPackingCartons = (json.packingCartons ?? []).map(normalizePackingCarton);
       window.__pendingShipments = json.shipments ?? [];
+      window.__pendingDeliveryRequests = json.deliveryRequests ?? [];
+      window.__pendingPickupRequests = json.pickupRequests ?? [];
       if (typeof onShipmentsDataLoaded === "function") {
         onShipmentsDataLoaded(window.__pendingShipments);
         window.__pendingShipments = null;
@@ -29,10 +34,23 @@ async function loadData() {
       applyDefaultStatusFilterFromServer(json.defaultStatusFilter);
     }
     invalidatePackingIndex();
+    migrateAllRows(allRows);
     resetLocalSelectedState(allRows);
     clearMiniSelection();
     syncAllEstIhd(allRows);
     syncAllQtyTotals(allRows);
+    if (typeof syncAllAssignDatesFromPickupRequests === "function") {
+      syncAllAssignDatesFromPickupRequests(allRows);
+    }
+    if (typeof onDeliveryPickupDataLoaded === "function") {
+      onDeliveryPickupDataLoaded(
+        isDemoMode() ? [] : (window.__pendingDeliveryRequests ?? []),
+        isDemoMode() ? [] : (window.__pendingPickupRequests ?? [])
+      );
+      window.__pendingDeliveryRequests = null;
+      window.__pendingPickupRequests = null;
+    }
+    await applyAutomaticStatusUpdates(allRows, allShipments ?? []);
     updateColumnFilterHeaderStates();
     applyFilters();
     if (typeof onPoSelectionChanged === "function") onPoSelectionChanged();

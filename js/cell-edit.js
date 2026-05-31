@@ -1,9 +1,9 @@
 /** @type {{ anchor: HTMLElement, col: string, row: Record<string, unknown> } | null} */
 let openCellSelect = null;
 
-function getCellSelectOptions(col) {
+function getCellSelectOptions(col, row) {
   if (col === "Status") {
-    return STATUS_SORT_ORDER.map(value => ({ value, label: value }));
+    return getAvailableStatusOptions(row ?? {});
   }
   if (col === "Ship Method") {
     return ["", ...SHIP_OPTIONS].map(value => ({
@@ -32,7 +32,7 @@ function renderCellSelectDropdown(col, row) {
   pop.dataset.col = col;
   pop.innerHTML = "";
 
-  getCellSelectOptions(col).forEach(({ value, label }) => {
+  getCellSelectOptions(col, row).forEach(({ value, label }) => {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "cell-select-option";

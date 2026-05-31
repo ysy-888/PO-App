@@ -106,6 +106,11 @@ function renderTable() {
         tr.appendChild(td);
         return;
       }
+      if (col === "Assign Date" && typeof renderAssignDateCell === "function") {
+        renderAssignDateCell(td, row, { interactionLocked });
+        tr.appendChild(td);
+        return;
+      }
 
       const editable = isPoFieldEditable(col, row) && !interactionLocked;
       const val = getColumnFilterRawValue(col, row);

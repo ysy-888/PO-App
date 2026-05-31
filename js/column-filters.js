@@ -280,10 +280,10 @@ function initColumnFilterHeaders() {
 }
 
 const STATUS_BADGE = {
-  "Received":"badge-received","Arrived at Port":"badge-port","Arrived at WH":"badge-wh",
-  "Assigned":"badge-assigned","OTW":"badge-otw","Requested":"badge-requested",
-  "Hold":"badge-hold","Cancelled":"badge-cancelled","WIP":"badge-wip",
-  "Shipped":"badge-shipped","Closed":"badge-closed"
+  "Pending":"badge-pending","WIP":"badge-wip","Requested":"badge-requested",
+  "OTW":"badge-otw","Arrived at Port":"badge-port","Scheduled":"badge-scheduled",
+  "In Warehouse":"badge-wh","Assigned":"badge-assigned","Hold":"badge-hold",
+  "CXL":"badge-cancelled","Closed":"badge-closed",
 };
 
 const DATE_FIELDS = new Set([

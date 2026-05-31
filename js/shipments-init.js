@@ -25,9 +25,15 @@ function initShipments() {
   document.getElementById("createShipmentSaveBtn")?.addEventListener("click", submitCreateShipment);
   document.getElementById("createShipmentCancelBtn")?.addEventListener("click", closeCreateShipmentModal);
   document.querySelector('[data-dismiss="create-shipment"]')?.addEventListener("click", closeCreateShipmentModal);
+  document.getElementById("shipmentAddPosBtn")?.addEventListener("click", openShipmentAddPoPanel);
+  document.getElementById("shipmentRemovePosBtn")?.addEventListener("click", removePosFromShipment);
+  document.getElementById("shipmentConfirmAddPosBtn")?.addEventListener("click", confirmAddPosToShipment);
   document.getElementById("shipmentModalSaveBtn")?.addEventListener("click", saveShipmentModal);
   document.getElementById("shipmentModalCloseBtn")?.addEventListener("click", closeShipmentModalForce);
   document.querySelector('[data-dismiss="shipment-modal"]')?.addEventListener("click", closeShipmentModalForce);
+  document.getElementById("shipmentDetailAddPosBtn")?.addEventListener("click", openShipmentAddPoPanel);
+  document.getElementById("shipmentDetailRemovePosBtn")?.addEventListener("click", removePosFromShipment);
+  document.getElementById("shipmentDetailConfirmAddPosBtn")?.addEventListener("click", confirmAddPosToShipment);
 
   document.getElementById("shipmentModalOverlay")?.addEventListener("click", e => {
     if (e.target.id === "shipmentModalOverlay") closeShipmentModalForce();
@@ -49,9 +55,10 @@ function onShipmentsDataLoaded(shipments) {
 
 // Hook called from po-table.js after renderTable / selection changes
 function onPoSelectionChanged() {
-  updateCreateShipmentButton();
+  updateToolbarRequestButtons();
   const pos = getLinkedPosFromModalTable();
   if (pos.length) updateShipmentLinkedPoSelectAllHeader(pos);
+  updateShipmentModalActionButtons();
 }
 
 initShipments();
