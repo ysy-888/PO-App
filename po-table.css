@@ -755,6 +755,38 @@ th.th-select-col:hover {
   padding-left: 4px;
 }
 
+#poTable thead th {
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+
+#poTable tbody td {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+#poTable .th-flag-icon,
+#poTable .po-flag-btn,
+#poTable .po-packing-list-indicator {
+  width: 24px;
+  height: 24px;
+}
+
+#poTable .th-flag-icon svg {
+  width: 12px;
+  height: 12px;
+}
+
+#poTable .po-select-checkbox,
+#poTable th.th-select-col input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+}
+
+#poTable .editable-preview {
+  padding: 2px 5px;
+}
+
 th.th-flag-col.filter-active:hover {
   background: var(--accent-light);
 }
@@ -889,6 +921,9 @@ th.th-filterable .th-label {
   white-space: nowrap;
   cursor: pointer;
   text-decoration: underline dotted transparent;
+  padding-right: 2px;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 th.th-filterable .th-label:hover {
@@ -1097,6 +1132,12 @@ th.th-filterable .th-label:hover {
 .edit-table-default-actions {
   margin-bottom: 10px;
   flex-shrink: 0;
+  gap: 8px;
+}
+
+.edit-table-default-btn {
+  padding: 6px 12px;
+  font-size: 12px;
 }
 
 .edit-table-panels {
@@ -1113,16 +1154,6 @@ th.th-filterable .th-label:hover {
   flex-direction: column;
   min-height: 0;
   min-width: 0;
-}
-
-.edit-table-panel-title {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
-  margin-bottom: 6px;
-  flex-shrink: 0;
 }
 
 .edit-table-picker-list,
@@ -1155,7 +1186,11 @@ th.th-filterable .th-label:hover {
 
 .edit-table-picker-option input[type="checkbox"] {
   flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin: 0;
   cursor: pointer;
+  accent-color: var(--accent);
 }
 
 .edit-table-picker-option input[type="checkbox"]:disabled {
@@ -1177,6 +1212,7 @@ th.th-filterable .th-label:hover {
   background: var(--surface);
   font-size: 12px;
   user-select: none;
+  position: relative;
 }
 
 .edit-table-order-item:not(.edit-table-order-item-fixed) {
@@ -1197,8 +1233,25 @@ th.th-filterable .th-label:hover {
   opacity: 0.45;
 }
 
-.edit-table-order-item.drag-over {
-  background: var(--accent-light);
+.edit-table-order-item.drag-insert-before::before,
+.edit-table-order-item.drag-insert-after::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 1px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.edit-table-order-item.drag-insert-before::before {
+  top: -1px;
+}
+
+.edit-table-order-item.drag-insert-after::after {
+  bottom: -1px;
 }
 
 .edit-table-order-item-label {

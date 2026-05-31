@@ -210,11 +210,11 @@ function expandEditTableKeys(keys) {
   return cols;
 }
 
-function moveEditTableKey(keys, fromIndex, toIndex) {
-  if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return keys;
+function moveEditTableKeyToHover(keys, fromIndex, hoverIndex) {
+  if (fromIndex === hoverIndex || fromIndex < 0 || hoverIndex < 0) return keys;
   const next = [...keys];
   const [item] = next.splice(fromIndex, 1);
-  next.splice(toIndex, 0, item);
+  next.splice(hoverIndex, 0, item);
   return next;
 }
 
@@ -476,6 +476,20 @@ function applyColumnVisibility() {
 
 let editTableDragFromIndex = null;
 
+function clearEditTableDragIndicators() {
+  document.querySelectorAll(".edit-table-order-item.drag-insert-before, .edit-table-order-item.drag-insert-after").forEach(el => {
+    el.classList.remove("drag-insert-before", "drag-insert-after");
+  });
+}
+
+function updateEditTableDragIndicator(item, fromIndex) {
+  clearEditTableDragIndicators();
+  if (fromIndex === null || !item) return;
+  const hoverIndex = getEditTableOrderItemIndex(item);
+  if (hoverIndex === -1 || hoverIndex === fromIndex) return;
+  item.classList.add(fromIndex > hoverIndex ? "drag-insert-before" : "drag-insert-after");
+}
+
 function renderEditTablePicker() {
   const list = document.getElementById("editTableColumnPicker");
   if (!list) return;
@@ -532,28 +546,28 @@ function createEditTableOrderItem(key, { fixed = false } = {}) {
     item.addEventListener("dragend", () => {
       editTableDragFromIndex = null;
       item.classList.remove("dragging");
-      document.querySelectorAll(".edit-table-order-item.drag-over").forEach(el => el.classList.remove("drag-over"));
+      clearEditTableDragIndicators();
     });
 
     item.addEventListener("dragover", e => {
       e.preventDefault();
       e.dataTransfer.dropEffect = "move";
-      document.querySelectorAll(".edit-table-order-item.drag-over").forEach(el => el.classList.remove("drag-over"));
-      item.classList.add("drag-over");
+      updateEditTableDragIndicator(item, editTableDragFromIndex);
     });
 
-    item.addEventListener("dragleave", () => {
-      item.classList.remove("drag-over");
+    item.addEventListener("dragleave", e => {
+      if (item.contains(e.relatedTarget)) return;
+      item.classList.remove("drag-insert-before", "drag-insert-after");
     });
 
     item.addEventListener("drop", e => {
       e.preventDefault();
-      item.classList.remove("drag-over");
+      clearEditTableDragIndicators();
       const fromIndex = editTableDragFromIndex;
-      const toIndex = getEditTableOrderItemIndex(item);
-      if (fromIndex === null || toIndex === null || fromIndex === toIndex) return;
+      const hoverIndex = getEditTableOrderItemIndex(item);
+      if (fromIndex === null || hoverIndex === -1 || fromIndex === hoverIndex) return;
       const keys = getVisibleOrderKeys();
-      columnOrderDraft = keysToColumnOrder(moveEditTableKey(keys, fromIndex, toIndex));
+      columnOrderDraft = keysToColumnOrder(moveEditTableKeyToHover(keys, fromIndex, hoverIndex));
       renderEditTableOrder();
     });
   }
@@ -569,7 +583,7 @@ function createEditTableOrderItem(key, { fixed = false } = {}) {
 function getEditTableOrderItemIndex(item) {
   const list = document.getElementById("editTableColumnOrder");
   if (!list || !item) return -1;
-  return [...list.querySelectorAll(".edit-table-order-item:not(.edit-table-order-item-fixed)")].indexOf(item);
+  return [...list.querySelectorAll(".edit-table-order-item")].indexOf(item);
 }
 
 function renderEditTableOrder() {
@@ -577,10 +591,6 @@ function renderEditTableOrder() {
   if (!list) return;
 
   list.innerHTML = "";
-  FIXED_LEADING_COLUMNS.forEach(col => {
-    list.appendChild(createEditTableOrderItem(col, { fixed: true }));
-  });
-
   getVisibleOrderKeys().forEach(key => {
     list.appendChild(createEditTableOrderItem(key));
   });
