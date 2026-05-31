@@ -1,0 +1,14 @@
+{
+  "name": "po-app",
+  "private": true,
+  "description": "Elevator Disco PO Table — frontend (GitHub Pages) + Apps Script backend",
+  "scripts": {
+    "push:test": "node -e \"require('fs').copyFileSync('.clasp.test.json','.clasp.json')\" && clasp push",
+    "push:prod": "node -e \"require('fs').copyFileSync('.clasp.prod.json','.clasp.json')\" && clasp push",
+    "deploy:test": "node -e \"require('fs').copyFileSync('.clasp.test.json','.clasp.json')\" && clasp deploy --description \"test\"",
+    "deploy:prod": "node -e \"require('fs').copyFileSync('.clasp.prod.json','.clasp.json')\" && clasp deploy --description \"production\""
+  },
+  "devDependencies": {
+    "@google/clasp": "^2.4.2"
+  }
+}

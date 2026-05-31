@@ -1,0 +1,350 @@
+
+async function loadData() {
+  showIndicator(`Refreshing${ELLIPSIS}`, "");
+  try {
+    if (isDemoMode()) {
+      allRows = DEMO_DATA.map(row => ({ ...row }));
+      allChargebacks = DEMO_CHARGEBACKS.map(normalizeChargeback);
+      allPackingLists = DEMO_PACKING_LISTS.map(normalizePackingList);
+      allPackingCartons = DEMO_PACKING_CARTONS.map(normalizePackingCarton);
+      window.__pendingShipments = [];
+      if (typeof onShipmentsDataLoaded === "function") {
+        onShipmentsDataLoaded([]);
+        window.__pendingShipments = null;
+      }
+    } else {
+      const res = await fetch(getAppsScriptUrl());
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error);
+      allRows = json.data.map(normalizeRow);
+      allChargebacks = (json.chargebacks ?? []).map(normalizeChargeback);
+      allPackingLists = (json.packingLists ?? []).map(normalizePackingList);
+      allPackingCartons = (json.packingCartons ?? []).map(normalizePackingCarton);
+      window.__pendingShipments = json.shipments ?? [];
+      if (typeof onShipmentsDataLoaded === "function") {
+        onShipmentsDataLoaded(window.__pendingShipments);
+        window.__pendingShipments = null;
+      }
+      if (json.defaultColumns) applyDefaultColumnsFromServer(json.defaultColumns);
+      applyDefaultStatusFilterFromServer(json.defaultStatusFilter);
+    }
+    invalidatePackingIndex();
+    resetLocalSelectedState(allRows);
+    clearMiniSelection();
+    syncAllEstIhd(allRows);
+    syncAllQtyTotals(allRows);
+    updateColumnFilterHeaderStates();
+    applyFilters();
+    if (typeof onPoSelectionChanged === "function") onPoSelectionChanged();
+    showIndicator("Loaded", "success");
+  } catch (err) {
+    showIndicator("Load failed: " + err.message, "error");
+  }
+}
+
+function compareDateFieldValues(aVal, bVal) {
+  const aYmd = normalizeToYmd(aVal);
+  const bYmd = normalizeToYmd(bVal);
+  if (!aYmd && !bYmd) return 0;
+  if (!aYmd) return 1;
+  if (!bYmd) return -1;
+  return aYmd.localeCompare(bYmd);
+}
+
+function compareTextFieldValues(aVal, bVal) {
+  const a = String(aVal ?? "").trim();
+  const b = String(bVal ?? "").trim();
+  if (!a && !b) return 0;
+  if (!a) return 1;
+  if (!b) return -1;
+  return a.localeCompare(b, undefined, { numeric: true });
+}
+
+function compareRowsByColumn(col, a, b) {
+  if (col === "Status") return statusSortIndex(getRowWorkflowStatus(a)) - statusSortIndex(getRowWorkflowStatus(b));
+  if (DATE_FIELDS.has(col)) return compareDateFieldValues(a[col], b[col]);
+  if (col === "Actual Qty") {
+    const aQty = getPackingActualQtyForRow(a);
+    const bQty = getPackingActualQtyForRow(b);
+    return compareTextFieldValues(aQty > 0 ? aQty : "", bQty > 0 ? bQty : "");
+  }
+  if (col === "Ctn Qty") {
+    const aQty = getPackingCtnQtyForRow(a);
+    const bQty = getPackingCtnQtyForRow(b);
+    return compareTextFieldValues(aQty > 0 ? aQty : "", bQty > 0 ? bQty : "");
+  }
+  return compareTextFieldValues(a[col], b[col]);
+}
+
+function compareRowsForSort(a, b) {
+  if (sortCol) {
+    const primary = compareRowsByColumn(sortCol, a, b) * sortDir;
+    if (primary !== 0) return primary;
+    for (const col of DEFAULT_SORT_COLUMNS) {
+      if (col === sortCol) continue;
+      const cmp = compareRowsByColumn(col, a, b);
+      if (cmp !== 0) return cmp;
+    }
+    return 0;
+  }
+  for (const col of DEFAULT_SORT_COLUMNS) {
+    const cmp = compareRowsByColumn(col, a, b);
+    if (cmp !== 0) return cmp;
+  }
+  return 0;
+}
+
+let searchDebounceTimer;
+/** Debounced entry point for the search box to avoid filtering on every keystroke. */
+function scheduleApplyFilters() {
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(applyFilters, 150);
+}
+
+function applyFilters() {
+  const q = document.getElementById("searchInput").value.toLowerCase();
+  const div = activeDivision;
+  filteredRows = allRows.filter(row => {
+    if (div && row["Division"] !== div) return false;
+    if (!rowMatchesStatusFilter(row)) return false;
+    if (flagFilterActive && !isTruthy(row["Flag"])) return false;
+    if (!rowPassesColumnFilters(row)) return false;
+    if (q) {
+      const haystack = COLUMNS.map(c => String(getColumnFilterRawValue(c, row) ?? "")).join(" ").toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
+    return true;
+  });
+
+  filteredRows.sort(compareRowsForSort);
+
+  currentPage = 1;
+  renderTable();
+  updateClearAllFiltersButton();
+}
+
+function isPageSizeAll() {
+  return !Number.isFinite(pageSize);
+}
+
+function getTotalPages() {
+  if (isPageSizeAll() || filteredRows.length === 0) return 1;
+  return Math.ceil(filteredRows.length / pageSize);
+}
+
+function getPagedRows() {
+  if (isPageSizeAll()) return filteredRows;
+  const totalPages = getTotalPages();
+  currentPage = Math.min(Math.max(1, currentPage), totalPages);
+  const start = (currentPage - 1) * pageSize;
+  return filteredRows.slice(start, start + pageSize);
+}
+
+function getFilteredSelectedCount() {
+  return filteredRows.filter(row => isTruthy(row["Selected"])).length;
+}
+
+function getRowCounterText() {
+  const total = filteredRows.length;
+  if (total === 0) return "0 rows";
+
+  if (isPageSizeAll()) {
+    return `${total} row${total === 1 ? "" : "s"}`;
+  }
+
+  const start = (currentPage - 1) * pageSize + 1;
+  const end = Math.min(currentPage * pageSize, total);
+  return `${start}${EN_DASH}${end} of ${total}`;
+}
+
+function updateRowCounter() {
+  const el = document.getElementById("rowCounter");
+  if (!el) return;
+
+  const rowText = getRowCounterText();
+  const selectedCount = getFilteredSelectedCount();
+  el.textContent = selectedCount >= 1
+    ? `${selectedCount} selected out of ${rowText}`
+    : rowText;
+}
+
+function updatePaginationUI() {
+  const nav = document.getElementById("paginationNav");
+  if (!nav) return;
+
+  const totalPages = getTotalPages();
+  const showPagination = !isPageSizeAll() && filteredRows.length > pageSize;
+  nav.hidden = !showPagination;
+
+  if (!showPagination) return;
+
+  const indicator = document.getElementById("pageIndicator");
+  if (indicator) indicator.textContent = `${currentPage} / ${totalPages}`;
+
+  const first = document.getElementById("pageFirst");
+  const prev = document.getElementById("pagePrev");
+  const next = document.getElementById("pageNext");
+  const last = document.getElementById("pageLast");
+  const onFirst = currentPage <= 1;
+  const onLast = currentPage >= totalPages;
+
+  if (first) first.disabled = onFirst;
+  if (prev) prev.disabled = onFirst;
+  if (next) next.disabled = onLast;
+  if (last) last.disabled = onLast;
+}
+
+function scrollTableToTop() {
+  document.querySelector(".table-scroll-y")?.scrollTo({ top: 0 });
+}
+
+function goToPage(page) {
+  const totalPages = getTotalPages();
+  const nextPage = Math.min(Math.max(1, page), totalPages);
+  if (nextPage === currentPage) return;
+  currentPage = nextPage;
+  clearMiniSelection();
+  closeCellSelectDropdown(false);
+  renderTable();
+  scrollTableToTop();
+}
+
+function normalizePageSizeValue(value) {
+  const raw = String(value ?? "").trim();
+  if (raw === "all") return "all";
+  const n = Number(raw);
+  if (n === 30 || n === 60 || n === 120) return String(n);
+  return DEFAULT_PAGE_SIZE;
+}
+
+function loadPageSizePreference() {
+  try {
+    const stored = localStorage.getItem(scopedStorageKey(PAGE_SIZE_STORAGE_BASE));
+    if (stored == null) return DEFAULT_PAGE_SIZE;
+    return normalizePageSizeValue(stored);
+  } catch {
+    return DEFAULT_PAGE_SIZE;
+  }
+}
+
+function savePageSizePreference(value) {
+  try {
+    localStorage.setItem(scopedStorageKey(PAGE_SIZE_STORAGE_BASE), normalizePageSizeValue(value));
+  } catch {
+    /* ignore storage failures */
+  }
+}
+
+function applyPageSize(value) {
+  const normalized = normalizePageSizeValue(value);
+  pageSize = normalized === "all" ? Infinity : Number(normalized);
+  currentPage = 1;
+  const select = document.getElementById("pageSizeSelect");
+  if (select) select.value = normalized;
+}
+
+function setPageSize(value) {
+  const normalized = normalizePageSizeValue(value);
+  savePageSizePreference(normalized);
+  pageSize = normalized === "all" ? Infinity : Number(normalized);
+  currentPage = 1;
+  closeCellSelectDropdown(false);
+  renderTable();
+}
+
+function initPagination() {
+  applyPageSize(loadPageSizePreference());
+  const select = document.getElementById("pageSizeSelect");
+  select?.addEventListener("change", () => setPageSize(select.value));
+
+  document.getElementById("pageFirst")?.addEventListener("click", () => goToPage(1));
+  document.getElementById("pagePrev")?.addEventListener("click", () => goToPage(currentPage - 1));
+  document.getElementById("pageNext")?.addEventListener("click", () => goToPage(currentPage + 1));
+  document.getElementById("pageLast")?.addEventListener("click", () => goToPage(getTotalPages()));
+}
+
+function updateSortHeaders() {
+  document.querySelectorAll("thead th[data-col]").forEach(th => {
+    th.classList.remove("sorted-asc", "sorted-desc");
+    if (sortCol && th.dataset.col === sortCol) {
+      th.classList.add(sortDir === 1 ? "sorted-asc" : "sorted-desc");
+    }
+  });
+}
+
+function sortBy(col) {
+  if (sortCol === col) {
+    if (sortDir === 1) sortDir = -1;
+    else {
+      sortCol = null;
+      sortDir = 1;
+    }
+  } else {
+    sortCol = col;
+    sortDir = 1;
+  }
+  updateSortHeaders();
+  applyFilters();
+}
+
+function formatDateForDisplay(v) {
+  if (isEmptyValue(v)) return EMPTY_DISPLAY;
+
+  const s = String(v).trim();
+
+  // Accept either YYYY-MM-DD or full ISO timestamps like 2026-04-22T07:00:00.000Z
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T\s].*)?$/.exec(s);
+  if (!m) return s; // fallback: don't change unknown formats
+
+  const [, yyyy, mm, dd] = m;
+  return `${Number(mm)}/${Number(dd)}/${yyyy.slice(2)}`;
+}
+
+function normalizeToYmd(v) {
+  if (isEmptyValue(v)) return "";
+  const s = String(v).trim();
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T\s].*)?$/.exec(s);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  return s;
+}
+
+function parseYmdToLocalDate(ymd) {
+  const normalized = normalizeToYmd(ymd);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(normalized);
+  if (!m) return null;
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+}
+
+function formatDateToYmd(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function calculateEstIhd(shipMethod, estExf) {
+  if (isEmptyValue(shipMethod) || isEmptyValue(estExf)) return "";
+
+  const method = String(shipMethod).trim();
+  const exfYmd = normalizeToYmd(estExf);
+  if (!exfYmd) return "";
+
+  const days = EST_IHD_DAYS_BY_SHIP_METHOD[method];
+  if (days == null) return "";
+
+  const base = parseYmdToLocalDate(exfYmd);
+  if (!base) return "";
+
+  base.setDate(base.getDate() + days);
+  return formatDateToYmd(base);
+}
+
+function syncEstIhdForRow(row) {
+  const calculated = calculateEstIhd(row["Ship Method"], row["EST EXF"]);
+  if (calculated) row["EST IHD"] = calculated;
+  return row["EST IHD"];
+}
+
+function syncAllEstIhd(rows) {
+  rows.forEach(syncEstIhdForRow);
+}

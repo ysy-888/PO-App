@@ -22,21 +22,18 @@ const SHIPMENT_DATA_FIELDS = [
   "Ship Method", "Vessel", "House #", "EXF", "Shipped", "ETD", "ETA", "IHD", "Notes"
 ];
 
-const PO_SYNC_FROM_SHIPMENT_FIELDS = [
-  "Ship Method", "Vessel", "House #", "EXF", "Shipped", "ETD", "ETA", "IHD"
-];
-
 const EDITABLE_FIELDS = [
   "Flag",
-  "PO Qty", "Status", "Ship Method",
+  "PO Qty", "Status", "N41 Status", "Ship Method",
   "Vessel", "House #", "Shipped", "ETD", "ETA", "IHD",
   "EST EXF", "EST IHD", "EXF", "CXL Date", "Assign Date", "Notes",
-  "Size",
-  "PO Unit 1", "PO Unit 2", "PO Unit 3", "PO Unit 4",
-  "PO Unit 5", "PO Unit 6", "PO Unit 7", "PO Unit 8"
+  "FOB Cost", "Price", "PO Total Cost",
+  "Received Qty", "Style Category",
+  "OG", "PROTO", "FIT/PP", "BULK", "TOP", "TRIM",
+  "PO Unit 1", "PO Unit 2", "PO Unit 3", "PO Unit 4", "PO Unit 5",
+  "PO Unit 6", "PO Unit 7", "PO Unit 8", "PO Unit 9", "PO Unit 10",
+  "PO Unit 11", "PO Unit 12", "PO Unit 13", "PO Unit 14", "PO Unit 15"
 ];
-
-const SHIPMENT_EDITABLE_FIELDS = SHIPMENT_DATA_FIELDS.slice();
 
 const CHARGEBACK_DATA_FIELDS = [
   "PO #", "Amount", "Reason", "Status", "Date", "Notes", "Created At", "Updated At"
@@ -46,10 +43,7 @@ const CHARGEBACK_EDITABLE_FIELDS = [
   "Amount", "Reason", "Status", "Notes"
 ];
 
-const PACKING_UNIT_FIELDS = [
-  "Unit 1", "Unit 2", "Unit 3", "Unit 4",
-  "Unit 5", "Unit 6", "Unit 7", "Unit 8"
-];
+const PACKING_UNIT_FIELDS = Array.from({ length: 15 }, (_, i) => `Unit ${i + 1}`);
 
 const PACKING_LIST_DATA_FIELDS = [
   "PO #", "Carton Count", "Notes", "Created At", "Updated At"
@@ -114,6 +108,60 @@ function corsResponse(data) {
     .createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
 }
+
+/**
+ * Optional shared-secret auth. Set REQUIRE_REQUEST_TOKEN to true and store a
+ * "REQUEST_TOKEN" Script Property to require clients to send a matching token.
+ * Left disabled by default so existing deployments keep working; enabling it
+ * also requires the frontend to include the token in each request.
+ */
+const REQUIRE_REQUEST_TOKEN = false;
+
+function isAuthorizedRequest_(payload) {
+  if (!REQUIRE_REQUEST_TOKEN) return true;
+  const expected = PropertiesService.getScriptProperties().getProperty("REQUEST_TOKEN");
+  if (!expected) return false;
+  return payload && String(payload.token || "") === expected;
+}
+
+/** Generic client error message; full detail is logged server-side only. */
+function errorResponse_(err) {
+  console.error(err && err.stack ? err.stack : err);
+  return corsResponse({ success: false, error: "Request failed. Please try again." });
+}
+
+/**
+ * Neutralize spreadsheet formula injection: prefix a leading =, +, -, @ (or
+ * control chars) on string values with an apostrophe so Sheets treats them as
+ * literal text rather than executable formulas.
+ */
+function sanitizeCellValue_(value) {
+  if (typeof value !== "string") return value;
+  if (/^[=+\-@\t\r]/.test(value)) return "'" + value;
+  return value;
+}
+
+function sanitizeUpdatesMap_(updates) {
+  const out = {};
+  Object.entries(updates || {}).forEach(([field, value]) => {
+    out[field] = sanitizeCellValue_(value);
+  });
+  return out;
+}
+
+/** PO fields the CSV import is allowed to write (allowlist, not denylist). */
+const IMPORT_ALLOWED_PO_FIELDS = (function () {
+  const fields = [
+    "PO Date", "EST IHD", "Vendor", "N41 Status", "Division", "Ship Method",
+    "SO #", "Buyer", "Buyer PO #", "Style #", "Color", "Style Category",
+    "PO Qty", "Received Qty", "CXL Date", "FOB Cost", "PO Total Cost",
+  ];
+  for (let i = 1; i <= 15; i++) {
+    fields.push("Size " + i);
+    fields.push("PO Unit " + i);
+  }
+  return new Set(fields);
+})();
 
 function sheetToObjects_(sheet, requiredField) {
   const range = sheet.getDataRange();
@@ -278,7 +326,7 @@ function appendChargebackRow_(chargebacksSheet, chargebackId, poNumber, chargeba
     if (h === "PO #") return poNumber;
     if (h === "Date") return now;
     if (h === "Created At" || h === "Updated At") return now;
-    return chargebackData[h] !== undefined ? chargebackData[h] : "";
+    return chargebackData[h] !== undefined ? sanitizeCellValue_(chargebackData[h]) : "";
   });
   chargebacksSheet.appendRow(row);
 }
@@ -395,20 +443,47 @@ function writePoFields_(poSheet, rowIndex, headers, updates) {
   const rowValues = poSheet.getRange(rowIndex, 1, 1, headers.length).getValues()[0];
   Object.entries(updates).forEach(([field, value]) => {
     const colIndex = headers.indexOf(field);
-    if (colIndex !== -1) rowValues[colIndex] = value;
+    if (colIndex !== -1) rowValues[colIndex] = sanitizeCellValue_(value);
   });
   poSheet.getRange(rowIndex, 1, 1, headers.length).setValues([rowValues]);
+}
+
+/**
+ * Apply field updates to many POs with a single sheet read + targeted row
+ * writes (instead of a full-sheet scan per PO). `items` is [{poNumber, updates}].
+ */
+function applyPoUpdatesBatch_(poSheet, items) {
+  if (!Array.isArray(items) || items.length === 0) return;
+  const colCount = Math.max(poSheet.getLastColumn(), 1);
+  const lastRow = Math.max(poSheet.getLastRow(), 1);
+  const values = poSheet.getRange(1, 1, lastRow, colCount).getValues()
+    .map(row => padSheetRowToWidth_(row, colCount));
+  const headers = values[0].map(h => String(h ?? "").trim());
+  const poCol = headers.indexOf("PO #");
+  if (poCol === -1) throw new Error("PO # column not found in sheet.");
+  const indexMap = buildPoIndexMap_(values, poCol);
+  const changed = new Set();
+  items.forEach(item => {
+    const idx = indexMap.get(String(item.poNumber ?? "").trim());
+    if (idx === undefined) throw new Error("PO # not found: " + item.poNumber);
+    Object.entries(item.updates || {}).forEach(([field, value]) => {
+      const colIndex = headers.indexOf(field);
+      if (colIndex !== -1) {
+        values[idx][colIndex] = sanitizeCellValue_(value);
+        changed.add(idx);
+      }
+    });
+  });
+  changed.forEach(idx => {
+    poSheet.getRange(idx + 1, 1, 1, colCount).setValues([values[idx]]);
+  });
 }
 
 function syncPosFromShipment_(poSheet, shipmentId, shipmentData, poNumbers) {
   const syncData = pickShipmentData_(shipmentData);
   syncData[SHIPMENT_ID_FIELD] = shipmentId;
   const list = Array.isArray(poNumbers) ? poNumbers.map(String) : [];
-  list.forEach(poNumber => {
-    const found = findPoRowIndex_(poSheet, poNumber);
-    if (!found) throw new Error("PO # not found: " + poNumber);
-    writePoFields_(poSheet, found.rowIndex, found.headers, syncData);
-  });
+  applyPoUpdatesBatch_(poSheet, list.map(poNumber => ({ poNumber: poNumber, updates: syncData })));
 }
 
 function findPoRowsByShipmentId_(poSheet, shipmentId) {
@@ -453,7 +528,7 @@ function appendShipmentRow_(shipmentsSheet, shipmentId, shipmentData) {
     .map(h => String(h ?? "").trim());
   const row = headers.map(h => {
     if (h === SHIPMENT_ID_FIELD) return shipmentId;
-    return shipmentData[h] !== undefined ? shipmentData[h] : "";
+    return shipmentData[h] !== undefined ? sanitizeCellValue_(shipmentData[h]) : "";
   });
   shipmentsSheet.appendRow(row);
 }
@@ -475,16 +550,42 @@ function getPoShipmentId_(poSheet, poNumber) {
 }
 
 function assertPosNotAssigned_(poSheet, poNumbers) {
-  const shipmentsSheet = getShipmentsSheet_();
   const list = Array.isArray(poNumbers) ? poNumbers.map(String) : [];
-  for (let i = 0; i < list.length; i++) {
-    const poNumber = list[i];
-    const existing = getPoShipmentId_(poSheet, poNumber);
-    if (!existing) continue;
-    const shipmentFound = findShipmentRowIndex_(shipmentsSheet, existing);
-    if (!shipmentFound) continue;
-    throw new Error("PO " + poNumber + " is already assigned to " + existing);
+  if (list.length === 0) return;
+
+  // Read the PO sheet once and map each PO to its (non-empty) shipment id.
+  const colCount = Math.max(poSheet.getLastColumn(), 1);
+  const lastRow = Math.max(poSheet.getLastRow(), 1);
+  const values = poSheet.getRange(1, 1, lastRow, colCount).getValues();
+  const headers = values[0].map(h => String(h ?? "").trim());
+  const poCol = headers.indexOf("PO #");
+  const shipCol = headers.indexOf(SHIPMENT_ID_FIELD);
+  if (poCol === -1) throw new Error("PO # column not found in sheet.");
+  const poToShipment = new Map();
+  for (let i = 1; i < values.length; i++) {
+    const po = String(values[i][poCol] ?? "").trim();
+    if (!po) continue;
+    const ship = shipCol === -1 ? "" : String(values[i][shipCol] ?? "").trim();
+    poToShipment.set(po, isEmptyShipmentId_(ship) ? "" : ship);
   }
+
+  // Read the shipments sheet once to confirm the assigned shipment still exists.
+  const shipmentsSheet = getShipmentsSheet_();
+  const shipRows = shipmentsSheet.getDataRange().getValues();
+  const shipHeaders = shipRows.length ? shipRows[0].map(h => String(h ?? "").trim()) : [];
+  const shipIdCol = shipHeaders.indexOf(SHIPMENT_ID_FIELD);
+  const existingShipments = new Set();
+  for (let i = 1; i < shipRows.length; i++) {
+    const id = shipIdCol === -1 ? "" : String(shipRows[i][shipIdCol] ?? "").trim();
+    if (id) existingShipments.add(id);
+  }
+
+  list.forEach(poNumber => {
+    const assigned = poToShipment.get(String(poNumber).trim()) || "";
+    if (assigned && existingShipments.has(assigned)) {
+      throw new Error("PO " + poNumber + " is already assigned to " + assigned);
+    }
+  });
 }
 
 function handleCreateShipment(payload) {
@@ -531,7 +632,7 @@ function handleUpdateShipment(payload) {
   found.headers.forEach((field, colIndex) => {
     if (field === SHIPMENT_ID_FIELD) return;
     if (shipmentData[field] !== undefined) {
-      shipmentsSheet.getRange(found.rowIndex, colIndex + 1).setValue(shipmentData[field]);
+      shipmentsSheet.getRange(found.rowIndex, colIndex + 1).setValue(sanitizeCellValue_(shipmentData[field]));
     }
   });
 
@@ -620,7 +721,7 @@ function handleUpdateChargeback(payload) {
 
   found.headers.forEach((field, colIndex) => {
     if (updates[field] !== undefined) {
-      chargebacksSheet.getRange(found.rowIndex, colIndex + 1).setValue(updates[field]);
+      chargebacksSheet.getRange(found.rowIndex, colIndex + 1).setValue(sanitizeCellValue_(updates[field]));
     }
     if (field === "Updated At") {
       chargebacksSheet.getRange(found.rowIndex, colIndex + 1).setValue(new Date());
@@ -738,6 +839,234 @@ function handleDeletePackingList(payload) {
   return corsResponse({ success: true, deleted: 1 });
 }
 
+const IMPORT_PROTECTED_PO_FIELDS = new Set([
+  "Actual Qty", "Selected", "Packing List", "Status"
+]);
+
+const IMPORT_DATE_FIELDS = new Set(["PO Date", "EST IHD", "CXL Date"]);
+
+const IMPORT_NUMERIC_FIELDS = (function () {
+  const fields = new Set(["PO Qty", "Received Qty", "FOB Cost", "PO Total Cost"]);
+  for (let i = 1; i <= 15; i++) fields.add("PO Unit " + i);
+  return fields;
+})();
+
+function normalizeImportDivision_(value) {
+  const s = String(value ?? "").trim();
+  if (/^elevator\s*disco$/i.test(s)) return "Elevator Disco";
+  if (/^freesia$/i.test(s)) return "Freesia";
+  return s;
+}
+
+function normalizeImportDateToYmd_(value) {
+  if (value == null || value === "") return "";
+  if (Object.prototype.toString.call(value) === "[object Date]" && !isNaN(value.getTime())) {
+    const tz = SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone();
+    return Utilities.formatDate(value, tz, "yyyy-MM-dd");
+  }
+  const s = String(value).trim();
+  if (!s || s === "1/1/1900" || s === "1900-01-01") return "";
+  const slash = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
+  if (slash) {
+    const [, month, day, year] = slash;
+    return year + "-" + String(month).padStart(2, "0") + "-" + String(day).padStart(2, "0");
+  }
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  if (iso) return iso[1] + "-" + iso[2] + "-" + iso[3];
+  return s;
+}
+
+
+function importNumericValuesEqual_(existing, incoming) {
+  const toCompareNumber = value => {
+    if (value == null || value === "") return 0;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : NaN;
+  };
+  const a = toCompareNumber(existing);
+  const b = toCompareNumber(incoming);
+  if (Number.isFinite(a) && Number.isFinite(b)) return a === b;
+  return String(existing ?? "").trim() === String(incoming ?? "").trim();
+}
+
+function importFieldValuesEqual_(field, existing, incoming) {
+  if (IMPORT_DATE_FIELDS.has(field)) {
+    return normalizeImportDateToYmd_(existing) === normalizeImportDateToYmd_(incoming);
+  }
+  if (IMPORT_NUMERIC_FIELDS.has(field)) {
+    return importNumericValuesEqual_(existing, incoming);
+  }
+  if (field === "Division") {
+    return normalizeImportDivision_(existing) === normalizeImportDivision_(incoming);
+  }
+  return String(existing ?? "").trim() === String(incoming ?? "").trim();
+}
+
+function pickChangedImportUpdates_(rowValues, headers, updates) {
+  const changed = {};
+  Object.entries(updates || {}).forEach(([field, value]) => {
+    const colIndex = headers.indexOf(field);
+    const existing = colIndex !== -1 ? rowValues[colIndex] : "";
+    if (!importFieldValuesEqual_(field, existing, value)) {
+      changed[field] = value;
+    }
+  });
+  return changed;
+}
+
+function ensurePoHeaders_(poSheet, requiredHeaders) {
+  const lastCol = Math.max(poSheet.getLastColumn(), 1);
+  const headers = poSheet.getRange(1, 1, 1, lastCol).getValues()[0]
+    .map(h => String(h ?? "").trim());
+  const existing = new Set(headers.filter(Boolean));
+  let changed = false;
+  requiredHeaders.forEach(field => {
+    if (!field || existing.has(field)) return;
+    headers.push(field);
+    existing.add(field);
+    changed = true;
+  });
+  if (changed) {
+    poSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+  return poSheet.getRange(1, 1, 1, poSheet.getLastColumn()).getValues()[0]
+    .map(h => String(h ?? "").trim());
+}
+
+function padSheetRowToWidth_(row, width) {
+  const padded = row.slice();
+  while (padded.length < width) padded.push("");
+  return padded;
+}
+
+function applyImportUpdatesToRowValues_(rowValues, headers, updates) {
+  Object.entries(updates).forEach(([field, value]) => {
+    const colIndex = headers.indexOf(field);
+    if (colIndex !== -1) rowValues[colIndex] = sanitizeCellValue_(value);
+  });
+}
+
+function buildPoRowValues_(headers, rowData) {
+  return headers.map(h => rowData[h] !== undefined ? sanitizeCellValue_(rowData[h]) : "");
+}
+
+function buildPoIndexMap_(sheetValues, poCol) {
+  const poIndexMap = new Map();
+  for (let i = 1; i < sheetValues.length; i++) {
+    const poNumber = String(sheetValues[i][poCol] ?? "").trim();
+    if (poNumber) poIndexMap.set(poNumber, i);
+  }
+  return poIndexMap;
+}
+
+function pickImportUpdates_(rowData) {
+  const updates = {};
+  Object.entries(rowData || {}).forEach(([field, value]) => {
+    if (field === "PO #") return;
+    if (IMPORT_PROTECTED_PO_FIELDS.has(field)) return;
+    if (!IMPORT_ALLOWED_PO_FIELDS.has(field)) return;
+    updates[field] = value;
+  });
+  return updates;
+}
+
+function handleBulkUpsertPos(payload) {
+  const rows = payload.rows || [];
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return corsResponse({ success: false, error: "No rows to import." });
+  }
+
+  const poSheet = getSheet();
+  const requiredHeaders = new Set(["PO #"]);
+  rows.forEach(rowData => {
+    Object.keys(rowData || {}).forEach(field => requiredHeaders.add(field));
+  });
+  const headers = ensurePoHeaders_(poSheet, Array.from(requiredHeaders));
+  const colCount = headers.length;
+  const poCol = headers.indexOf("PO #");
+  if (poCol === -1) {
+    return corsResponse({ success: false, error: "PO # column not found in sheet." });
+  }
+
+  const lastRow = Math.max(poSheet.getLastRow(), 1);
+  let sheetValues = poSheet.getRange(1, 1, lastRow, colCount).getValues()
+    .map(row => padSheetRowToWidth_(row, colCount));
+  sheetValues[0] = headers.slice();
+
+  const poIndexMap = buildPoIndexMap_(sheetValues, poCol);
+  const rowsToAppend = [];
+  const updatedRowIndices = new Set();
+  const insertedPoNumbers = [];
+  const updatedPoNumbers = [];
+  let inserted = 0;
+  let updated = 0;
+  let skipped = 0;
+  const errors = [];
+
+  rows.forEach((rowData, index) => {
+    const poNumber = String(rowData["PO #"] ?? "").trim();
+    if (!poNumber) {
+      skipped++;
+      errors.push({ row: index + 1, error: "Missing PO #" });
+      return;
+    }
+
+    const updates = pickImportUpdates_(rowData);
+    const existingIdx = poIndexMap.get(poNumber);
+
+    if (existingIdx !== undefined) {
+      const targetRow = existingIdx < sheetValues.length
+        ? sheetValues[existingIdx]
+        : rowsToAppend[existingIdx - sheetValues.length];
+      const changedUpdates = pickChangedImportUpdates_(targetRow, headers, updates);
+      if (Object.keys(changedUpdates).length === 0) return;
+
+      applyImportUpdatesToRowValues_(targetRow, headers, changedUpdates);
+      if (existingIdx < sheetValues.length) updatedRowIndices.add(existingIdx);
+      updatedPoNumbers.push(poNumber);
+      updated++;
+      return;
+    }
+
+    const newRowValues = buildPoRowValues_(headers, { "PO #": poNumber, ...updates });
+    rowsToAppend.push(newRowValues);
+    poIndexMap.set(poNumber, sheetValues.length + rowsToAppend.length - 1);
+    insertedPoNumbers.push(poNumber);
+    inserted++;
+  });
+
+  // Write updated rows in batched contiguous runs (fewer setValues round-trips).
+  const sortedIdx = Array.from(updatedRowIndices).sort((a, b) => a - b);
+  let runStart = 0;
+  while (runStart < sortedIdx.length) {
+    const start = sortedIdx[runStart];
+    let end = start;
+    let runEnd = runStart;
+    while (runEnd + 1 < sortedIdx.length && sortedIdx[runEnd + 1] === end + 1) {
+      runEnd++;
+      end = sortedIdx[runEnd];
+    }
+    const block = [];
+    for (let r = start; r <= end; r++) block.push(sheetValues[r]);
+    poSheet.getRange(start + 1, 1, block.length, colCount).setValues(block);
+    runStart = runEnd + 1;
+  }
+
+  if (rowsToAppend.length > 0) {
+    poSheet.getRange(sheetValues.length + 1, 1, rowsToAppend.length, colCount).setValues(rowsToAppend);
+  }
+
+  return corsResponse({
+    success: true,
+    inserted,
+    updated,
+    skipped,
+    errors,
+    insertedPoNumbers,
+    updatedPoNumbers,
+  });
+}
+
 function handleUpdate(payload) {
   const { poNumber, updates } = payload;
 
@@ -783,14 +1112,22 @@ function doGet(e) {
       defaultStatusFilter: getDefaultStatusFilter_(),
     });
   } catch (err) {
-    return corsResponse({ success: false, error: err.message });
+    return errorResponse_(err);
   }
 }
 
 function doPost(e) {
+  const lock = LockService.getScriptLock();
   try {
     const payload = JSON.parse(e.postData.contents);
     const action = payload.action;
+
+    if (!isAuthorizedRequest_(payload)) {
+      return corsResponse({ success: false, error: "Unauthorized." });
+    }
+
+    // Serialize writes to avoid races on ID generation and bulk upserts.
+    lock.waitLock(30000);
 
     if (action === "update") return handleUpdate(payload);
     if (action === "saveColumnDefault") return handleSaveColumnDefault(payload);
@@ -802,9 +1139,12 @@ function doPost(e) {
     if (action === "deleteChargeback") return handleDeleteChargeback(payload);
     if (action === "savePackingList") return handleSavePackingList(payload);
     if (action === "deletePackingList") return handleDeletePackingList(payload);
+    if (action === "bulkUpsertPos") return handleBulkUpsertPos(payload);
 
     return corsResponse({ success: false, error: "Unknown action: " + action });
   } catch (err) {
-    return corsResponse({ success: false, error: err.message });
+    return errorResponse_(err);
+  } finally {
+    if (lock.hasLock()) lock.releaseLock();
   }
 }

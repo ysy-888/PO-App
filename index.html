@@ -26,6 +26,7 @@
       </button>
       <div id="headerMenuDropdown" class="header-menu-dropdown" hidden role="menu">
         <button type="button" class="header-menu-item" id="headerMenuEditTable" role="menuitem">Edit table</button>
+        <button type="button" class="header-menu-item" id="headerMenuImportCsv" role="menuitem">Import CSV</button>
         <button type="button" class="header-menu-item header-menu-checkable" id="headerMenuToggleCountdown" role="menuitemcheckbox" aria-checked="false">
           <span>Toggle countdown</span>
           <span class="header-menu-check" id="headerMenuCountdownCheck" hidden aria-hidden="true">✓</span>
@@ -34,15 +35,23 @@
           <span>Toggle Selection Mode</span>
           <span class="header-menu-check" id="headerMenuSelectionModeCheck" hidden aria-hidden="true">✓</span>
         </button>
+        <button type="button" class="header-menu-item header-menu-item-separator" id="headerMenuToggleAppMode" role="menuitem">
+          <span id="headerMenuAppModeLabel">Test Mode</span>
+        </button>
+        <button type="button" class="header-menu-item" id="headerMenuPublishToProduction" role="menuitem" hidden>
+          Publish to production…
+        </button>
       </div>
     </div>
   </div>
 </header>
 
+<input type="file" id="csvImportInput" accept=".csv,text/csv" hidden />
+
 <div id="poToolbar" class="toolbar">
   <div class="search-wrap">
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-    <input type="search" id="searchInput" placeholder="Search" oninput="applyFilters()" />
+    <input type="search" id="searchInput" placeholder="Search" oninput="scheduleApplyFilters()" />
   </div>
 
 
@@ -85,11 +94,12 @@
   <table id="poTable">
     <colgroup>
       <col class="col-select" /><col class="col-flag" /><col class="col-packing-list" />
-      <col class="col-status" /><col class="col-division" /><col class="col-vendor" />
+      <col class="col-status" /><col class="col-n41-status" /><col class="col-division" /><col class="col-vendor" />
       <col class="col-buyer" /><col class="col-buyer-po" />
       <col class="col-so" /><col class="col-po-date" /><col class="col-po" />
-      <col class="col-old-po" /><col class="col-style" /><col class="col-color" />
+      <col class="col-old-po" /><col class="col-style" /><col class="col-color" /><col class="col-style-category" />
       <col class="col-po-qty" /><col class="col-actual-qty" /><col class="col-ctn-qty" />
+      <col class="col-received-qty" /><col class="col-fob-cost" /><col class="col-po-total-cost" />
       <col class="col-vessel" /><col class="col-house" />
       <col class="col-shipped" /><col class="col-etd" />
       <col class="col-est-exf" /><col class="col-est-ihd" />
@@ -109,6 +119,7 @@
         </th>
         <th class="th-packing-list-col" data-col="Packing List" aria-label="Packing List"></th>
         <th data-col="Status" onclick="sortBy('Status')">Status</th>
+        <th data-col="N41 Status" onclick="sortBy('N41 Status')">N41 Status</th>
         <th data-col="Division" onclick="sortBy('Division')">Division</th>
         <th class="th-filterable" data-col="Vendor"><span class="th-label">Vendor</span></th>
         <th class="th-filterable" data-col="Buyer"><span class="th-label">Buyer</span></th>
@@ -119,9 +130,13 @@
         <th data-col="Old PO #" onclick="sortBy('Old PO #')">Old PO #</th>
         <th data-col="Style #" onclick="sortBy('Style #')">Style #</th>
         <th data-col="Color" onclick="sortBy('Color')">Color</th>
+        <th class="th-filterable" data-col="Style Category"><span class="th-label">Category</span></th>
         <th data-col="PO Qty" onclick="sortBy('PO Qty')">PO Qty</th>
         <th data-col="Actual Qty" onclick="sortBy('Actual Qty')">Act Qty</th>
         <th data-col="Ctn Qty" onclick="sortBy('Ctn Qty')">CTN</th>
+        <th data-col="Received Qty" onclick="sortBy('Received Qty')">Rcvd Qty</th>
+        <th data-col="FOB Cost" onclick="sortBy('FOB Cost')">FOB Cost</th>
+        <th data-col="PO Total Cost" onclick="sortBy('PO Total Cost')">PO Cost</th>
         <th data-col="Vessel" onclick="sortBy('Vessel')">Vessel</th>
         <th data-col="House #" onclick="sortBy('House #')">House #</th>
         <th data-col="Shipped" onclick="sortBy('Shipped')">Shipped</th>
@@ -139,7 +154,7 @@
       </tr>
     </thead>
     <tbody id="tableBody">
-      <tr class="state-row"><td colspan="30">Loading POs…</td></tr>
+      <tr class="state-row"><td colspan="36">Loading POs…</td></tr>
     </tbody>
   </table>
   </div>
@@ -250,6 +265,9 @@
     <div id="selectionModeBanner" class="selection-mode-status" hidden role="status" aria-live="polite">
       Selection Mode Enabled
     </div>
+    <div id="testModeBanner" class="test-mode-status" hidden role="status" aria-live="polite">
+      Test Mode
+    </div>
     <div class="save-indicator" id="saveIndicator" role="status" aria-live="polite" hidden></div>
   </div>
   <div id="poFooterEnd" class="app-footer-end">
@@ -356,6 +374,70 @@
   </div>
 </div>
 
+<div id="csvImportSummaryOverlay" class="modal-backdrop" onclick="closeCsvImportSummary(event)">
+  <div class="modal-card csv-import-summary-card" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-header-main">
+        <h3>CSV Import Complete</h3>
+      </div>
+      <div class="modal-header-actions">
+        <button type="button" class="btn-close" id="csvImportSummaryCloseBtn" aria-label="Close">✕</button>
+      </div>
+    </div>
+    <div class="modal-body csv-import-summary-body">
+      <p id="csvImportSummaryStats" class="csv-import-summary-stats"></p>
+      <div class="csv-import-summary-columns">
+        <section class="csv-import-summary-section">
+          <h4 id="csvImportSummaryAddedHeading">Added POs</h4>
+          <ul id="csvImportSummaryAddedList" class="csv-import-summary-list"></ul>
+        </section>
+        <section class="csv-import-summary-section">
+          <h4 id="csvImportSummaryUpdatedHeading">Updated POs</h4>
+          <ul id="csvImportSummaryUpdatedList" class="csv-import-summary-list"></ul>
+        </section>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-primary" id="csvImportSummaryOkBtn">OK</button>
+    </div>
+  </div>
+</div>
+
+<div id="publishToProductionOverlay" class="modal-backdrop">
+  <div class="modal-card publish-checklist-card" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-header-main">
+        <h3>Publish to Production</h3>
+      </div>
+      <div class="modal-header-actions">
+        <button type="button" class="btn-close" id="publishToProductionCloseBtn" aria-label="Close">✕</button>
+      </div>
+    </div>
+    <div class="modal-body publish-checklist-body">
+      <p class="publish-checklist-intro">
+        This publishes <strong>application code</strong> only. Test and production Google Sheets stay separate — no data or settings are copied.
+      </p>
+      <ol class="publish-checklist-steps">
+        <li>Confirm changes in Test Mode (Refresh against the test sheet).</li>
+        <li>
+          Push frontend to GitHub Pages:
+          <code class="publish-checklist-code">git push origin main</code>
+        </li>
+        <li>
+          Push backend to production Apps Script:
+          <code class="publish-checklist-code">npm run push:prod</code>
+          then update the Web app deployment (New version) in the Apps Script editor.
+        </li>
+        <li>Switch to <strong>Live Mode</strong>, Refresh, and verify production.</li>
+      </ol>
+      <p class="publish-checklist-note">See <code>DEPLOY.md</code> in the repo for full setup and troubleshooting.</p>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-primary" id="publishToProductionOkBtn">Got it</button>
+    </div>
+  </div>
+</div>
+
 <div id="modalOverlay" class="modal-backdrop" onclick="closeModal(event)">
   <div class="modal-card" onclick="event.stopPropagation()">
     <div class="modal-header">
@@ -378,7 +460,23 @@
   </div>
 </div>
 
-<script src="po-table.js"></script>
-<script src="shipments.js"></script>
+<script src="js/config.js"></script>
+<script src="js/header-menu.js"></script>
+<script src="js/columns.js"></script>
+<script src="js/rules.js"></script>
+<script src="js/status-filters.js"></script>
+<script src="js/column-filters.js"></script>
+<script src="js/state-api.js"></script>
+<script src="js/csv-import.js"></script>
+<script src="js/data-pipeline.js"></script>
+<script src="js/selection.js"></script>
+<script src="js/table-render.js"></script>
+<script src="js/cell-edit.js"></script>
+<script src="js/modal.js"></script>
+<script src="js/save.js"></script>
+<script src="js/main.js"></script>
+<script src="js/shipments-tables.js"></script>
+<script src="js/shipments-modals.js"></script>
+<script src="js/shipments-init.js"></script>
 </body>
 </html>

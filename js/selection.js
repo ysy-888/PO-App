@@ -1,0 +1,425 @@
+
+function isTruthy(val) {
+  if (val === true || val === 1) return true;
+  const s = String(val ?? "").trim().toLowerCase();
+  return s === "true" || s === "yes" || s === "1" || s === "x";
+}
+
+function toSheetBool(val) {
+  return !!val;
+}
+
+function toggleRowSelected(row, selected) {
+  const next = toSheetBool(selected);
+  if (isTruthy(row["Selected"]) === next) return false;
+  row["Selected"] = next;
+  updateSelectAllHeader();
+  if (typeof onPoSelectionChanged === "function") onPoSelectionChanged();
+  return true;
+}
+
+/** @type {Set<number>} visible row indices on the current page */
+let miniSelectedIndices = new Set();
+let miniSelectClickAnchorIndex = -1;
+let rowSelectPointerId = null;
+let rowSelectAnchorIndex = -1;
+let rowSelectRangeMode = false;
+let rowSelectToggleOff = false;
+
+function isRowMiniSelectBlocked(target) {
+  if (!(target instanceof Element)) return true;
+  return Boolean(target.closest(
+    "input, textarea, select, button, .cell-select-dropdown, .po-flag-btn, " +
+    ".td-select-cell, .select-cell, .editable, .copyable-text, .shipment-id-link"
+  ));
+}
+
+function isTypingInField(target) {
+  if (!(target instanceof Element)) return false;
+  return Boolean(target.closest('input, textarea, select, [contenteditable="true"]'));
+}
+
+function getVisibleRowTrList() {
+  return [...document.querySelectorAll("#tableBody tr[data-po]")];
+}
+
+function getRowIndexFromTr(tr) {
+  if (!tr) return -1;
+  return getVisibleRowTrList().indexOf(tr);
+}
+
+function getRowIndexAtPoint(x, y) {
+  const tr = document.elementFromPoint(x, y)?.closest("#tableBody tr[data-po]");
+  return getRowIndexFromTr(tr);
+}
+
+function getOffsetWithin(el, container) {
+  let top = 0;
+  let left = 0;
+  let current = el;
+  while (current && current !== container) {
+    top += current.offsetTop;
+    left += current.offsetLeft;
+    current = current.offsetParent;
+  }
+  if (current !== container) {
+    const er = el.getBoundingClientRect();
+    const cr = container.getBoundingClientRect();
+    return { top: er.top - cr.top, left: er.left - cr.left };
+  }
+  return { top, left };
+}
+
+let miniSelectAntsEl = null;
+
+function ensureMiniSelectAntsOverlay() {
+  if (miniSelectAntsEl) return miniSelectAntsEl;
+  const container = document.querySelector(".table-scroll-x");
+  if (!container) return null;
+
+  miniSelectAntsEl = document.createElement("div");
+  miniSelectAntsEl.id = "miniSelectAnts";
+  miniSelectAntsEl.className = "mini-select-ants";
+  miniSelectAntsEl.hidden = true;
+  miniSelectAntsEl.innerHTML =
+    `<svg class="mini-select-ants-svg" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
+    `<rect class="mini-select-ants-rect" fill="none"/></svg>`;
+  container.appendChild(miniSelectAntsEl);
+  return miniSelectAntsEl;
+}
+
+function updateMiniSelectAntsOverlay() {
+  const overlay = ensureMiniSelectAntsOverlay();
+  if (!overlay) return;
+
+  if (miniSelectedIndices.size === 0) {
+    overlay.hidden = true;
+    return;
+  }
+
+  const container = document.querySelector(".table-scroll-x");
+  const table = document.getElementById("poTable");
+  const trs = getVisibleRowTrList();
+  const sorted = [...miniSelectedIndices].sort((a, b) => a - b);
+  const firstTr = trs[sorted[0]];
+  const lastTr = trs[sorted[sorted.length - 1]];
+  if (!container || !table || !firstTr || !lastTr) {
+    overlay.hidden = true;
+    return;
+  }
+
+  const firstOff = getOffsetWithin(firstTr, container);
+  const lastOff = getOffsetWithin(lastTr, container);
+  const tableOff = getOffsetWithin(table, container);
+  const width = table.offsetWidth;
+  const height = lastOff.top + lastTr.offsetHeight - firstOff.top;
+  const inset = 0.75;
+
+  overlay.style.top = `${firstOff.top}px`;
+  overlay.style.left = `${tableOff.left}px`;
+  overlay.style.width = `${width}px`;
+  overlay.style.height = `${height}px`;
+  overlay.hidden = false;
+
+  const svg = overlay.querySelector(".mini-select-ants-svg");
+  const rect = overlay.querySelector(".mini-select-ants-rect");
+  if (!svg || !rect) return;
+
+  svg.setAttribute("width", String(width));
+  svg.setAttribute("height", String(height));
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  rect.setAttribute("x", String(inset));
+  rect.setAttribute("y", String(inset));
+  rect.setAttribute("width", String(Math.max(0, width - inset * 2)));
+  rect.setAttribute("height", String(Math.max(0, height - inset * 2)));
+}
+
+function applyMiniSelectionClasses() {
+  getVisibleRowTrList().forEach((tr, i) => {
+    tr.classList.toggle("row-mini-selected", miniSelectedIndices.has(i));
+  });
+  requestAnimationFrame(updateMiniSelectAntsOverlay);
+}
+
+function clearMiniSelection() {
+  if (miniSelectedIndices.size === 0) return;
+  miniSelectedIndices.clear();
+  miniSelectClickAnchorIndex = -1;
+  applyMiniSelectionClasses();
+}
+
+function getMiniSelectShiftAnchor() {
+  if (miniSelectClickAnchorIndex >= 0) return miniSelectClickAnchorIndex;
+  if (miniSelectedIndices.size === 0) return -1;
+  return Math.min(...miniSelectedIndices);
+}
+
+function setMiniSelectionByIndexRange(startIdx, endIdx) {
+  const trs = getVisibleRowTrList();
+  if (startIdx < 0 || endIdx < 0 || trs.length === 0) return;
+
+  const lo = Math.min(startIdx, endIdx);
+  const hi = Math.max(startIdx, endIdx);
+  miniSelectedIndices.clear();
+  for (let i = lo; i <= hi; i++) miniSelectedIndices.add(i);
+  applyMiniSelectionClasses();
+}
+
+function getVisiblePageRow(index) {
+  const rows = getPagedRows();
+  return rows[index] ?? null;
+}
+
+function findRowByPo(po) {
+  return allRows.find(row => String(row["PO #"]) === String(po));
+}
+
+function getMiniSelectedRows() {
+  const rows = [];
+  miniSelectedIndices.forEach(index => {
+    const row = getVisiblePageRow(index);
+    if (row) rows.push(row);
+  });
+  return rows;
+}
+
+function resolveMiniSelectTargetState(rows) {
+  const total = rows.length;
+  if (total === 0) return null;
+
+  const selectedCount = rows.filter(row => isTruthy(row["Selected"])).length;
+  if (selectedCount === total) return false;
+  if (selectedCount === 0) return true;
+  return selectedCount > total / 2;
+}
+
+function toggleMiniSelectedCheckboxState() {
+  const rows = getMiniSelectedRows();
+  if (rows.length === 0) return;
+
+  const targetState = resolveMiniSelectTargetState(rows);
+  if (targetState === null) return;
+
+  let changed = false;
+  rows.forEach(row => {
+    if (toggleRowSelected(row, targetState)) changed = true;
+  });
+
+  if (!changed) return;
+  renderTable();
+}
+
+function initRowMiniSelection() {
+  const tbody = document.getElementById("tableBody");
+  if (!tbody) return;
+
+  tbody.addEventListener("pointerdown", e => {
+    if (!isSelectionModeEnabled()) return;
+    if (e.button !== 0) return;
+    const tr = e.target.closest("tr[data-po]");
+    if (!tr || isRowMiniSelectBlocked(e.target)) return;
+
+    const idx = getRowIndexFromTr(tr);
+    if (idx === -1) return;
+
+    if (e.shiftKey) {
+      e.preventDefault();
+      const anchor = getMiniSelectShiftAnchor();
+      if (anchor === -1) {
+        setMiniSelectionByIndexRange(idx, idx);
+        miniSelectClickAnchorIndex = idx;
+      } else {
+        setMiniSelectionByIndexRange(anchor, idx);
+      }
+      return;
+    }
+
+    rowSelectPointerId = e.pointerId;
+    rowSelectAnchorIndex = idx;
+    rowSelectRangeMode = false;
+    rowSelectToggleOff = miniSelectedIndices.size === 1 && miniSelectedIndices.has(idx);
+    if (!rowSelectToggleOff) {
+      setMiniSelectionByIndexRange(idx, idx);
+    }
+
+    tbody.setPointerCapture(e.pointerId);
+    document.body.classList.add("row-drag-selecting");
+  });
+
+  tbody.addEventListener("pointermove", e => {
+    if (!isSelectionModeEnabled()) return;
+    if (e.pointerId !== rowSelectPointerId) return;
+    if (!(e.buttons & 1)) return;
+
+    const currentIdx = getRowIndexAtPoint(e.clientX, e.clientY);
+    if (currentIdx === -1) return;
+
+    if (currentIdx !== rowSelectAnchorIndex) {
+      rowSelectRangeMode = true;
+      rowSelectToggleOff = false;
+    }
+
+    if (rowSelectRangeMode) {
+      setMiniSelectionByIndexRange(rowSelectAnchorIndex, currentIdx);
+    }
+  });
+
+  function endRowPointerSelect(e) {
+    if (e.pointerId !== rowSelectPointerId) return;
+
+    if (!rowSelectRangeMode && rowSelectToggleOff) {
+      clearMiniSelection();
+    } else if (!rowSelectRangeMode && rowSelectAnchorIndex >= 0) {
+      setMiniSelectionByIndexRange(rowSelectAnchorIndex, rowSelectAnchorIndex);
+      miniSelectClickAnchorIndex = rowSelectAnchorIndex;
+    } else if (rowSelectRangeMode && rowSelectAnchorIndex >= 0) {
+      miniSelectClickAnchorIndex = rowSelectAnchorIndex;
+    }
+
+    if (tbody.hasPointerCapture(e.pointerId)) {
+      tbody.releasePointerCapture(e.pointerId);
+    }
+
+    rowSelectPointerId = null;
+    rowSelectAnchorIndex = -1;
+    rowSelectRangeMode = false;
+    rowSelectToggleOff = false;
+    document.body.classList.remove("row-drag-selecting");
+  }
+
+  tbody.addEventListener("pointerup", endRowPointerSelect);
+  tbody.addEventListener("pointercancel", endRowPointerSelect);
+
+  document.addEventListener("mousedown", e => {
+    if (rowSelectPointerId !== null) return;
+    if (e.target.closest("#tableBody")) return;
+    if (e.target.closest(".column-filter-popover, .cell-select-dropdown, .header-menu-dropdown")) return;
+    clearMiniSelection();
+  });
+
+  document.addEventListener("keydown", e => {
+    if (!isSelectionModeEnabled()) return;
+    if (e.key !== " " && e.code !== "Space") return;
+    if (miniSelectedIndices.size === 0) return;
+    if (isTypingInField(e.target)) return;
+    e.preventDefault();
+    toggleMiniSelectedCheckboxState();
+  });
+
+  document.querySelector(".table-scroll-y")?.addEventListener(
+    "scroll",
+    updateMiniSelectAntsOverlay,
+    { passive: true }
+  );
+  window.addEventListener("resize", updateMiniSelectAntsOverlay, { passive: true });
+}
+
+function updateModalIfOpen() {
+  if (!modalRow || !document.getElementById("modalOverlay")?.classList.contains("open")) return;
+  renderModalContent(modalRow);
+}
+
+function refreshModalPackingQtyDisplay(row) {
+  if (!row) return;
+  const sizeBody = document.querySelector("#modalOverlay .modal-size-grid-body");
+  if (sizeBody) renderSizeGridBody(sizeBody, row);
+}
+
+function closePackingListPanelInModal(row) {
+  packingListPanelOpen = false;
+  document.querySelector("#modalOverlay .modal-layout")?.classList.remove("modal-layout--packing-open");
+  document.querySelector("#modalOverlay .packing-list-side-panel")?.remove();
+  updateModalPackingListButton(row);
+  refreshModalPackingQtyDisplay(row);
+}
+
+function toggleRowFlag(row) {
+  if (isAppSaving()) return;
+  const next = !isTruthy(row["Flag"]);
+  row["Flag"] = next;
+  if (isPoModalOpenForRow(row)) {
+    updateModalIfOpen();
+    updateModalSaveState();
+    return;
+  }
+  saveUpdate(row["PO #"], { Flag: next });
+  renderTable();
+  updateModalIfOpen();
+}
+
+function setAllFilteredSelected(selected) {
+  const next = toSheetBool(selected);
+  let changed = false;
+  filteredRows.forEach(row => {
+    if (isTruthy(row["Selected"]) === next) return;
+    row["Selected"] = next;
+    changed = true;
+  });
+  if (!changed) return;
+  renderTable();
+  if (typeof onPoSelectionChanged === "function") onPoSelectionChanged();
+}
+
+function updateSelectAllHeader() {
+  const cb = document.getElementById("selectAllRowsCheckbox");
+  if (!cb) return;
+
+  if (filteredRows.length === 0) {
+    cb.checked = false;
+    cb.indeterminate = false;
+    cb.disabled = true;
+    updateRowCounter();
+    return;
+  }
+
+  cb.disabled = false;
+  const selectedCount = getFilteredSelectedCount();
+  cb.checked = selectedCount === filteredRows.length;
+  cb.indeterminate = selectedCount > 0 && selectedCount < filteredRows.length;
+  updateRowCounter();
+  if (typeof onPoSelectionChanged === "function") onPoSelectionChanged();
+}
+
+function updateFlagFilterHeaderState() {
+  const th = document.querySelector('th.th-flag-col[data-col="Flag"]');
+  if (!th) return;
+  th.classList.toggle("filter-active", flagFilterActive);
+  th.setAttribute("aria-pressed", flagFilterActive ? "true" : "false");
+  th.title = flagFilterActive ? "Show all rows" : "Show flagged only";
+}
+
+function toggleFlagFilter() {
+  flagFilterActive = !flagFilterActive;
+  updateFlagFilterHeaderState();
+  applyFilters();
+}
+
+function initFlagFilterHeader() {
+  const th = document.querySelector('th.th-flag-col[data-col="Flag"]');
+  if (!th) return;
+  th.setAttribute("role", "button");
+  th.setAttribute("aria-pressed", "false");
+  th.title = "Show flagged only";
+  th.addEventListener("click", toggleFlagFilter);
+}
+
+function initRowSelection() {
+  const cb = document.getElementById("selectAllRowsCheckbox");
+  cb?.addEventListener("click", e => {
+    e.stopPropagation();
+    setAllFilteredSelected(cb.checked);
+  });
+  initRowMiniSelection();
+}
+
+const FLAG_ICON_SVG =
+  `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" ` +
+  `fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">` +
+  `<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>` +
+  `<line x1="4" y1="22" x2="4" y2="15"/></svg>`;
+
+const PACKING_LIST_ICON_SVG =
+  `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" ` +
+  `fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">` +
+  `<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>` +
+  `<path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h6"/></svg>`;
