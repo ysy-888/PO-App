@@ -7,6 +7,10 @@ async function loadData() {
       allChargebacks = DEMO_CHARGEBACKS.map(normalizeChargeback);
       allPackingLists = DEMO_PACKING_LISTS.map(normalizePackingList);
       allPackingCartons = DEMO_PACKING_CARTONS.map(normalizePackingCarton);
+      allVendorEmailRows = [
+        { Vendor: "Blue Fabrics", Email: "demo@example.com", CC: "" },
+        { Vendor: "Summit Goods", Email: "demo@example.com", CC: "" },
+      ];
       window.__pendingShipments = DEMO_SHIPMENTS;
       window.__pendingExfRequests = [];
       if (typeof onShipmentsDataLoaded === "function") {
@@ -21,13 +25,16 @@ async function loadData() {
         onDeliveryPickupDataLoaded([], []);
       }
     } else {
-      const res = await fetch(getAppsScriptUrl());
+      const url = new URL(getAppsScriptUrl());
+      url.searchParams.set("_", String(Date.now()));
+      const res = await fetch(url.toString(), { cache: "no-store" });
       const json = await res.json();
       if (!json.success) throw new Error(json.error);
       allRows = json.data.map(normalizeRow);
       allChargebacks = (json.chargebacks ?? []).map(normalizeChargeback);
       allPackingLists = (json.packingLists ?? []).map(normalizePackingList);
       allPackingCartons = (json.packingCartons ?? []).map(normalizePackingCarton);
+      allVendorEmailRows = json.vendors ?? [];
       window.__pendingShipments = json.shipments ?? [];
       window.__pendingExfRequests = json.exfRequests ?? [];
       window.__pendingDeliveryRequests = json.deliveryRequests ?? [];

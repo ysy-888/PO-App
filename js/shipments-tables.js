@@ -537,9 +537,10 @@ function refreshShipmentsView() {
 function updateCreateShipmentButton() {
   const btn = document.getElementById("createShipmentBtn");
   if (!btn) return;
-  const eligible = getEligibleCheckedFilteredPosForShipment();
-  const count = eligible.length;
-  const show = currentAppView === "po" && count > 0;
+  const selected = getCheckedFilteredPos();
+  const show = currentAppView === "po" &&
+    selected.length > 0 &&
+    selected.every(isPoEligibleForShipment);
   btn.hidden = !show;
 }
 

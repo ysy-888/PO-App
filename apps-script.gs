@@ -1267,12 +1267,18 @@ function getVendorEmailInfo_(vendor) {
   const rows = sheet.getDataRange().getValues();
   if (rows.length < 2) return { to: "", cc: "" };
   const headers = rows[0].map(h => String(h ?? "").trim());
-  const vendorCol = headers.indexOf("Vendor");
-  const emailCol = headers.indexOf("Email") !== -1 ? headers.indexOf("Email") : headers.indexOf("Vendor Email");
-  const ccCol = headers.indexOf("CC");
+  const headerIndex = function(names) {
+    const lowered = names.map(function(name) { return name.toLowerCase(); });
+    return headers.findIndex(function(header) {
+      return lowered.indexOf(header.toLowerCase()) !== -1;
+    });
+  };
+  const vendorCol = headerIndex(["Vendor", "Vendor Name", "Name"]);
+  const emailCol = headerIndex(["Email", "Vendor Email", "Email Address", "E-mail", "To"]);
+  const ccCol = headerIndex(["CC", "Vendor CC", "Cc"]);
   if (vendorCol === -1 || emailCol === -1) return { to: "", cc: "" };
   const vendorKey = normalizeVendorName_(vendor).toLowerCase();
-  for (let i = 1; i < rows.length; i++) {
+  for (let i = rows.length - 1; i >= 1; i--) {
     if (normalizeVendorName_(rows[i][vendorCol]).toLowerCase() !== vendorKey) continue;
     return {
       to: String(rows[i][emailCol] ?? "").trim(),
@@ -1280,6 +1286,16 @@ function getVendorEmailInfo_(vendor) {
     };
   }
   return { to: "", cc: "" };
+}
+
+function getExfRequestEmailInfo_(payload, vendor) {
+  const stored = getVendorEmailInfo_(vendor);
+  const submittedTo = String(payload.vendorEmail ?? "").trim();
+  const submittedCc = String(payload.vendorCc ?? "").trim();
+  return {
+    to: submittedTo || stored.to,
+    cc: submittedCc || stored.cc,
+  };
 }
 
 function escapeHtml_(value) {
@@ -1296,7 +1312,10 @@ function formatEmailDate_(value) {
   if (Object.prototype.toString.call(value) === "[object Date]" && !isNaN(value.getTime())) {
     return Utilities.formatDate(value, Session.getScriptTimeZone(), "MM/dd/yyyy");
   }
-  return String(value);
+  const s = String(value).trim();
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (iso) return iso[2] + "/" + iso[3] + "/" + iso[1];
+  return s;
 }
 
 function getExfRequestPoTotalQty_(rows) {
@@ -1336,20 +1355,76 @@ function buildExfRequestEmailHtml_(requestId, vendor, rows, requestDate, memos, 
     "<p>Thank you.</p>";
 }
 
+function buildExfRequestEmailText_(requestId, vendor, rows, requestDate, memos, shipMethods) {
+  const lines = [
+    "Hello,",
+    "",
+    "Please confirm EXF readiness for the POs below.",
+    "",
+    "EXF Request: " + requestId,
+    "Vendor: " + vendor,
+    "Request Date: " + requestDate,
+    "",
+  ];
+  rows.forEach(row => {
+    const po = String(row["PO #"] ?? "");
+    lines.push(
+      "PO #: " + po,
+      "Style #: " + String(row["Style #"] ?? ""),
+      "Buyer: " + String(row["Buyer"] ?? ""),
+      "Buyer PO #: " + String(row["Buyer PO #"] ?? ""),
+      "Order Qty: " + String(row["PO Qty"] ?? ""),
+      "Ship Method: " + String(shipMethods[po] ?? row["Ship Method"] ?? ""),
+      "CXL Date: " + formatEmailDate_(row["CXL Date"]),
+      "EXF Memo: " + String(memos[po] ?? row[EXF_MEMO_FIELD] ?? ""),
+      ""
+    );
+  });
+  lines.push("Thank you.");
+  return lines.join("\n");
+}
+
 function sendExfRequestEmail_(requestId, vendor, vendorEmailInfo, rows, requestDate, memos, shipMethods) {
   if (!vendorEmailInfo.to) {
     throw new Error("No vendor email found for " + vendor + ". Add it to the Vendors sheet.");
   }
 
-  const subject = "EXF Request " + requestId + " - " + vendor + " - " + requestDate;
-  const htmlBody = buildExfRequestEmailHtml_(requestId, vendor, rows, requestDate, memos, shipMethods);
+  const displayDate = formatEmailDate_(requestDate);
+  const subject = "[ELEVATOR DISCO] EXF Request - " + displayDate + " - " + vendor;
+  const htmlBody = buildExfRequestEmailHtml_(requestId, vendor, rows, displayDate, memos, shipMethods);
   const options = {
     to: vendorEmailInfo.to,
     subject: subject,
+    body: buildExfRequestEmailText_(requestId, vendor, rows, displayDate, memos, shipMethods),
     htmlBody: htmlBody,
   };
   if (vendorEmailInfo.cc) options.cc = vendorEmailInfo.cc;
   MailApp.sendEmail(options);
+}
+
+function applyExfRequestPoDraftFields_(poSheet, poNumbers, memos, shipMethods) {
+  const items = poNumbers.map(poNumber => {
+    const updates = {};
+    if (shipMethods[poNumber] !== undefined) updates["Ship Method"] = shipMethods[poNumber];
+    const memo = String(memos[poNumber] ?? "").trim();
+    if (memo) updates[EXF_MEMO_FIELD] = memo;
+    return { poNumber: poNumber, updates: updates };
+  }).filter(item => Object.keys(item.updates).length > 0);
+  applyPoUpdatesBatch_(poSheet, items);
+}
+
+function markExfRequestPosRequested_(poSheet, poNumbers, requestDate, memos, shipMethods) {
+  const items = poNumbers.map(poNumber => {
+    const updates = {};
+    updates[EXF_REQUESTED_FIELD] = true;
+    updates["Status"] = "Requested";
+    updates[EXF_REQUEST_DATE_FIELD] = requestDate;
+    if (shipMethods[poNumber] !== undefined) updates["Ship Method"] = shipMethods[poNumber];
+    const memo = String(memos[poNumber] ?? "").trim();
+    if (memo) updates[EXF_MEMO_FIELD] = memo;
+    return { poNumber: poNumber, updates: updates };
+  });
+  applyPoUpdatesBatch_(poSheet, items);
 }
 
 function pickDeliveryRequestData_(raw) {
@@ -1379,6 +1454,12 @@ function handleExfRequest(payload) {
   }
   const memos = payload.memos || {};
   const shipMethods = payload.shipMethods || {};
+  const missingShipMethods = poNumbers.filter(function(poNumber) {
+    return String(shipMethods[poNumber] ?? "").trim() === "";
+  });
+  if (missingShipMethods.length > 0) {
+    return corsResponse({ success: false, error: "Select Shipping Method for all POs before submitting." });
+  }
   const poSheet = getSheet();
   let poRows;
   let vendor;
@@ -1395,22 +1476,16 @@ function handleExfRequest(payload) {
     return corsResponse({ success: false, error: err.message });
   }
 
+  const vendorEmailInfo = getExfRequestEmailInfo_(payload, vendor);
+  if (!vendorEmailInfo.to) {
+    return corsResponse({ success: false, error: "Vendor Email is required to send the EXF request." });
+  }
+
   const exfRequestsSheet = getExfRequestsSheet_();
   const existingRequests = sheetToObjects_(exfRequestsSheet, EXF_REQUEST_ID_FIELD);
   const requestId = generateExfRequestId_(existingRequests);
-  const vendorEmailInfo = getVendorEmailInfo_(vendor);
 
-  const items = poNumbers.map(poNumber => {
-    const updates = {};
-    updates[EXF_REQUESTED_FIELD] = true;
-    updates["Status"] = "Requested";
-    updates[EXF_REQUEST_DATE_FIELD] = requestDate;
-    if (shipMethods[poNumber] !== undefined) updates["Ship Method"] = shipMethods[poNumber];
-    const memo = String(memos[poNumber] ?? "").trim();
-    if (memo) updates[EXF_MEMO_FIELD] = memo;
-    return { poNumber: poNumber, updates: updates };
-  });
-  applyPoUpdatesBatch_(poSheet, items);
+  applyExfRequestPoDraftFields_(poSheet, poNumbers, memos, shipMethods);
 
   const now = new Date();
   appendRequestRow_(exfRequestsSheet, EXF_REQUEST_ID_FIELD, requestId, EXF_REQUEST_DATA_FIELDS, {
@@ -1433,6 +1508,9 @@ function handleExfRequest(payload) {
     emailSent = true;
   } catch (err) {
     emailError = err && err.message ? err.message : String(err);
+  }
+  if (emailSent) {
+    markExfRequestPosRequested_(poSheet, poNumbers, requestDate, memos, shipMethods);
   }
 
   updateRequestRowFields_(exfRequestsSheet, found.rowIndex, found.headers, {
@@ -1465,7 +1543,7 @@ function handleResendExfRequestEmail(payload) {
     .split(",")
     .map(s => s.trim())
     .filter(Boolean);
-  const requestDate = formatEmailDate_(request["Request Date"]);
+  const requestDate = request["Request Date"];
   const poSheet = getSheet();
   let poRows;
   let vendor;
@@ -1475,7 +1553,11 @@ function handleResendExfRequestEmail(payload) {
   } catch (err) {
     return corsResponse({ success: false, error: err.message });
   }
-  const vendorEmailInfo = getVendorEmailInfo_(vendor);
+  const storedVendorEmailInfo = getVendorEmailInfo_(vendor);
+  const vendorEmailInfo = {
+    to: String(request["Vendor Email"] ?? "").trim() || storedVendorEmailInfo.to,
+    cc: storedVendorEmailInfo.cc,
+  };
   const memos = {};
   const shipMethods = {};
   poRows.forEach(row => {
@@ -1491,6 +1573,9 @@ function handleResendExfRequestEmail(payload) {
     emailSent = true;
   } catch (err) {
     emailError = err && err.message ? err.message : String(err);
+  }
+  if (emailSent) {
+    markExfRequestPosRequested_(poSheet, poNumbers, requestDate, memos, shipMethods);
   }
 
   updateRequestRowFields_(exfRequestsSheet, found.rowIndex, found.headers, {
@@ -1715,6 +1800,7 @@ function doGet(e) {
     const poSheet = getSheet();
     const shipmentsSheet = getShipmentsSheet_();
     const exfRequestsSheet = getExfRequestsSheet_();
+    const vendorsSheet = getVendorsSheet_();
     const deliveryRequestsSheet = getDeliveryRequestsSheet_();
     const pickupRequestsSheet = getPickupRequestsSheet_();
     const chargebacksSheet = getChargebacksSheet_();
@@ -1723,6 +1809,7 @@ function doGet(e) {
     const data = sheetToObjects_(poSheet, "PO #");
     const shipments = sheetToObjects_(shipmentsSheet, SHIPMENT_ID_FIELD);
     const exfRequests = sheetToObjects_(exfRequestsSheet, EXF_REQUEST_ID_FIELD);
+    const vendors = sheetToObjects_(vendorsSheet, "Vendor");
     const deliveryRequests = sheetToObjects_(deliveryRequestsSheet, DELIVERY_REQUEST_ID_FIELD);
     const pickupRequests = sheetToObjects_(pickupRequestsSheet, PICKUP_REQUEST_ID_FIELD);
     const chargebacks = sheetToObjects_(chargebacksSheet, CHARGEBACK_ID_FIELD);
@@ -1734,6 +1821,7 @@ function doGet(e) {
       data: data,
       shipments: shipments,
       exfRequests: exfRequests,
+      vendors: vendors,
       deliveryRequests: deliveryRequests,
       pickupRequests: pickupRequests,
       chargebacks: chargebacks,

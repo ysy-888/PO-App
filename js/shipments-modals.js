@@ -16,6 +16,8 @@ function openShipmentDetail(shipmentOrId) {
   if (!shipment) return;
 
   closeCellSelectDropdown(false);
+  clearMainTableSelection();
+  clearShipmentFormSelection();
   shipmentModalRow = shipment;
   renderShipmentModalContent(shipment);
   bringModalToFront(document.getElementById("shipmentModalOverlay"));
@@ -24,6 +26,7 @@ function openShipmentDetail(shipmentOrId) {
 function closeShipmentModalForce() {
   shipmentModalRow = null;
   shipmentAddPoPanelOpen = false;
+  clearShipmentFormSelection();
   clearShipmentFooterMessage("shipmentModalFooterMessage");
   const overlay = document.getElementById("shipmentModalOverlay");
   if (overlay) overlay.classList.remove("open");
@@ -263,7 +266,7 @@ function updateShipmentModalActionButtons() {
   if (!addBtn && !removeBtn && !footerAddBtn && !footerRemoveBtn) return;
 
   const linked = getLinkedPosFromModalTable();
-  const linkedSelected = linked.filter(row => isTruthy(row["Selected"])).length;
+  const linkedSelected = linked.filter(isShipmentFormPoSelected).length;
   const showAdd = !shipmentAddPoPanelOpen && linkedSelected === 0;
   const showRemove = !shipmentAddPoPanelOpen && linkedSelected > 0;
 
@@ -274,7 +277,7 @@ function updateShipmentModalActionButtons() {
 }
 
 function openShipmentAddPoPanel() {
-  getLinkedPosFromModalTable().forEach(row => toggleRowSelected(row, false));
+  clearShipmentFormSelection();
   shipmentAddPoPanelOpen = true;
   rerenderOpenShipmentModalBody();
   updateShipmentModalActionButtons();
@@ -394,7 +397,7 @@ async function addPosToShipment(poNumbers, { keepPanelOpen = false } = {}) {
 }
 
 async function removePosFromShipment() {
-  const linked = getLinkedPosFromModalTable().filter(row => isTruthy(row["Selected"]));
+  const linked = getLinkedPosFromModalTable().filter(isShipmentFormPoSelected);
   if (linked.length === 0) {
     showIndicator("Select POs to remove", "error");
     return;
@@ -404,7 +407,7 @@ async function removePosFromShipment() {
   if (createOverlay?.classList.contains("open")) {
     const removeSet = new Set(linked.map(row => String(row["PO #"])));
     createShipmentPoNumbers = createShipmentPoNumbers.filter(po => !removeSet.has(String(po)));
-    linked.forEach(row => toggleRowSelected(row, false));
+    linked.forEach(row => toggleShipmentFormPoSelected(row, false));
     renderCreateShipmentModal(createShipmentPoNumbers);
     return;
   }
@@ -484,7 +487,7 @@ function renderCreateShipmentModal(poNumbers) {
   const pos = poNumbers
     .map(po => allRows.find(r => String(r["PO #"]) === String(po)))
     .filter(Boolean);
-  pos.forEach(row => { row["Selected"] = false; });
+  pruneShipmentFormSelection(pos);
 
   body.innerHTML = "";
   body.appendChild(buildShipmentModalLayout({
@@ -503,6 +506,7 @@ function renderCreateShipmentModal(poNumbers) {
 function closeCreateShipmentModal() {
   createShipmentPoNumbers = [];
   shipmentAddPoPanelOpen = false;
+  clearShipmentFormSelection();
   clearShipmentFooterMessage("createShipmentFooterMessage");
   document.getElementById("createShipmentOverlay")?.classList.remove("open");
   setShipmentModalAddPanelClass(document.getElementById("createShipmentBody"), false);
@@ -751,8 +755,8 @@ function updateShipmentLinkedPoSelectAllHeader(pos) {
     return;
   }
 
-  cb.disabled = false;
-  const selectedCount = pos.filter(row => isTruthy(row["Selected"])).length;
+  cb.disabled = shipmentAddPoPanelOpen;
+  const selectedCount = pos.filter(isShipmentFormPoSelected).length;
   cb.checked = selectedCount === pos.length;
   cb.indeterminate = selectedCount > 0 && selectedCount < pos.length;
 }
@@ -765,21 +769,18 @@ function syncLinkedPoTableCheckboxes(pos) {
     const po = String(row["PO #"] ?? "");
     const tr = [...tbody.querySelectorAll("tr[data-po]")].find(el => String(el.dataset.po) === po);
     const cb = tr?.querySelector(".po-select-checkbox");
-    if (cb) cb.checked = isTruthy(row["Selected"]);
+    if (cb) cb.checked = isShipmentFormPoSelected(row);
   });
   updateShipmentLinkedPoSelectAllHeader(pos);
 }
 
 function setAllLinkedPosSelected(pos, selected) {
   if (shipmentAddPoPanelOpen) return;
-  let changed = false;
   pos.forEach(row => {
-    if (toggleRowSelected(row, selected)) changed = true;
+    toggleShipmentFormPoSelected(row, selected);
   });
-  if (changed) {
-    syncLinkedPoTableCheckboxes(pos);
-    updateShipmentModalActionButtons();
-  }
+  syncLinkedPoTableCheckboxes(pos);
+  onFormPoSelectionChanged();
 }
 
 function renderShipmentLinkedPoSection(source) {
@@ -788,6 +789,7 @@ function renderShipmentLinkedPoSection(source) {
   section.classList.toggle("shipment-linked-pos--selection-disabled", shipmentAddPoPanelOpen);
 
   const pos = getLinkedPoRows(source);
+  pruneShipmentFormSelection(pos);
   const count = pos.length;
 
   if (count === 0) {
@@ -847,13 +849,12 @@ function renderShipmentLinkedPoSection(source) {
     tr.dataset.po = row["PO #"];
 
     const selectTd = document.createElement("td");
-    renderSelectedCell(selectTd, row);
-    const linkedCb = selectTd.querySelector(".po-select-checkbox");
-    if (linkedCb) linkedCb.disabled = shipmentAddPoPanelOpen;
-    linkedCb?.addEventListener("change", () => {
+    const linkedCb = renderFormSelectedCell(selectTd, row, isShipmentFormPoSelected(row), selected => {
       if (shipmentAddPoPanelOpen) return;
-      updateShipmentModalActionButtons();
+      toggleShipmentFormPoSelected(row, selected);
+      onFormPoSelectionChanged();
     });
+    linkedCb.disabled = shipmentAddPoPanelOpen;
     tr.appendChild(selectTd);
 
     SHIPMENT_LINKED_PO_COLUMNS.forEach(({ col, cellClass }) => {
@@ -902,6 +903,7 @@ function renderShipmentModalContent(shipment) {
   clearShipmentFooterMessage("shipmentModalFooterMessage");
   idEl.textContent = shipment[SHIPMENT_ID_FIELD] ?? EMPTY_DISPLAY;
   setShipmentModalPoCount(document.getElementById("shipmentModalPoCount"), shipment);
+  pruneShipmentFormSelection(getLinkedPoRows(shipment));
   body.innerHTML = "";
   body.appendChild(buildShipmentModalLayout({
     shipment,
@@ -1074,6 +1076,8 @@ function openCreateShipmentFromSelection() {
     );
   }
 
+  clearMainTableSelection();
+  clearShipmentFormSelection();
   renderCreateShipmentModal(eligible.map(row => row["PO #"]));
 }
 

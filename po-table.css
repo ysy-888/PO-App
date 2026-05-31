@@ -321,6 +321,10 @@ select.filter-select:focus { border-color: var(--accent); }
   transition: background 0.15s;
 }
 
+.btn svg {
+  flex: 0 0 auto;
+}
+
 .btn[hidden] {
   display: none !important;
 }
@@ -332,22 +336,17 @@ select.filter-select:focus { border-color: var(--accent); }
   cursor: not-allowed;
 }
 
-.btn-primary {
-  background: var(--accent);
-  color: #fff;
-  border-color: var(--accent);
-}
-
-.btn-primary:hover { background: #1e4a75; border-color: #1e4a75; }
-
+.btn-primary,
 .btn-secondary {
-  background: #ecfeff;
-  color: #0e7490;
-  border-color: #a5f3fc;
+  background: #fff;
+  color: var(--text);
+  border-color: var(--border-strong);
 }
 
+.btn-primary:hover,
 .btn-secondary:hover {
-  background: #cffafe;
+  background: #f8fafc;
+  border-color: var(--border-strong);
 }
 
 #createShipmentBtn[hidden],
@@ -365,6 +364,7 @@ select.filter-select:focus { border-color: var(--accent); }
 
 #poToolbar[hidden],
 #shipmentToolbar[hidden],
+#exfRequestListToolbar[hidden],
 #chargebackToolbar[hidden] {
   display: none !important;
 }
@@ -3699,6 +3699,11 @@ td.editable:not(.select-cell):hover .editable-preview {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.request-linked-po-table .request-linked-po-input--error {
+  border-color: #d93025;
+  box-shadow: 0 0 0 1px #d93025;
 }
 
 .request-linked-po-table td.shipment-po-cell-notes {

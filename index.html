@@ -65,10 +65,22 @@
   </div>
 
   <div class="toolbar-end">
-    <button type="button" class="btn btn-secondary" id="exfRequestBtn" hidden>EXF Request</button>
-    <button type="button" class="btn btn-secondary" id="deliveryRequestBtn" hidden>Delivery Request</button>
-    <button type="button" class="btn btn-secondary" id="pickupRequestBtn" hidden>Pickup Request</button>
-    <button type="button" class="btn btn-secondary" id="createShipmentBtn" hidden>Create shipment</button>
+    <button type="button" class="btn btn-secondary" id="exfRequestBtn" hidden>
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h5"/></svg>
+      EXF Request
+    </button>
+    <button type="button" class="btn btn-secondary" id="deliveryRequestBtn" hidden>
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v10H3z"/><path d="M14 10h4l3 3v4h-7z"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>
+      Delivery Request
+    </button>
+    <button type="button" class="btn btn-secondary" id="pickupRequestBtn" hidden>
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10v10H4z"/><path d="M14 11h3l3 3v3h-6z"/><path d="M7 7V5h4v2"/><circle cx="8" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>
+      Pickup Request
+    </button>
+    <button type="button" class="btn btn-secondary" id="createShipmentBtn" hidden>
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v10H3z"/><path d="M14 10h4l3 3v4h-7z"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/><path d="M12 4v6M9 7h6"/></svg>
+      Create shipment
+    </button>
     <button type="button" class="clear-all-filters-btn" id="clearAllColumnFiltersBtn" hidden>Clear all filters</button>
     <div class="counter" id="rowCounter">— rows</div>
   </div>
@@ -77,7 +89,7 @@
 <div id="shipmentToolbar" class="toolbar" hidden>
   <div class="search-wrap">
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-    <input type="search" id="shipmentSearchInput" placeholder="Search shipments" />
+    <input type="search" id="shipmentSearchInput" placeholder="Search" />
   </div>
   <div class="toolbar-end">
     <button type="button" class="btn btn-danger" id="deleteShipmentBtn" hidden>Delete shipment</button>
@@ -88,7 +100,7 @@
 <div id="exfRequestListToolbar" class="toolbar" hidden>
   <div class="search-wrap">
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-    <input type="search" id="exfRequestSearchInput" placeholder="Search EXF requests" />
+    <input type="search" id="exfRequestSearchInput" placeholder="Search" />
   </div>
   <div class="toolbar-end">
     <div class="counter" id="exfRequestRowCounter">— EXF requests</div>
@@ -98,7 +110,7 @@
 <div id="chargebackToolbar" class="toolbar" hidden>
   <div class="search-wrap">
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-    <input type="search" id="chargebackSearchInput" placeholder="Search chargebacks" />
+    <input type="search" id="chargebackSearchInput" placeholder="Search" />
   </div>
   <div class="toolbar-end">
     <button type="button" class="btn btn-danger" id="deleteChargebackBtn" hidden>Delete chargeback</button>
@@ -409,9 +421,18 @@
     <div class="modal-body" id="createShipmentBody"></div>
     <div class="modal-footer">
       <div id="createShipmentFooterMessage" class="modal-footer-message shipment-footer-message" role="status" aria-live="polite" hidden></div>
-      <button type="button" class="btn btn-secondary" id="shipmentAddPosBtn">Add POs</button>
-      <button type="button" class="btn btn-secondary" id="shipmentRemovePosBtn" hidden>Remove POs</button>
-      <button type="button" class="btn btn-primary" id="createShipmentSaveBtn">Create</button>
+      <button type="button" class="btn btn-secondary" id="shipmentAddPosBtn">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        Add POs
+      </button>
+      <button type="button" class="btn btn-secondary" id="shipmentRemovePosBtn" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>
+        Remove POs
+      </button>
+      <button type="button" class="btn btn-primary" id="createShipmentSaveBtn">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v10H3z"/><path d="M14 10h4l3 3v4h-7z"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>
+        Create
+      </button>
       <button type="button" class="btn" data-dismiss="create-shipment">Cancel</button>
     </div>
   </div>
@@ -431,9 +452,18 @@
     <div class="modal-body" id="shipmentModalBody"></div>
     <div class="modal-footer">
       <div id="shipmentModalFooterMessage" class="modal-footer-message shipment-footer-message" role="status" aria-live="polite" hidden></div>
-      <button type="button" class="btn btn-secondary" id="shipmentDetailAddPosBtn">Add POs</button>
-      <button type="button" class="btn btn-secondary" id="shipmentDetailRemovePosBtn" hidden>Remove POs</button>
-      <button type="button" class="btn btn-primary" id="shipmentModalSaveBtn">Save</button>
+      <button type="button" class="btn btn-secondary" id="shipmentDetailAddPosBtn">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        Add POs
+      </button>
+      <button type="button" class="btn btn-secondary" id="shipmentDetailRemovePosBtn" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>
+        Remove POs
+      </button>
+      <button type="button" class="btn btn-primary" id="shipmentModalSaveBtn">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+        Save
+      </button>
       <button type="button" class="btn" data-dismiss="shipment-modal">Close</button>
     </div>
   </div>
@@ -452,7 +482,11 @@
     </div>
     <div class="modal-body" id="exfRequestBody"></div>
     <div class="modal-footer">
-      <button type="button" class="btn btn-primary" id="exfRequestSubmitBtn">Submit</button>
+      <div id="exfRequestFooterMessage" class="modal-footer-message shipment-footer-message" role="status" aria-live="polite" hidden></div>
+      <button type="button" class="btn btn-primary" id="exfRequestSubmitBtn">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 2 11 13"/><path d="m22 2-7 20-4-9-9-4z"/></svg>
+        Submit
+      </button>
       <button type="button" class="btn" data-dismiss="exf-request">Cancel</button>
     </div>
   </div>
@@ -471,7 +505,10 @@
     </div>
     <div class="modal-body" id="deliveryRequestBody"></div>
     <div class="modal-footer">
-      <button type="button" class="btn btn-primary" id="deliveryRequestSubmitBtn">Create</button>
+      <button type="button" class="btn btn-primary" id="deliveryRequestSubmitBtn">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v10H3z"/><path d="M14 10h4l3 3v4h-7z"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>
+        Create
+      </button>
       <button type="button" class="btn" data-dismiss="delivery-request">Cancel</button>
     </div>
   </div>
@@ -490,7 +527,10 @@
     </div>
     <div class="modal-body" id="pickupRequestBody"></div>
     <div class="modal-footer">
-      <button type="button" class="btn btn-primary" id="pickupRequestSubmitBtn">Create</button>
+      <button type="button" class="btn btn-primary" id="pickupRequestSubmitBtn">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10v10H4z"/><path d="M14 11h3l3 3v3h-6z"/><path d="M7 7V5h4v2"/><circle cx="8" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>
+        Create
+      </button>
       <button type="button" class="btn" data-dismiss="pickup-request">Cancel</button>
     </div>
   </div>

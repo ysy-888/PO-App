@@ -3,6 +3,7 @@ let filteredRows = [];
 let allChargebacks = [];
 let allPackingLists = [];
 let allPackingCartons = [];
+let allVendorEmailRows = [];
 let packingListPanelOpen = false;
 let flagFilterActive = false;
 let sortCol = null;

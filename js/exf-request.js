@@ -48,6 +48,7 @@ const EXF_REQUEST_LINKED_PO_COLUMN_WIDTHS = [52, 64, 110, 102, 160, 112, 54, 54,
 let exfRequestPoNumbers = [];
 let exfRequestAddPoPanelOpen = false;
 let exfRequestDraftByPo = {};
+let exfRequestDraftEmail = {};
 let exfRequestVendor = "";
 let allExfRequests = [];
 let filteredExfRequests = [];
@@ -202,6 +203,35 @@ function normalizeExfRequestVendor(rowOrValue) {
   return String(value ?? "").trim();
 }
 
+function getExfRequestVendorEmailInfo(vendor) {
+  const vendorKey = normalizeExfRequestVendor(vendor).toLowerCase();
+  const getValue = (row, fields) => {
+    const key = Object.keys(row ?? {}).find(field =>
+      fields.some(candidate => field.trim().toLowerCase() === candidate.toLowerCase())
+    );
+    return key ? String(row[key] ?? "").trim() : "";
+  };
+  const findLastMatching = (rows, predicate) => {
+    for (let i = rows.length - 1; i >= 0; i--) {
+      if (predicate(rows[i])) return rows[i];
+    }
+    return null;
+  };
+  const vendorRows = allVendorEmailRows ?? [];
+  const row = findLastMatching(vendorRows, item =>
+    normalizeExfRequestVendor(getValue(item, ["Vendor", "Vendor Name", "Name"])).toLowerCase() === vendorKey
+  );
+  const previousRequest = findLastMatching(allExfRequests, request =>
+    normalizeExfRequestVendor(request).toLowerCase() === vendorKey &&
+    !isEmptyValue(request["Vendor Email"])
+  );
+  return {
+    email: getValue(row, ["Email", "Vendor Email", "Email Address", "E-mail", "To"]) ||
+      String(previousRequest?.["Vendor Email"] ?? "").trim(),
+    cc: getValue(row, ["CC", "Vendor CC", "Cc"]),
+  };
+}
+
 function getExfRequestVendorForRows(rows) {
   if (rows.length === 0) return "";
   const firstVendor = normalizeExfRequestVendor(rows[0]);
@@ -220,6 +250,13 @@ function updateExfRequestButton() {
   btn.hidden = currentAppView !== "po" || eligible.length === 0 || !rowsHaveSingleExfRequestVendor(checked);
 }
 
+function setExfRequestFooterMessage(message = "") {
+  const el = document.getElementById("exfRequestFooterMessage");
+  if (!el) return;
+  el.textContent = message;
+  el.hidden = !message;
+}
+
 function openExfRequestFromSelection() {
   if (isAppSaving()) return;
   const checked = getCheckedFilteredPos();
@@ -235,7 +272,11 @@ function openExfRequestFromSelection() {
   exfRequestPoNumbers = eligible.map(row => row["PO #"]);
   exfRequestVendor = getExfRequestVendorForRows(eligible);
   exfRequestDraftByPo = {};
-  renderExfRequestModal(exfRequestPoNumbers, { resetSelection: true });
+  exfRequestDraftEmail = {};
+  setExfRequestFooterMessage("");
+  clearMainTableSelection();
+  clearExfFormSelection();
+  renderExfRequestModal(exfRequestPoNumbers);
 }
 
 function getExfRequestRows(poNumbers = exfRequestPoNumbers) {
@@ -252,6 +293,12 @@ function getExfRequestDateValue() {
 function captureExfRequestDraft() {
   const body = document.getElementById("exfRequestBody");
   if (!body) return;
+  const form = document.getElementById("exfRequestForm");
+  const formData = form ? readRequestForm(form) : {};
+  exfRequestDraftEmail = {
+    email: formData["Vendor Email"] ?? exfRequestDraftEmail.email ?? "",
+    cc: formData["Vendor CC"] ?? exfRequestDraftEmail.cc ?? "",
+  };
   const memos = readRequestLinkedPoFields(body, EXF_MEMO_FIELD);
   const shipMethods = readRequestLinkedPoFields(body, "Ship Method");
   exfRequestPoNumbers.forEach(po => {
@@ -278,13 +325,13 @@ function setExfRequestModalAddPanelClass(body, isOpen) {
   body?.closest(".shipment-modal-card")?.classList.toggle("shipment-modal-card--add-panel-open", isOpen);
 }
 
-function renderExfRequestModal(poNumbers, { resetSelection = false, requestDate = formatDateToYmd(new Date()) } = {}) {
+function renderExfRequestModal(poNumbers, { requestDate = formatDateToYmd(new Date()) } = {}) {
   const body = document.getElementById("exfRequestBody");
   if (!body) return;
 
   exfRequestPoNumbers = poNumbers.slice();
   const originalPos = getExfRequestRows();
-  if (resetSelection) originalPos.forEach(row => { row["Selected"] = false; });
+  pruneExfFormSelection(originalPos);
   const pos = originalPos.map(applyExfRequestDraft);
   const vendor = exfRequestVendor || getExfRequestVendorForRows(originalPos);
 
@@ -306,7 +353,10 @@ function closeExfRequestModal() {
   exfRequestPoNumbers = [];
   exfRequestAddPoPanelOpen = false;
   exfRequestDraftByPo = {};
+  exfRequestDraftEmail = {};
   exfRequestVendor = "";
+  clearExfFormSelection();
+  setExfRequestFooterMessage("");
   document.getElementById("exfRequestOverlay")?.classList.remove("open");
   setExfRequestModalAddPanelClass(document.getElementById("exfRequestBody"), false);
 }
@@ -323,7 +373,10 @@ function buildExfRequestModalLayout({ requestDate, vendor, linkedPos, showAddPan
   const form = document.createElement("div");
   form.className = "shipment-form-edit";
   form.id = "exfRequestForm";
+  const vendorEmailInfo = getExfRequestVendorEmailInfo(vendor);
   form.appendChild(createRequestFormField("Vendor", "Vendor", vendor, { readOnly: true }));
+  form.appendChild(createRequestFormField("Vendor Email", "Vendor Email", exfRequestDraftEmail.email ?? vendorEmailInfo.email));
+  form.appendChild(createRequestFormField("CC", "Vendor CC", exfRequestDraftEmail.cc ?? vendorEmailInfo.cc));
   form.appendChild(createRequestFormField("Request Date", "Request Date", requestDate, { type: "date" }));
   left.appendChild(form);
 
@@ -355,7 +408,7 @@ function getAvailableExfRequestPanelRows() {
 
 function openExfRequestAddPoPanel() {
   captureExfRequestDraft();
-  getExfRequestRows().forEach(row => toggleRowSelected(row, false));
+  clearExfFormSelection();
   exfRequestAddPoPanelOpen = true;
   renderExfRequestModal(exfRequestPoNumbers, { requestDate: getExfRequestDateValue() });
 }
@@ -386,13 +439,13 @@ function addWipPoToExfRequest(poNumber) {
 
 function removePosFromExfRequest() {
   captureExfRequestDraft();
-  const linked = getExfRequestRows().filter(row => isTruthy(row["Selected"]));
+  const linked = getExfRequestRows().filter(isExfRequestRowSelected);
   if (linked.length === 0) {
     showIndicator("Select POs to remove", "error");
     return;
   }
   const removeSet = new Set(linked.map(row => String(row["PO #"])));
-  linked.forEach(row => toggleRowSelected(row, false));
+  linked.forEach(row => toggleExfFormPoSelected(row, false));
   exfRequestPoNumbers = exfRequestPoNumbers.filter(po => !removeSet.has(String(po)));
   removeSet.forEach(po => { delete exfRequestDraftByPo[po]; });
   renderExfRequestModal(exfRequestPoNumbers, { requestDate: getExfRequestDateValue() });
@@ -406,7 +459,7 @@ function updateExfRequestModalActionButtons() {
   const removeBtn = scope.querySelector(".exf-request-linked-po-footer-remove");
   if (!addBtn && !removeBtn) return;
 
-  const linkedSelected = getExfRequestRows().filter(row => isTruthy(row["Selected"])).length;
+  const linkedSelected = getExfRequestRows().filter(isExfRequestRowSelected).length;
   if (addBtn) addBtn.hidden = exfRequestAddPoPanelOpen || linkedSelected > 0;
   if (removeBtn) removeBtn.hidden = exfRequestAddPoPanelOpen || linkedSelected === 0;
 }
@@ -490,7 +543,7 @@ function getOriginalExfRequestRow(row) {
 }
 
 function isExfRequestRowSelected(row) {
-  return isTruthy(getOriginalExfRequestRow(row)["Selected"]);
+  return isExfFormPoSelected(row);
 }
 
 function syncExfRequestLinkedPoTableCheckboxes(pos) {
@@ -507,15 +560,11 @@ function syncExfRequestLinkedPoTableCheckboxes(pos) {
 
 function setAllExfRequestLinkedPosSelected(pos, selected) {
   if (exfRequestAddPoPanelOpen) return;
-  let changed = false;
   pos.forEach(row => {
-    const original = allRows.find(r => String(r["PO #"]) === String(row["PO #"]));
-    if (original && toggleRowSelected(original, selected)) changed = true;
+    toggleExfFormPoSelected(row, selected);
   });
-  if (changed) {
-    syncExfRequestLinkedPoTableCheckboxes(pos);
-    updateExfRequestModalActionButtons();
-  }
+  syncExfRequestLinkedPoTableCheckboxes(pos);
+  onFormPoSelectionChanged();
 }
 
 function renderExfRequestLinkedPoSection(pos) {
@@ -568,29 +617,26 @@ function renderExfRequestLinkedPoSection(pos) {
     const tr = document.createElement("tr");
     tr.dataset.po = row["PO #"];
 
-    const originalRow = getOriginalExfRequestRow(row);
     const selectTd = document.createElement("td");
-    selectTd.className = "td-select-cell readonly-no-select";
-    const linkedCb = document.createElement("input");
-    linkedCb.type = "checkbox";
-    linkedCb.className = "po-select-checkbox";
-    linkedCb.checked = isTruthy(originalRow["Selected"]);
-    linkedCb.setAttribute("aria-label", `Select PO ${row["PO #"] ?? ""}`);
-    if (linkedCb) linkedCb.disabled = exfRequestAddPoPanelOpen;
-    linkedCb.addEventListener("click", e => {
-      e.stopPropagation();
-      toggleRowSelected(originalRow, linkedCb.checked);
-      updateExfRequestLinkedPoSelectAllHeader(pos);
-      updateExfRequestModalActionButtons();
+    const linkedCb = renderFormSelectedCell(selectTd, row, isExfRequestRowSelected(row), selected => {
+      toggleExfFormPoSelected(row, selected);
+      onFormPoSelectionChanged();
     });
-    selectTd.appendChild(linkedCb);
+    linkedCb.disabled = exfRequestAddPoPanelOpen;
     tr.appendChild(selectTd);
 
     EXF_REQUEST_LINKED_PO_COLUMNS.forEach(({ col, cellClass, editable, editor, rows }) => {
       const td = document.createElement("td");
       if (cellClass) td.className = cellClass;
       if (editable) {
-        td.appendChild(createRequestLinkedPoEditableControl(col, row, { editor, rows }));
+        const input = createRequestLinkedPoEditableControl(col, row, { editor, rows });
+        if (col === "Ship Method") {
+          input.addEventListener("change", () => {
+            input.classList.remove("request-linked-po-input--error");
+            input.removeAttribute("aria-invalid");
+          });
+        }
+        td.appendChild(input);
       } else {
         const text = formatShipmentLinkedPoCell(col, row);
         if (col === "PO #") {
@@ -725,28 +771,61 @@ function renderExfWipPoPickerPanel(pos) {
   return panel;
 }
 
+function getExfRequestMissingShipMethodPos(shipMethods, poNumbers = exfRequestPoNumbers) {
+  return poNumbers.filter(poNumber => isEmptyValue(shipMethods[String(poNumber)]));
+}
+
+function markExfRequestMissingShipMethods(missingPoNumbers) {
+  const missing = new Set(missingPoNumbers.map(String));
+  let firstMissingInput = null;
+  document.querySelectorAll("#exfRequestOverlay .exf-request-linked-po-table tbody tr").forEach(tr => {
+    const input = tr.querySelector('[data-field="Ship Method"]');
+    if (!input) return;
+    const isMissing = missing.has(String(tr.dataset.po ?? ""));
+    input.classList.toggle("request-linked-po-input--error", isMissing);
+    if (isMissing) {
+      input.setAttribute("aria-invalid", "true");
+      if (!firstMissingInput) firstMissingInput = input;
+    } else {
+      input.removeAttribute("aria-invalid");
+    }
+  });
+  firstMissingInput?.focus();
+}
+
 async function submitExfRequest() {
   if (isAppSaving()) return;
+  setExfRequestFooterMessage("");
   if (exfRequestPoNumbers.length === 0) {
-    showIndicator("Add at least one PO", "error");
+    setExfRequestFooterMessage("Add at least one PO");
     return;
   }
 
   const form = document.getElementById("exfRequestForm");
   const data = readRequestForm(form);
   if (isEmptyValue(data["Request Date"])) {
-    showIndicator("Request Date is required", "error");
+    setExfRequestFooterMessage("Request Date is required");
+    return;
+  }
+  if (isEmptyValue(data["Vendor Email"])) {
+    setExfRequestFooterMessage("Vendor Email is required to send the EXF request");
     return;
   }
 
   const poNumbers = exfRequestPoNumbers.slice();
   if (!rowsHaveSingleExfRequestVendor(getExfRequestRows())) {
-    showIndicator("EXF Request POs must all have the same vendor", "error");
+    setExfRequestFooterMessage("EXF Request POs must all have the same vendor");
     return;
   }
   const requestDate = data["Request Date"];
   const memos = readRequestLinkedPoFields(document.getElementById("exfRequestBody"), EXF_MEMO_FIELD);
   const shipMethods = readRequestLinkedPoFields(document.getElementById("exfRequestBody"), "Ship Method");
+  const missingShipMethods = getExfRequestMissingShipMethodPos(shipMethods, poNumbers);
+  if (missingShipMethods.length > 0) {
+    markExfRequestMissingShipMethods(missingShipMethods);
+    setExfRequestFooterMessage("Select Shipping Method for all POs before submitting");
+    return;
+  }
   closeExfRequestModal();
   setAppSaving(true, "Submitting EXF request…");
   showIndicator(`Submitting EXF request${ELLIPSIS}`, "");
@@ -755,12 +834,14 @@ async function submitExfRequest() {
     let emailSent = true;
     let emailError = "";
     if (isDemoMode()) {
-      demoExfRequest(poNumbers, requestDate, memos, shipMethods);
+      demoExfRequest(poNumbers, requestDate, memos, shipMethods, data["Vendor Email"]);
     } else {
       const json = await postAppsScript({
         action: "exfRequest",
         poNumbers,
         requestDate,
+        vendorEmail: data["Vendor Email"],
+        vendorCc: data["Vendor CC"],
         memos,
         shipMethods,
       });
@@ -772,7 +853,7 @@ async function submitExfRequest() {
     if (emailSent) {
       showIndicator(`EXF requested and email sent ${CHECK_MARK}`, "success");
     } else {
-      showIndicator(`EXF requested, email not sent: ${emailError || "Missing vendor email"}`, "error");
+      showIndicator(`EXF email not sent; POs remain WIP until resend succeeds: ${emailError || "Missing vendor email"}`, "error");
     }
   } catch (err) {
     showIndicator("EXF request failed: " + err.message, "error");
@@ -781,7 +862,7 @@ async function submitExfRequest() {
   }
 }
 
-function demoExfRequest(poNumbers, requestDate, memos, shipMethods) {
+function demoExfRequest(poNumbers, requestDate, memos, shipMethods, vendorEmail = "demo@example.com") {
   const rows = poNumbers
     .map(poNumber => allRows.find(r => String(r["PO #"]) === String(poNumber)))
     .filter(Boolean);
@@ -791,7 +872,7 @@ function demoExfRequest(poNumbers, requestDate, memos, shipMethods) {
     [EXF_REQUEST_ID_FIELD]: requestId,
     "Request Date": requestDate,
     "Vendor": vendor,
-    "Vendor Email": "demo@example.com",
+    "Vendor Email": vendorEmail,
     "PO Numbers": poNumbers.join(", "),
     "PO Count": poNumbers.length,
     "Total Qty": rows.reduce((sum, row) => sum + toQtyNumber(row["PO Qty"]), 0),

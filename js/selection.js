@@ -18,6 +18,98 @@ function toggleRowSelected(row, selected) {
   return true;
 }
 
+let exfFormSelectedPos = new Set();
+let shipmentFormSelectedPos = new Set();
+
+function getPoSelectionKey(poOrRow) {
+  const po = poOrRow && typeof poOrRow === "object" ? poOrRow["PO #"] : poOrRow;
+  return String(po ?? "");
+}
+
+function clearMainTableSelection() {
+  resetLocalSelectedState(allRows);
+  clearMiniSelection();
+  document.querySelectorAll("#tableBody .po-select-checkbox").forEach(cb => {
+    cb.checked = false;
+  });
+  updateSelectAllHeader();
+}
+
+function clearExfFormSelection() {
+  exfFormSelectedPos.clear();
+}
+
+function clearShipmentFormSelection() {
+  shipmentFormSelectedPos.clear();
+}
+
+function isExfFormPoSelected(poOrRow) {
+  return exfFormSelectedPos.has(getPoSelectionKey(poOrRow));
+}
+
+function isShipmentFormPoSelected(poOrRow) {
+  return shipmentFormSelectedPos.has(getPoSelectionKey(poOrRow));
+}
+
+function toggleExfFormPoSelected(poOrRow, selected) {
+  const key = getPoSelectionKey(poOrRow);
+  if (!key) return;
+  if (selected) exfFormSelectedPos.add(key);
+  else exfFormSelectedPos.delete(key);
+}
+
+function toggleShipmentFormPoSelected(poOrRow, selected) {
+  const key = getPoSelectionKey(poOrRow);
+  if (!key) return;
+  if (selected) shipmentFormSelectedPos.add(key);
+  else shipmentFormSelectedPos.delete(key);
+}
+
+function pruneExfFormSelection(rows) {
+  const allowed = new Set(rows.map(getPoSelectionKey));
+  exfFormSelectedPos = new Set([...exfFormSelectedPos].filter(po => allowed.has(po)));
+}
+
+function pruneShipmentFormSelection(rows) {
+  const allowed = new Set(rows.map(getPoSelectionKey));
+  shipmentFormSelectedPos = new Set([...shipmentFormSelectedPos].filter(po => allowed.has(po)));
+}
+
+function renderFormSelectedCell(td, poOrRow, isSelected, onToggle) {
+  td.className = "td-select-cell readonly-no-select";
+
+  const cb = document.createElement("input");
+  cb.type = "checkbox";
+  cb.className = "po-select-checkbox";
+  cb.checked = !!isSelected;
+  cb.setAttribute("aria-label", `Select PO ${getPoSelectionKey(poOrRow)}`);
+  cb.addEventListener("click", e => {
+    e.stopPropagation();
+    onToggle(cb.checked, cb);
+  });
+  td.appendChild(cb);
+  return cb;
+}
+
+function onFormPoSelectionChanged() {
+  const exfOverlay = document.getElementById("exfRequestOverlay");
+  if (exfOverlay?.classList.contains("open") && typeof updateExfRequestModalActionButtons === "function") {
+    updateExfRequestModalActionButtons();
+    if (typeof getExfRequestRows === "function" && typeof updateExfRequestLinkedPoSelectAllHeader === "function") {
+      updateExfRequestLinkedPoSelectAllHeader(getExfRequestRows());
+    }
+  }
+
+  const shipmentOverlay = document.querySelector("#createShipmentOverlay.open, #shipmentModalOverlay.open");
+  if (shipmentOverlay && typeof getLinkedPosFromModalTable === "function") {
+    const pos = getLinkedPosFromModalTable();
+    if (pos.length && typeof updateShipmentLinkedPoSelectAllHeader === "function") {
+      updateShipmentLinkedPoSelectAllHeader(pos);
+    }
+    if (typeof updateShipmentModalActionButtons === "function") updateShipmentModalActionButtons();
+  }
+}
+
 /** @type {Set<number>} visible row indices on the current page */
 let miniSelectedIndices = new Set();
 let miniSelectClickAnchorIndex = -1;

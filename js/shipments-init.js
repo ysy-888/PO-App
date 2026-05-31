@@ -64,9 +64,6 @@ function onShipmentsDataLoaded(shipments) {
 // Hook called from po-table.js after renderTable / selection changes
 function onPoSelectionChanged() {
   updateToolbarRequestButtons();
-  const pos = getLinkedPosFromModalTable();
-  if (pos.length) updateShipmentLinkedPoSelectAllHeader(pos);
-  updateShipmentModalActionButtons();
 }
 
 initShipments();
