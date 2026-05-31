@@ -418,12 +418,12 @@ async function saveDefaultColumnVisibility() {
   setProgramDefaultStatusFilter(activeStatus);
 
   if (isDemoMode()) {
-    showIndicator("Default view saved", "success");
+    setEditTableFooterMessage("Default view saved", "success");
     return;
   }
 
   try {
-    showIndicator(`Saving default${ELLIPSIS}`, "");
+    setEditTableFooterMessage(`Saving default${ELLIPSIS}`, "");
     const res = await fetch(getAppsScriptUrl(), {
       method: "POST",
       body: JSON.stringify({
@@ -435,9 +435,9 @@ async function saveDefaultColumnVisibility() {
     });
     const json = await res.json();
     if (!json.success) throw new Error(json.error);
-    showIndicator("Default view saved", "success");
+    setEditTableFooterMessage("Default view saved", "success");
   } catch (err) {
-    showIndicator("Save default failed: " + err.message, "error");
+    setEditTableFooterMessage("Save default failed: " + err.message, "error");
   }
 }
 
@@ -446,7 +446,21 @@ function resetEditTableToDefault() {
   columnOrderDraft = normalizeColumnOrder([...DEFAULT_COLUMN_ORDER]);
   syncOrderDraftWithVisibility();
   renderEditTableList();
-  showIndicator("Reset to default", "success");
+  setEditTableFooterMessage("Reset to default", "success");
+}
+
+function setEditTableFooterMessage(msg, type = "") {
+  const overlay = document.getElementById("editTableBackdrop");
+  if (!overlay) return;
+  if (!msg) {
+    clearModalFooterMessageForOverlay(overlay);
+    return;
+  }
+  setModalFooterMessage(msg, type, { overlay });
+}
+
+function clearEditTableFooterMessage() {
+  clearModalFooterMessageForOverlay("editTableBackdrop");
 }
 
 function applyColumnVisibility() {
@@ -608,6 +622,7 @@ function openEditTablePopover() {
   const backdrop = document.getElementById("editTableBackdrop");
   if (!backdrop) return;
 
+  clearEditTableFooterMessage();
   backdrop.hidden = false;
   renderEditTableList();
   document.getElementById("editTableOk")?.focus();
@@ -616,6 +631,7 @@ function openEditTablePopover() {
 function closeEditTablePopover() {
   const backdrop = document.getElementById("editTableBackdrop");
   if (backdrop) backdrop.hidden = true;
+  clearEditTableFooterMessage();
 }
 
 function setEditTableDraftSelectAll(selectAll) {

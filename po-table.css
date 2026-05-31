@@ -1135,6 +1135,20 @@ th.th-filterable .th-label:hover {
   gap: 8px;
 }
 
+.edit-table-footer {
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.edit-table-footer .modal-footer-message {
+  margin-right: auto;
+  font-weight: 500;
+}
+
+.edit-table-footer .modal-footer-message:not(.success):not(.error) {
+  color: var(--text-muted);
+}
+
 .edit-table-default-btn {
   padding: 6px 12px;
   font-size: 12px;
@@ -3983,6 +3997,14 @@ td.editable:not(.select-cell):hover .editable-preview {
 .shipment-form-field--notes textarea {
   min-height: 72px;
   resize: vertical;
+}
+
+#exfRequestOverlay .shipment-form-edit textarea.shipment-form-input,
+#asnRequestOverlay .shipment-form-edit textarea.shipment-form-input,
+#deliveryRequestOverlay .shipment-form-edit textarea.shipment-form-input,
+#pickupRequestOverlay .shipment-form-edit textarea.shipment-form-input {
+  resize: none;
+  overflow-y: auto;
 }
 
 .request-body-po-count {
