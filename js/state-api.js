@@ -210,6 +210,13 @@ function getPackingCtnQtyForRow(row) {
   return getPackingCtnQtyForPo(row?.["PO #"]);
 }
 
+function getPackingWeightForPo(poNumber) {
+  return getPackingCartonsForPo(poNumber).reduce(
+    (sum, carton) => sum + toQtyNumber(carton["Carton Weight"]),
+    0
+  );
+}
+
 function getChargebacksForPo(poNumber) {
   const key = String(poNumber ?? "").trim();
   if (!key) return [];

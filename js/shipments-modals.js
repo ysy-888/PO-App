@@ -153,6 +153,42 @@ function createShipmentFormField(col, value, { readOnly = false } = {}) {
   return wrap;
 }
 
+const CREATE_SHIPMENT_ENTER_FIELDS = [
+  "Vessel", "House #", "EXF", "Shipped", "ETD", "ETA", "IHD",
+];
+
+function bindCreateShipmentEnterNavigation(form) {
+  form.addEventListener("keydown", e => {
+    if (e.key !== "Enter") return;
+    const target = e.target;
+    if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) return;
+    const field = target.dataset.field;
+    if (!field) return;
+
+    if (field === "Notes") {
+      if (e.shiftKey) return;
+      e.preventDefault();
+      target.blur();
+      return;
+    }
+
+    const idx = CREATE_SHIPMENT_ENTER_FIELDS.indexOf(field);
+    if (idx === -1) return;
+
+    e.preventDefault();
+    const nextField = CREATE_SHIPMENT_ENTER_FIELDS[idx + 1];
+    if (nextField) {
+      const nextEl = form.querySelector(`[data-field="${CSS.escape(nextField)}"]`);
+      if (nextEl) {
+        nextEl.focus();
+        if (nextEl instanceof HTMLInputElement) nextEl.select();
+      }
+    } else {
+      target.blur();
+    }
+  });
+}
+
 function buildShipmentFormEdit(shipment, formId) {
   const form = document.createElement("div");
   form.className = "shipment-form-edit";
@@ -177,6 +213,10 @@ function buildShipmentFormEdit(shipment, formId) {
   const notesField = createShipmentFormField("Notes", shipment["Notes"] ?? "");
   notesField.classList.add("shipment-form-field--notes");
   form.appendChild(notesField);
+
+  if (formId === "createShipmentForm") {
+    bindCreateShipmentEnterNavigation(form);
+  }
 
   return form;
 }
@@ -1076,33 +1116,25 @@ function openCreateShipmentFromSelection() {
   renderCreateShipmentModal(eligible.map(row => row["PO #"]));
 }
 
-function renderPoModalLinkedShipment(row) {
-  const slot = document.getElementById("modalLinkedShipment");
-  if (!slot) return;
+const MODAL_SHIPMENT_LINK_ICON_SVG =
+  `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">` +
+  `<path d="M3 7h11v10H3z"/><path d="M14 10h4l3 3v4h-7z"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>`;
 
-  slot.replaceChildren();
+function createModalLinkedShipmentCard(row) {
   const id = getPoShipmentId(row);
-  if (isEmptyValue(id) || !getShipmentById(id)) {
-    slot.hidden = true;
-    return;
-  }
-
-  slot.hidden = false;
-
-  const label = document.createElement("span");
-  label.className = "modal-linked-shipment-label";
-  label.textContent = "Linked Shipment";
+  if (isEmptyValue(id) || !getShipmentById(id)) return null;
 
   const btn = document.createElement("button");
   btn.type = "button";
-  btn.className = "modal-linked-shipment-header-link";
-  btn.textContent = id;
-  btn.title = "Open linked shipment";
+  btn.className = "modal-linked-shipment-card";
+  btn.innerHTML =
+    `<span class="modal-linked-shipment-card-icon">${MODAL_SHIPMENT_LINK_ICON_SVG}</span>` +
+    `<span class="modal-linked-shipment-card-id">${id}</span>`;
+  btn.title = `Open shipment ${id}`;
+  btn.setAttribute("aria-label", `Open linked shipment ${id}`);
   btn.addEventListener("click", e => {
     e.stopPropagation();
     openLinkedShipmentFromPo(row);
   });
-
-  slot.appendChild(label);
-  slot.appendChild(btn);
+  return btn;
 }

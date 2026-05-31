@@ -95,6 +95,58 @@ const REQUEST_LINKED_PO_COLUMNS = [
   { col: "PO Qty", label: "Order Qty", cellClass: "shipment-po-cell-qty" },
 ];
 
+const DELIVERY_PICKUP_LINKED_PO_COLUMNS = [
+  { col: "PO #", label: "PO #", cellClass: "shipment-po-cell-id" },
+  { col: "Status", label: "Status", cellClass: "shipment-po-cell-wrap" },
+  { col: "Style #", label: "Style #", cellClass: "shipment-po-cell-wrap" },
+  { col: "Vendor", label: "Vendor", cellClass: "shipment-po-cell-vendor" },
+  { col: "Buyer", label: "Buyer", cellClass: "shipment-po-cell-buyer" },
+  { col: "Buyer PO #", label: "Buyer PO #", cellClass: "shipment-po-cell-buyer-po" },
+  { col: "Color", label: "Color", cellClass: "shipment-po-cell-wrap" },
+  { col: "House #", label: "House #", cellClass: "shipment-po-cell-wrap" },
+  { col: "PO Qty", label: "Order Qty", cellClass: "shipment-po-cell-qty" },
+  { col: "Actual Qty", label: "Actual Qty", cellClass: "shipment-po-cell-qty" },
+  { col: "Ctn Qty", label: "Ctn Qty", cellClass: "shipment-po-cell-qty" },
+];
+
+function getRequestLinkedPoTotals(pos) {
+  return pos.reduce((totals, row) => {
+    totals.unitQty += toQtyNumber(row["Actual Qty"]);
+    totals.ctnQty += toQtyNumber(row["Ctn Qty"]);
+    if (typeof getPackingWeightForPo === "function") {
+      totals.totalWeight += getPackingWeightForPo(row["PO #"]);
+    }
+    return totals;
+  }, { unitQty: 0, ctnQty: 0, totalWeight: 0 });
+}
+
+function renderRequestLinkedPoFooterTotals(pos) {
+  const totals = getRequestLinkedPoTotals(pos);
+  const wrap = document.createElement("div");
+  wrap.className = "shipment-linked-po-footer-totals";
+  [
+    ["Unit Qty", totals.unitQty],
+    ["Ctn Qty", totals.ctnQty],
+    ["Total Weight", totals.totalWeight > 0 ? `${totals.totalWeight} lbs` : EMPTY_DISPLAY],
+    ["PO Count", pos.length],
+  ].forEach(([label, value]) => {
+    const item = document.createElement("div");
+    item.className = "shipment-linked-po-footer-item";
+    const labelEl = document.createElement("span");
+    labelEl.className = "shipment-linked-po-footer-label";
+    labelEl.textContent = label;
+    const valueEl = document.createElement("span");
+    valueEl.className = "shipment-linked-po-footer-value";
+    valueEl.textContent = typeof value === "number"
+      ? formatShipmentLinkedPoTotal(value)
+      : String(value);
+    item.appendChild(labelEl);
+    item.appendChild(valueEl);
+    wrap.appendChild(item);
+  });
+  return wrap;
+}
+
 function createRequestFormField(label, fieldName, value, { type = "text", readOnly = false } = {}) {
   const wrap = document.createElement("div");
   wrap.className = "shipment-form-field";

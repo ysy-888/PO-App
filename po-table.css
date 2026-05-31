@@ -2220,27 +2220,53 @@ td.editable:not(.select-cell):hover .editable-preview {
   flex-shrink: 0;
 }
 
-.modal-linked-shipment-slot {
+.modal-freight-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.modal-linked-shipment-card {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-}
-
-.modal-linked-shipment-header-link {
-  border: none;
-  background: transparent;
-  padding: 0;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 3px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--surface);
   font-family: var(--font);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
   cursor: pointer;
-  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s;
 }
 
-.modal-linked-shipment-header-link:hover {
-  color: #1e4a75;
-  text-decoration: underline;
+.modal-linked-shipment-card:hover {
+  background: var(--row-hover);
+  border-color: #9aa1aa;
+}
+
+.modal-linked-shipment-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+.modal-linked-shipment-card-icon svg {
+  display: block;
+}
+
+.modal-linked-shipment-card-id {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  white-space: nowrap;
 }
 
 .modal-header h3 {
@@ -2660,11 +2686,142 @@ td.editable:not(.select-cell):hover .editable-preview {
 /* Shipment-controlled freight values: display-only text, not modal inputs. */
 .modal-freight-info {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px 12px;
-  margin-top: 2px;
-  padding-top: 8px;
-  border-top: 1px dashed var(--border);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px 10px;
+}
+
+#modalOverlay .modal-block--freight {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 10px 0 0;
+  margin-top: auto;
+  flex-shrink: 0;
+  border: none;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.packing-list-editor .modal-block--freight {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.packing-list-editor .modal-freight-header {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.packing-list-editor .modal-freight-info {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.modal-freight-title {
+  margin-bottom: 0;
+  font-size: 11px;
+}
+
+.modal-freight-body {
+  gap: 8px;
+}
+
+.modal-freight-requests {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding-top: 2px;
+}
+
+.modal-freight-request-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 22px;
+  padding: 2px 8px 2px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.modal-freight-request-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.modal-freight-request-label {
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.modal-freight-request-link {
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: #0e7490;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.modal-freight-request-link:hover {
+  color: #155e75;
+}
+
+.modal-freight-request-chip--done {
+  border-color: #b7dfc0;
+  background: #f0faf2;
+}
+
+.modal-freight-request-chip--done .modal-freight-request-indicator {
+  color: var(--success);
+  background: #dff5e4;
+}
+
+.modal-freight-request-chip--done .modal-freight-request-label {
+  color: var(--text);
+}
+
+.modal-freight-request-chip--pending {
+  border-color: #fcd34d;
+  background: #fffbeb;
+}
+
+.modal-freight-request-chip--pending .modal-freight-request-indicator {
+  color: #b45309;
+  background: #fef3c7;
+}
+
+.modal-freight-request-chip--pending .modal-freight-request-label {
+  color: #92400e;
+}
+
+.modal-freight-request-chip--none {
+  border-color: var(--border);
+  background: var(--surface);
+}
+
+.modal-freight-request-chip--none .modal-freight-request-indicator {
+  color: var(--empty-display);
+  background: transparent;
+}
+
+.modal-freight-request-chip--none .modal-freight-request-label {
+  color: var(--text-muted);
 }
 
 .modal-static-field {
@@ -2988,15 +3145,6 @@ td.editable:not(.select-cell):hover .editable-preview {
   margin-bottom: 8px;
 }
 
-.packing-list-editor {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-width: 0;
-  height: 100%;
-  min-height: 0;
-}
-
 .packing-list-modal-meta {
   margin-top: 4px;
   font-size: 12px;
@@ -3009,11 +3157,23 @@ td.editable:not(.select-cell):hover .editable-preview {
   min-width: 0;
   max-width: 42vw;
   min-height: 0;
+  align-self: stretch;
   padding-left: 18px;
   border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
+}
+
+.packing-list-editor {
+  display: flex;
+  flex-direction: column;
   gap: 10px;
+  min-width: 0;
+  width: max-content;
+  max-width: 100%;
+  height: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
 }
 
 .packing-list-side-header {
@@ -3203,33 +3363,28 @@ td.editable:not(.select-cell):hover .editable-preview {
   flex: 1;
   min-height: 0;
   min-width: 0;
+  width: max-content;
+  max-width: 100%;
+  align-self: flex-start;
   display: flex;
   flex-direction: column;
   gap: 0;
   overflow: hidden;
-  position: relative;
 }
 
-.packing-list-total-col-shade {
-  position: absolute;
-  z-index: 0;
-  pointer-events: none;
-  border-radius: 4px;
-  background: rgba(45, 45, 41, 0.035);
-}
-
-.packing-list-grid-panel .packing-list-grid--head,
-.packing-list-grid-panel .packing-list-grid-scroll {
-  position: relative;
-  z-index: 1;
+.packing-list-grid-wrap {
+  width: max-content;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
 }
 
 .packing-list-grid-scroll {
   flex: 1;
   min-height: 0;
   max-height: 480px;
-  overflow: auto;
-  min-width: 0;
+  overflow-y: auto;
+  overflow-x: visible;
 }
 
 .packing-list-grid {
@@ -3241,13 +3396,12 @@ td.editable:not(.select-cell):hover .editable-preview {
   display: grid;
   grid-template-columns:
     var(--packing-rowhead-width)
-    repeat(var(--size-col-count), minmax(0, var(--packing-unit-width)))
+    repeat(var(--size-col-count), var(--packing-unit-width))
     var(--packing-total-width)
     var(--packing-weight-width);
   gap: 5px var(--packing-gap);
   align-items: center;
   width: max-content;
-  max-width: 100%;
 }
 
 .packing-list-grid--head {
@@ -3285,7 +3439,6 @@ td.editable:not(.select-cell):hover .editable-preview {
   color: var(--text);
 }
 
-.packing-list-totalhead--hidden,
 .packing-list-weighthead--hidden {
   visibility: hidden;
   pointer-events: none;
@@ -3354,7 +3507,7 @@ td.editable:not(.select-cell):hover .editable-preview {
 
 .packing-list-totalhead,
 .packing-list-weighthead {
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .packing-list-static {
@@ -3383,6 +3536,17 @@ td.editable:not(.select-cell):hover .editable-preview {
   font-size: 12px;
   font-weight: 700;
   color: var(--text);
+}
+
+.packing-list-grand-total,
+.packing-list-row-total {
+  min-height: 28px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(45, 45, 41, 0.035);
+  border-radius: 4px;
 }
 
 .packing-list-input {
@@ -3438,24 +3602,24 @@ td.editable:not(.select-cell):hover .editable-preview {
   min-width: 0;
 }
 
-#modalOverlay .modal-block:not(.modal-block--order):not(.modal-block--product):not(.modal-block--shipping):not(.modal-block--chargebacks):not(.modal-block--packing-list) {
+#modalOverlay .modal-block:not(.modal-block--order):not(.modal-block--product):not(.modal-block--shipping):not(.modal-block--chargebacks):not(.modal-block--packing-list):not(.modal-block--freight) {
   width: max-content;
   max-width: 100%;
 }
 
-#modalOverlay .modal-block:not(.modal-block--order):not(.modal-block--product):not(.modal-block--shipping):not(.modal-block--chargebacks):not(.modal-block--packing-list) .modal-field-row {
+#modalOverlay .modal-block:not(.modal-block--order):not(.modal-block--product):not(.modal-block--shipping):not(.modal-block--chargebacks):not(.modal-block--packing-list):not(.modal-block--freight) .modal-field-row {
   display: grid;
   grid-template-columns: repeat(3, 72px);
   gap: 6px 8px;
   align-items: end;
 }
 
-#modalOverlay .modal-block:not(.modal-block--order):not(.modal-block--product):not(.modal-block--shipping):not(.modal-block--chargebacks):not(.modal-block--packing-list) .modal-field--medium {
+#modalOverlay .modal-block:not(.modal-block--order):not(.modal-block--product):not(.modal-block--shipping):not(.modal-block--chargebacks):not(.modal-block--packing-list):not(.modal-block--freight) .modal-field--medium {
   width: 72px;
   min-width: 0;
 }
 
-#modalOverlay .modal-block:not(.modal-block--order):not(.modal-block--product):not(.modal-block--shipping):not(.modal-block--chargebacks):not(.modal-block--packing-list) .modal-field-value {
+#modalOverlay .modal-block:not(.modal-block--order):not(.modal-block--product):not(.modal-block--shipping):not(.modal-block--chargebacks):not(.modal-block--packing-list):not(.modal-block--freight) .modal-field-value {
   justify-content: center;
   text-align: center;
   font-size: 11px;
@@ -4389,15 +4553,6 @@ td.editable:not(.select-cell):hover .editable-preview {
 .shipment-linked-empty {
   color: var(--text-muted);
   font-size: 13px;
-}
-
-.modal-linked-shipment-label {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
-  white-space: nowrap;
 }
 
 #poTable th[data-col="Ship Method"],

@@ -400,7 +400,53 @@ function createModalShippingTopRow(row) {
   return rowEl;
 }
 
-function createModalStaticField(col, row) {
+const MODAL_FREIGHT_DATE_FIELDS = new Set(["Shipped", "ETD", "ETA"]);
+const MODAL_FREIGHT_FIELDS = ["Shipped", "ETD", "ETA", "Vessel", "House #"];
+
+const MODAL_FREIGHT_REQUEST_TYPES = [
+  {
+    key: "asn",
+    label: "ASN",
+    requestedField: "ASN Requested",
+    idField: ASN_REQUEST_ID_FIELD,
+    openDetail: id => typeof openAsnRequestDetail === "function" && openAsnRequestDetail(id),
+  },
+  {
+    key: "delivery",
+    label: "Delivery",
+    requestedField: "Delivery Requested",
+    idField: DELIVERY_REQUEST_ID_FIELD,
+    openDetail: id => typeof openDeliveryRequestDetail === "function" && openDeliveryRequestDetail(id),
+  },
+  {
+    key: "pickup",
+    label: "Pickup",
+    requestedField: "Pickup Requested",
+    idField: PICKUP_REQUEST_ID_FIELD,
+    openDetail: id => typeof openPickupRequestDetail === "function" && openPickupRequestDetail(id),
+  },
+];
+
+function getPoFreightData(row) {
+  const shipmentId = typeof getPoShipmentId === "function" ? getPoShipmentId(row) : "";
+  const shipment = shipmentId && typeof getShipmentById === "function"
+    ? getShipmentById(shipmentId)
+    : null;
+  const source = shipment || row;
+  const data = {};
+  MODAL_FREIGHT_FIELDS.forEach(field => {
+    data[field] = source[field];
+  });
+  return data;
+}
+
+function formatModalFreightValue(col, value) {
+  if (isEmptyValue(value)) return EMPTY_DISPLAY;
+  if (MODAL_FREIGHT_DATE_FIELDS.has(col)) return formatDateForDisplay(value);
+  return String(value);
+}
+
+function createModalStaticField(col, row, { source = row } = {}) {
   const fieldWrap = document.createElement("div");
   fieldWrap.className = "modal-static-field";
   fieldWrap.dataset.col = col;
@@ -411,11 +457,12 @@ function createModalStaticField(col, row) {
 
   const valueEl = document.createElement("span");
   valueEl.className = "modal-static-value";
-  if (isEmptyValue(row[col])) {
+  const displayValue = formatModalFreightValue(col, source[col]);
+  if (displayValue === EMPTY_DISPLAY) {
     valueEl.textContent = EMPTY_DISPLAY;
     valueEl.classList.add("empty-display");
   } else {
-    valueEl.textContent = row[col];
+    valueEl.textContent = displayValue;
   }
 
   fieldWrap.appendChild(labelEl);
@@ -423,13 +470,89 @@ function createModalStaticField(col, row) {
   return fieldWrap;
 }
 
-function createModalFreightInfo(row) {
+function createModalFreightRequestChip(row, config) {
+  const requestId = String(row[config.idField] ?? "").trim();
+  const requested = isTruthy(row[config.requestedField]);
+  const status = requestId ? "done" : requested ? "pending" : "none";
+
+  const chip = document.createElement("div");
+  chip.className = `modal-freight-request-chip modal-freight-request-chip--${status}`;
+  chip.title = config.label;
+
+  const indicator = document.createElement("span");
+  indicator.className = "modal-freight-request-indicator";
+  indicator.setAttribute("aria-hidden", "true");
+  indicator.textContent = status === "done" ? "\u2713" : status === "pending" ? "\u2022" : "\u2013";
+
+  const label = document.createElement("span");
+  label.className = "modal-freight-request-label";
+  label.textContent = config.label;
+
+  chip.appendChild(indicator);
+  chip.appendChild(label);
+
+  if (requestId) {
+    const link = document.createElement("button");
+    link.type = "button";
+    link.className = "modal-freight-request-link";
+    link.textContent = requestId;
+    link.title = `Open ${config.label} request ${requestId}`;
+    link.addEventListener("click", e => {
+      e.stopPropagation();
+      config.openDetail(requestId);
+    });
+    chip.appendChild(link);
+  }
+
+  return chip;
+}
+
+function createModalFreightRequests(row) {
   const wrap = document.createElement("div");
-  wrap.className = "modal-freight-info";
-  ["Vessel", "House #", "Shipped", "ETD", "ETA"].forEach(col => {
-    wrap.appendChild(createModalStaticField(col, row));
+  wrap.className = "modal-freight-requests";
+  MODAL_FREIGHT_REQUEST_TYPES.forEach(config => {
+    wrap.appendChild(createModalFreightRequestChip(row, config));
   });
   return wrap;
+}
+
+function createModalFreightInfo(row) {
+  const freightData = getPoFreightData(row);
+  const wrap = document.createElement("div");
+  wrap.className = "modal-freight-info";
+  MODAL_FREIGHT_FIELDS.forEach(col => {
+    wrap.appendChild(createModalStaticField(col, row, { source: freightData }));
+  });
+  return wrap;
+}
+
+function createModalFreightSection(row) {
+  if (typeof poHasShipment !== "function" || !poHasShipment(row)) return null;
+
+  const block = document.createElement("section");
+  block.className = "modal-block modal-block--freight";
+
+  const header = document.createElement("div");
+  header.className = "modal-freight-header";
+
+  const title = document.createElement("h4");
+  title.className = "modal-section-title modal-freight-title";
+  title.textContent = "Freight Information";
+  header.appendChild(title);
+
+  if (typeof createModalLinkedShipmentCard === "function") {
+    const shipmentCard = createModalLinkedShipmentCard(row);
+    if (shipmentCard) header.appendChild(shipmentCard);
+  }
+
+  const content = document.createElement("div");
+  content.className = "modal-block-content modal-freight-body";
+  content.appendChild(createModalFreightInfo(row));
+  content.appendChild(createModalFreightRequests(row));
+
+  block.appendChild(header);
+  block.appendChild(content);
+  return block;
 }
 
 function createModalShippingSection(row) {
@@ -836,10 +959,8 @@ function createPackingListEditor(row, packingList, sourceCartons) {
 
   const gridPanel = document.createElement("div");
   gridPanel.className = "packing-list-grid-panel";
-  const totalColShade = document.createElement("div");
-  totalColShade.className = "packing-list-total-col-shade";
-  totalColShade.setAttribute("aria-hidden", "true");
-  gridPanel.appendChild(totalColShade);
+  const gridWrap = document.createElement("div");
+  gridWrap.className = "packing-list-grid-wrap";
   const headGrid = document.createElement("div");
   headGrid.className = "packing-list-grid packing-list-grid--head";
   const bodyScroll = document.createElement("div");
@@ -847,25 +968,10 @@ function createPackingListEditor(row, packingList, sourceCartons) {
   const bodyGrid = document.createElement("div");
   bodyGrid.className = "packing-list-grid packing-list-grid--body";
   bodyScroll.appendChild(bodyGrid);
-  gridPanel.appendChild(headGrid);
-  gridPanel.appendChild(bodyScroll);
+  gridWrap.appendChild(headGrid);
+  gridWrap.appendChild(bodyScroll);
+  gridPanel.appendChild(gridWrap);
   editor.appendChild(gridPanel);
-
-  function updateTotalColShade() {
-    const topCell = headGrid.querySelector(".packing-list-grand-total");
-    if (!topCell) {
-      totalColShade.hidden = true;
-      return;
-    }
-    const panelRect = gridPanel.getBoundingClientRect();
-    const topRect = topCell.getBoundingClientRect();
-    const bottomRect = bodyScroll.getBoundingClientRect();
-    totalColShade.hidden = false;
-    totalColShade.style.left = `${topRect.left - panelRect.left}px`;
-    totalColShade.style.width = `${topRect.width}px`;
-    totalColShade.style.top = `${topRect.top - panelRect.top}px`;
-    totalColShade.style.height = `${Math.max(0, bottomRect.bottom - topRect.top)}px`;
-  }
 
   function renderGrid() {
     headGrid.innerHTML = "";
@@ -887,8 +993,8 @@ function createPackingListEditor(row, packingList, sourceCartons) {
       headGrid.appendChild(head);
     });
     const totalHead = document.createElement("div");
-    totalHead.className = "packing-list-totalhead packing-list-totalhead--hidden";
-    totalHead.setAttribute("aria-hidden", "true");
+    totalHead.className = "packing-list-totalhead";
+    totalHead.textContent = "Total";
     headGrid.appendChild(totalHead);
 
     const weightHead = document.createElement("div");
@@ -960,7 +1066,6 @@ function createPackingListEditor(row, packingList, sourceCartons) {
     });
 
     setPackingEditorTotals(editor, row, cartons);
-    requestAnimationFrame(updateTotalColShade);
   }
 
   countInput.addEventListener("change", renderGrid);
@@ -991,6 +1096,7 @@ function createPackingListEditor(row, packingList, sourceCartons) {
   });
 
   renderGrid();
+
   editor.__getPackingCartons = () => cartons;
   editor.__packingList = packingList;
   return editor;
@@ -1025,7 +1131,11 @@ function createPackingListSidePanel(row) {
 
   const panel = document.createElement("aside");
   panel.className = "packing-list-side-panel";
-  panel.appendChild(createPackingListEditor(row, packingList, cartons));
+
+  const editor = createPackingListEditor(row, packingList, cartons);
+  const freightSection = createModalFreightSection(row);
+  if (freightSection) editor.appendChild(freightSection);
+  panel.appendChild(editor);
   return panel;
 }
 
@@ -1148,6 +1258,10 @@ function createStylePhotoPlaceholders() {
 function syncPackingListPanelOpenForRow(row) {
   if (hasPackingList(row?.["PO #"])) {
     packingListPanelOpen = true;
+    return;
+  }
+  if (typeof poHasShipment === "function" && poHasShipment(row)) {
+    packingListPanelOpen = true;
   }
 }
 
@@ -1170,9 +1284,6 @@ function renderModalContent(row) {
 
   flagEl.replaceChildren(createPoFlagButton(row));
 
-  if (typeof renderPoModalLinkedShipment === "function") {
-    renderPoModalLinkedShipment(row);
-  }
   updateModalPackingListButton(row);
 
   bodyEl.innerHTML = "";
@@ -1208,7 +1319,8 @@ function shouldIgnoreRowDblClick(e) {
 function openPODetail(row) {
   if (isAppSaving()) return;
   closeCellSelectDropdown(false);
-  packingListPanelOpen = hasPackingList(row?.["PO #"]);
+  packingListPanelOpen = hasPackingList(row?.["PO #"])
+    || (typeof poHasShipment === "function" && poHasShipment(row));
   modalRow = snapshotModalRow(row);
   modalSnapshot = snapshotModalRow(row);
   renderModalContent(modalRow);

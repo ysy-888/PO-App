@@ -1563,6 +1563,74 @@ function escapeHtml_(value) {
     .replace(/'/g, "&#39;");
 }
 
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+const EMAIL_META_LABEL_STYLE_ = "width:36%;padding:10px 14px;font-size:12px;font-weight:600;color:#8b929c;background-color:#f7f7f8;border-bottom:1px solid #e5e7eb;";
+const EMAIL_META_VALUE_STYLE_ = "padding:10px 14px;font-size:14px;color:#1a1a18;border-bottom:1px solid #e5e7eb;";
+const EMAIL_PO_TH_STYLE_ = "padding:10px 12px;text-align:left;font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:#8b929c;background-color:#f7f7f8;border-bottom:1px solid #e5e7eb;";
+const EMAIL_PO_TD_STYLE_ = "padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#1a1a18;vertical-align:top;font-size:13px;";
+const EMAIL_PO_TD_NUM_STYLE_ = EMAIL_PO_TD_STYLE_ + "text-align:right;";
+
+function renderEmailTemplate_(filename, vars) {
+  const template = HtmlService.createTemplateFromFile(filename);
+  Object.keys(vars).forEach(key => { template[key] = vars[key]; });
+  return template.evaluate().getContent();
+}
+
+function renderEmailSubject_(filename, vars) {
+  return renderEmailTemplate_(filename, vars).trim();
+}
+
+function buildEmailNotesBlockHtml_(notes) {
+  const trimmed = String(notes ?? "").trim();
+  if (!trimmed) return "";
+  return "<div class=\"email-section\" style=\"margin-top:20px;padding:14px 16px;background-color:#f8fafc;border:1px solid #e5e7eb;border-radius:6px;\">" +
+    "<div class=\"email-section-title\" style=\"font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:#8b929c;margin:0 0 8px 0;\">Notes</div>" +
+    "<div class=\"email-notes-body\" style=\"font-size:14px;color:#1a1a18;\">" +
+    escapeHtml_(trimmed).replace(/\n/g, "<br>") +
+    "</div></div>";
+}
+
+function emailMetaRowStyles_(isLastRow) {
+  if (isLastRow) {
+    return {
+      label: EMAIL_META_LABEL_STYLE_.replace("border-bottom:1px solid #e5e7eb;", ""),
+      value: EMAIL_META_VALUE_STYLE_.replace("border-bottom:1px solid #e5e7eb;", ""),
+    };
+  }
+  return { label: EMAIL_META_LABEL_STYLE_, value: EMAIL_META_VALUE_STYLE_ };
+}
+
+function buildDeliveryPickupFromBlockHtml_(from, pickupAddr, isLastRow) {
+  from = String(from ?? "").trim();
+  pickupAddr = String(pickupAddr ?? "").trim();
+  if (!from) return "";
+  let value = escapeHtml_(from);
+  if (pickupAddr) {
+    value += "<span class=\"email-meta-sub\" style=\"display:block;margin-top:4px;font-size:13px;color:#6b7280;\">" +
+      escapeHtml_(pickupAddr).replace(/\n/g, "<br>") + "</span>";
+  }
+  const styles = emailMetaRowStyles_(isLastRow);
+  return "<tr><td class=\"email-meta-label\" style=\"" + styles.label + "\">From</td>" +
+    "<td class=\"email-meta-value\" style=\"" + styles.value + "\">" + value + "</td></tr>";
+}
+
+function buildDeliveryPickupToBlockHtml_(to, deliveryAddr) {
+  to = String(to ?? "").trim();
+  deliveryAddr = String(deliveryAddr ?? "").trim();
+  if (!to) return "";
+  let value = escapeHtml_(to);
+  if (deliveryAddr) {
+    value += "<span class=\"email-meta-sub\" style=\"display:block;margin-top:4px;font-size:13px;color:#6b7280;\">" +
+      escapeHtml_(deliveryAddr).replace(/\n/g, "<br>") + "</span>";
+  }
+  const styles = emailMetaRowStyles_(true);
+  return "<tr><td class=\"email-meta-label\" style=\"" + styles.label + "\">To</td>" +
+    "<td class=\"email-meta-value\" style=\"" + styles.value + "\">" + value + "</td></tr>";
+}
+
 function formatEmailDate_(value) {
   if (!value) return "";
   if (Object.prototype.toString.call(value) === "[object Date]" && !isNaN(value.getTime())) {
@@ -1589,54 +1657,125 @@ function getDeliveryPickupEmailInfo_(requestData) {
   };
 }
 
-function buildPoTableRowsHtml_(rows) {
-  return rows.map(row => {
-    return "<tr>" +
-      "<td>" + escapeHtml_(row["PO #"]) + "</td>" +
-      "<td>" + escapeHtml_(row["Status"]) + "</td>" +
-      "<td>" + escapeHtml_(row["Vendor"]) + "</td>" +
-      "<td>" + escapeHtml_(row["Buyer"]) + "</td>" +
-      "<td>" + escapeHtml_(row["Buyer PO #"]) + "</td>" +
-      "<td>" + escapeHtml_(row["Style #"]) + "</td>" +
-      "<td style=\"text-align:right;\">" + escapeHtml_(row["PO Qty"]) + "</td>" +
-    "</tr>";
-  }).join("");
+function getPackingWeightByPo_() {
+  const lists = sheetToObjects_(getPackingListsSheet_(), PACKING_LIST_ID_FIELD);
+  const cartons = sheetToObjects_(getPackingCartonsSheet_(), PACKING_LIST_ID_FIELD);
+  const weightByListId = {};
+  cartons.forEach(carton => {
+    const listId = String(carton[PACKING_LIST_ID_FIELD] ?? "");
+    const weight = Number(String(carton["Carton Weight"] ?? "").trim());
+    if (!listId) return;
+    if (!weightByListId[listId]) weightByListId[listId] = 0;
+    if (Number.isFinite(weight) && weight > 0) weightByListId[listId] += weight;
+  });
+  const weightByPo = {};
+  lists.forEach(list => {
+    const po = String(list["PO #"] ?? "").trim();
+    const listId = String(list[PACKING_LIST_ID_FIELD] ?? "");
+    if (po) weightByPo[po] = weightByListId[listId] || 0;
+  });
+  return weightByPo;
 }
 
-function buildPoTableHtml_(rows) {
-  return "<table border=\"1\" cellpadding=\"6\" cellspacing=\"0\" style=\"border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px;\">" +
-    "<thead><tr>" +
-      "<th>PO #</th><th>Status</th><th>Vendor</th><th>Buyer</th><th>Buyer PO #</th><th>Style #</th><th>Order Qty</th>" +
-    "</tr></thead>" +
-    "<tbody>" + buildPoTableRowsHtml_(rows) + "</tbody>" +
-    "</table>";
+function toQtyNumber_(value) {
+  const n = Number(String(value ?? "").replace(/,/g, "").trim());
+  return Number.isFinite(n) ? n : 0;
+}
+
+function computeRequestEmailTotals_(rows, weightByPo) {
+  return rows.reduce((totals, row) => {
+    const po = String(row["PO #"] ?? "").trim();
+    totals.unitQty += toQtyNumber_(row["Actual Qty"]);
+    totals.ctnQty += toQtyNumber_(row["Ctn Qty"]);
+    totals.totalWeight += weightByPo[po] || 0;
+    return totals;
+  }, { unitQty: 0, ctnQty: 0, totalWeight: 0 });
+}
+
+function formatEmailQty_(value) {
+  const n = toQtyNumber_(value);
+  return Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100);
+}
+
+function formatEmailWeight_(value) {
+  const n = toQtyNumber_(value);
+  if (n <= 0) return "";
+  return Number.isInteger(n) ? String(n) + " lbs" : String(Math.round(n * 100) / 100) + " lbs";
+}
+
+function buildRequestEmailTotalsLine_(rows, weightByPo) {
+  const totals = computeRequestEmailTotals_(rows, weightByPo);
+  return "Total | PO Count: " + rows.length +
+    " | Unit Qty: " + formatEmailQty_(totals.unitQty) +
+    " | Ctn Qty: " + formatEmailQty_(totals.ctnQty) +
+    " | Total Weight: " + (formatEmailWeight_(totals.totalWeight) || "—");
+}
+
+const REQUEST_EMAIL_TABLE_COLUMNS = [
+  "PO #", "Style #", "Vendor", "Buyer", "Buyer PO #", "Color", "House #", "Actual Qty", "Ctn Qty"
+];
+
+const REQUEST_EMAIL_TABLE_LABELS = {
+  "Actual Qty": "Unit Qty",
+};
+
+function buildRequestEmailPoTableHtml_(rows, weightByPo) {
+  const colCount = REQUEST_EMAIL_TABLE_COLUMNS.length;
+  const headerCells = REQUEST_EMAIL_TABLE_COLUMNS.map(col =>
+    "<th style=\"" + EMAIL_PO_TH_STYLE_ + "\">" + escapeHtml_(REQUEST_EMAIL_TABLE_LABELS[col] || col) + "</th>"
+  ).join("");
+  const bodyRows = rows.map(row => {
+    return "<tr>" + REQUEST_EMAIL_TABLE_COLUMNS.map(col => {
+      const isNum = col === "Actual Qty" || col === "Ctn Qty";
+      const tdStyle = isNum ? EMAIL_PO_TD_NUM_STYLE_ : EMAIL_PO_TD_STYLE_;
+      const classAttr = isNum ? " class=\"email-num\"" : "";
+      return "<td" + classAttr + " style=\"" + tdStyle + "\">" + escapeHtml_(row[col]) + "</td>";
+    }).join("") + "</tr>";
+  }).join("");
+  const footerRow = "<tr><td colspan=\"" + colCount + "\" style=\"padding:10px 12px;font-weight:600;background-color:#eef0f3;color:#1a1a18;border-top:2px solid #cbd0d6;font-size:13px;\">" +
+    escapeHtml_(buildRequestEmailTotalsLine_(rows, weightByPo)) +
+    "</td></tr>";
+  return "<table class=\"email-po-table\" role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"width:100%;border-collapse:collapse;margin-top:20px;border:1px solid #e5e7eb;font-size:13px;\">" +
+    "<thead><tr>" + headerCells + "</tr></thead>" +
+    "<tbody>" + bodyRows + "</tbody>" +
+    "<tfoot>" + footerRow + "</tfoot></table>";
+}
+
+function buildRequestEmailPoTableText_(rows, weightByPo) {
+  const labels = REQUEST_EMAIL_TABLE_COLUMNS.map(col => REQUEST_EMAIL_TABLE_LABELS[col] || col);
+  const lines = [labels.join(" | ")];
+  rows.forEach(row => {
+    lines.push(REQUEST_EMAIL_TABLE_COLUMNS.map(col => String(row[col] ?? "")).join(" | "));
+  });
+  lines.push("");
+  lines.push(buildRequestEmailTotalsLine_(rows, weightByPo));
+  return lines.join("\n");
 }
 
 function buildDeliveryPickupRequestEmailHtml_(requestType, requestId, rows, requestData) {
   const dateField = requestType === "Delivery" ? DELIVERY_DATE_FIELD : PICKUP_DATE_FIELD;
   const notesField = requestType === "Delivery" ? DELIVERY_REQ_NOTES_FIELD : PICKUP_REQ_NOTES_FIELD;
-  const notes = String(requestData[notesField] ?? requestData["Notes"] ?? "").trim();
-  const from = String(requestData["From"] ?? "").trim();
-  const to = String(requestData["To"] ?? "").trim();
-  const pickupAddr = String(requestData["Pickup Address"] ?? "").trim();
-  const deliveryAddr = String(requestData["Delivery Address"] ?? "").trim();
+  const weightByPo = getPackingWeightByPo_();
 
-  return "<p>Hello,</p>" +
-    "<p>Please see the " + escapeHtml_(requestType.toLowerCase()) + " request below.</p>" +
-    "<p><strong>" + escapeHtml_(requestType) + " Request:</strong> " + escapeHtml_(requestId) + "<br>" +
-    "<strong>Request Date:</strong> " + escapeHtml_(formatEmailDate_(requestData["Request Date"])) + "<br>" +
-    "<strong>" + escapeHtml_(requestType) + " Date:</strong> " + escapeHtml_(formatEmailDate_(requestData[dateField] ?? "")) + "<br>" +
-    (from ? "<strong>From:</strong> " + escapeHtml_(from) + (pickupAddr ? "<br><em>" + escapeHtml_(pickupAddr).replace(/\n/g, "<br>") + "</em>" : "") + "<br>" : "") +
-    (to ? "<strong>To:</strong> " + escapeHtml_(to) + (deliveryAddr ? "<br><em>" + escapeHtml_(deliveryAddr).replace(/\n/g, "<br>") + "</em>" : "") + "<br>" : "") +
-    "</p>" +
-    (notes ? "<p><strong>Notes:</strong><br>" + escapeHtml_(notes).replace(/\n/g, "<br>") + "</p>" : "") +
-    buildPoTableHtml_(rows) +
-    "<p>Thank you.</p>";
+  const hasTo = !!String(requestData["To"] ?? "").trim();
+  return renderEmailTemplate_("templates/email-delivery-pickup", {
+    requestType: requestType,
+    requestTypeLower: requestType.toLowerCase(),
+    requestId: requestId,
+    requestDate: formatEmailDate_(requestData["Request Date"]),
+    typeDate: formatEmailDate_(requestData[dateField] ?? ""),
+    poCount: rows.length,
+    fromBlockHtml: buildDeliveryPickupFromBlockHtml_(requestData["From"], requestData["Pickup Address"], !hasTo),
+    toBlockHtml: buildDeliveryPickupToBlockHtml_(requestData["To"], requestData["Delivery Address"]),
+    notesBlockHtml: buildEmailNotesBlockHtml_(requestData[notesField] ?? requestData["Notes"]),
+    poTableHtml: buildRequestEmailPoTableHtml_(rows, weightByPo),
+  });
 }
 
 function buildDeliveryPickupRequestEmailText_(requestType, requestId, rows, requestData) {
   const dateField = requestType === "Delivery" ? DELIVERY_DATE_FIELD : PICKUP_DATE_FIELD;
   const notesField = requestType === "Delivery" ? DELIVERY_REQ_NOTES_FIELD : PICKUP_REQ_NOTES_FIELD;
+  const weightByPo = getPackingWeightByPo_();
   const lines = [
     "Hello,",
     "",
@@ -1645,6 +1784,7 @@ function buildDeliveryPickupRequestEmailText_(requestType, requestId, rows, requ
     requestType + " Request: " + requestId,
     "Request Date: " + formatEmailDate_(requestData["Request Date"]),
     requestType + " Date: " + formatEmailDate_(requestData[dateField] ?? ""),
+    "PO Count: " + rows.length,
   ];
   if (requestData["From"]) lines.push("From: " + String(requestData["From"]));
   if (requestData["Pickup Address"]) lines.push("Pickup Address: " + String(requestData["Pickup Address"]));
@@ -1653,18 +1793,8 @@ function buildDeliveryPickupRequestEmailText_(requestType, requestId, rows, requ
   const notes = String(requestData[notesField] ?? requestData["Notes"] ?? "").trim();
   if (notes) lines.push("Notes: " + notes);
   lines.push("");
-  rows.forEach(row => {
-    lines.push(
-      "PO #: " + String(row["PO #"] ?? ""),
-      "Status: " + String(row["Status"] ?? ""),
-      "Vendor: " + String(row["Vendor"] ?? ""),
-      "Buyer: " + String(row["Buyer"] ?? ""),
-      "Buyer PO #: " + String(row["Buyer PO #"] ?? ""),
-      "Style #: " + String(row["Style #"] ?? ""),
-      "Order Qty: " + String(row["PO Qty"] ?? ""),
-      ""
-    );
-  });
+  lines.push(buildRequestEmailPoTableText_(rows, weightByPo));
+  lines.push("");
   lines.push("Thank you.");
   return lines.join("\n");
 }
@@ -1674,7 +1804,11 @@ function sendDeliveryPickupRequestEmail_(requestType, requestId, emailInfo, rows
   const dateField = requestType === "Delivery" ? DELIVERY_DATE_FIELD : PICKUP_DATE_FIELD;
   const displayDate = formatEmailDate_(requestData[dateField] ?? requestData["Request Date"]);
   const to = String(requestData["To"] ?? "").trim();
-  const subject = "[ELEVATOR DISCO] " + requestType + " Request - " + displayDate + (to ? " - " + to : "");
+  const subject = renderEmailSubject_("templates/email-delivery-pickup-subject", {
+    requestType: requestType,
+    displayDate: displayDate,
+    to: to,
+  });
   const options = {
     to: emailInfo.to,
     subject: subject,
@@ -1687,19 +1821,20 @@ function sendDeliveryPickupRequestEmail_(requestType, requestId, emailInfo, rows
 }
 
 function buildAsnRequestEmailHtml_(requestId, rows, requestData) {
-  const notes = String(requestData[ASN_REQ_NOTES_FIELD] ?? "").trim();
-  return "<p>Hello,</p>" +
-    "<p>Please see the ASN request below.</p>" +
-    "<p><strong>ASN Request:</strong> " + escapeHtml_(requestId) + "<br>" +
-    "<strong>Request Date:</strong> " + escapeHtml_(formatEmailDate_(requestData["Request Date"])) + "<br>" +
-    "<strong>ASN Date:</strong> " + escapeHtml_(formatEmailDate_(requestData[ASN_DATE_FIELD] ?? "")) + "<br>" +
-    "<strong>Buyer:</strong> " + escapeHtml_(requestData["Buyer"] ?? "") + "</p>" +
-    (notes ? "<p><strong>Notes:</strong><br>" + escapeHtml_(notes).replace(/\n/g, "<br>") + "</p>" : "") +
-    buildPoTableHtml_(rows) +
-    "<p>Thank you.</p>";
+  const weightByPo = getPackingWeightByPo_();
+  return renderEmailTemplate_("templates/email-asn", {
+    requestId: requestId,
+    requestDate: formatEmailDate_(requestData["Request Date"]),
+    asnDate: formatEmailDate_(requestData[ASN_DATE_FIELD] ?? ""),
+    buyer: String(requestData["Buyer"] ?? ""),
+    poCount: rows.length,
+    notesBlockHtml: buildEmailNotesBlockHtml_(requestData[ASN_REQ_NOTES_FIELD]),
+    poTableHtml: buildRequestEmailPoTableHtml_(rows, weightByPo),
+  });
 }
 
 function buildAsnRequestEmailText_(requestId, rows, requestData) {
+  const weightByPo = getPackingWeightByPo_();
   const lines = [
     "Hello,",
     "",
@@ -1709,22 +1844,13 @@ function buildAsnRequestEmailText_(requestId, rows, requestData) {
     "Request Date: " + formatEmailDate_(requestData["Request Date"]),
     "ASN Date: " + formatEmailDate_(requestData[ASN_DATE_FIELD] ?? ""),
     "Buyer: " + String(requestData["Buyer"] ?? ""),
+    "PO Count: " + rows.length,
   ];
   const notes = String(requestData[ASN_REQ_NOTES_FIELD] ?? "").trim();
   if (notes) lines.push("Notes: " + notes);
   lines.push("");
-  rows.forEach(row => {
-    lines.push(
-      "PO #: " + String(row["PO #"] ?? ""),
-      "Status: " + String(row["Status"] ?? ""),
-      "Vendor: " + String(row["Vendor"] ?? ""),
-      "Buyer: " + String(row["Buyer"] ?? ""),
-      "Buyer PO #: " + String(row["Buyer PO #"] ?? ""),
-      "Style #: " + String(row["Style #"] ?? ""),
-      "Order Qty: " + String(row["PO Qty"] ?? ""),
-      ""
-    );
-  });
+  lines.push(buildRequestEmailPoTableText_(rows, weightByPo));
+  lines.push("");
   lines.push("Thank you.");
   return lines.join("\n");
 }
@@ -1733,7 +1859,10 @@ function sendAsnRequestEmail_(requestId, emailInfo, rows, requestData) {
   if (!emailInfo.to) return false;
   const displayDate = formatEmailDate_(requestData[ASN_DATE_FIELD] ?? requestData["Request Date"]);
   const buyer = String(requestData["Buyer"] ?? "").trim();
-  const subject = "[ELEVATOR DISCO] ASN Request - " + displayDate + (buyer ? " - " + buyer : "");
+  const subject = renderEmailSubject_("templates/email-asn-subject", {
+    displayDate: displayDate,
+    buyer: buyer,
+  });
   const options = {
     to: emailInfo.to,
     subject: subject,
@@ -1765,38 +1894,47 @@ function getExfReqCcFromRequestRecord_(request, vendor) {
   return String(request[EXF_REQ_CC_FIELD] ?? request["Vendor CC"] ?? "").trim() || stored.cc;
 }
 
-function buildExfRequestEmailHtml_(requestId, vendor, rows, exfDate, exfReqNotes, memos, shipMethods) {
+function buildExfRequestEmailPoTableHtml_(rows, memos, shipMethods, weightByPo) {
+  const headers = ["PO #", "Style #", "Buyer", "Buyer PO #", "Unit Qty", "Ship Method", "CXL Date", "EXF Memo"];
+  const headerCells = headers.map(label =>
+    "<th style=\"" + EMAIL_PO_TH_STYLE_ + "\">" + escapeHtml_(label) + "</th>"
+  ).join("");
   const bodyRows = rows.map(row => {
     const po = String(row["PO #"] ?? "");
     return "<tr>" +
-      "<td>" + escapeHtml_(po) + "</td>" +
-      "<td>" + escapeHtml_(row["Style #"]) + "</td>" +
-      "<td>" + escapeHtml_(row["Buyer"]) + "</td>" +
-      "<td>" + escapeHtml_(row["Buyer PO #"]) + "</td>" +
-      "<td style=\"text-align:right;\">" + escapeHtml_(row["PO Qty"]) + "</td>" +
-      "<td>" + escapeHtml_(shipMethods[po] ?? row["Ship Method"]) + "</td>" +
-      "<td>" + escapeHtml_(formatEmailDate_(row["CXL Date"])) + "</td>" +
-      "<td>" + escapeHtml_(memos[po] ?? row[EXF_MEMO_FIELD]) + "</td>" +
+      "<td style=\"" + EMAIL_PO_TD_STYLE_ + "\">" + escapeHtml_(po) + "</td>" +
+      "<td style=\"" + EMAIL_PO_TD_STYLE_ + "\">" + escapeHtml_(row["Style #"]) + "</td>" +
+      "<td style=\"" + EMAIL_PO_TD_STYLE_ + "\">" + escapeHtml_(row["Buyer"]) + "</td>" +
+      "<td style=\"" + EMAIL_PO_TD_STYLE_ + "\">" + escapeHtml_(row["Buyer PO #"]) + "</td>" +
+      "<td class=\"email-num\" style=\"" + EMAIL_PO_TD_NUM_STYLE_ + "\">" + escapeHtml_(row["Actual Qty"]) + "</td>" +
+      "<td style=\"" + EMAIL_PO_TD_STYLE_ + "\">" + escapeHtml_(shipMethods[po] ?? row["Ship Method"]) + "</td>" +
+      "<td style=\"" + EMAIL_PO_TD_STYLE_ + "\">" + escapeHtml_(formatEmailDate_(row["CXL Date"])) + "</td>" +
+      "<td style=\"" + EMAIL_PO_TD_STYLE_ + "\">" + escapeHtml_(memos[po] ?? row[EXF_MEMO_FIELD]) + "</td>" +
     "</tr>";
   }).join("");
+  const footerRow = "<tr><td colspan=\"8\" style=\"padding:10px 12px;font-weight:600;background-color:#eef0f3;color:#1a1a18;border-top:2px solid #cbd0d6;font-size:13px;\">" +
+    escapeHtml_(buildRequestEmailTotalsLine_(rows, weightByPo)) +
+    "</td></tr>";
+  return "<table class=\"email-po-table\" role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"width:100%;border-collapse:collapse;margin-top:20px;border:1px solid #e5e7eb;font-size:13px;\">" +
+    "<thead><tr>" + headerCells + "</tr></thead>" +
+    "<tbody>" + bodyRows + "</tbody>" +
+    "<tfoot>" + footerRow + "</tfoot></table>";
+}
 
-  return "<p>Hello,</p>" +
-    "<p>Please confirm EXF readiness for the POs below.</p>" +
-    "<p><strong>EXF Request:</strong> " + escapeHtml_(requestId) + "<br>" +
-    "<strong>Vendor:</strong> " + escapeHtml_(vendor) + "<br>" +
-    "<strong>EXF Date:</strong> " + escapeHtml_(exfDate) + "</p>" +
-    (exfReqNotes ? "<p><strong>Notes:</strong><br>" + escapeHtml_(exfReqNotes).replace(/\n/g, "<br>") + "</p>" : "") +
-    "<table border=\"1\" cellpadding=\"6\" cellspacing=\"0\" style=\"border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px;\">" +
-      "<thead><tr>" +
-        "<th>PO #</th><th>Style #</th><th>Buyer</th><th>Buyer PO #</th>" +
-        "<th>Order Qty</th><th>Ship Method</th><th>CXL Date</th><th>EXF Memo</th>" +
-      "</tr></thead>" +
-      "<tbody>" + bodyRows + "</tbody>" +
-    "</table>" +
-    "<p>Thank you.</p>";
+function buildExfRequestEmailHtml_(requestId, vendor, rows, exfDate, exfReqNotes, memos, shipMethods) {
+  const weightByPo = getPackingWeightByPo_();
+  return renderEmailTemplate_("templates/email-exf", {
+    requestId: requestId,
+    vendor: vendor,
+    exfDate: exfDate,
+    poCount: rows.length,
+    notesBlockHtml: buildEmailNotesBlockHtml_(exfReqNotes),
+    poTableHtml: buildExfRequestEmailPoTableHtml_(rows, memos, shipMethods, weightByPo),
+  });
 }
 
 function buildExfRequestEmailText_(requestId, vendor, rows, exfDate, exfReqNotes, memos, shipMethods) {
+  const weightByPo = getPackingWeightByPo_();
   const lines = [
     "Hello,",
     "",
@@ -1805,23 +1943,27 @@ function buildExfRequestEmailText_(requestId, vendor, rows, exfDate, exfReqNotes
     "EXF Request: " + requestId,
     "Vendor: " + vendor,
     "EXF Date: " + exfDate,
+    "PO Count: " + rows.length,
   ];
   if (exfReqNotes) lines.push("Notes: " + exfReqNotes);
   lines.push("");
+  lines.push("PO # | Style # | Buyer | Buyer PO # | Unit Qty | Ship Method | CXL Date | EXF Memo");
   rows.forEach(row => {
     const po = String(row["PO #"] ?? "");
-    lines.push(
-      "PO #: " + po,
-      "Style #: " + String(row["Style #"] ?? ""),
-      "Buyer: " + String(row["Buyer"] ?? ""),
-      "Buyer PO #: " + String(row["Buyer PO #"] ?? ""),
-      "Order Qty: " + String(row["PO Qty"] ?? ""),
-      "Ship Method: " + String(shipMethods[po] ?? row["Ship Method"] ?? ""),
-      "CXL Date: " + formatEmailDate_(row["CXL Date"]),
-      "EXF Memo: " + String(memos[po] ?? row[EXF_MEMO_FIELD] ?? ""),
-      ""
-    );
+    lines.push([
+      po,
+      String(row["Style #"] ?? ""),
+      String(row["Buyer"] ?? ""),
+      String(row["Buyer PO #"] ?? ""),
+      String(row["Actual Qty"] ?? ""),
+      String(shipMethods[po] ?? row["Ship Method"] ?? ""),
+      formatEmailDate_(row["CXL Date"]),
+      String(memos[po] ?? row[EXF_MEMO_FIELD] ?? ""),
+    ].join(" | "));
   });
+  lines.push("");
+  lines.push(buildRequestEmailTotalsLine_(rows, weightByPo));
+  lines.push("");
   lines.push("Thank you.");
   return lines.join("\n");
 }
@@ -1832,7 +1974,10 @@ function sendExfRequestEmail_(requestId, vendor, vendorEmailInfo, rows, exfDate,
   }
 
   const displayDate = formatEmailDate_(exfDate);
-  const subject = "[ELEVATOR DISCO] EXF Request - " + displayDate + " - " + vendor;
+  const subject = renderEmailSubject_("templates/email-exf-subject", {
+    exfDate: displayDate,
+    vendor: vendor,
+  });
   const htmlBody = buildExfRequestEmailHtml_(requestId, vendor, rows, displayDate, exfReqNotes, memos, shipMethods);
   const options = {
     to: vendorEmailInfo.to,

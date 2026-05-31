@@ -406,7 +406,7 @@ function renderDeliveryRequestLinkedPoSection(pos, isEdit) {
   }
 
   headRow.appendChild(selectTh);
-  REQUEST_LINKED_PO_COLUMNS.forEach(({ label, cellClass }) => {
+  DELIVERY_PICKUP_LINKED_PO_COLUMNS.forEach(({ label, cellClass }) => {
     const th = document.createElement("th");
     th.textContent = label;
     if (cellClass) th.className = cellClass;
@@ -427,7 +427,7 @@ function renderDeliveryRequestLinkedPoSection(pos, isEdit) {
       });
     }
     tr.appendChild(selectTd);
-    REQUEST_LINKED_PO_COLUMNS.forEach(({ col, cellClass }) => {
+    DELIVERY_PICKUP_LINKED_PO_COLUMNS.forEach(({ col, cellClass }) => {
       const td = document.createElement("td");
       if (cellClass) td.className = cellClass;
       if (col === "Status") td.innerHTML = renderStatus(row[col]);
@@ -471,20 +471,7 @@ function renderDeliveryRequestLinkedPoFooter(pos) {
   actions.appendChild(removeBtn);
   footer.appendChild(actions);
 
-  const totalsWrap = document.createElement("div");
-  totalsWrap.className = "shipment-linked-po-footer-totals";
-  const item = document.createElement("div");
-  item.className = "shipment-linked-po-footer-item";
-  const labelEl = document.createElement("span");
-  labelEl.className = "shipment-linked-po-footer-label";
-  labelEl.textContent = "PO Count";
-  const valueEl = document.createElement("span");
-  valueEl.className = "shipment-linked-po-footer-value";
-  valueEl.textContent = String(pos.length);
-  item.appendChild(labelEl);
-  item.appendChild(valueEl);
-  totalsWrap.appendChild(item);
-  footer.appendChild(totalsWrap);
+  footer.appendChild(renderRequestLinkedPoFooterTotals(pos));
   return footer;
 }
 

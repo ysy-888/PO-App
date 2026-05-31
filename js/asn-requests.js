@@ -49,6 +49,30 @@ function getAsnRequestRecordId(request) {
   return String(request?.[ASN_REQUEST_ID_FIELD] ?? "").trim();
 }
 
+function getAsnRequestById(id) {
+  const key = String(id ?? "").trim();
+  if (!key) return null;
+  return allAsnRequests.find(request => getAsnRequestRecordId(request) === key) ?? null;
+}
+
+function openAsnRequestDetail(id) {
+  const request = getAsnRequestById(id);
+  if (!request) return;
+  asnRequestPoNumbers = allRows
+    .filter(row => String(row[ASN_REQUEST_ID_FIELD] ?? "").trim() === String(id).trim())
+    .map(row => row["PO #"]);
+  asnRequestBuyer = request["Buyer"] ?? "";
+  asnRequestDraftEmail = {
+    email: request["Buyer Email"] ?? "",
+    cc: request["CC"] ?? "",
+  };
+  asnRequestDraftAsnDate = request[ASN_DATE_FIELD] ?? "";
+  asnRequestDraftNotes = request[ASN_REQ_NOTES_FIELD] ?? "";
+  asnRequestAddPoPanelOpen = false;
+  setAsnRequestFooterMessage("");
+  renderAsnRequestModal(asnRequestPoNumbers, { request });
+}
+
 function applyAsnRequestFilters() {
   const q = (document.getElementById("asnRequestSearchInput")?.value ?? "").toLowerCase();
   filteredAsnRequests = allAsnRequests.filter(request => {
@@ -256,13 +280,25 @@ function setAsnRequestModalAddPanelClass(body, isOpen) {
   body?.closest(".shipment-modal-card")?.classList.toggle("shipment-modal-card--add-panel-open", isOpen);
 }
 
-function renderAsnRequestModal(poNumbers, { asnDate = formatDateToYmd(new Date()) } = {}) {
+function renderAsnRequestModal(poNumbers, { asnDate = formatDateToYmd(new Date()), request = null } = {}) {
   const body = document.getElementById("asnRequestBody");
+  const titleEl = document.getElementById("asnRequestModalTitle");
+  const submitBtn = document.getElementById("asnRequestSubmitBtn");
   if (!body) return;
+
+  const isView = Boolean(request?.[ASN_REQUEST_ID_FIELD]);
+  if (titleEl) {
+    titleEl.textContent = isView
+      ? `ASN Request ${request[ASN_REQUEST_ID_FIELD]}`
+      : "ASN Request";
+  }
+  if (submitBtn) submitBtn.hidden = isView;
 
   asnRequestPoNumbers = poNumbers.slice();
   const pos = getAsnRequestRows();
-  const buyer = asnRequestBuyer || getAsnRequestBuyerForRows(pos);
+  const buyer = isView
+    ? (request["Buyer"] ?? "")
+    : (asnRequestBuyer || getAsnRequestBuyerForRows(pos));
   const buyerEmailInfo = getAsnRequestBuyerEmailInfo(buyer);
   const submitDate = formatDateToYmd(new Date());
 
@@ -279,23 +315,48 @@ function renderAsnRequestModal(poNumbers, { asnDate = formatDateToYmd(new Date()
   form.className = "shipment-form-edit";
   form.id = "asnRequestForm";
 
-  form.appendChild(createRequestFormField("ASN Date", ASN_DATE_FIELD, asnRequestDraftAsnDate || asnDate, { type: "date" }));
-  form.appendChild(createRequestFormField("Request Date", ASN_REQ_SUBMIT_DATE_FIELD, submitDate, { type: "date", readOnly: true }));
+  form.appendChild(createRequestFormField(
+    "ASN Date",
+    ASN_DATE_FIELD,
+    isView ? (request[ASN_DATE_FIELD] ?? "") : (asnRequestDraftAsnDate || asnDate),
+    { type: "date", readOnly: isView }
+  ));
+  form.appendChild(createRequestFormField(
+    "Request Date",
+    ASN_REQ_SUBMIT_DATE_FIELD,
+    isView ? (request[ASN_REQ_SUBMIT_DATE_FIELD] ?? submitDate) : submitDate,
+    { type: "date", readOnly: true }
+  ));
   form.appendChild(createRequestFormField("Buyer", "Buyer", buyer, { readOnly: true }));
-  form.appendChild(createRequestFormField("Buyer Email", "Buyer Email", asnRequestDraftEmail.email ?? buyerEmailInfo.email));
-  form.appendChild(createRequestFormField("CC", "CC", asnRequestDraftEmail.cc ?? buyerEmailInfo.cc));
-  form.appendChild(createRequestFormField("Notes", ASN_REQ_NOTES_FIELD, asnRequestDraftNotes, { type: "textarea" }));
+  form.appendChild(createRequestFormField(
+    "Buyer Email",
+    "Buyer Email",
+    isView ? (request["Buyer Email"] ?? "") : (asnRequestDraftEmail.email ?? buyerEmailInfo.email),
+    { readOnly: isView }
+  ));
+  form.appendChild(createRequestFormField(
+    "CC",
+    "CC",
+    isView ? (request["CC"] ?? "") : (asnRequestDraftEmail.cc ?? buyerEmailInfo.cc),
+    { readOnly: isView }
+  ));
+  form.appendChild(createRequestFormField(
+    "Notes",
+    ASN_REQ_NOTES_FIELD,
+    isView ? (request[ASN_REQ_NOTES_FIELD] ?? "") : asnRequestDraftNotes,
+    { type: "textarea", readOnly: isView }
+  ));
   left.appendChild(form);
 
   const right = document.createElement("div");
   right.className = "shipment-modal-right";
-  right.appendChild(renderAsnRequestLinkedPoSection(pos));
+  right.appendChild(renderAsnRequestLinkedPoSection(pos, isView));
 
   layout.appendChild(left);
   layout.appendChild(right);
   outer.appendChild(layout);
 
-  if (asnRequestAddPoPanelOpen) {
+  if (!isView && asnRequestAddPoPanelOpen) {
     outer.classList.add("shipment-modal-outer--add-panel-open");
     outer.appendChild(renderAvailablePoPickerPanel(getAvailableAsnRequestPanelRows(), {
       panelId: "asnRequestAddPoPanel",
@@ -354,10 +415,10 @@ function removePosFromAsnRequest() {
   renderAsnRequestModal(asnRequestPoNumbers, { asnDate: getAsnRequestAsnDateValue() });
 }
 
-function renderAsnRequestLinkedPoSection(pos) {
+function renderAsnRequestLinkedPoSection(pos, isView = false) {
   const section = document.createElement("section");
   section.className = "shipment-linked-pos";
-  section.classList.toggle("shipment-linked-pos--selection-disabled", asnRequestAddPoPanelOpen);
+  section.classList.toggle("shipment-linked-pos--selection-disabled", asnRequestAddPoPanelOpen || isView);
 
   const wrap = document.createElement("div");
   wrap.className = "shipment-linked-po-table-wrap shipment-linked-po-table-wrap--with-footer";
@@ -370,16 +431,18 @@ function renderAsnRequestLinkedPoSection(pos) {
 
   const selectTh = document.createElement("th");
   selectTh.className = "th-select-col";
-  const selectAllCb = document.createElement("input");
-  selectAllCb.type = "checkbox";
-  selectAllCb.setAttribute("aria-label", "Select all");
-  selectAllCb.disabled = asnRequestAddPoPanelOpen;
-  selectAllCb.addEventListener("change", () => {
-    pos.forEach(row => toggleAsnFormPoSelected(row, selectAllCb.checked));
-    syncAsnRequestLinkedPoCheckboxes(pos);
-    updateAsnRequestActionButtons();
-  });
-  selectTh.appendChild(selectAllCb);
+  if (!isView) {
+    const selectAllCb = document.createElement("input");
+    selectAllCb.type = "checkbox";
+    selectAllCb.setAttribute("aria-label", "Select all");
+    selectAllCb.disabled = asnRequestAddPoPanelOpen;
+    selectAllCb.addEventListener("change", () => {
+      pos.forEach(row => toggleAsnFormPoSelected(row, selectAllCb.checked));
+      syncAsnRequestLinkedPoCheckboxes(pos);
+      updateAsnRequestActionButtons();
+    });
+    selectTh.appendChild(selectAllCb);
+  }
   headRow.appendChild(selectTh);
 
   REQUEST_LINKED_PO_COLUMNS.forEach(({ label, cellClass }) => {
@@ -397,10 +460,12 @@ function renderAsnRequestLinkedPoSection(pos) {
     tr.dataset.po = row["PO #"];
 
     const selectTd = document.createElement("td");
-    renderFormSelectedCell(selectTd, row, isAsnFormPoSelected(row), selected => {
-      toggleAsnFormPoSelected(row, selected);
-      updateAsnRequestActionButtons();
-    });
+    if (!isView) {
+      renderFormSelectedCell(selectTd, row, isAsnFormPoSelected(row), selected => {
+        toggleAsnFormPoSelected(row, selected);
+        updateAsnRequestActionButtons();
+      });
+    }
     tr.appendChild(selectTd);
 
     REQUEST_LINKED_PO_COLUMNS.forEach(({ col, cellClass }) => {
@@ -421,7 +486,7 @@ function renderAsnRequestLinkedPoSection(pos) {
   table.appendChild(tbody);
   wrap.appendChild(table);
   section.appendChild(wrap);
-  section.appendChild(renderAsnRequestLinkedPoFooter(pos));
+  if (!isView) section.appendChild(renderAsnRequestLinkedPoFooter(pos));
   return section;
 }
 

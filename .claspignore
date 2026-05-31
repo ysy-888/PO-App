@@ -1,4 +1,4 @@
-# Ignore everything except the Apps Script backend source.
 **/**
 !apps-script.gs
 !appsscript.json
+!templates/**
