@@ -468,7 +468,8 @@ select.filter-select:focus { border-color: var(--accent); }
 #poToolbar[hidden],
 #shipmentToolbar[hidden],
 #requestsToolbar[hidden],
-#chargebackToolbar[hidden] {
+#chargebackToolbar[hidden],
+#packingReviewToolbar[hidden] {
   display: none !important;
 }
 
@@ -5256,3 +5257,89 @@ th.th-shipment-id-col.th-filterable.sorted-desc {
   width: 17px;
   height: 17px;
 }
+
+/* ── Packing Reviews view ───────────────────────────────────── */
+
+#packingReviewTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+#packingReviewTable th {
+  text-align: left;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 8px 12px;
+  background: var(--bg-header, #f7f7f8);
+  border-bottom: 2px solid var(--border, #e5e7eb);
+  color: var(--text-muted, #6b7280);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+#packingReviewTable td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-light, #f0f0f0);
+  font-size: 13px;
+  vertical-align: middle;
+}
+
+.packing-review-row--pending td {
+  background: #fffbeb;
+}
+
+.packing-review-action-cell {
+  white-space: nowrap;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.packing-review-approve-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.packing-review-reject-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  background: var(--bg-danger-soft, #fef2f2);
+  color: var(--text-danger, #b91c1c);
+  border-color: var(--border-danger, #fca5a5);
+}
+
+.packing-review-reject-btn:hover:not(:disabled) {
+  background: var(--bg-danger-hover, #fee2e2);
+}
+
+.packing-review-status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.packing-review-status-badge--approved {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.packing-review-status-badge--rejected {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.packing-review-status-badge--pending {
+  background: #fef9c3;
+  color: #854d0e;
+}
+
+.col-submission-id { width: 110px; }
+.col-packing-review-action { width: 180px; }

@@ -588,6 +588,7 @@ function saveProgramColumnDefaultToStorage() {
       JSON.stringify({
         order: [...DEFAULT_COLUMN_ORDER],
         visible: [...DEFAULT_VISIBLE_COLUMNS],
+        statusFilter: defaultStatusFilter,
       })
     );
   } catch {
@@ -604,7 +605,11 @@ function loadProgramColumnDefaultFromStorage() {
     const order = Array.isArray(data.order) ? normalizeColumnOrder(data.order) : null;
     const visibleList = Array.isArray(data.visible) ? data.visible : null;
     if (!order || !visibleList || visibleList.length === 0) return false;
-    return setProgramDefaultLayout(order, new Set(visibleList));
+    const ok = setProgramDefaultLayout(order, new Set(visibleList));
+    if (ok && data.statusFilter !== undefined) {
+      setProgramDefaultStatusFilter(data.statusFilter);
+    }
+    return ok;
   } catch {
     return false;
   }
@@ -637,8 +642,6 @@ function applyDefaultColumnsFromServer(data) {
     return false;
   }
 
-  saveProgramColumnDefaultToStorage();
-
   if (!hasStoredColumnLayout()) {
     columnOrder = normalizeColumnOrder([...DEFAULT_COLUMN_ORDER]);
     visibleColumns = getDefaultVisibleColumnsSet();
@@ -656,8 +659,8 @@ async function saveDefaultColumnVisibility() {
   applyColumnOrder();
   applyColumnVisibility();
   saveColumnLayoutPreference();
+  setProgramDefaultStatusFilter(resolveStatusFilterForProgramDefault());
   saveProgramColumnDefaultToStorage();
-  setProgramDefaultStatusFilter(activeStatus);
 
   if (isDemoMode()) {
     setEditTableFooterMessage("Default view saved", "success");

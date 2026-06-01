@@ -182,6 +182,7 @@ function updateHeaderMenuChecks() {
   updateHeaderMenuCountdownCheck();
   updateAppModeMenuLabel();
   updateTestModeBanner();
+  if (typeof updateVendorSubmitModeCheck === "function") updateVendorSubmitModeCheck();
 }
 
 function updateAppModeMenuLabel() {
@@ -299,6 +300,51 @@ function initHeaderTooltips() {
   window.addEventListener("resize", hideThTooltip);
 }
 
+async function openGenerateVendorLinkDialog() {
+  if (isDemoMode()) {
+    showIndicator("Vendor links are not available in demo mode", "error");
+    return;
+  }
+
+  // Gather distinct vendor names from loaded PO rows
+  const vendors = [...new Set(
+    (allRows ?? [])
+      .map(r => String(r["Vendor"] ?? "").trim())
+      .filter(Boolean)
+  )].sort();
+
+  let vendor;
+  if (vendors.length === 0) {
+    vendor = prompt("Enter the vendor name for the portal link:");
+  } else {
+    const options = vendors.map((v, i) => `${i + 1}. ${v}`).join("\n");
+    const raw = prompt(`Choose a vendor (enter number or type name):\n\n${options}`);
+    if (!raw) return;
+    const idx = Number(raw.trim()) - 1;
+    vendor = (idx >= 0 && idx < vendors.length) ? vendors[idx] : raw.trim();
+  }
+
+  if (!vendor) return;
+
+  showIndicator(`Generating link for ${vendor}${ELLIPSIS}`, "");
+  try {
+    const json = await postAppsScript({ action: "createVendorPortalLink", vendor });
+    if (!json.success) throw new Error(json.error);
+    // Copy to clipboard if available, then show the URL
+    const url = json.url;
+    try {
+      await navigator.clipboard.writeText(url);
+      showIndicator(`Link copied to clipboard for ${json.vendor} ${CHECK_MARK}`, "success");
+    } catch (_clipErr) {
+      showIndicator(`Link generated for ${json.vendor} ${CHECK_MARK}`, "success");
+    }
+    // Always prompt-display so the user can copy manually if clipboard failed
+    prompt(`Vendor portal link for ${json.vendor} (already copied to clipboard):`, url);
+  } catch (err) {
+    showIndicator("Failed to generate link: " + err.message, "error");
+  }
+}
+
 function initHeaderMenu() {
   const btn = document.getElementById("headerMenuBtn");
   const menu = document.getElementById("headerMenuDropdown");
@@ -317,6 +363,18 @@ function initHeaderMenu() {
   });
 
   initCsvImport();
+
+  document.getElementById("headerMenuGenerateVendorLink")?.addEventListener("click", e => {
+    e.stopPropagation();
+    closeHeaderMenu();
+    openGenerateVendorLinkDialog();
+  });
+
+  document.getElementById("headerMenuVendorModeToggle")?.addEventListener("click", e => {
+    e.stopPropagation();
+    closeHeaderMenu();
+    if (typeof toggleVendorSubmitMode === "function") toggleVendorSubmitMode();
+  });
 
   document.getElementById("headerMenuToggleAppMode")?.addEventListener("click", e => {
     e.stopPropagation();

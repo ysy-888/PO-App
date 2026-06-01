@@ -4,6 +4,7 @@ applyTwoLineTableHeaders();
 loadCxlCountdownPreference();
 initDivisionFilters();
 initStatusFilters();
+applyDefaultStatusFilter(defaultStatusFilter);
 initColumnFilterHeaders();
 initFlagFilterHeader();
 initCellSelectDropdown();

@@ -67,6 +67,7 @@ function createShipmentFormField(col, value, { readOnly = false } = {}) {
       initialYmd: value,
       readOnly,
       inputClassName: "shipment-form-input shipment-form-input--date",
+      placeholder: "",
     });
     input = dateInput.input;
     wrap.appendChild(label);

@@ -27,6 +27,10 @@ const EXF_REQ_NOTES_FIELD = "ExfReqNotes";
 const EXF_REQ_CC_FIELD = "CC";
 const CHARGEBACK_ID_FIELD = "Chargeback ID";
 const PACKING_LIST_ID_FIELD = "Packing List ID";
+const VENDOR_PORTAL_TOKENS_SHEET_NAME = "Vendor Portal Tokens";
+const PENDING_PACKING_LISTS_SHEET_NAME = "Pending Packing Lists";
+const PENDING_PACKING_LIST_ID_FIELD = "Submission ID";
+const VENDOR_SUBMIT_MODE_KEY = "vendorSubmitMode";
 
 // PO per-request flag/date column names
 const ASN_REQUESTED_FIELD = "ASN Requested";
@@ -121,6 +125,13 @@ const PACKING_LIST_DATA_FIELDS = [
 
 const PACKING_CARTON_DATA_FIELDS = [
   PACKING_LIST_ID_FIELD, "Carton #", ...PACKING_UNIT_FIELDS, "Total Units", "Carton Weight"
+];
+
+const VENDOR_PORTAL_TOKEN_FIELDS = ["Vendor", "Active", "Created At", "Last Used At"];
+
+const PENDING_PACKING_LIST_DATA_FIELDS = [
+  "PO #", "Vendor", "Carton Count", "Notes", "Cartons JSON",
+  "Status", "Submitted At", "Reviewed At"
 ];
 
 function getSheet() {
@@ -285,6 +296,32 @@ function getPackingCartonsSheet_() {
     sheet.getRange(1, 1, 1, PACKING_CARTON_DATA_FIELDS.length).setValues([PACKING_CARTON_DATA_FIELDS]);
   }
   ensureSheetHeaders_(sheet, PACKING_CARTON_DATA_FIELDS);
+  return sheet;
+}
+
+function getVendorPortalTokensSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(VENDOR_PORTAL_TOKENS_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(VENDOR_PORTAL_TOKENS_SHEET_NAME);
+    sheet.getRange(1, 1, 1, VENDOR_PORTAL_TOKEN_FIELDS.length + 1).setValues([[
+      "Token", ...VENDOR_PORTAL_TOKEN_FIELDS
+    ]]);
+  }
+  ensureSheetHeaders_(sheet, ["Token", ...VENDOR_PORTAL_TOKEN_FIELDS]);
+  return sheet;
+}
+
+function getPendingPackingListsSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(PENDING_PACKING_LISTS_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(PENDING_PACKING_LISTS_SHEET_NAME);
+    sheet.getRange(1, 1, 1, PENDING_PACKING_LIST_DATA_FIELDS.length + 1).setValues([[
+      PENDING_PACKING_LIST_ID_FIELD, ...PENDING_PACKING_LIST_DATA_FIELDS
+    ]]);
+  }
+  ensureSheetHeaders_(sheet, [PENDING_PACKING_LIST_ID_FIELD, ...PENDING_PACKING_LIST_DATA_FIELDS]);
   return sheet;
 }
 
@@ -612,6 +649,78 @@ function getNextPackingListId_(packingListsSheet) {
   return formatPackingListId_(max + 1);
 }
 
+// --- Vendor submit mode ---
+
+function getVendorSubmitMode_() {
+  const mode = PropertiesService.getScriptProperties().getProperty(VENDOR_SUBMIT_MODE_KEY);
+  return mode === "direct" ? "direct" : "review";
+}
+
+function setVendorSubmitMode_(mode) {
+  PropertiesService.getScriptProperties().setProperty(
+    VENDOR_SUBMIT_MODE_KEY,
+    mode === "direct" ? "direct" : "review"
+  );
+}
+
+// --- Pending submission ID ---
+
+function parseSubmissionIdSequence_(id) {
+  const m = /^PS-(\d+)$/.exec(String(id ?? "").trim());
+  return m ? Number(m[1]) : 0;
+}
+
+function formatSubmissionId_(sequence) {
+  return "PS-" + String(sequence).padStart(4, "0");
+}
+
+function getNextSubmissionId_(sheet) {
+  const rows = sheet.getDataRange().getValues();
+  if (rows.length < 2) return formatSubmissionId_(1);
+  const headers = rows[0].map(h => String(h ?? "").trim());
+  const idCol = headers.indexOf(PENDING_PACKING_LIST_ID_FIELD);
+  if (idCol === -1) return formatSubmissionId_(1);
+  let max = 0;
+  for (let i = 1; i < rows.length; i++) {
+    max = Math.max(max, parseSubmissionIdSequence_(rows[i][idCol]));
+  }
+  return formatSubmissionId_(max + 1);
+}
+
+// --- Vendor portal token helpers ---
+
+function generateVendorToken_() {
+  const bytes = Utilities.getSecureRandomBytes(24);
+  return Utilities.base64EncodeWebSafe(bytes).replace(/=/g, "");
+}
+
+function resolveVendorPortalToken_(token) {
+  if (!token) return null;
+  const sheet = getVendorPortalTokensSheet_();
+  const rows = sheet.getDataRange().getValues();
+  if (rows.length < 2) return null;
+  const headers = rows[0].map(h => String(h ?? "").trim());
+  const tokenCol = headers.indexOf("Token");
+  const vendorCol = headers.indexOf("Vendor");
+  const activeCol = headers.indexOf("Active");
+  const lastUsedCol = headers.indexOf("Last Used At");
+  if (tokenCol === -1 || vendorCol === -1) return null;
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][tokenCol]) === token) {
+      const active = rows[i][activeCol];
+      const activeStr = String(active).toLowerCase().trim();
+      if (active === false || activeStr === "false" || activeStr === "no") return null;
+      const vendor = String(rows[i][vendorCol] ?? "").trim();
+      if (!vendor) return null;
+      if (lastUsedCol !== -1) {
+        sheet.getRange(i + 1, lastUsedCol + 1).setValue(new Date());
+      }
+      return { vendor, rowIndex: i + 1, headers };
+    }
+  }
+  return null;
+}
+
 function pickChargebackData_(source) {
   const out = {};
   CHARGEBACK_EDITABLE_FIELDS.forEach(field => {
@@ -764,6 +873,56 @@ function buildPoUpdatesFromPackingSave_(cartons, cartonCount, extraUpdates) {
     updates["Act Unit " + (index + 1)] = qty || "";
   });
   return updates;
+}
+
+/**
+ * Core packing list write: upsert the Packing Lists row, rewrite cartons, and
+ * sync the PO row fields. Returns { packingListId, poUpdates } or throws.
+ */
+function savePackingListCore_(poNumber, cartons, packingListMeta, poEditUpdates) {
+  const poSheet = ensurePoWorkflowHeaders_();
+  if (!poSheet) throw new Error("POs sheet not found.");
+  const poFound = findPoRowIndex_(poSheet, poNumber);
+  if (!poFound) throw new Error("PO # not found: " + poNumber);
+
+  const packingListsSheet = getPackingListsSheet_();
+  const cartonsSheet = getPackingCartonsSheet_();
+  const existing = findPackingListForPo_(packingListsSheet, poNumber);
+  const packingListId = existing
+    ? String(existing.packingListId)
+    : getNextPackingListId_(packingListsSheet);
+
+  const now = new Date();
+  const cartonCount = packingListMeta["Carton Count"] || cartons.length;
+  const notes = packingListMeta["Notes"] || "";
+
+  if (existing) {
+    writePoFields_(packingListsSheet, existing.rowIndex, existing.headers, {
+      "Carton Count": cartonCount,
+      "Notes": notes,
+      "Updated At": now,
+    });
+  } else {
+    const headers = packingListsSheet.getRange(1, 1, 1, packingListsSheet.getLastColumn()).getValues()[0]
+      .map(h => String(h ?? "").trim());
+    const row = headers.map(h => {
+      if (h === PACKING_LIST_ID_FIELD) return packingListId;
+      if (h === "PO #") return poNumber;
+      if (h === "Carton Count") return cartonCount;
+      if (h === "Notes") return notes;
+      if (h === "Created At" || h === "Updated At") return now;
+      return "";
+    });
+    packingListsSheet.appendRow(row);
+  }
+
+  rewritePackingCartonsForList_(cartonsSheet, packingListId, cartons);
+  const poHeaders = poSheet.getRange(1, 1, 1, poSheet.getLastColumn()).getValues()[0]
+    .map(h => String(h ?? "").trim());
+  const combinedPoUpdates = buildPoUpdatesFromPackingSave_(cartons, cartonCount, poEditUpdates);
+  writePoFields_(poSheet, poFound.rowIndex, poHeaders, combinedPoUpdates);
+
+  return { packingListId, poUpdates: combinedPoUpdates };
 }
 
 function pickShipmentData_(source) {
@@ -1121,22 +1280,6 @@ function handleSavePackingList(payload) {
     return corsResponse({ success: false, error: "PO # is required." });
   }
 
-  const poSheet = ensurePoWorkflowHeaders_();
-  if (!poSheet) {
-    return corsResponse({ success: false, error: "POs sheet not found." });
-  }
-
-  const poFound = findPoRowIndex_(poSheet, poNumber);
-  if (!poFound) {
-    return corsResponse({ success: false, error: "PO # not found: " + poNumber });
-  }
-
-  const packingListsSheet = getPackingListsSheet_();
-  const cartonsSheet = getPackingCartonsSheet_();
-  const existing = findPackingListForPo_(packingListsSheet, poNumber);
-  const packingListId = existing
-    ? String(existing.packingListId)
-    : getNextPackingListId_(packingListsSheet);
   const cartons = normalizePackingCartons_(payload.cartons || []);
   if (cartons.length === 0) {
     return corsResponse({ success: false, error: "At least one carton is required." });
@@ -1145,9 +1288,6 @@ function handleSavePackingList(payload) {
     return corsResponse({ success: false, error: "A carton quantity cannot be zero." });
   }
 
-  const now = new Date();
-  const cartonCount = payload.packingList?.["Carton Count"] || cartons.length;
-  const notes = payload.packingList?.["Notes"] || "";
   const poEditUpdates = sanitizeUpdatesMap_(payload.updates || {});
   const invalidFields = Object.keys(poEditUpdates).filter(f => !EDITABLE_FIELDS.includes(f));
   if (invalidFields.length > 0) {
@@ -1157,37 +1297,17 @@ function handleSavePackingList(payload) {
     });
   }
 
-  if (existing) {
-    writePoFields_(packingListsSheet, existing.rowIndex, existing.headers, {
-      "Carton Count": cartonCount,
-      "Notes": notes,
-      "Updated At": now,
-    });
-  } else {
-    const headers = packingListsSheet.getRange(1, 1, 1, packingListsSheet.getLastColumn()).getValues()[0]
-      .map(h => String(h ?? "").trim());
-    const row = headers.map(h => {
-      if (h === PACKING_LIST_ID_FIELD) return packingListId;
-      if (h === "PO #") return poNumber;
-      if (h === "Carton Count") return cartonCount;
-      if (h === "Notes") return notes;
-      if (h === "Created At" || h === "Updated At") return now;
-      return "";
-    });
-    packingListsSheet.appendRow(row);
+  const packingListMeta = {
+    "Carton Count": payload.packingList?.["Carton Count"] || cartons.length,
+    "Notes": payload.packingList?.["Notes"] || "",
+  };
+
+  try {
+    const result = savePackingListCore_(poNumber, cartons, packingListMeta, poEditUpdates);
+    return corsResponse({ success: true, ...result });
+  } catch (err) {
+    return corsResponse({ success: false, error: err.message });
   }
-
-  rewritePackingCartonsForList_(cartonsSheet, packingListId, cartons);
-  const poHeaders = poSheet.getRange(1, 1, 1, poSheet.getLastColumn()).getValues()[0]
-    .map(h => String(h ?? "").trim());
-  const combinedPoUpdates = buildPoUpdatesFromPackingSave_(cartons, cartonCount, poEditUpdates);
-  writePoFields_(poSheet, poFound.rowIndex, poHeaders, combinedPoUpdates);
-
-  return corsResponse({
-    success: true,
-    packingListId: packingListId,
-    poUpdates: combinedPoUpdates
-  });
 }
 
 function handleDeletePackingList(payload) {
@@ -3062,7 +3182,33 @@ function handleUpdate(payload) {
   return corsResponse({ success: true, message: "PO updated successfully." });
 }
 
+function handleVendorPortalGet_(e) {
+  const token = String((e.parameter && e.parameter.token) || "").trim();
+  if (!token) {
+    return HtmlService.createHtmlOutput(
+      "<html><body style=\"font-family:sans-serif;padding:2rem\"><h2>Invalid link.</h2><p>Please contact us for a valid link.</p></body></html>"
+    ).setTitle("Invalid Link");
+  }
+  const tokenInfo = resolveVendorPortalToken_(token);
+  if (!tokenInfo) {
+    return HtmlService.createHtmlOutput(
+      "<html><body style=\"font-family:sans-serif;padding:2rem\"><h2>This link is invalid or has been deactivated.</h2><p>Please contact us for a new link.</p></body></html>"
+    ).setTitle("Invalid Link");
+  }
+  const template = HtmlService.createTemplateFromFile("templates/vendor-portal");
+  template.vendorName = tokenInfo.vendor;
+  template.token = token;
+  return template.evaluate()
+    .setTitle("Packing List Submission")
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
 function doGet(e) {
+  // Serve the vendor portal HTML form when ?page=vendor is present.
+  if (e && e.parameter && e.parameter.page === "vendor") {
+    return handleVendorPortalGet_(e);
+  }
+
   try {
     const poSheet = ensurePoWorkflowHeaders_();
     const shipmentsSheet = getShipmentsSheet_();
@@ -3076,6 +3222,7 @@ function doGet(e) {
     const packingListsSheet = getPackingListsSheet_();
     const packingCartonsSheet = getPackingCartonsSheet_();
     const stylePhotosSheet = getStylePhotosSheet_();
+    const pendingPackingListsSheet = getPendingPackingListsSheet_();
     const data = sheetToObjects_(poSheet, "PO #");
     const shipments = sheetToObjects_(shipmentsSheet, SHIPMENT_ID_FIELD);
     const exfRequests = sheetToObjects_(exfRequestsSheet, EXF_REQUEST_ID_FIELD);
@@ -3088,6 +3235,7 @@ function doGet(e) {
     const packingLists = sheetToObjects_(packingListsSheet, PACKING_LIST_ID_FIELD);
     const packingCartons = sheetToObjects_(packingCartonsSheet, PACKING_LIST_ID_FIELD);
     const stylePhotos = stylePhotosSheetToObjects_(stylePhotosSheet);
+    const pendingPackingLists = sheetToObjects_(pendingPackingListsSheet, PENDING_PACKING_LIST_ID_FIELD);
 
     return corsResponse({
       success: true,
@@ -3105,12 +3253,221 @@ function doGet(e) {
       packingLists: packingLists,
       packingCartons: packingCartons,
       stylePhotos: stylePhotos,
+      pendingPackingLists: pendingPackingLists,
+      vendorSubmitMode: getVendorSubmitMode_(),
       defaultColumns: getDefaultColumns_(),
       defaultStatusFilter: getDefaultStatusFilter_(),
     });
   } catch (err) {
     return errorResponse_(err);
   }
+}
+
+// ============================================================
+// Vendor portal server functions (called via google.script.run)
+// ============================================================
+
+/**
+ * Returns all open POs for the vendor identified by `token`.
+ * Called from the vendor portal HTML form.
+ */
+function vendorPortalGetPos(token) {
+  try {
+    const tokenInfo = resolveVendorPortalToken_(String(token || "").trim());
+    if (!tokenInfo) return { success: false, error: "Invalid or expired link." };
+    const vendor = tokenInfo.vendor;
+
+    const poSheet = getSheet();
+    if (!poSheet) return { success: false, error: "POs sheet not found." };
+    const rows = sheetToObjects_(poSheet, "PO #");
+    const vendorKey = vendor.toLowerCase();
+    const vendorPos = rows.filter(row =>
+      String(row["Vendor"] ?? "").trim().toLowerCase() === vendorKey &&
+      String(row["Status"] ?? "").trim().toLowerCase() !== "closed"
+    );
+
+    const packingPoSet = getPackingListPoSet_();
+    const pos = vendorPos.map(row => {
+      const po = String(row["PO #"] ?? "").trim();
+      const sizeLabels = [];
+      for (let i = 1; i <= 15; i++) {
+        const label = String(row["Size " + i] ?? "").trim();
+        if (label) sizeLabels.push(label);
+      }
+      return {
+        "PO #": po,
+        "Style #": String(row["Style #"] ?? "").trim(),
+        "Color": String(row["Color"] ?? "").trim(),
+        "Status": String(row["Status"] ?? "").trim(),
+        "PO Qty": row["PO Qty"] ?? "",
+        "sizeLabels": sizeLabels,
+        "hasPackingList": packingPoSet.has(po),
+      };
+    });
+    return { success: true, vendor, pos };
+  } catch (err) {
+    console.error(err.stack || err);
+    return { success: false, error: "Server error." };
+  }
+}
+
+/**
+ * Accepts a packing list submission from a vendor.
+ * Routes to direct save or pending queue based on vendorSubmitMode.
+ * Called from the vendor portal HTML form.
+ */
+function vendorPortalSubmit(token, poNumber, cartons, notes) {
+  try {
+    const tokenInfo = resolveVendorPortalToken_(String(token || "").trim());
+    if (!tokenInfo) return { success: false, error: "Invalid or expired link." };
+    const vendor = tokenInfo.vendor;
+
+    // Confirm PO belongs to this vendor
+    const poSheet = getSheet();
+    if (!poSheet) return { success: false, error: "POs sheet not found." };
+    const rows = sheetToObjects_(poSheet, "PO #");
+    const poRow = rows.find(r => poNumbersEqual_(r["PO #"], poNumber));
+    if (!poRow) return { success: false, error: "PO # not found." };
+    if (String(poRow["Vendor"] ?? "").trim().toLowerCase() !== vendor.toLowerCase()) {
+      return { success: false, error: "You are not authorized to submit for this PO." };
+    }
+
+    const normalizedCartons = normalizePackingCartons_(cartons || []);
+    if (normalizedCartons.length === 0) {
+      return { success: false, error: "At least one carton is required." };
+    }
+    if (normalizedCartons.some(c => Number(c["Total Units"] || 0) <= 0)) {
+      return { success: false, error: "Each carton must have at least one unit." };
+    }
+
+    const mode = getVendorSubmitMode_();
+
+    if (mode === "direct") {
+      const meta = { "Carton Count": normalizedCartons.length, "Notes": notes || "" };
+      savePackingListCore_(poNumber, normalizedCartons, meta, {});
+      return { success: true, mode: "direct", message: "Packing list submitted successfully." };
+    }
+
+    // Queue for staff review
+    const lock = LockService.getScriptLock();
+    lock.waitLock(30000);
+    try {
+      const pendingSheet = getPendingPackingListsSheet_();
+      const submissionId = getNextSubmissionId_(pendingSheet);
+      const now = new Date();
+      const headers = pendingSheet.getRange(1, 1, 1, pendingSheet.getLastColumn()).getValues()[0]
+        .map(h => String(h ?? "").trim());
+      const row = headers.map(h => {
+        if (h === PENDING_PACKING_LIST_ID_FIELD) return submissionId;
+        if (h === "PO #") return poNumber;
+        if (h === "Vendor") return vendor;
+        if (h === "Carton Count") return normalizedCartons.length;
+        if (h === "Notes") return notes || "";
+        if (h === "Cartons JSON") return JSON.stringify(normalizedCartons);
+        if (h === "Status") return "Pending";
+        if (h === "Submitted At") return now;
+        if (h === "Reviewed At") return "";
+        return "";
+      });
+      pendingSheet.appendRow(row);
+      return { success: true, mode: "review", message: "Packing list submitted for review. We will process it shortly." };
+    } finally {
+      if (lock.hasLock()) lock.releaseLock();
+    }
+  } catch (err) {
+    console.error(err.stack || err);
+    return { success: false, error: "Server error. Please try again." };
+  }
+}
+
+// ============================================================
+// Admin doPost action handlers for the vendor portal
+// ============================================================
+
+function handleCreateVendorPortalLink(payload) {
+  const vendor = String(payload.vendor ?? "").trim();
+  if (!vendor) return corsResponse({ success: false, error: "Vendor is required." });
+  const token = generateVendorToken_();
+  const sheet = getVendorPortalTokensSheet_();
+  const now = new Date();
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+    .map(h => String(h ?? "").trim());
+  const row = headers.map(h => {
+    if (h === "Token") return token;
+    if (h === "Vendor") return vendor;
+    if (h === "Active") return true;
+    if (h === "Created At") return now;
+    if (h === "Last Used At") return "";
+    return "";
+  });
+  sheet.appendRow(row);
+  const scriptUrl = ScriptApp.getService().getUrl();
+  const portalUrl = scriptUrl + "?page=vendor&token=" + encodeURIComponent(token);
+  return corsResponse({ success: true, token, url: portalUrl, vendor });
+}
+
+function handleSetVendorSubmitMode(payload) {
+  const mode = String(payload.mode ?? "").trim();
+  if (mode !== "direct" && mode !== "review") {
+    return corsResponse({ success: false, error: "Mode must be 'review' or 'direct'." });
+  }
+  setVendorSubmitMode_(mode);
+  return corsResponse({ success: true, mode });
+}
+
+function handleApprovePendingPackingList(payload) {
+  const submissionId = String(payload.submissionId ?? "").trim();
+  if (!submissionId) return corsResponse({ success: false, error: "Submission ID is required." });
+  const pendingSheet = getPendingPackingListsSheet_();
+  const rows = pendingSheet.getDataRange().getValues();
+  if (rows.length < 2) return corsResponse({ success: false, error: "Submission not found." });
+  const headers = rows[0].map(h => String(h ?? "").trim());
+  const idCol = headers.indexOf(PENDING_PACKING_LIST_ID_FIELD);
+  const statusCol = headers.indexOf("Status");
+  const cartonsJsonCol = headers.indexOf("Cartons JSON");
+  const poCol = headers.indexOf("PO #");
+  const notesCol = headers.indexOf("Notes");
+  const reviewedAtCol = headers.indexOf("Reviewed At");
+  if (idCol === -1) return corsResponse({ success: false, error: "Sheet missing ID column." });
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][idCol]) !== submissionId) continue;
+    if (String(rows[i][statusCol] ?? "").trim() !== "Pending") {
+      return corsResponse({ success: false, error: "Submission is not in Pending status." });
+    }
+    const poNumber = String(rows[i][poCol] ?? "").trim();
+    const notes = String(rows[i][notesCol] ?? "").trim();
+    let cartons = [];
+    try { cartons = JSON.parse(rows[i][cartonsJsonCol] || "[]"); } catch (_e) {
+      return corsResponse({ success: false, error: "Could not parse carton data." });
+    }
+    const normalizedCartons = normalizePackingCartons_(cartons);
+    const meta = { "Carton Count": normalizedCartons.length, "Notes": notes };
+    const result = savePackingListCore_(poNumber, normalizedCartons, meta, {});
+    if (statusCol !== -1) pendingSheet.getRange(i + 1, statusCol + 1).setValue("Approved");
+    if (reviewedAtCol !== -1) pendingSheet.getRange(i + 1, reviewedAtCol + 1).setValue(new Date());
+    return corsResponse({ success: true, submissionId, ...result });
+  }
+  return corsResponse({ success: false, error: "Submission not found: " + submissionId });
+}
+
+function handleRejectPendingPackingList(payload) {
+  const submissionId = String(payload.submissionId ?? "").trim();
+  if (!submissionId) return corsResponse({ success: false, error: "Submission ID is required." });
+  const pendingSheet = getPendingPackingListsSheet_();
+  const rows = pendingSheet.getDataRange().getValues();
+  if (rows.length < 2) return corsResponse({ success: false, error: "Submission not found." });
+  const headers = rows[0].map(h => String(h ?? "").trim());
+  const idCol = headers.indexOf(PENDING_PACKING_LIST_ID_FIELD);
+  const statusCol = headers.indexOf("Status");
+  const reviewedAtCol = headers.indexOf("Reviewed At");
+  if (idCol === -1) return corsResponse({ success: false, error: "Sheet missing ID column." });
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][idCol]) !== submissionId) continue;
+    if (statusCol !== -1) pendingSheet.getRange(i + 1, statusCol + 1).setValue("Rejected");
+    if (reviewedAtCol !== -1) pendingSheet.getRange(i + 1, reviewedAtCol + 1).setValue(new Date());
+    return corsResponse({ success: true, submissionId });
+  }
+  return corsResponse({ success: false, error: "Submission not found: " + submissionId });
 }
 
 function doPost(e) {
@@ -3150,6 +3507,10 @@ function doPost(e) {
     if (action === "savePackingList") return handleSavePackingList(payload);
     if (action === "deletePackingList") return handleDeletePackingList(payload);
     if (action === "bulkUpsertPos") return handleBulkUpsertPos(payload);
+    if (action === "createVendorPortalLink") return handleCreateVendorPortalLink(payload);
+    if (action === "setVendorSubmitMode") return handleSetVendorSubmitMode(payload);
+    if (action === "approvePendingPackingList") return handleApprovePendingPackingList(payload);
+    if (action === "rejectPendingPackingList") return handleRejectPendingPackingList(payload);
 
     return corsResponse({ success: false, error: "Unknown action: " + action });
   } catch (err) {

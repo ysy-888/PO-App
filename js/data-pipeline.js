@@ -29,6 +29,9 @@ async function loadData() {
         onAsnRequestsDataLoaded([]);
         window.__pendingAsnRequests = null;
       }
+      if (typeof onPendingPackingListsDataLoaded === "function") {
+        onPendingPackingListsDataLoaded([], "review");
+      }
       buildStylePhotoIndex(DEMO_STYLE_PHOTOS);
       applyDefaultStatusFilter(STATUS_FILTER_OPEN);
     } else {
@@ -46,6 +49,9 @@ async function loadData() {
       allVendorEmailRows = allContactRows;
       allLocationRows = json.locations ?? [];
       buildStylePhotoIndex(json.stylePhotos ?? []);
+      if (typeof onPendingPackingListsDataLoaded === "function") {
+        onPendingPackingListsDataLoaded(json.pendingPackingLists ?? [], json.vendorSubmitMode);
+      }
       window.__pendingShipments = json.shipments ?? [];
       window.__pendingExfRequests = json.exfRequests ?? [];
       window.__pendingAsnRequests = json.asnRequests ?? [];
@@ -61,6 +67,7 @@ async function loadData() {
       }
       if (json.defaultColumns) applyDefaultColumnsFromServer(json.defaultColumns);
       applyDefaultStatusFilterFromServer(json.defaultStatusFilter);
+      saveProgramColumnDefaultToStorage();
     }
     invalidatePackingIndex();
     migrateAllRows(allRows);

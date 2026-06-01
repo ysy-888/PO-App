@@ -15,6 +15,7 @@
     <button type="button" class="app-title-tab" id="navTabShipments" role="tab" aria-selected="false">Shipments</button>
     <button type="button" class="app-title-tab" id="navTabRequests" role="tab" aria-selected="false">Requests</button>
     <button type="button" class="app-title-tab" id="navTabChargebacks" role="tab" aria-selected="false">Chargebacks</button>
+    <button type="button" class="app-title-tab" id="navTabPackingReviews" role="tab" aria-selected="false">Vendor Submissions</button>
   </nav>
   <div class="header-right">
     <div class="header-po-meta" id="poHeaderMeta">
@@ -36,6 +37,13 @@
         <button type="button" class="header-menu-item header-menu-checkable" id="headerMenuToggleCountdown" role="menuitemcheckbox" aria-checked="false">
           <span>Toggle countdown</span>
           <span class="header-menu-check" id="headerMenuCountdownCheck" hidden aria-hidden="true">✓</span>
+        </button>
+        <button type="button" class="header-menu-item header-menu-item-separator" id="headerMenuGenerateVendorLink" role="menuitem">
+          Generate vendor link
+        </button>
+        <button type="button" class="header-menu-item header-menu-checkable" id="headerMenuVendorModeToggle" role="menuitemcheckbox" aria-checked="false">
+          <span id="headerMenuVendorModeLabel">Vendor submissions: Review</span>
+          <span class="header-menu-check" id="headerMenuVendorModeCheck" aria-hidden="true">✓</span>
         </button>
         <button type="button" class="header-menu-item header-menu-item-separator" id="headerMenuToggleAppMode" role="menuitem">
           <span id="headerMenuAppModeLabel">Test Mode</span>
@@ -131,6 +139,16 @@
   <div class="toolbar-end">
     <button type="button" class="btn btn-danger" id="deleteChargebackBtn" hidden>Delete chargeback</button>
     <div class="counter" id="chargebackRowCounter">— chargebacks</div>
+  </div>
+</div>
+
+<div id="packingReviewToolbar" class="toolbar" hidden>
+  <div class="search-wrap">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    <input type="search" id="packingReviewSearchInput" placeholder="Search" />
+  </div>
+  <div class="toolbar-end">
+    <div class="counter" id="packingReviewRowCounter">— submissions</div>
   </div>
 </div>
 
@@ -495,6 +513,36 @@
   </div>
 </div>
 
+<div id="packingReviewTableWrap" class="table-scroll-y" hidden>
+  <div class="table-scroll-x">
+  <table id="packingReviewTable">
+    <colgroup>
+      <col class="col-submission-id" />
+      <col class="col-po" />
+      <col class="col-vendor" />
+      <col class="col-ctn-qty" />
+      <col class="col-status" />
+      <col class="col-date" />
+      <col class="col-packing-review-action" />
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Submission ID</th>
+        <th>PO #</th>
+        <th>Vendor</th>
+        <th>Cartons</th>
+        <th>Status</th>
+        <th>Submitted At</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody id="packingReviewTableBody">
+      <tr class="state-row"><td colspan="7">Loading submissions…</td></tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
 <footer id="appFooter" class="app-footer">
   <div class="app-footer-message-slot">
     <div id="testModeBanner" class="test-mode-status" hidden role="status" aria-live="polite">
@@ -808,6 +856,7 @@
 <script src="js/asn-requests.js"></script>
 <script src="js/delivery-requests.js"></script>
 <script src="js/pickup-requests.js"></script>
+<script src="js/packing-reviews.js"></script>
 <script src="js/export-csv.js"></script>
 <script src="js/shipments-init.js"></script>
 </body>

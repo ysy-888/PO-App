@@ -362,25 +362,30 @@ function switchAppView(view) {
   const shipmentToolbar = document.getElementById("shipmentToolbar");
   const requestsToolbar = document.getElementById("requestsToolbar");
   const chargebackToolbar = document.getElementById("chargebackToolbar");
+  const packingReviewToolbar = document.getElementById("packingReviewToolbar");
   const poHeaderMeta = document.getElementById("poHeaderMeta");
   const poTableWrap = document.getElementById("poTableWrap");
   const shipmentTableWrap = document.getElementById("shipmentTableWrap");
   const requestsTableWrap = document.getElementById("requestsTableWrap");
   const chargebackTableWrap = document.getElementById("chargebackTableWrap");
+  const packingReviewTableWrap = document.getElementById("packingReviewTableWrap");
   const poTab = document.getElementById("navTabPo");
   const requestsTab = document.getElementById("navTabRequests");
   const shipTab = document.getElementById("navTabShipments");
   const chargebackTab = document.getElementById("navTabChargebacks");
+  const packingReviewTab = document.getElementById("navTabPackingReviews");
 
   if (poToolbar) poToolbar.hidden = view !== "po";
   if (shipmentToolbar) shipmentToolbar.hidden = view !== "shipments";
   if (requestsToolbar) requestsToolbar.hidden = view !== "requests";
   if (chargebackToolbar) chargebackToolbar.hidden = view !== "chargebacks";
+  if (packingReviewToolbar) packingReviewToolbar.hidden = view !== "packingReviews";
   if (poHeaderMeta) poHeaderMeta.hidden = view !== "po";
   if (poTableWrap) poTableWrap.hidden = view !== "po";
   if (shipmentTableWrap) shipmentTableWrap.hidden = view !== "shipments";
   if (requestsTableWrap) requestsTableWrap.hidden = view !== "requests";
   if (chargebackTableWrap) chargebackTableWrap.hidden = view !== "chargebacks";
+  if (packingReviewTableWrap) packingReviewTableWrap.hidden = view !== "packingReviews";
   const poFooterEnd = document.getElementById("poFooterEnd");
   if (poFooterEnd) poFooterEnd.hidden = view !== "po";
   poTab?.classList.toggle("is-active", view === "po");
@@ -391,10 +396,13 @@ function switchAppView(view) {
   shipTab?.setAttribute("aria-selected", view === "shipments" ? "true" : "false");
   chargebackTab?.classList.toggle("is-active", view === "chargebacks");
   chargebackTab?.setAttribute("aria-selected", view === "chargebacks" ? "true" : "false");
+  packingReviewTab?.classList.toggle("is-active", view === "packingReviews");
+  packingReviewTab?.setAttribute("aria-selected", view === "packingReviews" ? "true" : "false");
 
   if (view === "shipments") applyShipmentFilters();
   if (view === "requests") switchRequestType(currentRequestType);
   if (view === "chargebacks") applyChargebackFilters();
+  if (view === "packingReviews" && typeof applyPackingReviewFilters === "function") applyPackingReviewFilters();
   updateDeleteShipmentButton();
   updateDeleteChargebackButton();
   updateToolbarRequestButtons();

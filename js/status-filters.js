@@ -58,6 +58,14 @@ function setProgramDefaultStatusFilter(status) {
   return true;
 }
 
+/** Current toolbar/header status selection for Save as default. */
+function resolveStatusFilterForProgramDefault() {
+  syncStatusFilterFromHeaderSelection();
+  if (statusFilterSelection === null) return "";
+  if (statusFilterSelection.size === 1) return [...statusFilterSelection][0];
+  return defaultStatusFilter;
+}
+
 function applyDefaultStatusFilter(status) {
   if (!setProgramDefaultStatusFilter(status)) return false;
   setStatusFilter(status);
