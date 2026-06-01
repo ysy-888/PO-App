@@ -362,6 +362,7 @@ function switchAppView(view) {
   const shipmentToolbar = document.getElementById("shipmentToolbar");
   const requestsToolbar = document.getElementById("requestsToolbar");
   const chargebackToolbar = document.getElementById("chargebackToolbar");
+  const poHeaderMeta = document.getElementById("poHeaderMeta");
   const poTableWrap = document.getElementById("poTableWrap");
   const shipmentTableWrap = document.getElementById("shipmentTableWrap");
   const requestsTableWrap = document.getElementById("requestsTableWrap");
@@ -375,6 +376,7 @@ function switchAppView(view) {
   if (shipmentToolbar) shipmentToolbar.hidden = view !== "shipments";
   if (requestsToolbar) requestsToolbar.hidden = view !== "requests";
   if (chargebackToolbar) chargebackToolbar.hidden = view !== "chargebacks";
+  if (poHeaderMeta) poHeaderMeta.hidden = view !== "po";
   if (poTableWrap) poTableWrap.hidden = view !== "po";
   if (shipmentTableWrap) shipmentTableWrap.hidden = view !== "shipments";
   if (requestsTableWrap) requestsTableWrap.hidden = view !== "requests";

@@ -116,6 +116,21 @@ body.test-mode-active .app-header {
   gap: 10px;
 }
 
+.header-po-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.header-po-meta[hidden] {
+  display: none !important;
+}
+
+.header-po-meta .counter {
+  text-align: left;
+}
+
 .header-menu-wrap {
   position: relative;
 }
@@ -643,7 +658,6 @@ table {
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
-  min-width: 2800px;
 }
 
 #chargebackTable {
@@ -865,10 +879,6 @@ th.th-select-col:hover {
   padding: 2px 5px;
 }
 
-th.th-flag-col.filter-active:hover {
-  background: var(--accent-light);
-}
-
 th[data-col="EXF"],
 th[data-col="ETA"],
 th[data-col="IHD"],
@@ -983,13 +993,18 @@ td.select-cell.select-cell-open::after {
 }
 
 th.th-filterable.filter-active::after {
-  color: var(--filter-icon-active);
+  color: #fff;
   opacity: 1;
 }
 
 th.th-filterable.filter-active {
-  background: var(--accent-heavy);
-  color: var(--text);
+  background: var(--accent);
+  color: #fff;
+}
+
+th.th-filterable.filter-active:hover {
+  background: var(--accent);
+  color: #fff;
 }
 
 th.th-filterable .th-label {
@@ -1633,11 +1648,17 @@ th.th-select-col input[type="checkbox"]:checked:hover {
 }
 
 th.th-flag-col.filter-active {
-  background: var(--accent-light);
+  background: var(--accent);
+  color: #fff;
+}
+
+th.th-flag-col.filter-active:hover {
+  background: var(--accent);
+  color: #fff;
 }
 
 th.th-flag-col.filter-active .th-flag-icon {
-  color: var(--flag-icon-hover);
+  color: #fff;
 }
 
 th.th-flag-col.filter-active .th-flag-icon svg path {
@@ -2028,44 +2049,74 @@ td.editable:not(.select-cell):hover .editable-preview {
   font-size: 14px;
 }
 
-/* ── Column widths ── */
-.col-select      { width: 36px; }
-.col-flag        { width: 58px; }
-.col-packing-list { width: 36px; }
-.col-division    { width: 120px; }
-.col-status      { width: 130px; }
-.col-vendor      { width: 130px; }
-.col-buyer       { width: 120px; }
-.col-buyer-po    { width: 100px; }
-.col-so          { width: 80px; }
-.col-po-date     { width: 80px; }
-.col-po          { width: 80px; }
-.col-old-po      { width: 80px; }
-.col-style       { width: 100px; }
-.col-color       { width: 100px; }
-.col-po-qty      { width: 60px; }
-.col-actual-qty  { width: 60px; }
-.col-ctn-qty     { width: 60px; }
-.col-ship-method { width: 100px; }
-.col-vessel      { width: 100px; }
-.col-house       { width: 80px; }
-.col-shipment-id  { width: 96px; }
-#poTable col.col-ship-method + col.col-shipment-id { width: 36px; }
-#poTable col.col-shipment-id + col.col-packing-list { width: 36px; }
-.col-exf-req     { width: 72px; }
-.col-delivery-req { width: 100px; }
-.col-pickup-req  { width: 100px; }
-.col-shipped     { width: 80px; }
-.col-etd         { width: 80px; }
-.col-est-exf     { width: 80px; }
-.col-est-ihd     { width: 80px; }
-.col-exf         { width: 80px; }
-.col-eta         { width: 80px; }
-.col-ihd         { width: 80px; }
-.col-cxl         { width: 80px; }
-.col-assign      { width: 80px; }
-.col-exf-memo    { width: 120px; max-width: 120px; }
-.col-notes       { width: 240px; min-width: 240px; }
+/* ── PO table column width tiers (XS / S / M / L) ── */
+#poTable {
+  min-width: 0;
+  --col-w-xs-min: 48px;
+  --col-w-xs-max: 56px;
+  --col-w-s-min: 72px;
+  --col-w-s-max: 84px;
+  --col-w-m-min: 96px;
+  --col-w-m-max: 132px;
+  --col-w-l-min: 160px;
+  --col-w-l-max: 240px;
+  --col-w-flag: 58px;
+  --col-w-select: 36px;
+  --col-w-packing: 36px;
+}
+
+#poTable col.col-w-xs { width: var(--col-w-xs-max); }
+#poTable col.col-w-s { width: var(--col-w-s-max); }
+#poTable col.col-w-m { width: var(--col-w-m-max); }
+#poTable col.col-w-l { width: var(--col-w-l-max); }
+#poTable col.col-w-flag { width: var(--col-w-flag); }
+#poTable col.col-w-select { width: var(--col-w-select); }
+#poTable col.col-w-packing { width: var(--col-w-packing); }
+
+#poTable :is(th, td).col-w-xs {
+  min-width: var(--col-w-xs-min);
+  max-width: var(--col-w-xs-max);
+}
+
+#poTable :is(th, td).col-w-s {
+  min-width: var(--col-w-s-min);
+  max-width: var(--col-w-s-max);
+}
+
+#poTable :is(th, td).col-w-m {
+  min-width: var(--col-w-m-min);
+  max-width: var(--col-w-m-max);
+}
+
+#poTable :is(th, td).col-w-l {
+  min-width: var(--col-w-l-min);
+  max-width: var(--col-w-l-max);
+}
+
+#poTable :is(th, td).col-w-flag {
+  min-width: var(--col-w-flag);
+  max-width: var(--col-w-flag);
+}
+
+#poTable :is(th, td).col-w-select {
+  min-width: var(--col-w-select);
+  max-width: var(--col-w-select);
+}
+
+#poTable :is(th, td).col-w-packing {
+  min-width: var(--col-w-packing);
+  max-width: var(--col-w-packing);
+}
+
+/* Ship Method / shipment link / packing list — adjacent narrow group */
+#poTable col[data-col="Ship Method"] {
+  width: var(--col-w-m-max);
+}
+
+#poTable :is(th, td)[data-col="Ship Method"].col-w-m {
+  min-width: 88px;
+  max-width: var(--col-w-m-max);
+}
 
 /* Full-screen dark overlay */
 .modal-backdrop {

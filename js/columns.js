@@ -85,16 +85,43 @@ const COLUMNS = [
   "EXF","ETA","IHD","CXL Date","Assign Date","Notes"
 ];
 
-const COLUMN_WIDTHS = [
-  58, 36,
-  130, 100, 120, 130, 120, 100, 80, 80, 80, 80, 100, 100, 100, 60, 60, 60, 70, 70, 80,
-  100, 80, 96,   80, 80, 80, 100, 36, 36,
-  72, 80, 80, 120,
-  72, 80, 80, 80,
-  80, 80, 80, 100,
-  80, 80, 80, 100,
-  80, 80, 80, 80, 80, 240
+/** PO table column width tiers (see #poTable col-w-* in po-table.css). */
+const COLUMN_WIDTH_TIER_MAX = {
+  xs: 56,
+  s: 84,
+  m: 132,
+  l: 240,
+  flag: 58,
+  select: 36,
+  packing: 36,
+};
+
+const PO_COL_WIDTH_CLASSES = [
+  "col-w-xs", "col-w-s", "col-w-m", "col-w-l",
+  "col-w-flag", "col-w-select", "col-w-packing",
 ];
+
+const COLUMN_WIDTH_TIER_XS = new Set([
+  "PO Qty", "Actual Qty", "Ctn Qty", "Received Qty",
+]);
+
+const COLUMN_WIDTH_TIER_S = new Set([
+  "PO Date", "Shipped", "ETD", "EST EXF", "EST IHD",
+  "EXF Date", "EXF Req Date", "ASN Date", "ASN Req Date",
+  "Delivery Date", "Delivery Req Date", "Pickup Date", "Pickup Req Date",
+  "EXF", "ETA", "IHD", "CXL Date", "Assign Date",
+  "PO #", "Old PO #", "SO #", "FOB Cost", "PO Total Cost",
+  "N41 Status",
+  "EXF Requested", "ASN Requested", "Delivery Requested", "Pickup Requested",
+  "ASN Request ID", "Delivery Request ID", "Pickup Request ID",
+]);
+
+const COLUMN_WIDTH_TIER_M = new Set([
+  "Status", "Division", "Vendor", "Buyer", "Buyer PO #", "Style #", "Color",
+  "Style Category", "Vessel", "House #", "Ship Method", "EXF Memo",
+]);
+
+const COLUMN_WIDTH_TIER_L = new Set(["Notes"]);
 
 const COLUMN_LABELS = {
   "Actual Qty": "Act Qty",
@@ -142,21 +169,69 @@ function ensureAlwaysVisibleColumns(cols) {
   return cols;
 }
 
+/** Ship Method + Shipment ID stay with the always-visible Packing List column group. */
+function ensureMergedShipmentColumnsVisible(cols) {
+  cols.add("Ship Method");
+  cols.add("Shipment ID");
+  return cols;
+}
+
 function getSelectableColumnsFromVisible(visible) {
   return new Set([...visible].filter(col => !ALWAYS_VISIBLE_COLUMNS.has(col)));
 }
 
 function buildVisibleColumnsFromDraft(draft) {
-  return ensureAlwaysVisibleColumns(new Set(draft));
+  return ensureMergedShipmentColumnsVisible(ensureAlwaysVisibleColumns(new Set(draft)));
 }
 
 function getColumnLabel(col) {
   return COLUMN_LABELS[col] ?? col;
 }
 
+function getColumnWidthTier(col) {
+  if (col === "Flag") return "flag";
+  if (col === "Selected") return "select";
+  if (col === "Packing List" || col === "Shipment ID") return "packing";
+  if (COLUMN_WIDTH_TIER_L.has(col)) return "l";
+  if (COLUMN_WIDTH_TIER_M.has(col)) return "m";
+  if (COLUMN_WIDTH_TIER_XS.has(col)) return "xs";
+  if (COLUMN_WIDTH_TIER_S.has(col)) return "s";
+  return "s";
+}
+
+function getColumnWidthClass(col) {
+  const tier = getColumnWidthTier(col);
+  if (tier === "flag") return "col-w-flag";
+  if (tier === "select") return "col-w-select";
+  if (tier === "packing") return "col-w-packing";
+  return `col-w-${tier}`;
+}
+
 function getColumnWidth(col) {
-  const i = COLUMNS.indexOf(col);
-  return i >= 0 ? COLUMN_WIDTHS[i] : 80;
+  return COLUMN_WIDTH_TIER_MAX[getColumnWidthTier(col)] ?? COLUMN_WIDTH_TIER_MAX.s;
+}
+
+function applyPoColumnWidthClass(el, col) {
+  if (!el) return;
+  const widthClass = getColumnWidthClass(col);
+  PO_COL_WIDTH_CLASSES.forEach(c => el.classList.remove(c));
+  el.classList.add(widthClass);
+}
+
+function syncPoColumnWidthClasses() {
+  const table = document.getElementById("poTable");
+  if (!table) return;
+  getColumnOrder().forEach(col => {
+    const colEl = table.querySelector(`colgroup col[data-col="${CSS.escape(col)}"]`);
+    if (colEl) {
+      const hidden = colEl.classList.contains("col-hidden");
+      colEl.className = getColumnWidthClass(col) + (hidden ? " col-hidden" : "");
+    }
+    applyPoColumnWidthClass(table.querySelector(`thead th[data-col="${CSS.escape(col)}"]`), col);
+    table.querySelectorAll(`tbody td[data-col="${CSS.escape(col)}"]`).forEach(td => {
+      applyPoColumnWidthClass(td, col);
+    });
+  });
 }
 
 function normalizeColumnOrder(order) {
@@ -199,6 +274,7 @@ let columnOrderDraft = [...COLUMNS];
 const DEFAULT_COLUMN_ORDER = [...COLUMNS];
 
 const COLUMN_LAYOUT_STORAGE_BASE = "columnLayout";
+const PROGRAM_COLUMN_DEFAULT_STORAGE_BASE = "programColumnDefault";
 
 function hasStoredColumnLayout() {
   try {
@@ -247,6 +323,7 @@ function indexTableColumns() {
   if (!table) return;
   const cols = table.querySelectorAll("colgroup col");
   COLUMNS.forEach((col, i) => cols[i]?.setAttribute("data-col", col));
+  syncPoColumnWidthClasses();
 }
 
 function applyColumnOrder() {
@@ -454,7 +531,9 @@ function visibleColumnCount() {
 
 function getDefaultVisibleColumnsSet() {
   const ordered = DEFAULT_COLUMN_ORDER.filter(col => DEFAULT_VISIBLE_COLUMNS.includes(col));
-  return ensureAlwaysVisibleColumns(new Set(ordered.length > 0 ? ordered : COLUMNS));
+  return ensureMergedShipmentColumnsVisible(
+    ensureAlwaysVisibleColumns(new Set(ordered.length > 0 ? ordered : COLUMNS))
+  );
 }
 
 function setProgramDefaultLayout(order, visibleDraft) {
@@ -468,7 +547,37 @@ function setProgramDefaultLayout(order, visibleDraft) {
   return true;
 }
 
+function saveProgramColumnDefaultToStorage() {
+  try {
+    localStorage.setItem(
+      scopedStorageKey(PROGRAM_COLUMN_DEFAULT_STORAGE_BASE),
+      JSON.stringify({
+        order: [...DEFAULT_COLUMN_ORDER],
+        visible: [...DEFAULT_VISIBLE_COLUMNS],
+      })
+    );
+  } catch {
+    /* ignore storage failures */
+  }
+}
+
+function loadProgramColumnDefaultFromStorage() {
+  try {
+    const raw = localStorage.getItem(scopedStorageKey(PROGRAM_COLUMN_DEFAULT_STORAGE_BASE));
+    if (!raw) return false;
+    const data = JSON.parse(raw);
+    if (!data || typeof data !== "object") return false;
+    const order = Array.isArray(data.order) ? normalizeColumnOrder(data.order) : null;
+    const visibleList = Array.isArray(data.visible) ? data.visible : null;
+    if (!order || !visibleList || visibleList.length === 0) return false;
+    return setProgramDefaultLayout(order, new Set(visibleList));
+  } catch {
+    return false;
+  }
+}
+
 function loadColumnVisibility() {
+  loadProgramColumnDefaultFromStorage();
   if (loadColumnLayoutPreference()) return;
   columnOrder = normalizeColumnOrder([...DEFAULT_COLUMN_ORDER]);
   visibleColumns = getDefaultVisibleColumnsSet();
@@ -494,6 +603,8 @@ function applyDefaultColumnsFromServer(data) {
     return false;
   }
 
+  saveProgramColumnDefaultToStorage();
+
   if (!hasStoredColumnLayout()) {
     columnOrder = normalizeColumnOrder([...DEFAULT_COLUMN_ORDER]);
     visibleColumns = getDefaultVisibleColumnsSet();
@@ -511,6 +622,7 @@ async function saveDefaultColumnVisibility() {
   applyColumnOrder();
   applyColumnVisibility();
   saveColumnLayoutPreference();
+  saveProgramColumnDefaultToStorage();
   setProgramDefaultStatusFilter(activeStatus);
 
   if (isDemoMode()) {
@@ -582,6 +694,7 @@ function applyColumnVisibility() {
   });
 
   table.style.minWidth = `${Math.max(minWidth, 400)}px`;
+  syncPoColumnWidthClasses();
 }
 
 let editTableDragFromIndex = null;

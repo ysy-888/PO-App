@@ -470,7 +470,15 @@ function getDefaultColumns_() {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : null;
+    if (Array.isArray(parsed)) return parsed;
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      (Array.isArray(parsed.order) || Array.isArray(parsed.visible))
+    ) {
+      return parsed;
+    }
+    return null;
   } catch (e) {
     return null;
   }
