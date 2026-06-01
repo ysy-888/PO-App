@@ -102,24 +102,50 @@ function focusPoSearch() {
   input.select();
 }
 
-function updateSearchInputState(input) {
+function updateSearchInputVisualState() {
+  const input = document.getElementById("searchInput");
+  const overlay = document.getElementById("searchInputOverlay");
   if (!input) return;
-  const hasText = input.value.trim().length > 0;
-  const showFilled = hasText && document.activeElement !== input;
-  input.classList.toggle("has-value", showFilled);
+
+  const isFocused = document.activeElement === input;
+  const q = input.value.trim();
+  const showCommitted = !isFocused && q.length > 0;
+
+  input.classList.toggle("has-value", showCommitted);
+  input.classList.toggle("search-applied", showCommitted);
+
+  if (!overlay) return;
+  if (showCommitted) {
+    overlay.classList.add("is-visible");
+    overlay.innerHTML = `<mark class="search-match search-input-match">${escapeHtml(q)}</mark>`;
+  } else {
+    overlay.classList.remove("is-visible");
+    overlay.innerHTML = "";
+  }
 }
 
 function initSearchInput() {
   const input = document.getElementById("searchInput");
   if (!input) return;
-  input.addEventListener("focus", () => input.classList.remove("has-value"));
-  input.addEventListener("blur", () => updateSearchInputState(input));
-  updateSearchInputState(input);
+
+  input.addEventListener("focus", () => {
+    input.classList.remove("has-value", "search-applied");
+    const overlay = document.getElementById("searchInputOverlay");
+    overlay?.classList.remove("is-visible");
+    if (overlay) overlay.innerHTML = "";
+  });
+
+  input.addEventListener("blur", () => commitPoSearch());
+
+  input.addEventListener("search", () => commitPoSearch());
+
   input.addEventListener("keydown", e => {
     if (e.key !== "Enter") return;
     e.preventDefault();
     input.blur();
   });
+
+  updateSearchInputVisualState();
 }
 
 function initToolbarKeyboard() {

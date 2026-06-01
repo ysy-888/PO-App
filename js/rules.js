@@ -1,12 +1,38 @@
 const STYLE_PHOTO_FIELDS = ["Style Photo 1", "Style Photo 2"];
 
+/** Convert share links (Google Drive, Dropbox) into URLs browsers can load in img tags. */
+function normalizeStylePhotoUrl(url) {
+  let s = String(url ?? "").trim();
+  if (!s) return "";
+  if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
+    s = s.slice(1, -1).trim();
+  }
+
+  const driveFileMatch = /drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/i.exec(s);
+  if (driveFileMatch) {
+    return `https://drive.google.com/thumbnail?id=${driveFileMatch[1]}&sz=w1000`;
+  }
+  const driveOpenMatch = /drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/i.exec(s);
+  if (driveOpenMatch) {
+    return `https://drive.google.com/thumbnail?id=${driveOpenMatch[1]}&sz=w1000`;
+  }
+  const driveUcMatch = /drive\.google\.com\/uc(?:\?[^#]*)?[&?]id=([a-zA-Z0-9_-]+)/i.exec(s);
+  if (driveUcMatch) {
+    return `https://drive.google.com/thumbnail?id=${driveUcMatch[1]}&sz=w1000`;
+  }
+  if (/dropbox\.com/i.test(s) && !/[?&](?:raw=1|dl=1)(?:&|$)/i.test(s)) {
+    const base = s.replace(/[?&]dl=0(?:&|$)/, "").replace(/[?&]$/, "");
+    return `${base}${base.includes("?") ? "&" : "?"}raw=1`;
+  }
+  return s;
+}
+
 const EDITABLE = new Set([
   "Flag",
   "Status","N41 Status","Ship Method",
   "IHD","EST EXF","CXL Date","Assign Date","Notes",
   "FOB Cost","Price","PO Total Cost","OG","PROTO","FIT/PP","BULK","TOP","TRIM",
   "Received Qty",
-  ...STYLE_PHOTO_FIELDS,
 ]);
 
 /** Set on PO sheet; values come from the linked shipment. */
@@ -135,7 +161,6 @@ const APPS_SCRIPT_EDITABLE_PO_FIELDS = new Set([
   "FOB Cost", "Price", "PO Total Cost",
   "Received Qty", "Style Category",
   "OG", "PROTO", "FIT/PP", "BULK", "TOP", "TRIM",
-  ...STYLE_PHOTO_FIELDS,
   ...PO_UNIT_FIELDS,
 ]);
 

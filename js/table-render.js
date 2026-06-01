@@ -216,7 +216,8 @@ function renderTable() {
 
         td.className = "readonly readonly-no-select";
 
-        setDisplayText(td, isTruthy(row[col]) ? "Yes" : EMPTY_DISPLAY);
+        const exfDisplay = isTruthy(row[col]) ? "Yes" : EMPTY_DISPLAY;
+        mountSearchHighlightedText(td, exfDisplay, isTruthy(row[col]) ? "Yes" : row[col]);
 
         tr.appendChild(td);
 
@@ -296,9 +297,7 @@ function renderTable() {
 
       } else {
 
-        td.textContent = val;
-
-        td.classList.remove("empty-display");
+        mountSearchHighlightedText(td, val, val);
 
       }
 
@@ -350,7 +349,7 @@ function renderStatus(val) {
 
   const cls = STATUS_BADGE[val] || "badge-cancelled";
 
-  return `<span class="badge ${cls}">${escapeHtml(val)}</span>`;
+  return `<span class="badge ${cls}">${getSearchHighlightedFragment(val, val)}</span>`;
 
 }
 
@@ -420,7 +419,13 @@ function mountCopyableText(container, col, rawVal) {
 
   span.className = "copyable-text";
 
-  span.textContent = text;
+  const q = (activeSearchQuery ?? "").trim();
+  const hay = String(rawVal ?? "").toLowerCase();
+  if (q && hay.includes(q.toLowerCase())) {
+    span.innerHTML = getSearchHighlightedFragment(text, rawVal);
+  } else {
+    span.textContent = text;
+  }
 
   span.title = "Right-click to copy";
 

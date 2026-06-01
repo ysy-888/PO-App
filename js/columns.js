@@ -3,6 +3,58 @@ function setDisplayText(el, text) {
   el.classList.toggle("empty-display", text === EMPTY_DISPLAY);
 }
 
+function buildSearchHighlightedHtml(text, query) {
+  const str = String(text ?? "");
+  const q = String(query ?? "").trim();
+  if (!q) return escapeHtml(str);
+
+  const lowerStr = str.toLowerCase();
+  const lowerQ = q.toLowerCase();
+  if (!lowerStr.includes(lowerQ)) return escapeHtml(str);
+
+  let html = "";
+  let start = 0;
+  let idx = lowerStr.indexOf(lowerQ, start);
+  while (idx !== -1) {
+    html += escapeHtml(str.slice(start, idx));
+    html += `<mark class="search-match">${escapeHtml(str.slice(idx, idx + q.length))}</mark>`;
+    start = idx + q.length;
+    idx = lowerStr.indexOf(lowerQ, start);
+  }
+  html += escapeHtml(str.slice(start));
+  return html;
+}
+
+function getSearchHighlightedFragment(displayText, searchableText) {
+  const display = String(displayText ?? "");
+  const q = (activeSearchQuery ?? "").trim();
+  if (!q) return escapeHtml(display);
+
+  const hay = String(searchableText ?? display).toLowerCase();
+  if (!hay.includes(q.toLowerCase())) return escapeHtml(display);
+  if (display.toLowerCase().includes(q.toLowerCase())) return buildSearchHighlightedHtml(display, q);
+  return `<mark class="search-match">${escapeHtml(display)}</mark>`;
+}
+
+function mountSearchHighlightedText(el, displayText, searchableText) {
+  if (displayText === EMPTY_DISPLAY || isEmptyValue(displayText)) {
+    setDisplayText(el, EMPTY_DISPLAY);
+    return;
+  }
+  const q = (activeSearchQuery ?? "").trim();
+  if (!q) {
+    setDisplayText(el, displayText);
+    return;
+  }
+  const hay = String(searchableText ?? displayText).toLowerCase();
+  if (!hay.includes(q.toLowerCase())) {
+    setDisplayText(el, displayText);
+    return;
+  }
+  el.classList.remove("empty-display");
+  el.innerHTML = getSearchHighlightedFragment(displayText, searchableText);
+}
+
 function wrapEditablePreview(cell) {
   if (!cell || cell.classList.contains("select-cell") || cell.dataset.editing === "active") return;
   if (cell.querySelector(":scope > .editable-preview")) return;

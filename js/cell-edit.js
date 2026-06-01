@@ -245,9 +245,6 @@ function refreshAfterModalFieldEdit(fieldEl, col, row) {
 }
 
 function commitActiveModalEditor() {
-  if (typeof commitActiveStylePhotoEditor === "function") {
-    commitActiveStylePhotoEditor();
-  }
   const active = document.querySelector("#modalOverlay .modal-field-value[data-editing='active']");
   if (!active || !modalRow) return;
   const input = active.querySelector(".cell-input, .cell-textarea");

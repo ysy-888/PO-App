@@ -10,6 +10,7 @@ const PICKUP_REQUESTS_SHEET_NAME = "Pickup Requests";
 const CHARGEBACKS_SHEET_NAME = "Chargebacks";
 const PACKING_LISTS_SHEET_NAME = "Packing Lists";
 const PACKING_CARTONS_SHEET_NAME = "Packing List Cartons";
+const STYLE_PHOTOS_SHEET_NAME = "Style Photos";
 const COLUMN_DEFAULT_KEY = "defaultVisibleColumns";
 const STATUS_DEFAULT_KEY = "defaultStatusFilter";
 const SHIPMENT_ID_FIELD = "Shipment ID";
@@ -46,6 +47,9 @@ const PICKUP_REQ_NOTES_FIELD = "Pickup Req Notes";
 
 /*
   POs sheet row 1 headers (see po-table.js COLUMNS). Add columns: Shipment ID, EXF Request Date, EXF Memo
+
+  Style Photos sheet row 1 headers (auto-created if missing):
+    Style #, Color, Style Photo 1, Style Photo 2
 
   Shipments sheet row 1 headers (auto-created if missing):
     Shipment ID, Ship Method, Vessel, House #, EXF, Shipped, ETD, ETA, IHD, Notes
@@ -95,7 +99,6 @@ const EDITABLE_FIELDS = [
   PICKUP_REQUEST_ID_FIELD, PICKUP_REQUESTED_FIELD, PICKUP_DATE_FIELD, PICKUP_REQ_DATE_FIELD,
   "FOB Cost", "Price", "PO Total Cost",
   "Received Qty", "Style Category",
-  "Style Photo 1", "Style Photo 2",
   "OG", "PROTO", "FIT/PP", "BULK", "TOP", "TRIM",
   "PO Unit 1", "PO Unit 2", "PO Unit 3", "PO Unit 4", "PO Unit 5",
   "PO Unit 6", "PO Unit 7", "PO Unit 8", "PO Unit 9", "PO Unit 10",
@@ -195,7 +198,6 @@ function ensurePoWorkflowHeaders_() {
     // Pickup
     PICKUP_DATE_FIELD, PICKUP_REQ_DATE_FIELD, PICKUP_REQUESTED_FIELD, PICKUP_REQUEST_ID_FIELD,
     "Has Packing List",
-    "Style Photo 1", "Style Photo 2",
   ]);
   return sheet;
 }
@@ -284,6 +286,100 @@ function getPackingCartonsSheet_() {
   }
   ensureSheetHeaders_(sheet, PACKING_CARTON_DATA_FIELDS);
   return sheet;
+}
+
+function getStylePhotosSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(STYLE_PHOTOS_SHEET_NAME);
+  const headers = ["Style #", "Color", "Style Photo 1", "Style Photo 2"];
+  if (!sheet) {
+    sheet = ss.insertSheet(STYLE_PHOTOS_SHEET_NAME);
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+  ensureSheetHeaders_(sheet, headers);
+  return sheet;
+}
+
+function normalizeStylePhotoUrl_(url) {
+  let s = String(url ?? "").trim();
+  if (!s) return "";
+  if ((s.charAt(0) === '"' && s.charAt(s.length - 1) === '"')
+    || (s.charAt(0) === "'" && s.charAt(s.length - 1) === "'")) {
+    s = s.slice(1, -1).trim();
+  }
+  var fileIdMatch = /drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/i.exec(s);
+  if (fileIdMatch) {
+    return "https://drive.google.com/thumbnail?id=" + fileIdMatch[1] + "&sz=w1000";
+  }
+  var openIdMatch = /drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/i.exec(s);
+  if (openIdMatch) {
+    return "https://drive.google.com/thumbnail?id=" + openIdMatch[1] + "&sz=w1000";
+  }
+  var ucIdMatch = /drive\.google\.com\/uc(?:\?[^#]*)?[&?]id=([a-zA-Z0-9_-]+)/i.exec(s);
+  if (ucIdMatch) {
+    return "https://drive.google.com/thumbnail?id=" + ucIdMatch[1] + "&sz=w1000";
+  }
+  if (/dropbox\.com/i.test(s) && !/[?&](?:raw=1|dl=1)(?:&|$)/i.test(s)) {
+    var base = s.replace(/[?&]dl=0(?:&|$)/, "").replace(/[?&]$/, "");
+    return base + (base.indexOf("?") === -1 ? "?" : "&") + "raw=1";
+  }
+  return s;
+}
+
+function readUrlCellValue_(sheet, rowIndex, colIndex) {
+  var range = sheet.getRange(rowIndex, colIndex);
+  var rich = range.getRichTextValue();
+  if (rich) {
+    var cellLink = rich.getLinkUrl();
+    if (cellLink) return normalizeStylePhotoUrl_(String(cellLink).trim());
+    var runs = rich.getRuns();
+    for (var i = 0; i < runs.length; i++) {
+      var linkUrl = runs[i].getLinkUrl();
+      if (linkUrl) return normalizeStylePhotoUrl_(String(linkUrl).trim());
+    }
+  }
+  var formula = String(range.getFormula() || "").trim();
+  if (formula) {
+    var hyperlinkMatch = /^=HYPERLINK\s*\(\s*"((?:[^"\\]|\\.)*)"/i.exec(formula);
+    if (hyperlinkMatch) {
+      return normalizeStylePhotoUrl_(hyperlinkMatch[1].replace(/\\"/g, '"').trim());
+    }
+    var imageMatch = /^=IMAGE\s*\(\s*"((?:[^"\\]|\\.)*)"/i.exec(formula);
+    if (imageMatch) {
+      return normalizeStylePhotoUrl_(imageMatch[1].replace(/\\"/g, '"').trim());
+    }
+  }
+  return normalizeStylePhotoUrl_(String(range.getDisplayValue() ?? "").trim());
+}
+
+function stylePhotosSheetToObjects_(sheet) {
+  var lastRow = sheet.getLastRow();
+  var lastCol = sheet.getLastColumn();
+  if (lastRow < 2 || lastCol < 1) return [];
+  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0]
+    .map(function(h) { return String(h ?? "").trim(); });
+  var styleCol = headers.indexOf("Style #");
+  var colorCol = headers.indexOf("Color");
+  if (styleCol === -1 || colorCol === -1) return [];
+
+  var photoColByField = {};
+  ["Style Photo 1", "Style Photo 2"].forEach(function(field) {
+    var idx = headers.indexOf(field);
+    if (idx !== -1) photoColByField[field] = idx + 1;
+  });
+
+  var result = [];
+  for (var rowIndex = 2; rowIndex <= lastRow; rowIndex++) {
+    var styleNum = String(sheet.getRange(rowIndex, styleCol + 1).getDisplayValue() ?? "").trim();
+    var color = String(sheet.getRange(rowIndex, colorCol + 1).getDisplayValue() ?? "").trim();
+    if (!styleNum || !color) continue;
+    var obj = { "Style #": styleNum, "Color": color, _rowIndex: rowIndex };
+    Object.keys(photoColByField).forEach(function(field) {
+      obj[field] = readUrlCellValue_(sheet, rowIndex, photoColByField[field]);
+    });
+    result.push(obj);
+  }
+  return result;
 }
 
 function corsResponse(data) {
@@ -2967,6 +3063,7 @@ function doGet(e) {
     const chargebacksSheet = getChargebacksSheet_();
     const packingListsSheet = getPackingListsSheet_();
     const packingCartonsSheet = getPackingCartonsSheet_();
+    const stylePhotosSheet = getStylePhotosSheet_();
     const data = sheetToObjects_(poSheet, "PO #");
     const shipments = sheetToObjects_(shipmentsSheet, SHIPMENT_ID_FIELD);
     const exfRequests = sheetToObjects_(exfRequestsSheet, EXF_REQUEST_ID_FIELD);
@@ -2978,6 +3075,7 @@ function doGet(e) {
     const chargebacks = sheetToObjects_(chargebacksSheet, CHARGEBACK_ID_FIELD);
     const packingLists = sheetToObjects_(packingListsSheet, PACKING_LIST_ID_FIELD);
     const packingCartons = sheetToObjects_(packingCartonsSheet, PACKING_LIST_ID_FIELD);
+    const stylePhotos = stylePhotosSheetToObjects_(stylePhotosSheet);
 
     return corsResponse({
       success: true,
@@ -2994,6 +3092,7 @@ function doGet(e) {
       chargebacks: chargebacks,
       packingLists: packingLists,
       packingCartons: packingCartons,
+      stylePhotos: stylePhotos,
       defaultColumns: getDefaultColumns_(),
       defaultStatusFilter: getDefaultStatusFilter_(),
     });

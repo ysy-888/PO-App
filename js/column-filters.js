@@ -388,10 +388,13 @@ function getCxlProximityLevel(ihdYmd, cxlYmd) {
   return null;
 }
 
-function renderCountdownDateMarkup(display, countdownLabel, dateClasses) {
+function renderCountdownDateMarkup(display, countdownLabel, dateClasses, searchableText) {
+  const dateHtml = searchableText != null
+    ? getSearchHighlightedFragment(display, searchableText)
+    : escapeHtml(display);
   return (
     `<span class="cxl-countdown-stack">` +
-    `<span class="${dateClasses.join(" ")}">${escapeHtml(display)}</span>` +
+    `<span class="${dateClasses.join(" ")}">${dateHtml}</span>` +
     (countdownLabel ? `<span class="cxl-countdown-label">${escapeHtml(countdownLabel)}</span>` : "") +
     `</span>`
   );
@@ -446,20 +449,30 @@ function applyDateCellDisplay(el, col, row, { context = "table" } = {}) {
     if (countdownLabel || days === 0) {
       el.classList.add("date-countdown-cell");
       el.classList.remove("empty-display");
-      el.innerHTML = renderCountdownDateMarkup(display, countdownLabel, dateClasses);
+      el.innerHTML = renderCountdownDateMarkup(
+        display,
+        countdownLabel,
+        dateClasses,
+        context === "table" ? rawVal : null
+      );
       return;
     }
   }
 
   if (context === "table" && proximity) {
     el.classList.remove("empty-display");
-    el.innerHTML = `<span class="date-display date-proximity-${proximity}">${escapeHtml(display)}</span>`;
+    el.innerHTML = `<span class="date-display date-proximity-${proximity}">${getSearchHighlightedFragment(display, rawVal)}</span>`;
     return;
   }
 
   if (context === "modal" && proximity) {
     el.classList.remove("empty-display");
     el.innerHTML = `<span class="date-display date-proximity-${proximity}">${escapeHtml(display)}</span>`;
+    return;
+  }
+
+  if (context === "table") {
+    mountSearchHighlightedText(el, display, rawVal);
     return;
   }
 

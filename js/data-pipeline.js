@@ -29,6 +29,7 @@ async function loadData() {
         onAsnRequestsDataLoaded([]);
         window.__pendingAsnRequests = null;
       }
+      buildStylePhotoIndex(DEMO_STYLE_PHOTOS);
     } else {
       const url = new URL(getAppsScriptUrl());
       url.searchParams.set("_", String(Date.now()));
@@ -43,6 +44,7 @@ async function loadData() {
       allContactRows = json.contacts ?? json.vendors ?? [];
       allVendorEmailRows = allContactRows;
       allLocationRows = json.locations ?? [];
+      buildStylePhotoIndex(json.stylePhotos ?? []);
       window.__pendingShipments = json.shipments ?? [];
       window.__pendingExfRequests = json.exfRequests ?? [];
       window.__pendingAsnRequests = json.asnRequests ?? [];
@@ -146,15 +148,17 @@ function compareRowsForSort(a, b) {
   return 0;
 }
 
-let searchDebounceTimer;
-/** Debounced entry point for the search box to avoid filtering on every keystroke. */
-function scheduleApplyFilters() {
-  clearTimeout(searchDebounceTimer);
-  searchDebounceTimer = setTimeout(applyFilters, 150);
+let activeSearchQuery = "";
+
+function commitPoSearch() {
+  const input = document.getElementById("searchInput");
+  activeSearchQuery = (input?.value ?? "").trim().toLowerCase();
+  applyFilters();
+  if (typeof updateSearchInputVisualState === "function") updateSearchInputVisualState();
 }
 
 function applyFilters() {
-  const q = document.getElementById("searchInput").value.toLowerCase();
+  const q = activeSearchQuery;
   const div = activeDivision;
   filteredRows = allRows.filter(row => {
     if (div && row["Division"] !== div) return false;

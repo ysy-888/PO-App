@@ -1266,35 +1266,57 @@ function createModalStylePhotosColumn(row) {
   return wrap;
 }
 
-function getStylePhotoUrl(row, field) {
-  return String(row?.[field] ?? "").trim();
-}
-
 function isStylePhotoUrl(url) {
   return /^https?:\/\/.+/i.test(url);
 }
 
-function renderStylePhotoSlot(photoEl, field, row) {
-  const url = getStylePhotoUrl(row, field);
-  const photoIndex = STYLE_PHOTO_FIELDS.indexOf(field) + 1;
+function getStylePhotoMaxDimensions(contextEl) {
+  const style = getComputedStyle(contextEl || document.getElementById("modalOverlay") || document.documentElement);
+  const maxW = parseFloat(style.getPropertyValue("--po-modal-photo-max-width")) || 204;
+  const maxH = parseFloat(style.getPropertyValue("--po-modal-photo-max-height")) || 340;
+  return { maxW, maxH };
+}
 
+function applyStylePhotoImageSize(img) {
+  const { maxW, maxH } = getStylePhotoMaxDimensions(img);
+  const naturalW = img.naturalWidth;
+  const naturalH = img.naturalHeight;
+  if (!naturalW || !naturalH) return;
+
+  const scale = Math.min(1, maxW / naturalW, maxH / naturalH);
+  img.style.width = `${Math.round(naturalW * scale)}px`;
+  img.style.height = `${Math.round(naturalH * scale)}px`;
+}
+
+function bindStylePhotoImageSizing(img) {
+  const apply = () => applyStylePhotoImageSize(img);
+  if (img.complete && img.naturalWidth) {
+    apply();
+    return;
+  }
+  img.addEventListener("load", apply, { once: true });
+}
+
+function renderStylePhotoSlot(photoEl, url, photoIndex) {
   photoEl.innerHTML = "";
-  photoEl.classList.remove("modal-style-photo--has-image", "modal-style-photo--error", "editing");
-  delete photoEl.dataset.editing;
+  photoEl.classList.remove("modal-style-photo--has-image", "modal-style-photo--error");
 
-  if (isStylePhotoUrl(url)) {
+  const normalizedUrl = normalizeStylePhotoUrl(url);
+  const openUrl = String(url ?? "").trim() || normalizedUrl;
+
+  if (isStylePhotoUrl(normalizedUrl)) {
     photoEl.classList.add("modal-style-photo--has-image");
     const img = document.createElement("img");
     img.className = "modal-style-photo-img";
-    img.src = url;
+    img.src = normalizedUrl;
     img.alt = `Style photo ${photoIndex}`;
     img.loading = "lazy";
-    img.referrerPolicy = "no-referrer";
     img.title = "Open in new tab";
     img.addEventListener("click", e => {
       e.stopPropagation();
-      window.open(url, "_blank", "noopener,noreferrer");
+      window.open(openUrl, "_blank", "noopener,noreferrer");
     });
+    bindStylePhotoImageSizing(img);
     img.addEventListener("error", () => {
       photoEl.classList.remove("modal-style-photo--has-image");
       photoEl.classList.add("modal-style-photo--error");
@@ -1303,6 +1325,12 @@ function renderStylePhotoSlot(photoEl, field, row) {
       label.className = "modal-style-photo-label";
       label.textContent = "Image unavailable";
       photoEl.appendChild(label);
+      if (openUrl && openUrl !== normalizedUrl) {
+        photoEl.title = "Open original link";
+        photoEl.addEventListener("click", () => {
+          window.open(openUrl, "_blank", "noopener,noreferrer");
+        }, { once: true });
+      }
     });
     photoEl.appendChild(img);
     return;
@@ -1310,99 +1338,20 @@ function renderStylePhotoSlot(photoEl, field, row) {
 
   const label = document.createElement("span");
   label.className = "modal-style-photo-label";
-  label.textContent = url ? "Invalid URL" : `Photo ${photoIndex}`;
+  label.textContent = `Photo ${photoIndex}`;
   photoEl.appendChild(label);
 }
 
-function bindStylePhotoSlot(photoEl, field, row) {
-  photoEl.dataset.col = field;
-
-  if (!isPoFieldEditable(field, row)) {
-    photoEl.classList.add("readonly");
-    return;
-  }
-
-  photoEl.classList.add("editable");
-  photoEl.title = "Click to edit URL";
-  photoEl.addEventListener("click", e => {
-    if (photoEl.dataset.editing === "active") return;
-    if (e.target.classList.contains("modal-style-photo-img")) return;
-    e.stopPropagation();
-    mountStylePhotoEditor(photoEl, field, row);
-  });
-}
-
-function mountStylePhotoEditor(photoEl, field, row) {
-  if (isAppSaving() || !isPoFieldEditable(field, row)) return;
-  if (photoEl.dataset.editing === "active") return;
-
-  const originalVal = row[field] ?? "";
-  const input = createCellInput(field, originalVal);
-
-  photoEl.innerHTML = "";
-  photoEl.appendChild(input);
-  photoEl.classList.add("editing");
-  photoEl.dataset.editing = "active";
-
-  function finishEdit() {
-    delete photoEl.dataset.editing;
-    photoEl.classList.remove("editing");
-    renderStylePhotoSlot(photoEl, field, row);
-    updateModalSaveState();
-  }
-
-  function commit() {
-    const newVal = input.value.trim();
-    if (String(originalVal ?? "").trim() !== newVal) {
-      row[field] = newVal;
-    }
-    finishEdit();
-  }
-
-  function cancelEdit() {
-    finishEdit();
-  }
-
-  input.onblur = commit;
-  input.onkeydown = e => {
-    if (e.key === "Escape") {
-      e.preventDefault();
-      cancelEdit();
-    }
-    if (e.key === "Enter") {
-      e.preventDefault();
-      input.blur();
-    }
-  };
-  input.focus();
-  input.select();
-}
-
-function commitActiveStylePhotoEditor() {
-  const active = document.querySelector("#modalOverlay .modal-style-photo[data-editing='active']");
-  if (!active || !modalRow) return;
-  const input = active.querySelector(".cell-input");
-  if (!input) return;
-  const col = active.dataset.col;
-  if (!col) return;
-
-  input.onblur = null;
-  modalRow[col] = input.value.trim();
-  renderStylePhotoSlot(active, col, modalRow);
-  delete active.dataset.editing;
-  active.classList.remove("editing");
-}
-
 function createModalStylePhotos(row) {
+  const stylePhotos = getStylePhotosForRow(row);
   const wrap = document.createElement("div");
   wrap.className = "modal-style-photos";
 
-  STYLE_PHOTO_FIELDS.forEach(field => {
+  STYLE_PHOTO_FIELDS.forEach((field, index) => {
     const photo = document.createElement("div");
     photo.className = "modal-style-photo";
     photo.setAttribute("aria-label", field);
-    renderStylePhotoSlot(photo, field, row);
-    bindStylePhotoSlot(photo, field, row);
+    renderStylePhotoSlot(photo, stylePhotos?.[field] ?? "", index + 1);
     wrap.appendChild(photo);
   });
 

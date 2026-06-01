@@ -245,8 +245,57 @@ input[type="search"]:focus { border-color: var(--accent); background: #fff; }
 }
 
 #searchInput.has-value {
-  font-weight: 600;
   background: #fff;
+}
+
+#searchInput.search-applied {
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  caret-color: var(--text);
+  background: #fff;
+}
+
+.search-input-overlay {
+  position: absolute;
+  left: 32px;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  overflow: hidden;
+  white-space: nowrap;
+  font-family: var(--font);
+  font-size: 13px;
+  line-height: 1.2;
+  visibility: hidden;
+}
+
+.search-input-overlay.is-visible {
+  visibility: visible;
+}
+
+mark.search-match.search-input-match {
+  padding: 2px 4px;
+}
+
+mark.search-match {
+  background: rgba(255, 200, 64, 0.65);
+  color: inherit;
+  font-weight: 600;
+  padding: 0 3px;
+  margin: 0 -1px;
+  border-radius: 3px;
+  box-shadow:
+    0 0 5px rgba(255, 149, 0, 0.95),
+    0 0 12px rgba(255, 176, 32, 0.7),
+    inset 0 0 8px rgba(255, 220, 96, 0.45);
+  outline: 1px solid rgba(255, 130, 0, 0.75);
+}
+
+.badge mark.search-match {
+  background: rgba(255, 200, 64, 0.72);
+  color: inherit;
+  font-weight: 600;
 }
 
 select.filter-select {
@@ -2080,12 +2129,17 @@ td.editable:not(.select-cell):hover .editable-preview {
 }
 
 #modalOverlay .modal-layout-photos .modal-style-photos {
-  width: calc(168px * 2 + 8px);
+  width: max-content;
   gap: 8px;
 }
 
-#modalOverlay .modal-layout-photos .modal-style-photo {
+#modalOverlay .modal-layout-photos .modal-style-photo:not(.modal-style-photo--has-image) {
   width: 168px;
+}
+
+#modalOverlay .modal-layout-photos {
+  --po-modal-photo-max-width: 168px;
+  --po-modal-photo-max-height: 280px;
 }
 
 #modalOverlay .modal-field--long {
@@ -2116,6 +2170,8 @@ td.editable:not(.select-cell):hover .editable-preview {
   --modal-field-height: 34px;
   --po-modal-content-width: 900px;
   --po-modal-photo-width: 142px;
+  --po-modal-photo-max-width: 204px;
+  --po-modal-photo-max-height: 340px;
   --po-modal-section-gap: 12px;
 }
 
@@ -2337,11 +2393,11 @@ td.editable:not(.select-cell):hover .editable-preview {
 
 .modal-layout-photos .modal-style-photos {
   flex-direction: row;
-  width: calc(204px * 2 + 10px);
+  width: max-content;
   gap: 10px;
 }
 
-.modal-layout-photos .modal-style-photo {
+.modal-layout-photos .modal-style-photo:not(.modal-style-photo--has-image) {
   width: 204px;
 }
 
@@ -2933,11 +2989,13 @@ td.editable:not(.select-cell):hover .editable-preview {
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 14px 16px;
+  --po-modal-photo-max-width: 142px;
+  --po-modal-photo-max-height: 220px;
 }
 
 .modal-style-section-grid {
   display: grid;
-  grid-template-columns: 168px max-content calc((var(--po-modal-photo-width) * 2) + 8px);
+  grid-template-columns: 168px max-content max-content;
   justify-content: space-between;
   column-gap: var(--po-modal-section-gap);
   row-gap: 0;
@@ -2956,28 +3014,19 @@ td.editable:not(.select-cell):hover .editable-preview {
 }
 
 #modalOverlay .modal-block--style-full .modal-style-photos-column {
-  width: calc((var(--po-modal-photo-width) * 2) + 8px);
+  width: max-content;
   align-self: center;
 }
 
 #modalOverlay .modal-block--style-full .modal-style-photos {
   flex-direction: row;
-  width: 100%;
+  width: max-content;
   gap: 8px;
   align-self: stretch;
 }
 
-#modalOverlay .modal-block--style-full .modal-style-photo {
+#modalOverlay .modal-block--style-full .modal-style-photo:not(.modal-style-photo--has-image) {
   width: var(--po-modal-photo-width);
-}
-
-#modalOverlay .modal-block--style-full .modal-style-photo--has-image,
-#modalOverlay .modal-block--style-full .modal-style-photo.editing {
-  padding: 0;
-}
-
-#modalOverlay .modal-block--style-full .modal-style-photo.editing {
-  padding: 4px;
 }
 
 #modalOverlay .modal-block--chargebacks,
@@ -3892,45 +3941,41 @@ td.editable:not(.select-cell):hover .editable-preview {
 }
 
 .modal-style-photo--has-image {
-  border-style: solid;
+  width: fit-content;
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: auto;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
   padding: 0;
+  background: var(--bg);
+  overflow: visible;
+  display: block;
+  line-height: 0;
+  box-shadow:
+    0 0 0 1px rgba(15, 23, 42, 0.08),
+    0 1px 3px rgba(15, 23, 42, 0.06),
+    0 4px 12px rgba(15, 23, 42, 0.04);
 }
 
 .modal-style-photo--error {
   border-style: dashed;
 }
 
-.modal-style-photo.editable {
-  cursor: pointer;
-}
-
-.modal-style-photo.editable:hover {
-  border-color: var(--editable-hover-border);
-}
-
-.modal-style-photo.editing {
-  border-style: solid;
-  border-color: var(--accent);
-  background: var(--edit-bg);
-  padding: 4px;
-  cursor: text;
-}
-
-.modal-style-photo.editing .cell-input {
-  width: 100%;
-  height: 100%;
+.modal-style-photo--has-image .modal-style-photo-img {
+  width: auto;
+  height: auto;
+  max-width: var(--po-modal-photo-max-width, 204px);
+  max-height: var(--po-modal-photo-max-height, 340px);
+  object-fit: unset;
   border: none;
-  background: transparent;
-  font-size: 11px;
-  line-height: 1.3;
-  padding: 0;
-  resize: none;
+  outline: none;
+  border-radius: 7px;
+  box-shadow: none;
+  vertical-align: top;
 }
 
 .modal-style-photo-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
   display: block;
   cursor: pointer;
 }
