@@ -6,7 +6,7 @@ const DELIVERY_REQUEST_ID_FIELD = "Delivery Request ID";
 const PICKUP_REQUEST_ID_FIELD = "Pickup Request ID";
 
 const SHIPPED_GROUP_STATUSES = new Set([
-  "OTW", "Arrived at Port",
+  "OTW", "Arrived at Port", "Scheduled",
 ]);
 
 const DELIVERY_REQUEST_ELIGIBLE_STATUSES = new Set(["OTW", "Arrived at Port"]);

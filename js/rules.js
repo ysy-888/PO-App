@@ -85,6 +85,16 @@ function toQtyNumber(val) {
   return Number.isFinite(n) ? n : 0;
 }
 
+/** Block scientific-notation keys on type=number inputs (browsers allow e/E by default). */
+function bindNumberInput(input) {
+  input.addEventListener("keydown", e => {
+    if (e.key === "e" || e.key === "E") e.preventDefault();
+  });
+  input.addEventListener("beforeinput", e => {
+    if (e.data && /[eE]/.test(e.data)) e.preventDefault();
+  });
+}
+
 function sumUnitFields(row, fields) {
   return fields.reduce((sum, field) => sum + toQtyNumber(row[field]), 0);
 }

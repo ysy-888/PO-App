@@ -234,6 +234,7 @@ function buildSizeGridRow(chart, row, label, unitFields, colCount, rowType) {
     input.value = isEmptyValue(row[field]) ? "" : String(row[field]);
     input.dataset.field = field;
     input.dataset.rowType = rowType;
+    bindNumberInput(input);
     chart.appendChild(input);
   }
 
@@ -630,6 +631,7 @@ function createChargebackInput(field, value = "") {
     input.step = "0.01";
     input.inputMode = "decimal";
     input.value = isEmptyValue(value) ? "" : String(value);
+    bindNumberInput(input);
   } else {
     input = document.createElement("input");
     input.type = "text";
@@ -924,6 +926,7 @@ function createPackingListEditor(row, packingList, sourceCartons) {
   countInput.className = "packing-list-count-input";
   countInput.value = String(initialCount);
   countInput.setAttribute("aria-label", "Carton count");
+  bindNumberInput(countInput);
 
   const countIncrease = document.createElement("button");
   countIncrease.type = "button";
@@ -1037,6 +1040,7 @@ function createPackingListEditor(row, packingList, sourceCartons) {
         input.value = isEmptyValue(carton[field]) ? "" : String(carton[field]);
         input.dataset.cartonIndex = String(cartonIndex);
         input.dataset.field = field;
+        bindNumberInput(input);
         bodyGrid.appendChild(input);
       });
 
@@ -1058,6 +1062,7 @@ function createPackingListEditor(row, packingList, sourceCartons) {
       weightInput.value = isEmptyValue(carton[CARTON_WEIGHT_FIELD]) ? "" : String(carton[CARTON_WEIGHT_FIELD]);
       weightInput.dataset.cartonIndex = String(cartonIndex);
       weightInput.dataset.field = CARTON_WEIGHT_FIELD;
+      bindNumberInput(weightInput);
       const weightSuffix = document.createElement("span");
       weightSuffix.className = "packing-list-weight-suffix";
       weightSuffix.textContent = "lbs";
