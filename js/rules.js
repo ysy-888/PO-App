@@ -1,9 +1,12 @@
+const STYLE_PHOTO_FIELDS = ["Style Photo 1", "Style Photo 2"];
+
 const EDITABLE = new Set([
   "Flag",
   "Status","N41 Status","Ship Method",
   "IHD","EST EXF","CXL Date","Assign Date","Notes",
   "FOB Cost","Price","PO Total Cost","OG","PROTO","FIT/PP","BULK","TOP","TRIM",
   "Received Qty",
+  ...STYLE_PHOTO_FIELDS,
 ]);
 
 /** Set on PO sheet; values come from the linked shipment. */
@@ -116,8 +119,7 @@ function computeQtyVariancePercent(poQty, actualQty) {
 
 function formatQtyVariancePercent(value) {
   if (!Number.isFinite(value)) return EMPTY_DISPLAY;
-  const rounded = Math.round(value * 10) / 10;
-  return `${Number.isInteger(rounded) ? rounded : rounded.toFixed(1)}%`;
+  return `${Math.round(value)}%`;
 }
 
 /** Mirror apps-script.gs EDITABLE_FIELDS for PO update payloads. */
@@ -133,6 +135,7 @@ const APPS_SCRIPT_EDITABLE_PO_FIELDS = new Set([
   "FOB Cost", "Price", "PO Total Cost",
   "Received Qty", "Style Category",
   "OG", "PROTO", "FIT/PP", "BULK", "TOP", "TRIM",
+  ...STYLE_PHOTO_FIELDS,
   ...PO_UNIT_FIELDS,
 ]);
 

@@ -172,6 +172,21 @@ body.test-mode-active .app-header {
   line-height: 1;
 }
 
+.row-context-menu {
+  position: fixed;
+  z-index: 2000;
+  min-width: 160px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  padding: 4px 0;
+}
+
+.row-context-menu-item {
+  width: 100%;
+}
+
 /* ── Toolbar ── */
 .toolbar {
   padding: 12px 24px;
@@ -636,6 +651,20 @@ table {
 #exfRequestTable .exf-request-email-status-cell[data-status="failed"] {
   color: #b91c1c;
   font-weight: 600;
+}
+
+#exfRequestTable tbody tr.clickable-row,
+#asnRequestTable tbody tr.clickable-row,
+#deliveryRequestTable tbody tr.clickable-row,
+#pickupRequestTable tbody tr.clickable-row {
+  cursor: pointer;
+}
+
+#exfRequestTable tbody tr.clickable-row:hover td,
+#asnRequestTable tbody tr.clickable-row:hover td,
+#deliveryRequestTable tbody tr.clickable-row:hover td,
+#pickupRequestTable tbody tr.clickable-row:hover td {
+  background: var(--row-hover);
 }
 
 #chargebackTable .col-date,
@@ -1464,7 +1493,7 @@ td.readonly-no-select {
 }
 
 .copyable-text {
-  cursor: context-menu;
+  cursor: copy;
   user-select: none;
   -webkit-user-select: none;
 }
@@ -1986,7 +2015,8 @@ td.editable:not(.select-cell):hover .editable-preview {
 .col-ihd         { width: 80px; }
 .col-cxl         { width: 80px; }
 .col-assign      { width: 80px; }
-.col-notes       { width: 200px; }
+.col-exf-memo    { width: 120px; max-width: 120px; }
+.col-notes       { width: 240px; min-width: 240px; }
 
 /* Full-screen dark overlay */
 .modal-backdrop {
@@ -2460,8 +2490,8 @@ td.editable:not(.select-cell):hover .editable-preview {
   display: grid;
   grid-template-columns:
     var(--modal-size-rowhead-width)
-    repeat(var(--size-col-count), minmax(0, var(--modal-size-unit-width)))
-    var(--modal-size-total-width);
+    var(--modal-size-total-width)
+    repeat(var(--size-col-count), minmax(0, var(--modal-size-unit-width)));
   gap: 5px var(--modal-size-gap);
   align-items: center;
   width: max-content;
@@ -2502,7 +2532,7 @@ td.editable:not(.select-cell):hover .editable-preview {
   height: 28px;
   box-sizing: border-box;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: 4px;
   background: #fff;
   font-family: var(--font);
   font-size: 12px;
@@ -2520,7 +2550,7 @@ td.editable:not(.select-cell):hover .editable-preview {
   box-sizing: border-box;
   padding: 6px 4px;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: 4px;
   background: transparent;
   color: var(--text);
   font-family: var(--font);
@@ -2550,7 +2580,6 @@ td.editable:not(.select-cell):hover .editable-preview {
   outline: none;
   border-color: var(--accent);
   background: #fff;
-  box-shadow: 0 0 0 1px var(--accent);
 }
 
 .modal-size-input--variance-warn {
@@ -2569,14 +2598,41 @@ td.editable:not(.select-cell):hover .editable-preview {
 .modal-size-rowhead--variance,
 .modal-size-variance {
   padding-top: 2px;
-  font-size: 10px;
+  font-size: 9px;
   line-height: 1.2;
 }
 
 .modal-size-variance {
   min-width: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
   text-align: center;
-  font-weight: 700;
+  font-weight: 600;
+}
+
+.modal-size-variance-chevron {
+  flex: 0 0 auto;
+  width: 3px;
+  height: 3px;
+  border-right: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+  opacity: 0.85;
+}
+
+.modal-size-variance-chevron--up {
+  transform: rotate(-135deg);
+}
+
+.modal-size-variance-chevron--down {
+  transform: rotate(45deg);
+}
+
+.modal-size-variance-value {
+  flex: 0 0 auto;
+  line-height: 1;
 }
 
 .modal-size-variance--ok {
@@ -2584,7 +2640,8 @@ td.editable:not(.select-cell):hover .editable-preview {
 }
 
 .modal-size-variance--warn {
-  color: var(--danger);
+  color: #c48f8f;
+  font-weight: 600;
 }
 
 .modal-top-split {
@@ -2912,6 +2969,15 @@ td.editable:not(.select-cell):hover .editable-preview {
 
 #modalOverlay .modal-block--style-full .modal-style-photo {
   width: var(--po-modal-photo-width);
+}
+
+#modalOverlay .modal-block--style-full .modal-style-photo--has-image,
+#modalOverlay .modal-block--style-full .modal-style-photo.editing {
+  padding: 0;
+}
+
+#modalOverlay .modal-block--style-full .modal-style-photo.editing {
+  padding: 4px;
 }
 
 #modalOverlay .modal-block--chargebacks,
@@ -3385,6 +3451,7 @@ td.editable:not(.select-cell):hover .editable-preview {
   max-height: 480px;
   overflow-y: auto;
   overflow-x: visible;
+  scrollbar-gutter: stable;
 }
 
 .packing-list-grid {
@@ -3396,8 +3463,8 @@ td.editable:not(.select-cell):hover .editable-preview {
   display: grid;
   grid-template-columns:
     var(--packing-rowhead-width)
-    repeat(var(--size-col-count), var(--packing-unit-width))
     var(--packing-total-width)
+    repeat(var(--size-col-count), var(--packing-unit-width))
     var(--packing-weight-width);
   gap: 5px var(--packing-gap);
   align-items: center;
@@ -3406,8 +3473,12 @@ td.editable:not(.select-cell):hover .editable-preview {
 
 .packing-list-grid--head {
   flex-shrink: 0;
-  padding-bottom: 6px;
-  margin-bottom: 2px;
+}
+
+.packing-list-grid-divider--horizontal {
+  grid-column: 1 / -1;
+  height: 0;
+  margin: 4px 0 2px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -3446,47 +3517,69 @@ td.editable:not(.select-cell):hover .editable-preview {
 
 .packing-list-weight-field {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
-  gap: 1px;
   min-width: 0;
-  min-height: 28px;
-  padding-bottom: 4px;
+  height: 28px;
+  box-sizing: border-box;
 }
 
-.packing-list-weight-field .packing-list-weight-input {
+.packing-list-weight-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.packing-list-grid--body .packing-list-weight-field {
+  border-left: 1px solid var(--border);
+}
+
+.packing-list-weight-input {
   width: auto;
   flex: 0 1 auto;
-  min-width: 0;
-  max-width: 32px;
-  height: auto;
-  min-height: 0;
+  min-width: 1ch;
+  max-width: 28px;
+  height: 28px;
+  box-sizing: border-box;
   padding: 0;
-  font-size: 10px;
-  font-weight: 500;
-  line-height: 1;
+  margin: 0;
   border: none;
-  background: transparent;
   border-radius: 0;
+  background: transparent;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 28px;
+  text-align: right;
+  color: var(--text);
+  field-sizing: content;
+  -moz-appearance: textfield;
+  appearance: textfield;
 }
 
-.packing-list-weight-field .packing-list-weight-input:hover,
-.packing-list-weight-field .packing-list-weight-input:focus {
+.packing-list-weight-input::-webkit-outer-spin-button,
+.packing-list-weight-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+  display: none;
+}
+
+.packing-list-weight-input:hover,
+.packing-list-weight-input:focus {
   border: none;
   box-shadow: none;
   outline: none;
   background: transparent;
 }
 
-.packing-list-weight-field .packing-list-weight-input:focus {
-  box-shadow: inset 0 -1px 0 var(--accent);
-}
-
 .packing-list-weight-suffix {
   flex: 0 0 auto;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 500;
-  line-height: 1;
+  line-height: 28px;
   color: var(--text-muted);
   white-space: nowrap;
 }
@@ -3499,10 +3592,18 @@ td.editable:not(.select-cell):hover .editable-preview {
 .packing-list-totalhead,
 .packing-list-weighthead {
   min-width: 0;
+  box-sizing: border-box;
   text-align: center;
   font-size: 11px;
   font-weight: 700;
   color: var(--text);
+}
+
+.packing-list-totalhead {
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .packing-list-totalhead,
@@ -3538,6 +3639,16 @@ td.editable:not(.select-cell):hover .editable-preview {
   color: var(--text);
 }
 
+.packing-list-total-cell {
+  min-height: 28px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .packing-list-grand-total,
 .packing-list-row-total {
   min-height: 28px;
@@ -3555,7 +3666,7 @@ td.editable:not(.select-cell):hover .editable-preview {
   height: 28px;
   box-sizing: border-box;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: 4px;
   background: #fff;
   font-family: var(--font);
   font-size: 12px;
@@ -3582,7 +3693,6 @@ td.editable:not(.select-cell):hover .editable-preview {
 
 .packing-list-input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
   outline: none;
 }
 
@@ -3778,6 +3888,51 @@ td.editable:not(.select-cell):hover .editable-preview {
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
+}
+
+.modal-style-photo--has-image {
+  border-style: solid;
+  padding: 0;
+}
+
+.modal-style-photo--error {
+  border-style: dashed;
+}
+
+.modal-style-photo.editable {
+  cursor: pointer;
+}
+
+.modal-style-photo.editable:hover {
+  border-color: var(--editable-hover-border);
+}
+
+.modal-style-photo.editing {
+  border-style: solid;
+  border-color: var(--accent);
+  background: var(--edit-bg);
+  padding: 4px;
+  cursor: text;
+}
+
+.modal-style-photo.editing .cell-input {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  font-size: 11px;
+  line-height: 1.3;
+  padding: 0;
+  resize: none;
+}
+
+.modal-style-photo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  cursor: pointer;
 }
 
 .modal-style-photo-label {
@@ -3920,6 +4075,24 @@ td.editable:not(.select-cell):hover .editable-preview {
   padding-top: 12px;
   border-top: 1px solid var(--border);
   flex-shrink: 0;
+}
+
+#modalSaveBtn {
+  background: var(--text);
+  color: #fff;
+  border-color: var(--text);
+}
+
+#modalSaveBtn:hover:not(:disabled) {
+  background: #1a1a18;
+  border-color: #1a1a18;
+  color: #fff;
+}
+
+#modalSaveBtn:disabled {
+  background: var(--text);
+  color: #fff;
+  border-color: var(--text);
 }
 
 .shipment-modal-card {
@@ -4275,6 +4448,22 @@ td.editable:not(.select-cell):hover .editable-preview {
   white-space: nowrap;
 }
 
+.shipment-linked-po-table tbody tr.clickable-row,
+.request-linked-po-table tbody tr.clickable-row {
+  cursor: pointer;
+}
+
+.shipment-linked-po-table tbody tr.clickable-row:hover td,
+.request-linked-po-table tbody tr.clickable-row:hover td {
+  background: var(--row-hover);
+}
+
+.request-linked-po-table td.shipment-po-cell-id,
+.request-linked-po-table td.shipment-po-cell-id .shipment-linked-po-link,
+.request-linked-po-table th.shipment-po-cell-id {
+  font-weight: 600;
+}
+
 .shipment-linked-po-link {
   display: inline;
   border: none;
@@ -4352,7 +4541,14 @@ td.editable:not(.select-cell):hover .editable-preview {
 }
 
 .exf-request-linked-po-table col.shipment-po-col-notes {
-  width: auto;
+  width: 120px;
+  max-width: 120px;
+}
+
+.exf-request-linked-po-table th.shipment-po-cell-notes,
+.exf-request-linked-po-table td.shipment-po-cell-notes {
+  max-width: 120px;
+  width: 120px;
 }
 
 .exf-request-linked-po-table th.shipment-po-cell-buyer,
@@ -4365,11 +4561,11 @@ td.editable:not(.select-cell):hover .editable-preview {
   border-right: none;
 }
 
-.shipment-linked-po-table tbody tr {
+.shipment-linked-po-table tbody tr:not(.clickable-row) {
   cursor: default;
 }
 
-.shipment-linked-po-table tbody tr:hover td {
+.shipment-linked-po-table tbody tr:not(.clickable-row):hover td {
   background: transparent;
 }
 

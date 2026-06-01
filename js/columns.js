@@ -36,12 +36,12 @@ const COLUMNS = [
 const COLUMN_WIDTHS = [
   58, 36,
   130, 100, 120, 130, 120, 100, 80, 80, 80, 80, 100, 100, 100, 60, 60, 60, 70, 70, 80,
-  100, 80, 96, 80, 80, 80, 100, 36, 36,
-  72, 80, 80, 80,
+  100, 80, 96,   80, 80, 80, 100, 36, 36,
+  72, 80, 80, 120,
   72, 80, 80, 80,
   80, 80, 80, 100,
   80, 80, 80, 100,
-  80, 80, 80, 80, 80, 200
+  80, 80, 80, 80, 80, 240
 ];
 
 const COLUMN_LABELS = {
@@ -145,6 +145,46 @@ let columnOrder = [...COLUMNS];
 let columnOrderDraft = [...COLUMNS];
 /** @type {string[]} */
 const DEFAULT_COLUMN_ORDER = [...COLUMNS];
+
+const COLUMN_LAYOUT_STORAGE_BASE = "columnLayout";
+
+function hasStoredColumnLayout() {
+  try {
+    return Boolean(localStorage.getItem(scopedStorageKey(COLUMN_LAYOUT_STORAGE_BASE)));
+  } catch {
+    return false;
+  }
+}
+
+function saveColumnLayoutPreference() {
+  try {
+    localStorage.setItem(scopedStorageKey(COLUMN_LAYOUT_STORAGE_BASE), JSON.stringify({
+      order: getColumnOrder(),
+      visible: [...visibleColumns],
+    }));
+  } catch {
+    /* ignore storage failures */
+  }
+}
+
+function loadColumnLayoutPreference() {
+  try {
+    const raw = localStorage.getItem(scopedStorageKey(COLUMN_LAYOUT_STORAGE_BASE));
+    if (!raw) return false;
+    const data = JSON.parse(raw);
+    if (!data || typeof data !== "object") return false;
+    const order = Array.isArray(data.order) ? normalizeColumnOrder(data.order) : null;
+    const visibleList = Array.isArray(data.visible) ? data.visible : null;
+    if (!order || !visibleList || visibleList.length === 0) return false;
+    columnOrder = order;
+    visibleColumns = buildVisibleColumnsFromDraft(
+      new Set(visibleList.filter(col => COLUMNS.includes(col)))
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function getColumnOrder() {
   return columnOrder;
@@ -377,6 +417,7 @@ function setProgramDefaultLayout(order, visibleDraft) {
 }
 
 function loadColumnVisibility() {
+  if (loadColumnLayoutPreference()) return;
   columnOrder = normalizeColumnOrder([...DEFAULT_COLUMN_ORDER]);
   visibleColumns = getDefaultVisibleColumnsSet();
 }
@@ -401,10 +442,12 @@ function applyDefaultColumnsFromServer(data) {
     return false;
   }
 
-  columnOrder = normalizeColumnOrder([...DEFAULT_COLUMN_ORDER]);
-  visibleColumns = getDefaultVisibleColumnsSet();
-  applyColumnOrder();
-  applyColumnVisibility();
+  if (!hasStoredColumnLayout()) {
+    columnOrder = normalizeColumnOrder([...DEFAULT_COLUMN_ORDER]);
+    visibleColumns = getDefaultVisibleColumnsSet();
+    applyColumnOrder();
+    applyColumnVisibility();
+  }
   return true;
 }
 
@@ -415,6 +458,7 @@ async function saveDefaultColumnVisibility() {
   visibleColumns = getDefaultVisibleColumnsSet();
   applyColumnOrder();
   applyColumnVisibility();
+  saveColumnLayoutPreference();
   setProgramDefaultStatusFilter(activeStatus);
 
   if (isDemoMode()) {
@@ -646,6 +690,8 @@ function applyEditTableFromPopover() {
   visibleColumns = buildVisibleColumnsFromDraft(columnVisibilityDraft);
   applyColumnOrder();
   applyColumnVisibility();
+  saveColumnLayoutPreference();
+  if (typeof updateColumnFilterHeaderStates === "function") updateColumnFilterHeaderStates();
   closeEditTablePopover();
 }
 

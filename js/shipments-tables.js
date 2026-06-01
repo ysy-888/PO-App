@@ -593,6 +593,43 @@ function refreshShipmentsView() {
   refreshChargebacksView();
 }
 
+let pendingShipmentOrRequestCreateCount = 0;
+
+function beginToolbarCreatePending() {
+  pendingShipmentOrRequestCreateCount++;
+  updateToolbarRequestButtons();
+}
+
+function endToolbarCreatePending() {
+  pendingShipmentOrRequestCreateCount = Math.max(0, pendingShipmentOrRequestCreateCount - 1);
+  updateToolbarRequestButtons();
+}
+
+function isCreateShipmentModalOpen() {
+  return Boolean(document.getElementById("createShipmentOverlay")?.classList.contains("open"));
+}
+
+function isCreateRequestModalOpen() {
+  if (document.getElementById("exfRequestOverlay")?.classList.contains("open") && !exfRequestModalRow) return true;
+  if (document.getElementById("asnRequestOverlay")?.classList.contains("open") && !asnRequestModalRow) return true;
+  if (document.getElementById("deliveryRequestOverlay")?.classList.contains("open") && !deliveryRequestModalRow) return true;
+  if (document.getElementById("pickupRequestOverlay")?.classList.contains("open") && !pickupRequestModalRow) return true;
+  return false;
+}
+
+function isToolbarCreateActionBlocked() {
+  return pendingShipmentOrRequestCreateCount > 0 ||
+    isCreateShipmentModalOpen() ||
+    isCreateRequestModalOpen();
+}
+
+function hideToolbarCreateButtons() {
+  ["exfRequestBtn", "asnRequestBtn", "deliveryRequestBtn", "pickupRequestBtn", "createShipmentBtn"].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) btn.hidden = true;
+  });
+}
+
 function updateCreateShipmentButton() {
   const btn = document.getElementById("createShipmentBtn");
   if (!btn) return;
@@ -604,6 +641,10 @@ function updateCreateShipmentButton() {
 }
 
 function updateToolbarRequestButtons() {
+  if (isToolbarCreateActionBlocked()) {
+    hideToolbarCreateButtons();
+    return;
+  }
   if (typeof updateExfRequestButton === "function") updateExfRequestButton();
   if (typeof updateAsnRequestButton === "function") updateAsnRequestButton();
   if (typeof updateDeliveryRequestButton === "function") updateDeliveryRequestButton();

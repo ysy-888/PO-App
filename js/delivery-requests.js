@@ -30,6 +30,7 @@ let deliveryRequestDraftFrom = "";
 let deliveryRequestDraftTo = "";
 let deliveryRequestDraftNotes = "";
 let deliveryRequestModalRow = null;
+let deliveryRequestOpInProgress = false;
 
 function normalizeDeliveryRequest(row) {
   return { ...row };
@@ -131,13 +132,17 @@ function renderDeliveryRequestTable() {
       tr.appendChild(td);
     });
     tbody.appendChild(tr);
+    attachRequestTableRowDblClick(tr, () => {
+      const id = String(request[DELIVERY_REQUEST_ID_FIELD] ?? "").trim();
+      if (id) openDeliveryRequestDetail(id);
+    });
   });
   updateDeliveryRequestRowCounter();
 }
 
 async function resendDeliveryRequestEmail(requestId) {
-  if (isAppSaving() || !requestId) return;
-  setAppSaving(true, "Resending delivery email…");
+  if (deliveryRequestOpInProgress || !requestId) return;
+  deliveryRequestOpInProgress = true;
   showIndicator(`Resending delivery email${ELLIPSIS}`, "");
   try {
     if (isDemoMode()) {
@@ -151,7 +156,13 @@ async function resendDeliveryRequestEmail(requestId) {
     } else {
       const json = await postAppsScript({ action: "resendDeliveryRequestEmail", deliveryRequestId: requestId });
       if (!json.success) throw new Error(json.error);
-      await loadData();
+      const request = allDeliveryRequests.find(r => String(r[DELIVERY_REQUEST_ID_FIELD] ?? "").trim() === requestId);
+      if (request) {
+        request["Email Status"] = json.emailSent ? "Sent" : "Failed";
+        request["Email Error"] = json.emailError ?? "";
+        if (json.emailSent) request["Email Sent At"] = formatDateToYmd(new Date());
+        applyDeliveryRequestFilters();
+      }
       if (!json.emailSent) {
         showIndicator(`Delivery email not sent: ${json.emailError || "Missing email"}`, "error");
         return;
@@ -161,7 +172,7 @@ async function resendDeliveryRequestEmail(requestId) {
   } catch (err) {
     showIndicator("Resend failed: " + err.message, "error");
   } finally {
-    setAppSaving(false);
+    deliveryRequestOpInProgress = false;
   }
 }
 
@@ -197,7 +208,7 @@ function setDeliveryRequestFooterMessage(message = "") {
 }
 
 function openDeliveryRequestFromSelection() {
-  if (isAppSaving()) return;
+  if (isAppSaving() || isToolbarCreateActionBlocked()) return;
   const selected = getCheckedFilteredPos();
   if (!areRowsEligibleForDeliveryRequest(selected)) {
     showIndicator("Select Elevator Disco OTW or Arrived at Port POs with packing lists", "error");
@@ -216,12 +227,12 @@ function openDeliveryRequestFromSelection() {
 }
 
 function openDeliveryRequestDetail(id) {
+  if (isAppSaving()) return;
   const request = getDeliveryRequestById(id);
   if (!request) return;
   deliveryRequestModalRow = request;
-  deliveryRequestPoNumbers = allRows
-    .filter(row => String(row[DELIVERY_REQUEST_ID_FIELD] ?? "").trim() === String(id).trim())
-    .map(row => row["PO #"]);
+  deliveryRequestPoNumbers = getRequestPoNumbers(request, DELIVERY_REQUEST_ID_FIELD);
+  deliveryRequestAddPoPanelOpen = false;
   renderDeliveryRequestModal(deliveryRequestPoNumbers, request);
 }
 
@@ -246,22 +257,26 @@ function setDeliveryRequestModalAddPanelClass(body, isOpen) {
 function renderDeliveryRequestModal(poNumbers, request = {}) {
   const body = document.getElementById("deliveryRequestBody");
   const titleEl = document.getElementById("deliveryRequestModalTitle");
+  const submitBtn = document.getElementById("deliveryRequestSubmitBtn");
   if (!body) return;
 
   const pos = poNumbers
     .map(po => allRows.find(r => String(r["PO #"]) === String(po)))
     .filter(Boolean);
 
-  const isEdit = Boolean(request[DELIVERY_REQUEST_ID_FIELD]);
+  const activeRequest = request[DELIVERY_REQUEST_ID_FIELD] ? request : (deliveryRequestModalRow ?? request);
+  const isExisting = Boolean(activeRequest[DELIVERY_REQUEST_ID_FIELD]);
+  const isReadOnly = isExisting && isRequestEmailSent(activeRequest);
   if (titleEl) {
-    titleEl.textContent = isEdit
-      ? `Delivery Request ${request[DELIVERY_REQUEST_ID_FIELD]}`
+    titleEl.textContent = isExisting
+      ? `Delivery Request ${activeRequest[DELIVERY_REQUEST_ID_FIELD]}`
       : "Delivery Request";
   }
+  if (submitBtn) submitBtn.hidden = isReadOnly;
 
   const submitDate = formatDateToYmd(new Date());
-  const defaultFrom = isEdit ? (request["From"] ?? "") : (deliveryRequestDraftFrom || DEFAULT_WAREHOUSE_ENTITY);
-  const defaultTo = isEdit ? (request["To"] ?? "") : (deliveryRequestDraftTo || DEFAULT_DELIVERY_TO_ENTITY);
+  const defaultFrom = isExisting ? (activeRequest["From"] ?? "") : (deliveryRequestDraftFrom || DEFAULT_WAREHOUSE_ENTITY);
+  const defaultTo = isExisting ? (activeRequest["To"] ?? "") : (deliveryRequestDraftTo || DEFAULT_DELIVERY_TO_ENTITY);
 
   body.innerHTML = "";
   const outer = document.createElement("div");
@@ -277,37 +292,43 @@ function renderDeliveryRequestModal(poNumbers, request = {}) {
   form.id = "deliveryRequestForm";
 
   form.appendChild(createRequestFormField("Delivery Date", DELIVERY_DATE_FIELD,
-    isEdit ? (request[DELIVERY_DATE_FIELD] ?? "") : (deliveryRequestDraftDeliveryDate || ""),
-    { type: "date" }));
+    isExisting ? (activeRequest[DELIVERY_DATE_FIELD] ?? "") : (deliveryRequestDraftDeliveryDate || ""),
+    { type: "date", readOnly: isReadOnly }));
   form.appendChild(createRequestFormField("Request Date", DELIVERY_REQ_SUBMIT_DATE_FIELD,
-    isEdit ? (request[DELIVERY_REQ_SUBMIT_DATE_FIELD] ?? submitDate) : submitDate,
+    isExisting ? (activeRequest[DELIVERY_REQ_SUBMIT_DATE_FIELD] ?? submitDate) : submitDate,
     { type: "date", readOnly: true }));
 
-  const fromFields = createRequestLocationField("From", "From", "Pickup Address", defaultFrom);
+  const fromFields = createRequestLocationField("From", "From", "Pickup Address", defaultFrom, { readOnly: isReadOnly });
   form.appendChild(fromFields.frag);
 
-  const toFields = createRequestLocationField("To", "To", "Delivery Address", defaultTo);
+  const toFields = createRequestLocationField("To", "To", "Delivery Address", defaultTo, { readOnly: isReadOnly });
   form.appendChild(toFields.frag);
+  if (isReadOnly) {
+    fromFields.addressEl.value = activeRequest["Pickup Address"] ?? fromFields.addressEl.value;
+    toFields.addressEl.value = activeRequest["Delivery Address"] ?? toFields.addressEl.value;
+  }
 
   form.appendChild(createRequestFormField("Email", "Email To",
-    isEdit ? (request["Email To"] ?? "") : (deliveryRequestDraftEmail.emailTo ?? "")));
+    isExisting ? (activeRequest["Email To"] ?? "") : (deliveryRequestDraftEmail.emailTo ?? ""),
+    { readOnly: isReadOnly }));
   form.appendChild(createRequestFormField("CC", "Email CC",
-    isEdit ? (request["Email CC"] ?? "") : (deliveryRequestDraftEmail.emailCc ?? "")));
+    isExisting ? (activeRequest["Email CC"] ?? "") : (deliveryRequestDraftEmail.emailCc ?? ""),
+    { readOnly: isReadOnly }));
   form.appendChild(createRequestFormField("Notes", DELIVERY_REQ_NOTES_FIELD,
-    isEdit ? (request[DELIVERY_REQ_NOTES_FIELD] ?? request["Notes"] ?? "") : deliveryRequestDraftNotes,
-    { type: "textarea" }));
+    isExisting ? (activeRequest[DELIVERY_REQ_NOTES_FIELD] ?? activeRequest["Notes"] ?? "") : deliveryRequestDraftNotes,
+    { type: "textarea", readOnly: isReadOnly }));
 
   left.appendChild(form);
 
   const right = document.createElement("div");
   right.className = "shipment-modal-right";
-  right.appendChild(renderDeliveryRequestLinkedPoSection(pos, isEdit));
+  right.appendChild(renderDeliveryRequestLinkedPoSection(pos, isReadOnly));
 
   layout.appendChild(left);
   layout.appendChild(right);
   outer.appendChild(layout);
 
-  if (!isEdit && deliveryRequestAddPoPanelOpen) {
+  if (!isReadOnly && deliveryRequestAddPoPanelOpen) {
     outer.classList.add("shipment-modal-outer--add-panel-open");
     outer.appendChild(renderAvailablePoPickerPanel(getAvailableDeliveryRequestPanelRows(), {
       panelId: "deliveryRequestAddPoPanel",
@@ -322,6 +343,7 @@ function renderDeliveryRequestModal(poNumbers, request = {}) {
   setDeliveryRequestModalAddPanelClass(body, deliveryRequestAddPoPanelOpen);
   setRequestModalPoCount(document.getElementById("deliveryRequestPoCount"), pos.length);
   bringModalToFront(document.getElementById("deliveryRequestOverlay"));
+  updateToolbarRequestButtons();
 }
 
 function getAvailableDeliveryRequestPanelRows() {
@@ -332,16 +354,20 @@ function getAvailableDeliveryRequestPanelRows() {
   );
 }
 
+function getDeliveryRequestModalContext() {
+  return deliveryRequestModalRow ?? {};
+}
+
 function openDeliveryRequestAddPoPanel() {
   captureDeliveryRequestDraft();
   deliveryRequestAddPoPanelOpen = true;
-  renderDeliveryRequestModal(deliveryRequestPoNumbers);
+  renderDeliveryRequestModal(deliveryRequestPoNumbers, getDeliveryRequestModalContext());
 }
 
 function closeDeliveryRequestAddPoPanel() {
   captureDeliveryRequestDraft();
   deliveryRequestAddPoPanelOpen = false;
-  renderDeliveryRequestModal(deliveryRequestPoNumbers);
+  renderDeliveryRequestModal(deliveryRequestPoNumbers, getDeliveryRequestModalContext());
 }
 
 function addPoToDeliveryRequest(poNumber) {
@@ -350,7 +376,7 @@ function addPoToDeliveryRequest(poNumber) {
   if (!po || deliveryRequestPoNumbers.map(String).includes(po)) return;
   deliveryRequestPoNumbers = [...deliveryRequestPoNumbers, po];
   deliveryRequestAddPoPanelOpen = true;
-  renderDeliveryRequestModal(deliveryRequestPoNumbers);
+  renderDeliveryRequestModal(deliveryRequestPoNumbers, getDeliveryRequestModalContext());
 }
 
 const _deliveryFormSelectedPos = new Set();
@@ -374,13 +400,13 @@ function removePosFromDeliveryRequest() {
   if (linked.length === 0) { showIndicator("Select POs to remove", "error"); return; }
   const removeSet = new Set(linked.map(row => String(row["PO #"])));
   deliveryRequestPoNumbers = deliveryRequestPoNumbers.filter(po => !removeSet.has(String(po)));
-  renderDeliveryRequestModal(deliveryRequestPoNumbers);
+  renderDeliveryRequestModal(deliveryRequestPoNumbers, getDeliveryRequestModalContext());
 }
 
-function renderDeliveryRequestLinkedPoSection(pos, isEdit) {
+function renderDeliveryRequestLinkedPoSection(pos, isReadOnly = false) {
   const section = document.createElement("section");
   section.className = "shipment-linked-pos";
-  section.classList.toggle("shipment-linked-pos--selection-disabled", deliveryRequestAddPoPanelOpen || isEdit);
+  section.classList.toggle("shipment-linked-pos--selection-disabled", deliveryRequestAddPoPanelOpen || isReadOnly);
 
   const wrap = document.createElement("div");
   wrap.className = "shipment-linked-po-table-wrap shipment-linked-po-table-wrap--with-footer";
@@ -393,7 +419,7 @@ function renderDeliveryRequestLinkedPoSection(pos, isEdit) {
   const selectTh = document.createElement("th");
   selectTh.className = "th-select-col";
 
-  if (!isEdit) {
+  if (!isReadOnly) {
     const selectAllCb = document.createElement("input");
     selectAllCb.type = "checkbox";
     selectAllCb.setAttribute("aria-label", "Select all");
@@ -419,8 +445,9 @@ function renderDeliveryRequestLinkedPoSection(pos, isEdit) {
   pos.forEach(row => {
     const tr = document.createElement("tr");
     tr.dataset.po = row["PO #"];
+    attachRequestLinkedPoRowOpen(tr, row["PO #"]);
     const selectTd = document.createElement("td");
-    if (!isEdit) {
+    if (!isReadOnly) {
       renderFormSelectedCell(selectTd, row, isDeliveryFormPoSelected(row), selected => {
         toggleDeliveryFormPoSelected(row, selected);
         updateDeliveryRequestActionButtons();
@@ -429,13 +456,7 @@ function renderDeliveryRequestLinkedPoSection(pos, isEdit) {
     tr.appendChild(selectTd);
     DELIVERY_PICKUP_LINKED_PO_COLUMNS.forEach(({ col, cellClass }) => {
       const td = document.createElement("td");
-      if (cellClass) td.className = cellClass;
-      if (col === "Status") td.innerHTML = renderStatus(row[col]);
-      else {
-        const text = formatShipmentLinkedPoCell(col, row);
-        if (text === EMPTY_DISPLAY) setDisplayText(td, EMPTY_DISPLAY);
-        else { td.textContent = text; td.title = text; }
-      }
+      renderRequestLinkedPoDataCell(td, col, row, { cellClass });
       tr.appendChild(td);
     });
     tbody.appendChild(tr);
@@ -444,7 +465,7 @@ function renderDeliveryRequestLinkedPoSection(pos, isEdit) {
   table.appendChild(tbody);
   wrap.appendChild(table);
   section.appendChild(wrap);
-  if (!isEdit) section.appendChild(renderDeliveryRequestLinkedPoFooter(pos));
+  if (!isReadOnly) section.appendChild(renderDeliveryRequestLinkedPoFooter(pos));
   return section;
 }
 
@@ -501,10 +522,11 @@ function closeDeliveryRequestModal() {
   clearModalFooterMessageForOverlay("deliveryRequestOverlay");
   document.getElementById("deliveryRequestOverlay")?.classList.remove("open");
   setDeliveryRequestModalAddPanelClass(document.getElementById("deliveryRequestBody"), false);
+  updateToolbarRequestButtons();
 }
 
 async function submitDeliveryRequest() {
-  if (isAppSaving() || deliveryRequestPoNumbers.length === 0) return;
+  if (deliveryRequestOpInProgress || deliveryRequestPoNumbers.length === 0) return;
   setDeliveryRequestFooterMessage("");
 
   const form = document.getElementById("deliveryRequestForm");
@@ -521,79 +543,104 @@ async function submitDeliveryRequest() {
   const poNumbers = deliveryRequestPoNumbers.slice();
   const savedRow = deliveryRequestModalRow;
   const isEdit = Boolean(savedRow?.[DELIVERY_REQUEST_ID_FIELD]);
+  if (!isEdit) beginToolbarCreatePending();
   closeDeliveryRequestModal();
-  setAppSaving(true, isEdit ? "Saving…" : "Creating delivery request…");
-  showIndicator(`${isEdit ? "Saving" : "Creating"}${ELLIPSIS}`, "");
+  deliveryRequestOpInProgress = true;
+  showIndicator(
+    isEdit ? `Saving${ELLIPSIS}` : `Creating delivery request${ELLIPSIS}`,
+    ""
+  );
 
   try {
     if (isDemoMode()) {
-      demoCreateOrUpdateDeliveryRequest(poNumbers, data, savedRow);
-      showIndicator(isEdit ? `Saved ${CHECK_MARK}` : `Delivery request created and email sent ${CHECK_MARK}`, "success");
+      if (isEdit) {
+        applyDeliveryRequestUpdatedLocally(savedRow[DELIVERY_REQUEST_ID_FIELD], data);
+      } else {
+        applyDeliveryRequestCreatedLocally(generateDemoDeliveryRequestId(), poNumbers, data);
+      }
     } else {
       const json = await postAppsScript(
         isEdit
           ? { action: "updateDeliveryRequest", deliveryRequestId: savedRow[DELIVERY_REQUEST_ID_FIELD], request: data }
           : { action: "createDeliveryRequest", poNumbers, request: data }
       );
-      if (json.deliveryRequestId) await loadData();
       if (!json.success) throw new Error(json.error || "Delivery request failed");
+      if (isEdit) {
+        applyDeliveryRequestUpdatedLocally(savedRow[DELIVERY_REQUEST_ID_FIELD], data);
+      } else {
+        applyDeliveryRequestCreatedLocally(json.deliveryRequestId, poNumbers, data);
+      }
     }
-    showIndicator(isEdit ? `Saved ${CHECK_MARK}` : `Delivery request created and email sent ${CHECK_MARK}`, "success");
+    showIndicator(
+      isEdit ? `Saved ${CHECK_MARK}` : `Delivery request created and email sent ${CHECK_MARK}`,
+      "success"
+    );
   } catch (err) {
     showIndicator("Delivery request failed: " + err.message, "error");
   } finally {
-    setAppSaving(false);
+    deliveryRequestOpInProgress = false;
+    if (!isEdit) endToolbarCreatePending();
   }
 }
 
-function demoCreateOrUpdateDeliveryRequest(poNumbers, data, existing) {
-  let requestId = existing?.[DELIVERY_REQUEST_ID_FIELD];
-  const now = formatDateToYmd(new Date());
-  if (!requestId) {
-    let max = 0;
-    allDeliveryRequests.forEach(r => {
-      const m = /^DR-(\d+)$/.exec(String(r[DELIVERY_REQUEST_ID_FIELD] ?? ""));
-      if (m) max = Math.max(max, Number(m[1]));
-    });
-    requestId = `DR-${String(max + 1).padStart(4, "0")}`;
-    allDeliveryRequests.push({
-      [DELIVERY_REQUEST_ID_FIELD]: requestId,
-      [DELIVERY_DATE_FIELD]: data[DELIVERY_DATE_FIELD] ?? "",
-      "Request Date": now,
-      "From": data["From"] ?? "",
-      "Pickup Address": data["Pickup Address"] ?? "",
-      "To": data["To"] ?? "",
-      "Delivery Address": data["Delivery Address"] ?? "",
-      "Email To": data["Email To"] ?? "",
-      "Email CC": data["Email CC"] ?? "",
-      [DELIVERY_REQ_NOTES_FIELD]: data[DELIVERY_REQ_NOTES_FIELD] ?? "",
-      "PO Numbers": poNumbers.join(", "),
-      "PO Count": poNumbers.length,
-      "Email Status": !isEmptyValue(data["Email To"]) ? "Sent" : "Not Sent",
-      "Email Sent At": !isEmptyValue(data["Email To"]) ? now : "",
-      "Email Error": "",
-      "Created At": now,
-      "Updated At": now,
-    });
-  } else {
-    Object.assign(existing, data);
-  }
+function generateDemoDeliveryRequestId() {
+  let max = 0;
+  allDeliveryRequests.forEach(r => {
+    const m = /^DR-(\d+)$/.exec(String(r[DELIVERY_REQUEST_ID_FIELD] ?? ""));
+    if (m) max = Math.max(max, Number(m[1]));
+  });
+  return `DR-${String(max + 1).padStart(4, "0")}`;
+}
 
-  if (!existing) {
-    poNumbers.forEach(poNumber => {
-      const row = allRows.find(r => String(r["PO #"]) === String(poNumber));
-      if (!row) return;
-      row[DELIVERY_REQUEST_ID_FIELD] = requestId;
-      row["Delivery Requested"] = true;
-      row["Delivery Date"] = data[DELIVERY_DATE_FIELD] ?? "";
-      row["Delivery Req Date"] = now;
-      row["Status"] = "Scheduled";
-    });
-  }
+function applyDeliveryRequestCreatedLocally(requestId, poNumbers, data) {
+  const now = formatDateToYmd(new Date());
+  allDeliveryRequests.push({
+    [DELIVERY_REQUEST_ID_FIELD]: requestId,
+    [DELIVERY_DATE_FIELD]: data[DELIVERY_DATE_FIELD] ?? "",
+    "Request Date": data[DELIVERY_REQ_SUBMIT_DATE_FIELD] ?? now,
+    "From": data["From"] ?? "",
+    "Pickup Address": data["Pickup Address"] ?? "",
+    "To": data["To"] ?? "",
+    "Delivery Address": data["Delivery Address"] ?? "",
+    "Email To": data["Email To"] ?? "",
+    "Email CC": data["Email CC"] ?? "",
+    [DELIVERY_REQ_NOTES_FIELD]: data[DELIVERY_REQ_NOTES_FIELD] ?? "",
+    "PO Numbers": poNumbers.join(", "),
+    "PO Count": poNumbers.length,
+    "Email Status": !isEmptyValue(data["Email To"]) ? "Sent" : "Not Sent",
+    "Email Sent At": !isEmptyValue(data["Email To"]) ? now : "",
+    "Email Error": "",
+    "Created At": now,
+    "Updated At": now,
+  });
+
+  poNumbers.forEach(poNumber => {
+    const row = allRows.find(r => String(r["PO #"]) === String(poNumber));
+    if (!row) return;
+    row[DELIVERY_REQUEST_ID_FIELD] = requestId;
+    row["Delivery Requested"] = true;
+    row["Delivery Date"] = data[DELIVERY_DATE_FIELD] ?? "";
+    row["Delivery Req Date"] = data[DELIVERY_REQ_SUBMIT_DATE_FIELD] ?? now;
+    row["Status"] = "Scheduled";
+  });
   resetLocalSelectedState(allRows);
   applyFilters();
   applyDeliveryRequestFilters();
   if (typeof updateToolbarRequestButtons === "function") updateToolbarRequestButtons();
+}
+
+function applyDeliveryRequestUpdatedLocally(requestId, data) {
+  const existing = getDeliveryRequestById(requestId);
+  if (existing) Object.assign(existing, data);
+  applyDeliveryRequestFilters();
+}
+
+function demoCreateOrUpdateDeliveryRequest(poNumbers, data, existing) {
+  if (existing?.[DELIVERY_REQUEST_ID_FIELD]) {
+    applyDeliveryRequestUpdatedLocally(existing[DELIVERY_REQUEST_ID_FIELD], data);
+  } else {
+    applyDeliveryRequestCreatedLocally(generateDemoDeliveryRequestId(), poNumbers, data);
+  }
 }
 
 function initDeliveryRequests() {

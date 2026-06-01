@@ -3,6 +3,110 @@
 const DEFAULT_WAREHOUSE_ENTITY = "FORERUNNER LOGISTICS";
 const DEFAULT_DELIVERY_TO_ENTITY = "ELEVATOR DISCO";
 
+function isRequestEmailSent(request) {
+  return String(request?.["Email Status"] ?? "").trim().toLowerCase() === "sent";
+}
+
+function shouldIgnoreRequestTableDblClick(e) {
+  const target = e.target;
+  if (!(target instanceof Element)) return false;
+  return Boolean(target.closest(
+    "input, textarea, select, button, .btn, .exf-request-resend-btn, .asn-request-resend-btn, .delivery-request-resend-btn, .pickup-request-resend-btn"
+  ));
+}
+
+function attachRequestTableRowDblClick(tr, openDetail) {
+  tr.className = "clickable-row";
+  tr.ondblclick = e => {
+    if (shouldIgnoreRequestTableDblClick(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    openDetail();
+  };
+}
+
+function parseRequestPoNumbers(request) {
+  return String(request?.["PO Numbers"] ?? "")
+    .split(",")
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
+function getRequestPoNumbers(request, idField) {
+  const fromRequest = parseRequestPoNumbers(request);
+  if (fromRequest.length > 0) return fromRequest;
+  const id = String(request?.[idField] ?? "").trim();
+  if (!id) return [];
+  return allRows
+    .filter(row => String(row[idField] ?? "").trim() === id)
+    .map(row => row["PO #"])
+    .filter(po => !isEmptyValue(po));
+}
+
+function openRequestLinkedPoDetail(poNumber) {
+  if (typeof openPoFromShipment === "function") {
+    openPoFromShipment(poNumber);
+    return;
+  }
+  const row = allRows.find(r => String(r["PO #"]) === String(poNumber));
+  if (row && typeof openPODetail === "function") openPODetail(row);
+}
+
+function shouldIgnoreRequestLinkedPoRowDblClick(e) {
+  const target = e.target;
+  if (!(target instanceof Element)) return false;
+  return Boolean(target.closest(
+    "input, textarea, select, .po-select-checkbox, .td-select-cell"
+  )) || Boolean(target.closest("button:not(.shipment-linked-po-link)"));
+}
+
+function attachRequestLinkedPoRowOpen(tr, poNumber) {
+  tr.classList.add("clickable-row");
+  tr.ondblclick = e => {
+    if (shouldIgnoreRequestLinkedPoRowDblClick(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    openRequestLinkedPoDetail(poNumber);
+  };
+}
+
+function appendRequestLinkedPoIdCell(td, row) {
+  td.classList.add("shipment-po-cell-id");
+  const text = formatShipmentLinkedPoCell("PO #", row);
+  if (text === EMPTY_DISPLAY) {
+    setDisplayText(td, EMPTY_DISPLAY);
+    return;
+  }
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "shipment-linked-po-link";
+  btn.textContent = text;
+  btn.title = "Open PO detail";
+  btn.addEventListener("click", e => {
+    e.stopPropagation();
+    openRequestLinkedPoDetail(row["PO #"]);
+  });
+  td.appendChild(btn);
+}
+
+function renderRequestLinkedPoDataCell(td, col, row, { cellClass } = {}) {
+  if (cellClass) td.className = cellClass;
+  if (col === "PO #") {
+    appendRequestLinkedPoIdCell(td, row);
+    return;
+  }
+  if (col === "Status") {
+    td.innerHTML = renderStatus(row[col]);
+    return;
+  }
+  const text = formatShipmentLinkedPoCell(col, row);
+  if (text === EMPTY_DISPLAY) setDisplayText(td, EMPTY_DISPLAY);
+  else {
+    td.textContent = text;
+    td.title = text;
+  }
+}
+
 function getLocationEntities() {
   return (allLocationRows ?? []).map(r => String(r["Entity"] ?? "").trim()).filter(Boolean);
 }
@@ -18,7 +122,7 @@ function getLocationAddress(entity) {
  * Creates a pair of form fields: an entity <select> and a read-only address <textarea>.
  * Returns { wrap (contains both), selectEl, addressEl }.
  */
-function createRequestLocationField(label, entityFieldName, addressFieldName, defaultEntity = "") {
+function createRequestLocationField(label, entityFieldName, addressFieldName, defaultEntity = "", { readOnly = false } = {}) {
   const frag = document.createDocumentFragment();
 
   // Entity select
@@ -54,6 +158,8 @@ function createRequestLocationField(label, entityFieldName, addressFieldName, de
     select.appendChild(opt);
   }
 
+  if (readOnly) select.disabled = true;
+
   entityWrap.appendChild(entityLbl);
   entityWrap.appendChild(select);
 
@@ -71,9 +177,11 @@ function createRequestLocationField(label, entityFieldName, addressFieldName, de
   textarea.readOnly = true;
   textarea.value = getLocationAddress(select.value);
 
-  select.addEventListener("change", () => {
-    textarea.value = getLocationAddress(select.value);
-  });
+  if (!readOnly) {
+    select.addEventListener("change", () => {
+      textarea.value = getLocationAddress(select.value);
+    });
+  }
 
   addrWrap.appendChild(addrLbl);
   addrWrap.appendChild(textarea);
@@ -252,21 +360,15 @@ function renderRequestLinkedPoTable(pos, { columns } = {}) {
   pos.forEach(row => {
     const tr = document.createElement("tr");
     tr.dataset.po = row["PO #"];
+    attachRequestLinkedPoRowOpen(tr, row["PO #"]);
     colDefs.forEach(({ col, cellClass, editable, editor, rows }) => {
       const td = document.createElement("td");
-      if (cellClass) td.className = cellClass;
       if (editable) {
+        if (cellClass) td.className = cellClass;
         const input = createRequestLinkedPoEditableControl(col, row, { editor, rows });
         td.appendChild(input);
-      } else if (col === "Status") {
-        td.innerHTML = renderStatus(row[col]);
       } else {
-        const text = formatShipmentLinkedPoCell(col, row);
-        if (text === EMPTY_DISPLAY) setDisplayText(td, EMPTY_DISPLAY);
-        else {
-          td.textContent = text;
-          td.title = text;
-        }
+        renderRequestLinkedPoDataCell(td, col, row, { cellClass });
       }
       tr.appendChild(td);
     });

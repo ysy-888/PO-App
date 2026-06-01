@@ -33,6 +33,8 @@ let asnRequestDraftEmail = {};
 let asnRequestDraftAsnDate = "";
 let asnRequestDraftNotes = "";
 let asnRequestBuyer = "";
+let asnRequestModalRow = null;
+let asnRequestOpInProgress = false;
 // allAsnRequests is declared in state-api.js
 let filteredAsnRequests = [];
 
@@ -56,11 +58,11 @@ function getAsnRequestById(id) {
 }
 
 function openAsnRequestDetail(id) {
+  if (isAppSaving()) return;
   const request = getAsnRequestById(id);
   if (!request) return;
-  asnRequestPoNumbers = allRows
-    .filter(row => String(row[ASN_REQUEST_ID_FIELD] ?? "").trim() === String(id).trim())
-    .map(row => row["PO #"]);
+  asnRequestModalRow = request;
+  asnRequestPoNumbers = getRequestPoNumbers(request, ASN_REQUEST_ID_FIELD);
   asnRequestBuyer = request["Buyer"] ?? "";
   asnRequestDraftEmail = {
     email: request["Buyer Email"] ?? "",
@@ -161,13 +163,14 @@ function renderAsnRequestTable() {
     });
 
     tbody.appendChild(tr);
+    attachRequestTableRowDblClick(tr, () => openAsnRequestDetail(getAsnRequestRecordId(request)));
   });
   updateAsnRequestRowCounter();
 }
 
 async function resendAsnRequestEmail(requestId) {
-  if (isAppSaving() || !requestId) return;
-  setAppSaving(true, "Resending ASN email…");
+  if (asnRequestOpInProgress || !requestId) return;
+  asnRequestOpInProgress = true;
   showIndicator(`Resending ASN email${ELLIPSIS}`, "");
   try {
     if (isDemoMode()) {
@@ -182,7 +185,14 @@ async function resendAsnRequestEmail(requestId) {
     } else {
       const json = await postAppsScript({ action: "resendAsnRequestEmail", asnRequestId: requestId });
       if (!json.success) throw new Error(json.error);
-      await loadData();
+      const request = allAsnRequests.find(r => getAsnRequestRecordId(r) === requestId);
+      if (request) {
+        request["Email Status"] = json.emailSent ? "Sent" : "Failed";
+        request["Email Error"] = json.emailError ?? "";
+        if (json.emailSent) request["Email Sent At"] = formatDateToYmd(new Date());
+        request["Last Email Attempt At"] = formatDateToYmd(new Date());
+        applyAsnRequestFilters();
+      }
       if (!json.emailSent) {
         showIndicator(`ASN email not sent: ${json.emailError || "Missing buyer email"}`, "error");
         return;
@@ -192,7 +202,7 @@ async function resendAsnRequestEmail(requestId) {
   } catch (err) {
     showIndicator("Resend failed: " + err.message, "error");
   } finally {
-    setAppSaving(false);
+    asnRequestOpInProgress = false;
   }
 }
 
@@ -235,13 +245,14 @@ function setAsnRequestFooterMessage(message = "") {
 }
 
 function openAsnRequestFromSelection() {
-  if (isAppSaving()) return;
+  if (isAppSaving() || isToolbarCreateActionBlocked()) return;
   const selected = getCheckedFilteredPos();
   if (!areRowsEligibleForAsnRequest(selected)) {
     showIndicator("Select OTW or Arrived at Port POs with packing lists, all LULU'S or all 12TH TRIBE, and no ASN request yet", "error");
     return;
   }
   asnRequestPoNumbers = selected.map(row => row["PO #"]);
+  asnRequestModalRow = null;
   asnRequestBuyer = getAsnRequestBuyerForRows(selected);
   asnRequestDraftByPo = {};
   asnRequestDraftEmail = {};
@@ -286,9 +297,10 @@ function renderAsnRequestModal(poNumbers, { asnDate = formatDateToYmd(new Date()
   const submitBtn = document.getElementById("asnRequestSubmitBtn");
   if (!body) return;
 
-  const isView = Boolean(request?.[ASN_REQUEST_ID_FIELD]);
+  const isExisting = Boolean(request?.[ASN_REQUEST_ID_FIELD]);
+  const isView = isExisting && isRequestEmailSent(request);
   if (titleEl) {
-    titleEl.textContent = isView
+    titleEl.textContent = isExisting
       ? `ASN Request ${request[ASN_REQUEST_ID_FIELD]}`
       : "ASN Request";
   }
@@ -296,7 +308,7 @@ function renderAsnRequestModal(poNumbers, { asnDate = formatDateToYmd(new Date()
 
   asnRequestPoNumbers = poNumbers.slice();
   const pos = getAsnRequestRows();
-  const buyer = isView
+  const buyer = isExisting
     ? (request["Buyer"] ?? "")
     : (asnRequestBuyer || getAsnRequestBuyerForRows(pos));
   const buyerEmailInfo = getAsnRequestBuyerEmailInfo(buyer);
@@ -318,32 +330,32 @@ function renderAsnRequestModal(poNumbers, { asnDate = formatDateToYmd(new Date()
   form.appendChild(createRequestFormField(
     "ASN Date",
     ASN_DATE_FIELD,
-    isView ? (request[ASN_DATE_FIELD] ?? "") : (asnRequestDraftAsnDate || asnDate),
+    isExisting ? (request[ASN_DATE_FIELD] ?? "") : (asnRequestDraftAsnDate || asnDate),
     { type: "date", readOnly: isView }
   ));
   form.appendChild(createRequestFormField(
     "Request Date",
     ASN_REQ_SUBMIT_DATE_FIELD,
-    isView ? (request[ASN_REQ_SUBMIT_DATE_FIELD] ?? submitDate) : submitDate,
+    isExisting ? (request[ASN_REQ_SUBMIT_DATE_FIELD] ?? submitDate) : submitDate,
     { type: "date", readOnly: true }
   ));
   form.appendChild(createRequestFormField("Buyer", "Buyer", buyer, { readOnly: true }));
   form.appendChild(createRequestFormField(
     "Buyer Email",
     "Buyer Email",
-    isView ? (request["Buyer Email"] ?? "") : (asnRequestDraftEmail.email ?? buyerEmailInfo.email),
+    isExisting ? (request["Buyer Email"] ?? "") : (asnRequestDraftEmail.email ?? buyerEmailInfo.email),
     { readOnly: isView }
   ));
   form.appendChild(createRequestFormField(
     "CC",
     "CC",
-    isView ? (request["CC"] ?? "") : (asnRequestDraftEmail.cc ?? buyerEmailInfo.cc),
+    isExisting ? (request["CC"] ?? "") : (asnRequestDraftEmail.cc ?? buyerEmailInfo.cc),
     { readOnly: isView }
   ));
   form.appendChild(createRequestFormField(
     "Notes",
     ASN_REQ_NOTES_FIELD,
-    isView ? (request[ASN_REQ_NOTES_FIELD] ?? "") : asnRequestDraftNotes,
+    isExisting ? (request[ASN_REQ_NOTES_FIELD] ?? "") : asnRequestDraftNotes,
     { type: "textarea", readOnly: isView }
   ));
   left.appendChild(form);
@@ -372,6 +384,7 @@ function renderAsnRequestModal(poNumbers, { asnDate = formatDateToYmd(new Date()
   const headerCount = document.getElementById("asnRequestPoCount");
   setRequestModalPoCount(headerCount, pos.length);
   bringModalToFront(document.getElementById("asnRequestOverlay"));
+  updateToolbarRequestButtons();
 }
 
 function getAvailableAsnRequestPanelRows() {
@@ -385,16 +398,24 @@ function getAvailableAsnRequestPanelRows() {
   );
 }
 
+function getAsnRequestModalRenderOptions(extra = {}) {
+  return {
+    asnDate: getAsnRequestAsnDateValue(),
+    request: asnRequestModalRow,
+    ...extra,
+  };
+}
+
 function openAsnRequestAddPoPanel() {
   captureAsnRequestDraft();
   asnRequestAddPoPanelOpen = true;
-  renderAsnRequestModal(asnRequestPoNumbers, { asnDate: getAsnRequestAsnDateValue() });
+  renderAsnRequestModal(asnRequestPoNumbers, getAsnRequestModalRenderOptions());
 }
 
 function closeAsnRequestAddPoPanel() {
   captureAsnRequestDraft();
   asnRequestAddPoPanelOpen = false;
-  renderAsnRequestModal(asnRequestPoNumbers, { asnDate: getAsnRequestAsnDateValue() });
+  renderAsnRequestModal(asnRequestPoNumbers, getAsnRequestModalRenderOptions());
 }
 
 function addPoToAsnRequest(poNumber) {
@@ -403,7 +424,7 @@ function addPoToAsnRequest(poNumber) {
   if (!po || asnRequestPoNumbers.map(String).includes(po)) return;
   asnRequestPoNumbers = [...asnRequestPoNumbers, po];
   asnRequestAddPoPanelOpen = true;
-  renderAsnRequestModal(asnRequestPoNumbers, { asnDate: getAsnRequestAsnDateValue() });
+  renderAsnRequestModal(asnRequestPoNumbers, getAsnRequestModalRenderOptions());
 }
 
 function removePosFromAsnRequest() {
@@ -412,7 +433,7 @@ function removePosFromAsnRequest() {
   if (linked.length === 0) { showIndicator("Select POs to remove", "error"); return; }
   const removeSet = new Set(linked.map(row => String(row["PO #"])));
   asnRequestPoNumbers = asnRequestPoNumbers.filter(po => !removeSet.has(String(po)));
-  renderAsnRequestModal(asnRequestPoNumbers, { asnDate: getAsnRequestAsnDateValue() });
+  renderAsnRequestModal(asnRequestPoNumbers, getAsnRequestModalRenderOptions());
 }
 
 function renderAsnRequestLinkedPoSection(pos, isView = false) {
@@ -458,6 +479,7 @@ function renderAsnRequestLinkedPoSection(pos, isView = false) {
   pos.forEach(row => {
     const tr = document.createElement("tr");
     tr.dataset.po = row["PO #"];
+    attachRequestLinkedPoRowOpen(tr, row["PO #"]);
 
     const selectTd = document.createElement("td");
     if (!isView) {
@@ -470,14 +492,7 @@ function renderAsnRequestLinkedPoSection(pos, isView = false) {
 
     DELIVERY_PICKUP_LINKED_PO_COLUMNS.forEach(({ col, cellClass }) => {
       const td = document.createElement("td");
-      if (cellClass) td.className = cellClass;
-      if (col === "Status") {
-        td.innerHTML = renderStatus(row[col]);
-      } else {
-        const text = formatShipmentLinkedPoCell(col, row);
-        if (text === EMPTY_DISPLAY) setDisplayText(td, EMPTY_DISPLAY);
-        else { td.textContent = text; td.title = text; }
-      }
+      renderRequestLinkedPoDataCell(td, col, row, { cellClass });
       tr.appendChild(td);
     });
     tbody.appendChild(tr);
@@ -562,14 +577,16 @@ function closeAsnRequestModal() {
   asnRequestDraftAsnDate = "";
   asnRequestDraftNotes = "";
   asnRequestBuyer = "";
+  asnRequestModalRow = null;
   clearAsnFormSelection();
   setAsnRequestFooterMessage("");
   document.getElementById("asnRequestOverlay")?.classList.remove("open");
   setAsnRequestModalAddPanelClass(document.getElementById("asnRequestBody"), false);
+  updateToolbarRequestButtons();
 }
 
 async function submitAsnRequest() {
-  if (isAppSaving() || asnRequestPoNumbers.length === 0) return;
+  if (asnRequestOpInProgress || asnRequestPoNumbers.length === 0) return;
   setAsnRequestFooterMessage("");
 
   const form = document.getElementById("asnRequestForm");
@@ -588,43 +605,47 @@ async function submitAsnRequest() {
   }
 
   const poNumbers = asnRequestPoNumbers.slice();
+  beginToolbarCreatePending();
   closeAsnRequestModal();
-  setAppSaving(true, "Sending ASN email…");
+  asnRequestOpInProgress = true;
   showIndicator(`Sending ASN email${ELLIPSIS}`, "");
 
   try {
     if (isDemoMode()) {
-      demoCreateAsnRequest(poNumbers, data);
-      showIndicator(`ASN requested and email sent ${CHECK_MARK}`, "success");
+      applyAsnRequestCreatedLocally(generateDemoAsnRequestId(), poNumbers, data);
     } else {
       const json = await postAppsScript({
         action: "createAsnRequest",
         poNumbers,
         request: data,
       });
-      if (json.asnRequestId) await loadData();
       if (!json.success) throw new Error(json.error || json.emailError || "ASN email failed to send");
-      showIndicator(`ASN requested and email sent ${CHECK_MARK}`, "success");
+      applyAsnRequestCreatedLocally(json.asnRequestId, poNumbers, data);
     }
+    showIndicator(`ASN requested and email sent ${CHECK_MARK}`, "success");
   } catch (err) {
     showIndicator("ASN email not sent: " + err.message, "error");
   } finally {
-    setAppSaving(false);
+    asnRequestOpInProgress = false;
+    endToolbarCreatePending();
   }
 }
 
-function demoCreateAsnRequest(poNumbers, data) {
+function generateDemoAsnRequestId() {
   let max = 0;
   allAsnRequests.forEach(r => {
     const m = /^ASN-(\d+)$/.exec(String(r[ASN_REQUEST_ID_FIELD] ?? ""));
     if (m) max = Math.max(max, Number(m[1]));
   });
-  const requestId = `ASN-${String(max + 1).padStart(4, "0")}`;
+  return `ASN-${String(max + 1).padStart(4, "0")}`;
+}
+
+function applyAsnRequestCreatedLocally(requestId, poNumbers, data) {
   const now = formatDateToYmd(new Date());
   allAsnRequests.push({
     [ASN_REQUEST_ID_FIELD]: requestId,
     [ASN_DATE_FIELD]: data[ASN_DATE_FIELD] ?? "",
-    [ASN_REQ_SUBMIT_DATE_FIELD]: now,
+    [ASN_REQ_SUBMIT_DATE_FIELD]: data[ASN_REQ_SUBMIT_DATE_FIELD] ?? now,
     "Buyer": data["Buyer"] ?? "",
     "Buyer Email": data["Buyer Email"] ?? "",
     "CC": data["CC"] ?? "",
@@ -645,12 +666,16 @@ function demoCreateAsnRequest(poNumbers, data) {
     row[ASN_REQUEST_ID_FIELD] = requestId;
     row["ASN Requested"] = true;
     row["ASN Date"] = data[ASN_DATE_FIELD] ?? "";
-    row["ASN Req Date"] = now;
+    row["ASN Req Date"] = data[ASN_REQ_SUBMIT_DATE_FIELD] ?? now;
   });
   resetLocalSelectedState(allRows);
   applyFilters();
   applyAsnRequestFilters();
   if (typeof updateToolbarRequestButtons === "function") updateToolbarRequestButtons();
+}
+
+function demoCreateAsnRequest(poNumbers, data) {
+  applyAsnRequestCreatedLocally(generateDemoAsnRequestId(), poNumbers, data);
 }
 
 function initAsnRequests() {

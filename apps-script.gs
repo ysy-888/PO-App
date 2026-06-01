@@ -95,6 +95,7 @@ const EDITABLE_FIELDS = [
   PICKUP_REQUEST_ID_FIELD, PICKUP_REQUESTED_FIELD, PICKUP_DATE_FIELD, PICKUP_REQ_DATE_FIELD,
   "FOB Cost", "Price", "PO Total Cost",
   "Received Qty", "Style Category",
+  "Style Photo 1", "Style Photo 2",
   "OG", "PROTO", "FIT/PP", "BULK", "TOP", "TRIM",
   "PO Unit 1", "PO Unit 2", "PO Unit 3", "PO Unit 4", "PO Unit 5",
   "PO Unit 6", "PO Unit 7", "PO Unit 8", "PO Unit 9", "PO Unit 10",
@@ -194,6 +195,7 @@ function ensurePoWorkflowHeaders_() {
     // Pickup
     PICKUP_DATE_FIELD, PICKUP_REQ_DATE_FIELD, PICKUP_REQUESTED_FIELD, PICKUP_REQUEST_ID_FIELD,
     "Has Packing List",
+    "Style Photo 1", "Style Photo 2",
   ]);
   return sheet;
 }
@@ -1567,11 +1569,26 @@ function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
 
-const EMAIL_META_LABEL_STYLE_ = "width:36%;padding:10px 14px;font-size:12px;font-weight:600;color:#8b929c;background-color:#f7f7f8;border-bottom:1px solid #e5e7eb;";
-const EMAIL_META_VALUE_STYLE_ = "padding:10px 14px;font-size:14px;color:#1a1a18;border-bottom:1px solid #e5e7eb;";
-const EMAIL_PO_TH_STYLE_ = "padding:10px 12px;text-align:left;font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:#8b929c;background-color:#f7f7f8;border-bottom:1px solid #e5e7eb;";
+function buildEmailRequestHeaderHtml_(requestTypeLabel, requestId, headerRequestDate) {
+  return "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"width:100%;border-collapse:collapse;\">" +
+    "<tr><td class=\"email-header-titles\" valign=\"middle\" style=\"vertical-align:middle;\">" +
+    "<h1 class=\"email-heading\" style=\"margin:0 0 6px 0;font-size:20px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:#ffffff;line-height:1.2;\">ELEVATOR DISCO</h1>" +
+    "<p class=\"email-subheading\" style=\"margin:0;font-size:16px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#d4d9df;line-height:1.3;\">" +
+    escapeHtml_(requestTypeLabel) + "</p></td>" +
+    "<td class=\"email-header-id\" valign=\"middle\" align=\"right\" style=\"vertical-align:middle;text-align:right;white-space:nowrap;padding-left:16px;\">" +
+    "<div class=\"email-request-id\" style=\"font-size:14px;font-weight:500;color:#ffffff;letter-spacing:0.02em;line-height:1.4;\">" +
+    escapeHtml_(requestId) + "</div>" +
+    "<div class=\"email-request-date\" style=\"margin-top:4px;font-size:12px;font-weight:500;color:#d4d9df;line-height:1.3;\">" +
+    escapeHtml_(headerRequestDate) + "</div></td></tr></table>";
+}
+
+const EMAIL_META_LABEL_STYLE_ = "width:110px;max-width:110px;padding:8px 12px;font-size:12px;font-weight:600;color:#374151;background-color:#f7f7f8;border-bottom:1px solid #e5e7eb;white-space:nowrap;";
+const EMAIL_META_VALUE_STYLE_ = "padding:8px 12px;font-size:14px;color:#1a1a18;border-bottom:1px solid #e5e7eb;";
+const EMAIL_PO_TH_STYLE_ = "padding:10px 12px;text-align:left;font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:#374151;background-color:#f7f7f8;border-bottom:1px solid #e5e7eb;white-space:nowrap;";
 const EMAIL_PO_TD_STYLE_ = "padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#1a1a18;vertical-align:top;font-size:13px;";
 const EMAIL_PO_TD_NUM_STYLE_ = EMAIL_PO_TD_STYLE_ + "text-align:right;";
+const EMAIL_PO_TD_ROW_NUM_STYLE_ = EMAIL_PO_TD_STYLE_ + "text-align:center;color:#6b7280;";
+const EMAIL_PO_FOOTER_TD_STYLE_ = "padding:10px 12px;font-weight:600;background-color:#eef0f3;color:#1a1a18;border-bottom:none;font-size:13px;";
 
 function renderEmailTemplate_(filename, vars) {
   const template = HtmlService.createTemplateFromFile(filename);
@@ -1585,12 +1602,12 @@ function renderEmailSubject_(filename, vars) {
 
 function buildEmailNotesBlockHtml_(notes) {
   const trimmed = String(notes ?? "").trim();
-  if (!trimmed) return "";
-  return "<div class=\"email-section\" style=\"margin-top:20px;padding:14px 16px;background-color:#f8fafc;border:1px solid #e5e7eb;border-radius:6px;\">" +
-    "<div class=\"email-section-title\" style=\"font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:#8b929c;margin:0 0 8px 0;\">Notes</div>" +
-    "<div class=\"email-notes-body\" style=\"font-size:14px;color:#1a1a18;\">" +
-    escapeHtml_(trimmed).replace(/\n/g, "<br>") +
-    "</div></div>";
+  const body = trimmed
+    ? escapeHtml_(trimmed).replace(/\n/g, "<br>")
+    : "<span style=\"color:#8b929c;\">&mdash;</span>";
+  return "<div class=\"email-notes-panel\" style=\"margin:0;padding:14px 16px;min-height:100px;height:100%;background:transparent;border:1px solid #e5e7eb;border-radius:6px;\">" +
+    "<div class=\"email-section-title\" style=\"font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:#374151;margin:0 0 8px 0;\">Notes</div>" +
+    "<div class=\"email-notes-body\" style=\"font-size:14px;color:#1a1a18;\">" + body + "</div></div>";
 }
 
 function emailMetaRowStyles_(isLastRow) {
@@ -1686,10 +1703,11 @@ function computeRequestEmailTotals_(rows, weightByPo) {
   return rows.reduce((totals, row) => {
     const po = String(row["PO #"] ?? "").trim();
     totals.unitQty += toQtyNumber_(row["Actual Qty"]);
+    totals.orderQty += toQtyNumber_(row["PO Qty"]);
     totals.ctnQty += toQtyNumber_(row["Ctn Qty"]);
     totals.totalWeight += weightByPo[po] || 0;
     return totals;
-  }, { unitQty: 0, ctnQty: 0, totalWeight: 0 });
+  }, { unitQty: 0, orderQty: 0, ctnQty: 0, totalWeight: 0 });
 }
 
 function formatEmailQty_(value) {
@@ -1705,47 +1723,165 @@ function formatEmailWeight_(value) {
 
 function buildRequestEmailTotalsLine_(rows, weightByPo) {
   const totals = computeRequestEmailTotals_(rows, weightByPo);
-  return "Total | PO Count: " + rows.length +
-    " | Unit Qty: " + formatEmailQty_(totals.unitQty) +
+  return "Total | Unit Qty: " + formatEmailQty_(totals.unitQty) +
     " | Ctn Qty: " + formatEmailQty_(totals.ctnQty) +
     " | Total Weight: " + (formatEmailWeight_(totals.totalWeight) || "—");
 }
 
 const REQUEST_EMAIL_TABLE_COLUMNS = [
-  "PO #", "Style #", "Vendor", "Buyer", "Buyer PO #", "Color", "House #", "Actual Qty", "Ctn Qty"
+  "_num", "PO #", "Style #", "Vendor", "Buyer", "Buyer PO #", "Color", "House #", "Actual Qty", "Ctn Qty", "_weight"
 ];
 
 const REQUEST_EMAIL_TABLE_LABELS = {
   "Actual Qty": "Unit Qty",
+  "_weight": "Weight",
 };
 
-function buildRequestEmailPoTableHtml_(rows, weightByPo) {
-  const colCount = REQUEST_EMAIL_TABLE_COLUMNS.length;
-  const headerCells = REQUEST_EMAIL_TABLE_COLUMNS.map(col =>
-    "<th style=\"" + EMAIL_PO_TH_STYLE_ + "\">" + escapeHtml_(REQUEST_EMAIL_TABLE_LABELS[col] || col) + "</th>"
-  ).join("");
-  const bodyRows = rows.map(row => {
-    return "<tr>" + REQUEST_EMAIL_TABLE_COLUMNS.map(col => {
-      const isNum = col === "Actual Qty" || col === "Ctn Qty";
-      const tdStyle = isNum ? EMAIL_PO_TD_NUM_STYLE_ : EMAIL_PO_TD_STYLE_;
-      const classAttr = isNum ? " class=\"email-num\"" : "";
-      return "<td" + classAttr + " style=\"" + tdStyle + "\">" + escapeHtml_(row[col]) + "</td>";
+function emailPoThExtraStyle_(col) {
+  if (col === "_num") return "width:36px;min-width:36px;text-align:center;";
+  if (col === "PO #") return "width:68px;min-width:68px;max-width:76px;";
+  if (col === "House #") return "width:84px;min-width:84px;";
+  return "";
+}
+
+function emailExfPoThExtraStyle_(col) {
+  if (col === "EXF Memo") {
+    return "min-width:160px;width:32%;white-space:normal;";
+  }
+  if (col === "_num") return "width:36px;min-width:36px;max-width:36px;text-align:center;";
+  if (col === "PO #") return "width:68px;min-width:68px;max-width:76px;";
+  if (col === "Style #") return "width:72px;min-width:72px;max-width:88px;";
+  if (col === "Buyer") return "width:80px;min-width:80px;max-width:96px;";
+  if (col === "Buyer PO #") return "width:88px;min-width:88px;max-width:100px;";
+  if (col === "PO Qty") return "width:72px;min-width:72px;max-width:80px;";
+  if (col === "Ship Method") return "width:88px;min-width:88px;max-width:100px;";
+  if (col === "CXL Date") return "width:80px;min-width:80px;max-width:88px;";
+  return "";
+}
+
+function emailExfPoCellClass_(col) {
+  if (col === "EXF Memo") return " class=\"email-memo-cell\"";
+  return emailPoCellClass_(col);
+}
+
+function emailExfPoCellStyle_(col) {
+  if (col === "EXF Memo") {
+    return EMAIL_PO_TD_STYLE_ + "min-width:160px;word-break:break-word;white-space:normal;";
+  }
+  return emailPoCellStyle_(col);
+}
+
+function emailPoCellClass_(col) {
+  if (col === "_num") return " class=\"email-row-num\"";
+  if (col === "Actual Qty" || col === "Ctn Qty" || col === "_weight" || col === "PO Qty") return " class=\"email-num\"";
+  return "";
+}
+
+function emailPoCellStyle_(col) {
+  if (col === "_num") return EMAIL_PO_TD_ROW_NUM_STYLE_;
+  if (col === "Actual Qty" || col === "Ctn Qty" || col === "_weight" || col === "PO Qty") return EMAIL_PO_TD_NUM_STYLE_;
+  return EMAIL_PO_TD_STYLE_;
+}
+
+function emailPoHeaderLabel_(col, labels) {
+  if (col === "_num") return "\u00a0";
+  return labels[col] || col;
+}
+
+function getRequestEmailPoCellValue_(row, col, rowIndex, weightByPo) {
+  if (col === "_num") return String(rowIndex + 1);
+  if (col === "_weight") {
+    const po = String(row["PO #"] ?? "").trim();
+    return formatEmailWeight_(weightByPo[po] || 0) || "";
+  }
+  return String(row[col] ?? "");
+}
+
+function getEmailPoFooterLabelCol_(columns, qtyFooterCol) {
+  const qtyIdx = columns.indexOf(qtyFooterCol);
+  if (qtyIdx <= 0) return null;
+  for (let i = qtyIdx - 1; i >= 0; i--) {
+    if (columns[i] !== "_num") return columns[i];
+  }
+  return null;
+}
+
+function buildEmailPoTableFooterRowHtml_(columns, totals, options) {
+  options = options || {};
+  const hasCtnQty = options.hasCtnQty !== false;
+  const qtyFooterCol = options.qtyFooterCol || "Actual Qty";
+  const labelCol = getEmailPoFooterLabelCol_(columns, qtyFooterCol);
+  return "<tr>" + columns.map(col => {
+    const base = EMAIL_PO_FOOTER_TD_STYLE_;
+    if (col === "_num") {
+      return "<td style=\"" + base + "\"></td>";
+    }
+    if (col === labelCol) {
+      return "<td style=\"" + base + "text-align:right;\">Total</td>";
+    }
+    if (col === qtyFooterCol) {
+      const qty = qtyFooterCol === "PO Qty" ? totals.orderQty : totals.unitQty;
+      return "<td class=\"email-num\" style=\"" + base + "text-align:right;\">" +
+        escapeHtml_(formatEmailQty_(qty)) + "</td>";
+    }
+    if (col === "Ctn Qty" && hasCtnQty) {
+      return "<td class=\"email-num\" style=\"" + base + "text-align:right;\">" +
+        escapeHtml_(formatEmailQty_(totals.ctnQty)) + "</td>";
+    }
+    if (col === "_weight") {
+      return "<td class=\"email-num\" style=\"" + base + "text-align:right;\">" +
+        escapeHtml_(formatEmailWeight_(totals.totalWeight) || "—") + "</td>";
+    }
+    return "<td style=\"" + base + "\"></td>";
+  }).join("") + "</tr>";
+}
+
+function buildEmailPoTableHtml_(columns, labels, rows, weightByPo, getCellValue, footerOptions) {
+  const headerCells = columns.map(col => {
+    const label = emailPoHeaderLabel_(col, labels);
+    return "<th style=\"" + EMAIL_PO_TH_STYLE_ + emailPoThExtraStyle_(col) + "\">" +
+      escapeHtml_(label) + "</th>";
+  }).join("");
+  const lastRowIndex = rows.length - 1;
+  const bodyRows = rows.map((row, rowIndex) => {
+    const isLastRow = rowIndex === lastRowIndex;
+    return "<tr>" + columns.map(col => {
+      const value = getCellValue(row, col, rowIndex, weightByPo);
+      let cellStyle = emailPoCellStyle_(col);
+      if (isLastRow) cellStyle = cellStyle.replace("border-bottom:1px solid #e5e7eb;", "border-bottom:none;");
+      return "<td" + emailPoCellClass_(col) + " style=\"" + cellStyle + "\">" +
+        escapeHtml_(value) + "</td>";
     }).join("") + "</tr>";
   }).join("");
-  const footerRow = "<tr><td colspan=\"" + colCount + "\" style=\"padding:10px 12px;font-weight:600;background-color:#eef0f3;color:#1a1a18;border-top:2px solid #cbd0d6;font-size:13px;\">" +
-    escapeHtml_(buildRequestEmailTotalsLine_(rows, weightByPo)) +
-    "</td></tr>";
+  const totals = computeRequestEmailTotals_(rows, weightByPo);
+  const footerRow = buildEmailPoTableFooterRowHtml_(columns, totals, footerOptions);
   return "<table class=\"email-po-table\" role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"width:100%;border-collapse:collapse;margin-top:20px;border:1px solid #e5e7eb;font-size:13px;\">" +
     "<thead><tr>" + headerCells + "</tr></thead>" +
     "<tbody>" + bodyRows + "</tbody>" +
     "<tfoot>" + footerRow + "</tfoot></table>";
 }
 
+function buildRequestEmailPoTableHtml_(rows, weightByPo) {
+  return buildEmailPoTableHtml_(
+    REQUEST_EMAIL_TABLE_COLUMNS,
+    REQUEST_EMAIL_TABLE_LABELS,
+    rows,
+    weightByPo,
+    getRequestEmailPoCellValue_,
+    { hasCtnQty: true }
+  );
+}
+
 function buildRequestEmailPoTableText_(rows, weightByPo) {
-  const labels = REQUEST_EMAIL_TABLE_COLUMNS.map(col => REQUEST_EMAIL_TABLE_LABELS[col] || col);
+  const textColumns = REQUEST_EMAIL_TABLE_COLUMNS.filter(col => col !== "_num" && col !== "_weight");
+  const labels = [""].concat(textColumns.map(col => REQUEST_EMAIL_TABLE_LABELS[col] || col)).concat(["Weight"]);
   const lines = [labels.join(" | ")];
-  rows.forEach(row => {
-    lines.push(REQUEST_EMAIL_TABLE_COLUMNS.map(col => String(row[col] ?? "")).join(" | "));
+  rows.forEach((row, rowIndex) => {
+    const po = String(row["PO #"] ?? "").trim();
+    const cells = [String(rowIndex + 1)]
+      .concat(textColumns.map(col => String(row[col] ?? "")))
+      .concat([formatEmailWeight_(weightByPo[po] || 0) || ""]);
+    lines.push(cells.join(" | "));
   });
   lines.push("");
   lines.push(buildRequestEmailTotalsLine_(rows, weightByPo));
@@ -1758,11 +1894,16 @@ function buildDeliveryPickupRequestEmailHtml_(requestType, requestId, rows, requ
   const weightByPo = getPackingWeightByPo_();
 
   const hasTo = !!String(requestData["To"] ?? "").trim();
+  const headerRequestDate = formatEmailDate_(requestData["Request Date"]);
+  const requestTypeLabel = requestType + " Request";
   return renderEmailTemplate_("templates/email-delivery-pickup", {
     requestType: requestType,
     requestTypeLower: requestType.toLowerCase(),
+    requestTypeLabel: requestTypeLabel,
     requestId: requestId,
-    requestDate: formatEmailDate_(requestData["Request Date"]),
+    headerRequestDate: headerRequestDate,
+    requestHeaderHtml: buildEmailRequestHeaderHtml_(requestTypeLabel, requestId, headerRequestDate),
+    requestDate: headerRequestDate,
     typeDate: formatEmailDate_(requestData[dateField] ?? ""),
     poCount: rows.length,
     fromBlockHtml: buildDeliveryPickupFromBlockHtml_(requestData["From"], requestData["Pickup Address"], !hasTo),
@@ -1795,7 +1936,7 @@ function buildDeliveryPickupRequestEmailText_(requestType, requestId, rows, requ
   lines.push("");
   lines.push(buildRequestEmailPoTableText_(rows, weightByPo));
   lines.push("");
-  lines.push("Thank you.");
+  lines.push("www.elevatordisco.com");
   return lines.join("\n");
 }
 
@@ -1822,9 +1963,14 @@ function sendDeliveryPickupRequestEmail_(requestType, requestId, emailInfo, rows
 
 function buildAsnRequestEmailHtml_(requestId, rows, requestData) {
   const weightByPo = getPackingWeightByPo_();
+  const headerRequestDate = formatEmailDate_(requestData["Request Date"]);
+  const requestTypeLabel = "ASN Request";
   return renderEmailTemplate_("templates/email-asn", {
+    requestTypeLabel: requestTypeLabel,
     requestId: requestId,
-    requestDate: formatEmailDate_(requestData["Request Date"]),
+    headerRequestDate: headerRequestDate,
+    requestHeaderHtml: buildEmailRequestHeaderHtml_(requestTypeLabel, requestId, headerRequestDate),
+    requestDate: headerRequestDate,
     asnDate: formatEmailDate_(requestData[ASN_DATE_FIELD] ?? ""),
     buyer: String(requestData["Buyer"] ?? ""),
     poCount: rows.length,
@@ -1851,7 +1997,7 @@ function buildAsnRequestEmailText_(requestId, rows, requestData) {
   lines.push("");
   lines.push(buildRequestEmailPoTableText_(rows, weightByPo));
   lines.push("");
-  lines.push("Thank you.");
+  lines.push("www.elevatordisco.com");
   return lines.join("\n");
 }
 
@@ -1894,37 +2040,66 @@ function getExfReqCcFromRequestRecord_(request, vendor) {
   return String(request[EXF_REQ_CC_FIELD] ?? request["Vendor CC"] ?? "").trim() || stored.cc;
 }
 
+const EXF_EMAIL_TABLE_COLUMNS = [
+  "_num", "PO #", "Style #", "Buyer", "Buyer PO #", "PO Qty", "Ship Method", "CXL Date", "EXF Memo"
+];
+
+const EXF_EMAIL_TABLE_LABELS = {
+  "PO Qty": "Order Qty",
+};
+
+function buildExfEmailTotalsLine_(rows) {
+  const totals = computeRequestEmailTotals_(rows, {});
+  return "Total | Order Qty: " + formatEmailQty_(totals.orderQty);
+}
+
+function getExfEmailPoCellValue_(row, col, rowIndex, weightByPo, memos, shipMethods) {
+  const po = String(row["PO #"] ?? "");
+  if (col === "_num") return String(rowIndex + 1);
+  if (col === "Ship Method") return String(shipMethods[po] ?? row["Ship Method"] ?? "");
+  if (col === "CXL Date") return formatEmailDate_(row["CXL Date"]);
+  if (col === "EXF Memo") return String(memos[po] ?? row[EXF_MEMO_FIELD] ?? "");
+  return String(row[col] ?? "");
+}
+
 function buildExfRequestEmailPoTableHtml_(rows, memos, shipMethods, weightByPo) {
-  const headers = ["PO #", "Style #", "Buyer", "Buyer PO #", "Unit Qty", "Ship Method", "CXL Date", "EXF Memo"];
-  const headerCells = headers.map(label =>
-    "<th style=\"" + EMAIL_PO_TH_STYLE_ + "\">" + escapeHtml_(label) + "</th>"
-  ).join("");
-  const bodyRows = rows.map(row => {
-    const po = String(row["PO #"] ?? "");
-    return "<tr>" +
-      "<td style=\"" + EMAIL_PO_TD_STYLE_ + "\">" + escapeHtml_(po) + "</td>" +
-      "<td style=\"" + EMAIL_PO_TD_STYLE_ + "\">" + escapeHtml_(row["Style #"]) + "</td>" +
-      "<td style=\"" + EMAIL_PO_TD_STYLE_ + "\">" + escapeHtml_(row["Buyer"]) + "</td>" +
-      "<td style=\"" + EMAIL_PO_TD_STYLE_ + "\">" + escapeHtml_(row["Buyer PO #"]) + "</td>" +
-      "<td class=\"email-num\" style=\"" + EMAIL_PO_TD_NUM_STYLE_ + "\">" + escapeHtml_(row["Actual Qty"]) + "</td>" +
-      "<td style=\"" + EMAIL_PO_TD_STYLE_ + "\">" + escapeHtml_(shipMethods[po] ?? row["Ship Method"]) + "</td>" +
-      "<td style=\"" + EMAIL_PO_TD_STYLE_ + "\">" + escapeHtml_(formatEmailDate_(row["CXL Date"])) + "</td>" +
-      "<td style=\"" + EMAIL_PO_TD_STYLE_ + "\">" + escapeHtml_(memos[po] ?? row[EXF_MEMO_FIELD]) + "</td>" +
-    "</tr>";
+  const columns = EXF_EMAIL_TABLE_COLUMNS;
+  const headerCells = columns.map(col => {
+    const label = emailPoHeaderLabel_(col, EXF_EMAIL_TABLE_LABELS);
+    return "<th style=\"" + EMAIL_PO_TH_STYLE_ + emailExfPoThExtraStyle_(col) + "\">" +
+      escapeHtml_(label) + "</th>";
   }).join("");
-  const footerRow = "<tr><td colspan=\"8\" style=\"padding:10px 12px;font-weight:600;background-color:#eef0f3;color:#1a1a18;border-top:2px solid #cbd0d6;font-size:13px;\">" +
-    escapeHtml_(buildRequestEmailTotalsLine_(rows, weightByPo)) +
-    "</td></tr>";
-  return "<table class=\"email-po-table\" role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"width:100%;border-collapse:collapse;margin-top:20px;border:1px solid #e5e7eb;font-size:13px;\">" +
+  const lastRowIndex = rows.length - 1;
+  const bodyRows = rows.map((row, rowIndex) => {
+    const isLastRow = rowIndex === lastRowIndex;
+    return "<tr>" + columns.map(col => {
+      const value = getExfEmailPoCellValue_(row, col, rowIndex, weightByPo, memos, shipMethods);
+      let cellStyle = emailExfPoCellStyle_(col);
+      if (isLastRow) cellStyle = cellStyle.replace("border-bottom:1px solid #e5e7eb;", "border-bottom:none;");
+      return "<td" + emailExfPoCellClass_(col) + " style=\"" + cellStyle + "\">" +
+        escapeHtml_(value) + "</td>";
+    }).join("") + "</tr>";
+  }).join("");
+  const totals = computeRequestEmailTotals_(rows, weightByPo);
+  const footerRow = buildEmailPoTableFooterRowHtml_(columns, totals, {
+    hasCtnQty: false,
+    qtyFooterCol: "PO Qty",
+  });
+  return "<table class=\"email-po-table email-exf-table\" role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"width:100%;table-layout:auto;border-collapse:collapse;margin-top:20px;border:1px solid #e5e7eb;font-size:13px;\">" +
     "<thead><tr>" + headerCells + "</tr></thead>" +
     "<tbody>" + bodyRows + "</tbody>" +
     "<tfoot>" + footerRow + "</tfoot></table>";
 }
 
-function buildExfRequestEmailHtml_(requestId, vendor, rows, exfDate, exfReqNotes, memos, shipMethods) {
+function buildExfRequestEmailHtml_(requestId, vendor, rows, exfDate, exfReqNotes, memos, shipMethods, headerRequestDate) {
   const weightByPo = getPackingWeightByPo_();
+  const requestTypeLabel = "EXF Request";
+  const safeHeaderDate = formatEmailDate_(headerRequestDate);
   return renderEmailTemplate_("templates/email-exf", {
+    requestTypeLabel: requestTypeLabel,
     requestId: requestId,
+    headerRequestDate: safeHeaderDate,
+    requestHeaderHtml: buildEmailRequestHeaderHtml_(requestTypeLabel, requestId, safeHeaderDate),
     vendor: vendor,
     exfDate: exfDate,
     poCount: rows.length,
@@ -1947,28 +2122,29 @@ function buildExfRequestEmailText_(requestId, vendor, rows, exfDate, exfReqNotes
   ];
   if (exfReqNotes) lines.push("Notes: " + exfReqNotes);
   lines.push("");
-  lines.push("PO # | Style # | Buyer | Buyer PO # | Unit Qty | Ship Method | CXL Date | EXF Memo");
-  rows.forEach(row => {
+  lines.push(" | PO # | Style # | Buyer | Buyer PO # | Order Qty | Ship Method | CXL Date | EXF Memo");
+  rows.forEach((row, rowIndex) => {
     const po = String(row["PO #"] ?? "");
     lines.push([
+      String(rowIndex + 1),
       po,
       String(row["Style #"] ?? ""),
       String(row["Buyer"] ?? ""),
       String(row["Buyer PO #"] ?? ""),
-      String(row["Actual Qty"] ?? ""),
+      String(row["PO Qty"] ?? ""),
       String(shipMethods[po] ?? row["Ship Method"] ?? ""),
       formatEmailDate_(row["CXL Date"]),
       String(memos[po] ?? row[EXF_MEMO_FIELD] ?? ""),
     ].join(" | "));
   });
   lines.push("");
-  lines.push(buildRequestEmailTotalsLine_(rows, weightByPo));
+  lines.push(buildExfEmailTotalsLine_(rows));
   lines.push("");
-  lines.push("Thank you.");
+  lines.push("www.elevatordisco.com");
   return lines.join("\n");
 }
 
-function sendExfRequestEmail_(requestId, vendor, vendorEmailInfo, rows, exfDate, exfReqNotes, memos, shipMethods) {
+function sendExfRequestEmail_(requestId, vendor, vendorEmailInfo, rows, exfDate, exfReqNotes, memos, shipMethods, headerRequestDate) {
   if (!vendorEmailInfo.to) {
     throw new Error("No vendor email found for " + vendor + ". Add it to the Vendors sheet.");
   }
@@ -1978,7 +2154,9 @@ function sendExfRequestEmail_(requestId, vendor, vendorEmailInfo, rows, exfDate,
     exfDate: displayDate,
     vendor: vendor,
   });
-  const htmlBody = buildExfRequestEmailHtml_(requestId, vendor, rows, displayDate, exfReqNotes, memos, shipMethods);
+  const htmlBody = buildExfRequestEmailHtml_(
+    requestId, vendor, rows, displayDate, exfReqNotes, memos, shipMethods, headerRequestDate
+  );
   const options = {
     to: vendorEmailInfo.to,
     subject: subject,
@@ -2027,7 +2205,10 @@ function sendAndFinalizeExfRequestEmail_(exfRequestsSheet, found) {
       shipMethods[po] = row["Ship Method"] ?? "";
     });
 
-    sendExfRequestEmail_(requestId, vendor, vendorEmailInfo, poRows, exfDate, exfReqNotes, memos, shipMethods);
+    sendExfRequestEmail_(
+      requestId, vendor, vendorEmailInfo, poRows, exfDate, exfReqNotes, memos, shipMethods,
+      formatEmailDate_(request["Request Date"])
+    );
     markExfRequestPosRequested_(poSheet, poNumbers, exfDate, memos, shipMethods);
     emailSent = true;
   } catch (err) {
@@ -2114,8 +2295,8 @@ function handleExfRequest(payload) {
     return corsResponse({ success: false, error: "Select Shipping Method for all POs before submitting." });
   }
   const poSheet = ensurePoWorkflowHeaders_();
-  let poRows;
-  let vendor;
+  let poRows = [];
+  let vendor = "";
   try {
     poRows = getPoObjectsByNumbers_(poSheet, poNumbers);
     vendor = assertSingleVendorForRows_(poRows);
@@ -2143,8 +2324,10 @@ function handleExfRequest(payload) {
   let emailSent = false;
   let emailError = "";
   try {
-    poRows = getPoObjectsByNumbers_(poSheet, poNumbers);
-    sendExfRequestEmail_(requestId, vendor, vendorEmailInfo, poRows, exfDate, exfReqNotes, memos, shipMethods);
+    sendExfRequestEmail_(
+      requestId, vendor, vendorEmailInfo, poRows, exfDate, exfReqNotes, memos, shipMethods,
+      formatEmailDate_(new Date())
+    );
     markExfRequestPosRequested_(poSheet, poNumbers, exfDate, memos, shipMethods);
     emailSent = true;
   } catch (err) {
@@ -2152,6 +2335,7 @@ function handleExfRequest(payload) {
   }
 
   const now = new Date();
+  try {
   appendRequestRow_(exfRequestsSheet, EXF_REQUEST_ID_FIELD, requestId, EXF_REQUEST_DATA_FIELDS, {
     [EXF_DATE_FIELD]: exfDate,
     [EXF_REQ_SUBMIT_DATE_FIELD]: now,
@@ -2169,6 +2353,13 @@ function handleExfRequest(payload) {
     "Created At": now,
     "Updated At": now,
   });
+  } catch (err) {
+    return corsResponse({
+      success: false,
+      error: (err && err.message ? err.message : String(err)) || "Failed to save EXF request.",
+      emailError: emailError,
+    });
+  }
 
   if (!emailSent) {
     return corsResponse({

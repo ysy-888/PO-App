@@ -1,4 +1,10 @@
 const latestPackingUnitTotalsByPo = new Map();
+let modalSaveInProgress = false;
+let modalPackingEditorSnapshot = null;
+
+function isModalSaveInProgress() {
+  return modalSaveInProgress;
+}
 
 function bindFieldInteractions(fieldEl, col, row) {
   fieldEl.dataset.col = col;
@@ -180,17 +186,17 @@ function renderSizeGridBody(body, row) {
   rowHead.className = "modal-size-rowhead modal-size-rowhead--blank";
   chart.appendChild(rowHead);
 
+  const totalHead = document.createElement("div");
+  totalHead.className = "modal-size-totalhead";
+  totalHead.textContent = "Total";
+  chart.appendChild(totalHead);
+
   labels.forEach(label => {
     const head = document.createElement("div");
     head.className = "modal-size-colhead";
     head.textContent = label;
     chart.appendChild(head);
   });
-
-  const totalHead = document.createElement("div");
-  totalHead.className = "modal-size-totalhead";
-  totalHead.textContent = "Total";
-  chart.appendChild(totalHead);
 
   const packingActualUnits = getPackingUnitsForStyleChart(row);
   const hasPackingActualUnits = packingActualUnits.some(qty => toQtyNumber(qty) > 0);
@@ -211,6 +217,10 @@ function buildSizeGridRow(chart, row, label, unitFields, colCount, rowType) {
   head.className = "modal-size-rowhead";
   head.textContent = label;
   chart.appendChild(head);
+
+  const totalCell = document.createElement("div");
+  totalCell.className = `modal-size-total modal-size-total--${rowType}`;
+  chart.appendChild(totalCell);
 
   for (let i = 0; i < colCount; i++) {
     const field = unitFields[i];
@@ -238,18 +248,17 @@ function buildSizeGridRow(chart, row, label, unitFields, colCount, rowType) {
     chart.appendChild(input);
   }
 
-  const totalCell = document.createElement("div");
-  totalCell.className = `modal-size-total modal-size-total--${rowType}`;
-  chart.appendChild(totalCell);
-
   return totalCell;
 }
 
 function buildSizeVarianceRow(chart, colCount) {
   const head = document.createElement("div");
   head.className = "modal-size-rowhead modal-size-rowhead--variance";
-  head.textContent = "Difference %";
   chart.appendChild(head);
+
+  const totalCell = document.createElement("div");
+  totalCell.className = "modal-size-variance modal-size-variance--total";
+  chart.appendChild(totalCell);
 
   for (let i = 0; i < colCount; i++) {
     const cell = document.createElement("div");
@@ -257,10 +266,6 @@ function buildSizeVarianceRow(chart, colCount) {
     cell.dataset.index = String(i);
     chart.appendChild(cell);
   }
-
-  const totalCell = document.createElement("div");
-  totalCell.className = "modal-size-variance modal-size-variance--total";
-  chart.appendChild(totalCell);
 }
 
 function formatSizeGridTotal(qty) {
@@ -291,41 +296,55 @@ function refreshSizeGridTotals(row, poTotalCell, actTotalCell, packingActualUnit
   }
 }
 
-function setSizeVarianceCell(cell, value) {
+function setSizeVarianceCell(cell, poQty, actualQty) {
   cell.classList.remove("modal-size-variance--ok", "modal-size-variance--warn");
+  cell.replaceChildren();
+
+  const po = toQtyNumber(poQty);
+  const actual = toQtyNumber(actualQty);
+  if (po <= 0) {
+    cell.classList.remove("empty-display");
+    return;
+  }
+
+  const diff = actual - po;
+  if (diff === 0) {
+    cell.classList.remove("empty-display");
+    return;
+  }
+
+  const value = computeQtyVariancePercent(poQty, actualQty);
   if (!Number.isFinite(value)) {
-    cell.textContent = "";
     cell.classList.remove("empty-display");
     return;
   }
 
   cell.classList.remove("empty-display");
-  cell.textContent = formatQtyVariancePercent(value);
   cell.classList.add(value <= 10 ? "modal-size-variance--ok" : "modal-size-variance--warn");
+
+  const chevron = document.createElement("span");
+  chevron.className = `modal-size-variance-chevron modal-size-variance-chevron--${diff > 0 ? "up" : "down"}`;
+  chevron.setAttribute("aria-hidden", "true");
+
+  const valueEl = document.createElement("span");
+  valueEl.className = "modal-size-variance-value";
+  valueEl.textContent = formatQtyVariancePercent(value);
+
+  cell.append(chevron, valueEl);
 }
 
 function refreshSizeGridVariance(row, chartEl, packingActualUnits = getPackingUnitsForStyleChart(row)) {
   chartEl.querySelectorAll(".modal-size-variance[data-index]").forEach(cell => {
     const index = Number(cell.dataset.index);
-    const value = computeQtyVariancePercent(row[PO_UNIT_FIELDS[index]], packingActualUnits[index]);
-    setSizeVarianceCell(cell, value);
-
-    const actualCell = chartEl.querySelector(
-      `[data-row-type="act"][data-index="${index}"]`
-    );
-    if (actualCell) {
-      actualCell.classList.toggle("modal-size-input--variance-warn", Number.isFinite(value) && value > 10);
-    }
+    setSizeVarianceCell(cell, row[PO_UNIT_FIELDS[index]], packingActualUnits[index]);
   });
 
   const totalCell = chartEl.querySelector(".modal-size-variance--total");
   if (totalCell) {
     setSizeVarianceCell(
       totalCell,
-      computeQtyVariancePercent(
-        computePoQtyFromUnits(row),
-        packingActualUnits.reduce((sum, qty) => sum + toQtyNumber(qty), 0)
-      )
+      computePoQtyFromUnits(row),
+      packingActualUnits.reduce((sum, qty) => sum + toQtyNumber(qty), 0)
     );
   }
 }
@@ -989,16 +1008,16 @@ function createPackingListEditor(row, packingList, sourceCartons) {
     const blankHead = document.createElement("div");
     blankHead.className = "packing-list-rowhead packing-list-rowhead--blank";
     headGrid.appendChild(blankHead);
-    labels.forEach(label => {
+    const totalHead = document.createElement("div");
+    totalHead.className = "packing-list-totalhead";
+    totalHead.textContent = "Total";
+    headGrid.appendChild(totalHead);
+    labels.forEach((label, index) => {
       const head = document.createElement("div");
       head.className = "packing-list-colhead";
       head.textContent = label;
       headGrid.appendChild(head);
     });
-    const totalHead = document.createElement("div");
-    totalHead.className = "packing-list-totalhead";
-    totalHead.textContent = "Total";
-    headGrid.appendChild(totalHead);
 
     const weightHead = document.createElement("div");
     weightHead.className = "packing-list-weighthead packing-list-weighthead--hidden";
@@ -1006,28 +1025,38 @@ function createPackingListEditor(row, packingList, sourceCartons) {
     headGrid.appendChild(weightHead);
 
     const totalsLabel = document.createElement("div");
-    totalsLabel.className = "packing-list-rowhead packing-list-rowhead--carton";
-    totalsLabel.textContent = "ctn";
+    totalsLabel.className = "packing-list-rowhead packing-list-rowhead--blank";
     headGrid.appendChild(totalsLabel);
+    const grandTotal = document.createElement("div");
+    grandTotal.className = "packing-list-total packing-list-grand-total";
+    headGrid.appendChild(grandTotal);
     labels.forEach((_, index) => {
       const cell = document.createElement("div");
       cell.className = "packing-list-static packing-list-total-cell";
       cell.dataset.index = String(index);
       headGrid.appendChild(cell);
     });
-    const grandTotal = document.createElement("div");
-    grandTotal.className = "packing-list-total packing-list-grand-total";
-    headGrid.appendChild(grandTotal);
 
     const totalsWeightBlank = document.createElement("div");
     totalsWeightBlank.className = "packing-list-weight-blank";
     headGrid.appendChild(totalsWeightBlank);
+
+    const totalsDivider = document.createElement("div");
+    totalsDivider.className = "packing-list-grid-divider packing-list-grid-divider--horizontal";
+    totalsDivider.setAttribute("aria-hidden", "true");
+    headGrid.appendChild(totalsDivider);
 
     cartons.forEach((carton, cartonIndex) => {
       const rowHead = document.createElement("div");
       rowHead.className = "packing-list-rowhead packing-list-rowhead--carton";
       rowHead.textContent = String(cartonIndex + 1);
       bodyGrid.appendChild(rowHead);
+
+      const rowTotal = document.createElement("div");
+      rowTotal.className = "packing-list-total packing-list-row-total";
+      rowTotal.dataset.cartonIndex = String(cartonIndex);
+      rowTotal.textContent = formatPackingListTotal(computeCartonTotal(carton));
+      bodyGrid.appendChild(rowTotal);
 
       labels.forEach((_, unitIndex) => {
         const field = `Unit ${unitIndex + 1}`;
@@ -1044,20 +1073,16 @@ function createPackingListEditor(row, packingList, sourceCartons) {
         bodyGrid.appendChild(input);
       });
 
-      const rowTotal = document.createElement("div");
-      rowTotal.className = "packing-list-total packing-list-row-total";
-      rowTotal.dataset.cartonIndex = String(cartonIndex);
-      rowTotal.textContent = formatPackingListTotal(computeCartonTotal(carton));
-      bodyGrid.appendChild(rowTotal);
-
       const weightField = document.createElement("div");
       weightField.className = "packing-list-weight-field";
+      const weightInner = document.createElement("div");
+      weightInner.className = "packing-list-weight-inner";
       const weightInput = document.createElement("input");
       weightInput.type = "number";
       weightInput.min = "0";
       weightInput.step = "0.01";
       weightInput.inputMode = "decimal";
-      weightInput.className = "packing-list-input packing-list-weight-input";
+      weightInput.className = "packing-list-weight-input";
       weightInput.placeholder = EN_DASH;
       weightInput.value = isEmptyValue(carton[CARTON_WEIGHT_FIELD]) ? "" : String(carton[CARTON_WEIGHT_FIELD]);
       weightInput.dataset.cartonIndex = String(cartonIndex);
@@ -1066,7 +1091,8 @@ function createPackingListEditor(row, packingList, sourceCartons) {
       const weightSuffix = document.createElement("span");
       weightSuffix.className = "packing-list-weight-suffix";
       weightSuffix.textContent = "lbs";
-      weightField.append(weightInput, weightSuffix);
+      weightInner.append(weightInput, weightSuffix);
+      weightField.appendChild(weightInner);
       bodyGrid.appendChild(weightField);
     });
 
@@ -1236,26 +1262,149 @@ function createModalStylePhotosColumn(row) {
 
   category.appendChild(value);
   wrap.appendChild(category);
-  wrap.appendChild(createStylePhotoPlaceholders());
+  wrap.appendChild(createModalStylePhotos(row));
   return wrap;
 }
 
-function createStylePhotoPlaceholders() {
+function getStylePhotoUrl(row, field) {
+  return String(row?.[field] ?? "").trim();
+}
+
+function isStylePhotoUrl(url) {
+  return /^https?:\/\/.+/i.test(url);
+}
+
+function renderStylePhotoSlot(photoEl, field, row) {
+  const url = getStylePhotoUrl(row, field);
+  const photoIndex = STYLE_PHOTO_FIELDS.indexOf(field) + 1;
+
+  photoEl.innerHTML = "";
+  photoEl.classList.remove("modal-style-photo--has-image", "modal-style-photo--error", "editing");
+  delete photoEl.dataset.editing;
+
+  if (isStylePhotoUrl(url)) {
+    photoEl.classList.add("modal-style-photo--has-image");
+    const img = document.createElement("img");
+    img.className = "modal-style-photo-img";
+    img.src = url;
+    img.alt = `Style photo ${photoIndex}`;
+    img.loading = "lazy";
+    img.referrerPolicy = "no-referrer";
+    img.title = "Open in new tab";
+    img.addEventListener("click", e => {
+      e.stopPropagation();
+      window.open(url, "_blank", "noopener,noreferrer");
+    });
+    img.addEventListener("error", () => {
+      photoEl.classList.remove("modal-style-photo--has-image");
+      photoEl.classList.add("modal-style-photo--error");
+      img.remove();
+      const label = document.createElement("span");
+      label.className = "modal-style-photo-label";
+      label.textContent = "Image unavailable";
+      photoEl.appendChild(label);
+    });
+    photoEl.appendChild(img);
+    return;
+  }
+
+  const label = document.createElement("span");
+  label.className = "modal-style-photo-label";
+  label.textContent = url ? "Invalid URL" : `Photo ${photoIndex}`;
+  photoEl.appendChild(label);
+}
+
+function bindStylePhotoSlot(photoEl, field, row) {
+  photoEl.dataset.col = field;
+
+  if (!isPoFieldEditable(field, row)) {
+    photoEl.classList.add("readonly");
+    return;
+  }
+
+  photoEl.classList.add("editable");
+  photoEl.title = "Click to edit URL";
+  photoEl.addEventListener("click", e => {
+    if (photoEl.dataset.editing === "active") return;
+    if (e.target.classList.contains("modal-style-photo-img")) return;
+    e.stopPropagation();
+    mountStylePhotoEditor(photoEl, field, row);
+  });
+}
+
+function mountStylePhotoEditor(photoEl, field, row) {
+  if (isAppSaving() || !isPoFieldEditable(field, row)) return;
+  if (photoEl.dataset.editing === "active") return;
+
+  const originalVal = row[field] ?? "";
+  const input = createCellInput(field, originalVal);
+
+  photoEl.innerHTML = "";
+  photoEl.appendChild(input);
+  photoEl.classList.add("editing");
+  photoEl.dataset.editing = "active";
+
+  function finishEdit() {
+    delete photoEl.dataset.editing;
+    photoEl.classList.remove("editing");
+    renderStylePhotoSlot(photoEl, field, row);
+    updateModalSaveState();
+  }
+
+  function commit() {
+    const newVal = input.value.trim();
+    if (String(originalVal ?? "").trim() !== newVal) {
+      row[field] = newVal;
+    }
+    finishEdit();
+  }
+
+  function cancelEdit() {
+    finishEdit();
+  }
+
+  input.onblur = commit;
+  input.onkeydown = e => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      cancelEdit();
+    }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      input.blur();
+    }
+  };
+  input.focus();
+  input.select();
+}
+
+function commitActiveStylePhotoEditor() {
+  const active = document.querySelector("#modalOverlay .modal-style-photo[data-editing='active']");
+  if (!active || !modalRow) return;
+  const input = active.querySelector(".cell-input");
+  if (!input) return;
+  const col = active.dataset.col;
+  if (!col) return;
+
+  input.onblur = null;
+  modalRow[col] = input.value.trim();
+  renderStylePhotoSlot(active, col, modalRow);
+  delete active.dataset.editing;
+  active.classList.remove("editing");
+}
+
+function createModalStylePhotos(row) {
   const wrap = document.createElement("div");
   wrap.className = "modal-style-photos";
 
-  for (let i = 1; i <= 2; i++) {
+  STYLE_PHOTO_FIELDS.forEach(field => {
     const photo = document.createElement("div");
     photo.className = "modal-style-photo";
-    photo.setAttribute("aria-label", `Style photo ${i} placeholder`);
-
-    const label = document.createElement("span");
-    label.className = "modal-style-photo-label";
-    label.textContent = `Photo ${i}`;
-
-    photo.appendChild(label);
+    photo.setAttribute("aria-label", field);
+    renderStylePhotoSlot(photo, field, row);
+    bindStylePhotoSlot(photo, field, row);
     wrap.appendChild(photo);
-  }
+  });
 
   return wrap;
 }
@@ -1309,7 +1458,15 @@ function renderModalContent(row) {
     layout.appendChild(createPackingListSidePanel(row));
   }
   bodyEl.appendChild(layout);
-  updateModalSaveState();
+  if (packingListPanelOpen) {
+    requestAnimationFrame(() => {
+      syncModalPackingEditorSnapshot();
+      updateModalSaveState();
+    });
+  } else {
+    modalPackingEditorSnapshot = null;
+    updateModalSaveState();
+  }
 }
 
 function shouldIgnoreRowDblClick(e) {
@@ -1322,7 +1479,7 @@ function shouldIgnoreRowDblClick(e) {
 }
 
 function openPODetail(row) {
-  if (isAppSaving()) return;
+  if (isAppSaving() || modalSaveInProgress) return;
   closeCellSelectDropdown(false);
   packingListPanelOpen = hasPackingList(row?.["PO #"])
     || (typeof poHasShipment === "function" && poHasShipment(row));
@@ -1346,6 +1503,7 @@ function dismissModalOverlay() {
   closeCellSelectDropdown(false);
   modalRow = null;
   modalSnapshot = null;
+  modalPackingEditorSnapshot = null;
   packingListPanelOpen = false;
   clearModalFooterMessageForOverlay("modalOverlay");
   document.getElementById("modalOverlay")?.classList.remove("open");
@@ -1356,6 +1514,92 @@ function refreshChargebacksForPo(poNumber) {
   if (!modalRow || String(modalRow["PO #"]) !== String(poNumber)) return;
   updateModalIfOpen();
   if (typeof refreshChargebacksView === "function") refreshChargebacksView();
+}
+
+function snapshotPackingRelatedRowFields(row) {
+  const fields = ["Has Packing List", "Ctn Qty", "Actual Qty"];
+  for (let i = 1; i <= QTY_UNIT_COUNT; i++) fields.push(`Act Unit ${i}`);
+  const out = {};
+  fields.forEach(field => { out[field] = row[field]; });
+  return out;
+}
+
+function snapshotPackingStateForPo(poNumber, row) {
+  const key = normalizePoNumber(poNumber);
+  const packingList = getPackingListForPo(key);
+  return {
+    poNumber: key,
+    packingList: packingList ? { ...packingList } : null,
+    cartons: getPackingCartonsForPo(key).map(carton => ({ ...carton })),
+    rowFields: row ? snapshotPackingRelatedRowFields(row) : {},
+  };
+}
+
+function restorePackingStateForPo(snapshot, row) {
+  const key = snapshot.poNumber;
+  const current = getPackingListForPo(key);
+  const currentId = current ? getPackingListId(current) : "";
+  if (currentId) {
+    allPackingLists = allPackingLists.filter(item => getPackingListPoNumber(item) !== key);
+    allPackingCartons = allPackingCartons.filter(carton =>
+      String(carton?.[PACKING_LIST_ID_FIELD] ?? "").trim() !== currentId
+    );
+  }
+  if (snapshot.packingList) {
+    upsertLocalPackingList(
+      key,
+      getPackingListId(snapshot.packingList),
+      snapshot.packingList,
+      snapshot.cartons
+    );
+  }
+  latestPackingUnitTotalsByPo.set(
+    key,
+    snapshot.cartons.length ? computePackingTotalsByUnit(snapshot.cartons) : getPackingUnitTotalsForPo(key)
+  );
+  if (row && snapshot.rowFields) {
+    Object.assign(row, snapshot.rowFields);
+    applyModalUpdatesToTableRow(key, snapshot.rowFields);
+  }
+  invalidatePackingIndex();
+}
+
+function applyPackingListLocally(poNumber, existingPackingList, packingList, cartons, filteredPoUpdates, row) {
+  const provisionalId = getPackingListId(existingPackingList) || generateDemoPackingListId();
+  const packingPoUpdates = buildPackingPoUpdatesFromCartons(cartons, cartons.length);
+  const mergedUpdates = { ...filteredPoUpdates, ...packingPoUpdates };
+  upsertLocalPackingList(poNumber, provisionalId, packingList, cartons);
+  latestPackingUnitTotalsByPo.set(poNumber, computePackingTotalsByUnit(cartons));
+  Object.assign(row, mergedUpdates);
+  applyModalUpdatesToTableRow(poNumber, mergedUpdates);
+  return { mergedUpdates, provisionalId };
+}
+
+async function syncPackingListToServer(poNumber, packingList, cartons, filteredPoUpdates, provisionalId, row) {
+  const json = await postAppsScript({
+    action: "savePackingList",
+    poNumber,
+    packingList,
+    cartons,
+    updates: filteredPoUpdates,
+  });
+  if (!json.success) throw new Error(json.error);
+
+  const packingListId = json.packingListId || provisionalId;
+  if (packingListId !== provisionalId) {
+    allPackingLists = allPackingLists.filter(item => getPackingListId(item) !== provisionalId);
+    allPackingCartons = allPackingCartons.filter(carton =>
+      String(carton?.[PACKING_LIST_ID_FIELD] ?? "").trim() !== provisionalId
+    );
+  }
+  upsertLocalPackingList(poNumber, packingListId, packingList, cartons);
+  latestPackingUnitTotalsByPo.set(poNumber, computePackingTotalsByUnit(cartons));
+  const poUpdates = json.poUpdates || {};
+  if (Object.keys(poUpdates).length > 0) {
+    Object.assign(row, poUpdates);
+    applyModalUpdatesToTableRow(poNumber, poUpdates);
+  }
+  return poUpdates;
 }
 
 function upsertLocalPackingList(poNumber, packingListId, packingList, cartons) {
@@ -1387,7 +1631,7 @@ function upsertLocalPackingList(poNumber, packingListId, packingList, cartons) {
 }
 
 async function deletePackingListFromPanel(row, packingList) {
-  if (isAppSaving()) return;
+  if (modalSaveInProgress || isAppSaving()) return;
   const packingListId = getPackingListId(packingList);
   const poNumber = String(row["PO #"] ?? "").trim();
   if (!packingListId && !poNumber) return;
@@ -1405,7 +1649,8 @@ async function deletePackingListFromPanel(row, packingList) {
     return;
   }
 
-  setAppSaving(true, "Deleting packing list...");
+  modalSaveInProgress = true;
+  showIndicator(`Deleting packing list${ELLIPSIS}`, "");
   try {
     const json = await postAppsScript({
       action: "deletePackingList",
@@ -1424,7 +1669,7 @@ async function deletePackingListFromPanel(row, packingList) {
   } catch (err) {
     showIndicator("Packing list delete failed: " + err.message, "error");
   } finally {
-    setAppSaving(false);
+    modalSaveInProgress = false;
   }
 }
 
@@ -1454,7 +1699,33 @@ function getActivePackingListPayload() {
   };
 }
 
-async function persistPackingListPayload({ editor, row, existingPackingList, cartons }, poEditUpdates = {}) {
+function serializePackingEditorState(editor, cartons) {
+  const countInput = editor?.querySelector(".packing-list-count-input");
+  const cartonCount = Math.max(1, Math.floor(Number(countInput?.value) || cartons.length || 1));
+  return JSON.stringify({
+    cartonCount,
+    cartons: normalizePackingCartonsForSave(cartons),
+  });
+}
+
+function syncModalPackingEditorSnapshot() {
+  const payload = getActivePackingListPayload();
+  if (!payload) {
+    modalPackingEditorSnapshot = null;
+    return;
+  }
+  modalPackingEditorSnapshot = serializePackingEditorState(payload.editor, payload.editor.__getPackingCartons());
+}
+
+function hasPackingListPendingChanges() {
+  if (!packingListPanelOpen) return false;
+  const payload = getActivePackingListPayload();
+  if (!payload || !modalPackingEditorSnapshot) return false;
+  const current = serializePackingEditorState(payload.editor, payload.editor.__getPackingCartons());
+  return current !== modalPackingEditorSnapshot;
+}
+
+function preparePackingListSave({ editor, row, existingPackingList, cartons }, poEditUpdates = {}) {
   const poNumber = normalizePoNumber(row["PO #"]);
   if (!poNumber) return null;
 
@@ -1468,33 +1739,48 @@ async function persistPackingListPayload({ editor, row, existingPackingList, car
     "Carton Count": cartons.length,
     "Notes": existingPackingList?.["Notes"] || "",
   };
-  const packingPoUpdates = buildPackingPoUpdatesFromCartons(cartons, cartons.length);
 
   if (isDemoMode()) {
     const packingListId = getPackingListId(existingPackingList) || generateDemoPackingListId();
     upsertLocalPackingList(poNumber, packingListId, packingList, cartons);
     latestPackingUnitTotalsByPo.set(poNumber, computePackingTotalsByUnit(cartons));
-    const mergedUpdates = { ...filteredPoUpdates, ...packingPoUpdates };
+    const mergedUpdates = {
+      ...filteredPoUpdates,
+      ...buildPackingPoUpdatesFromCartons(cartons, cartons.length),
+    };
     Object.assign(row, mergedUpdates);
     applyModalUpdatesToTableRow(poNumber, mergedUpdates);
-    return mergedUpdates;
+    return { mergedUpdates, syncToServer: null };
   }
 
-  const json = await postAppsScript({
-    action: "savePackingList",
+  const snapshot = snapshotPackingStateForPo(poNumber, row);
+  const { mergedUpdates, provisionalId } = applyPackingListLocally(
     poNumber,
+    existingPackingList,
     packingList,
     cartons,
-    updates: filteredPoUpdates,
-  });
-  if (!json.success) throw new Error(json.error);
-  const packingListId = json.packingListId || getPackingListId(existingPackingList);
-  upsertLocalPackingList(poNumber, packingListId, packingList, cartons);
-  latestPackingUnitTotalsByPo.set(poNumber, computePackingTotalsByUnit(cartons));
-  const poUpdates = json.poUpdates || { ...filteredPoUpdates, ...packingPoUpdates };
-  Object.assign(row, poUpdates);
-  applyModalUpdatesToTableRow(poNumber, poUpdates);
-  return poUpdates;
+    filteredPoUpdates,
+    row
+  );
+
+  return {
+    mergedUpdates,
+    syncToServer: async () => {
+      try {
+        return await syncPackingListToServer(
+          poNumber,
+          packingList,
+          cartons,
+          filteredPoUpdates,
+          provisionalId,
+          row
+        );
+      } catch (err) {
+        restorePackingStateForPo(snapshot, row);
+        throw err;
+      }
+    },
+  };
 }
 
 async function addChargebackRow(rowEl, poNumber) {
@@ -1595,7 +1881,7 @@ async function deleteChargebackRow(rowEl, poNumber) {
 }
 
 function cancelModalChanges() {
-  if (isAppSaving()) return;
+  if (isAppSaving() || modalSaveInProgress) return;
   commitActiveModalEditor();
   dismissModalOverlay();
 }
@@ -1607,31 +1893,52 @@ function applyModalUpdatesToTableRow(poNumber, updates) {
 }
 
 async function saveModalChanges() {
-  if (isAppSaving() || !modalRow || !modalSnapshot) return;
+  if (isAppSaving() || modalSaveInProgress || !modalRow || !modalSnapshot) return;
+  if (!hasModalPendingChanges()) return;
   commitActiveModalEditor();
 
   const updates = getModalPendingUpdates();
   const packingPayload = getActivePackingListPayload();
-  if (Object.keys(updates).length === 0 && !packingPayload) {
-    dismissModalOverlay();
-    return;
-  }
+  const hasPackingChanges = hasPackingListPendingChanges();
+  if (Object.keys(updates).length === 0 && !hasPackingChanges) return;
 
   const poNumber = modalRow["PO #"];
-  setAppSaving(true, "Saving…");
-  try {
-    if (packingPayload) {
-      const savedPackingUpdates = await persistPackingListPayload(packingPayload, updates);
-      if (!savedPackingUpdates) return;
-      applyModalUpdatesToTableRow(poNumber, savedPackingUpdates);
-      modalSnapshot = snapshotModalRow(modalRow);
-      renderModalContent(modalRow);
-      updateModalSaveState();
-      queuePoTableRefresh();
+
+  if (packingPayload && hasPackingChanges) {
+    const prepared = preparePackingListSave(packingPayload, updates);
+    if (!prepared) return;
+
+    const poNumber = modalRow["PO #"];
+    if (prepared.mergedUpdates) {
+      applyModalUpdatesToTableRow(poNumber, prepared.mergedUpdates);
+    }
+
+    dismissModalOverlay();
+    queuePoTableRefresh();
+
+    if (!prepared.syncToServer) {
       showIndicator(`Saved ${CHECK_MARK}`, "success");
       return;
     }
 
+    modalSaveInProgress = true;
+    showIndicator(`Saving packing list${ELLIPSIS}`, "");
+    try {
+      await prepared.syncToServer();
+      queuePoTableRefresh();
+      showIndicator(`Saved ${CHECK_MARK}`, "success");
+    } catch (err) {
+      queuePoTableRefresh();
+      showIndicator("Save failed: " + err.message, "error");
+    } finally {
+      modalSaveInProgress = false;
+    }
+    return;
+  }
+
+  modalSaveInProgress = true;
+  showIndicator(`Saving${ELLIPSIS}`, "");
+  try {
     const ok = await saveUpdate(poNumber, updates, { silent: true });
     if (!ok) {
       showIndicator("Save failed", "error");
@@ -1644,7 +1951,7 @@ async function saveModalChanges() {
   } catch (err) {
     showIndicator("Save failed: " + err.message, "error");
   } finally {
-    setAppSaving(false);
+    modalSaveInProgress = false;
   }
 }
 

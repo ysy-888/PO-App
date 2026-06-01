@@ -222,7 +222,7 @@ function getModalPendingUpdates() {
 }
 
 function hasModalPendingChanges() {
-  return Object.keys(getModalPendingUpdates()).length > 0 || packingListPanelOpen;
+  return Object.keys(getModalPendingUpdates()).length > 0 || hasPackingListPendingChanges();
 }
 
 function updateModalSaveState() {
@@ -245,6 +245,9 @@ function refreshAfterModalFieldEdit(fieldEl, col, row) {
 }
 
 function commitActiveModalEditor() {
+  if (typeof commitActiveStylePhotoEditor === "function") {
+    commitActiveStylePhotoEditor();
+  }
   const active = document.querySelector("#modalOverlay .modal-field-value[data-editing='active']");
   if (!active || !modalRow) return;
   const input = active.querySelector(".cell-input, .cell-textarea");

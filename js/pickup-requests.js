@@ -30,6 +30,7 @@ let pickupRequestDraftFrom = "";
 let pickupRequestDraftTo = "";
 let pickupRequestDraftNotes = "";
 let pickupRequestModalRow = null;
+let pickupRequestOpInProgress = false;
 
 function normalizePickupRequest(row) {
   return { ...row };
@@ -131,13 +132,17 @@ function renderPickupRequestTable() {
       tr.appendChild(td);
     });
     tbody.appendChild(tr);
+    attachRequestTableRowDblClick(tr, () => {
+      const id = String(request[PICKUP_REQUEST_ID_FIELD] ?? "").trim();
+      if (id) openPickupRequestDetail(id);
+    });
   });
   updatePickupRequestRowCounter();
 }
 
 async function resendPickupRequestEmail(requestId) {
-  if (isAppSaving() || !requestId) return;
-  setAppSaving(true, "Resending pickup email…");
+  if (pickupRequestOpInProgress || !requestId) return;
+  pickupRequestOpInProgress = true;
   showIndicator(`Resending pickup email${ELLIPSIS}`, "");
   try {
     if (isDemoMode()) {
@@ -151,7 +156,13 @@ async function resendPickupRequestEmail(requestId) {
     } else {
       const json = await postAppsScript({ action: "resendPickupRequestEmail", pickupRequestId: requestId });
       if (!json.success) throw new Error(json.error);
-      await loadData();
+      const request = allPickupRequests.find(r => String(r[PICKUP_REQUEST_ID_FIELD] ?? "").trim() === requestId);
+      if (request) {
+        request["Email Status"] = json.emailSent ? "Sent" : "Failed";
+        request["Email Error"] = json.emailError ?? "";
+        if (json.emailSent) request["Email Sent At"] = formatDateToYmd(new Date());
+        applyPickupRequestFilters();
+      }
       if (!json.emailSent) {
         showIndicator(`Pickup email not sent: ${json.emailError || "Missing email"}`, "error");
         return;
@@ -161,7 +172,7 @@ async function resendPickupRequestEmail(requestId) {
   } catch (err) {
     showIndicator("Resend failed: " + err.message, "error");
   } finally {
-    setAppSaving(false);
+    pickupRequestOpInProgress = false;
   }
 }
 
@@ -229,7 +240,7 @@ function getBuyerEmailInfo(buyer) {
 }
 
 function openPickupRequestFromSelection() {
-  if (isAppSaving()) return;
+  if (isAppSaving() || isToolbarCreateActionBlocked()) return;
   const selected = getCheckedFilteredPos();
   if (!areRowsEligibleForPickupRequest(selected)) {
     showIndicator("Select LULU'S or 12TH TRIBE OTW or Arrived at Port POs with packing lists and ASN requests submitted", "error");
@@ -248,12 +259,12 @@ function openPickupRequestFromSelection() {
 }
 
 function openPickupRequestDetail(id) {
+  if (isAppSaving()) return;
   const request = getPickupRequestById(id);
   if (!request) return;
   pickupRequestModalRow = request;
-  pickupRequestPoNumbers = allRows
-    .filter(row => String(row[PICKUP_REQUEST_ID_FIELD] ?? "").trim() === String(id).trim())
-    .map(row => row["PO #"]);
+  pickupRequestPoNumbers = getRequestPoNumbers(request, PICKUP_REQUEST_ID_FIELD);
+  pickupRequestAddPoPanelOpen = false;
   renderPickupRequestModal(pickupRequestPoNumbers, request);
 }
 
@@ -278,22 +289,26 @@ function setPickupRequestModalAddPanelClass(body, isOpen) {
 function renderPickupRequestModal(poNumbers, request = {}) {
   const body = document.getElementById("pickupRequestBody");
   const titleEl = document.getElementById("pickupRequestModalTitle");
+  const submitBtn = document.getElementById("pickupRequestSubmitBtn");
   if (!body) return;
 
   const pos = poNumbers
     .map(po => allRows.find(r => String(r["PO #"]) === String(po)))
     .filter(Boolean);
 
-  const isEdit = Boolean(request[PICKUP_REQUEST_ID_FIELD]);
+  const activeRequest = request[PICKUP_REQUEST_ID_FIELD] ? request : (pickupRequestModalRow ?? request);
+  const isExisting = Boolean(activeRequest[PICKUP_REQUEST_ID_FIELD]);
+  const isReadOnly = isExisting && isRequestEmailSent(activeRequest);
   if (titleEl) {
-    titleEl.textContent = isEdit
-      ? `Pickup Request ${request[PICKUP_REQUEST_ID_FIELD]}`
+    titleEl.textContent = isExisting
+      ? `Pickup Request ${activeRequest[PICKUP_REQUEST_ID_FIELD]}`
       : "Pickup Request";
   }
+  if (submitBtn) submitBtn.hidden = isReadOnly;
 
   const submitDate = formatDateToYmd(new Date());
-  const defaultFrom = isEdit ? (request["From"] ?? "") : (pickupRequestDraftFrom || DEFAULT_WAREHOUSE_ENTITY);
-  const buyer = isEdit ? (request["To"] ?? "") : (pickupRequestDraftTo || getPickupRequestBuyerForRows(pos));
+  const defaultFrom = isExisting ? (activeRequest["From"] ?? "") : (pickupRequestDraftFrom || DEFAULT_WAREHOUSE_ENTITY);
+  const buyer = isExisting ? (activeRequest["To"] ?? "") : (pickupRequestDraftTo || getPickupRequestBuyerForRows(pos));
   const buyerEmailInfo = getBuyerEmailInfo(buyer);
 
   body.innerHTML = "";
@@ -310,39 +325,45 @@ function renderPickupRequestModal(poNumbers, request = {}) {
   form.id = "pickupRequestForm";
 
   form.appendChild(createRequestFormField("Pickup Date", PICKUP_DATE_FIELD,
-    isEdit ? (request[PICKUP_DATE_FIELD] ?? "") : (pickupRequestDraftPickupDate || ""),
-    { type: "date" }));
+    isExisting ? (activeRequest[PICKUP_DATE_FIELD] ?? "") : (pickupRequestDraftPickupDate || ""),
+    { type: "date", readOnly: isReadOnly }));
   form.appendChild(createRequestFormField("Request Date", PICKUP_REQ_SUBMIT_DATE_FIELD,
-    isEdit ? (request[PICKUP_REQ_SUBMIT_DATE_FIELD] ?? submitDate) : submitDate,
+    isExisting ? (activeRequest[PICKUP_REQ_SUBMIT_DATE_FIELD] ?? submitDate) : submitDate,
     { type: "date", readOnly: true }));
 
-  const fromFields = createRequestLocationField("From", "From", "Pickup Address", defaultFrom);
+  const fromFields = createRequestLocationField("From", "From", "Pickup Address", defaultFrom, { readOnly: isReadOnly });
   form.appendChild(fromFields.frag);
 
   // "To" is buyer-driven: show as a select populated from location entities,
   // defaulting to the buyer name. The Delivery Address auto-fills from the Locations sheet.
-  const toFields = createRequestLocationField("To", "To", "Delivery Address", buyer);
+  const toFields = createRequestLocationField("To", "To", "Delivery Address", buyer, { readOnly: isReadOnly });
   form.appendChild(toFields.frag);
+  if (isReadOnly) {
+    fromFields.addressEl.value = activeRequest["Pickup Address"] ?? fromFields.addressEl.value;
+    toFields.addressEl.value = activeRequest["Delivery Address"] ?? toFields.addressEl.value;
+  }
 
   form.appendChild(createRequestFormField("Email", "Email To",
-    isEdit ? (request["Email To"] ?? "") : (pickupRequestDraftEmail.emailTo ?? buyerEmailInfo.email)));
+    isExisting ? (activeRequest["Email To"] ?? "") : (pickupRequestDraftEmail.emailTo ?? buyerEmailInfo.email),
+    { readOnly: isReadOnly }));
   form.appendChild(createRequestFormField("CC", "Email CC",
-    isEdit ? (request["Email CC"] ?? "") : (pickupRequestDraftEmail.emailCc ?? buyerEmailInfo.cc)));
+    isExisting ? (activeRequest["Email CC"] ?? "") : (pickupRequestDraftEmail.emailCc ?? buyerEmailInfo.cc),
+    { readOnly: isReadOnly }));
   form.appendChild(createRequestFormField("Notes", PICKUP_REQ_NOTES_FIELD,
-    isEdit ? (request[PICKUP_REQ_NOTES_FIELD] ?? request["Notes"] ?? "") : pickupRequestDraftNotes,
-    { type: "textarea" }));
+    isExisting ? (activeRequest[PICKUP_REQ_NOTES_FIELD] ?? activeRequest["Notes"] ?? "") : pickupRequestDraftNotes,
+    { type: "textarea", readOnly: isReadOnly }));
 
   left.appendChild(form);
 
   const right = document.createElement("div");
   right.className = "shipment-modal-right";
-  right.appendChild(renderPickupRequestLinkedPoSection(pos, isEdit));
+  right.appendChild(renderPickupRequestLinkedPoSection(pos, isReadOnly));
 
   layout.appendChild(left);
   layout.appendChild(right);
   outer.appendChild(layout);
 
-  if (!isEdit && pickupRequestAddPoPanelOpen) {
+  if (!isReadOnly && pickupRequestAddPoPanelOpen) {
     outer.classList.add("shipment-modal-outer--add-panel-open");
     outer.appendChild(renderAvailablePoPickerPanel(getAvailablePickupRequestPanelRows(), {
       panelId: "pickupRequestAddPoPanel",
@@ -357,6 +378,7 @@ function renderPickupRequestModal(poNumbers, request = {}) {
   setPickupRequestModalAddPanelClass(body, pickupRequestAddPoPanelOpen);
   setRequestModalPoCount(document.getElementById("pickupRequestPoCount"), pos.length);
   bringModalToFront(document.getElementById("pickupRequestOverlay"));
+  updateToolbarRequestButtons();
 }
 
 function getAvailablePickupRequestPanelRows() {
@@ -372,16 +394,20 @@ function getAvailablePickupRequestPanelRows() {
   );
 }
 
+function getPickupRequestModalContext() {
+  return pickupRequestModalRow ?? {};
+}
+
 function openPickupRequestAddPoPanel() {
   capturePickupRequestDraft();
   pickupRequestAddPoPanelOpen = true;
-  renderPickupRequestModal(pickupRequestPoNumbers);
+  renderPickupRequestModal(pickupRequestPoNumbers, getPickupRequestModalContext());
 }
 
 function closePickupRequestAddPoPanel() {
   capturePickupRequestDraft();
   pickupRequestAddPoPanelOpen = false;
-  renderPickupRequestModal(pickupRequestPoNumbers);
+  renderPickupRequestModal(pickupRequestPoNumbers, getPickupRequestModalContext());
 }
 
 function addPoToPickupRequest(poNumber) {
@@ -390,7 +416,7 @@ function addPoToPickupRequest(poNumber) {
   if (!po || pickupRequestPoNumbers.map(String).includes(po)) return;
   pickupRequestPoNumbers = [...pickupRequestPoNumbers, po];
   pickupRequestAddPoPanelOpen = true;
-  renderPickupRequestModal(pickupRequestPoNumbers);
+  renderPickupRequestModal(pickupRequestPoNumbers, getPickupRequestModalContext());
 }
 
 const _pickupFormSelectedPos = new Set();
@@ -414,13 +440,13 @@ function removePosFromPickupRequest() {
   if (linked.length === 0) { showIndicator("Select POs to remove", "error"); return; }
   const removeSet = new Set(linked.map(row => String(row["PO #"])));
   pickupRequestPoNumbers = pickupRequestPoNumbers.filter(po => !removeSet.has(String(po)));
-  renderPickupRequestModal(pickupRequestPoNumbers);
+  renderPickupRequestModal(pickupRequestPoNumbers, getPickupRequestModalContext());
 }
 
-function renderPickupRequestLinkedPoSection(pos, isEdit) {
+function renderPickupRequestLinkedPoSection(pos, isReadOnly = false) {
   const section = document.createElement("section");
   section.className = "shipment-linked-pos";
-  section.classList.toggle("shipment-linked-pos--selection-disabled", pickupRequestAddPoPanelOpen || isEdit);
+  section.classList.toggle("shipment-linked-pos--selection-disabled", pickupRequestAddPoPanelOpen || isReadOnly);
 
   const wrap = document.createElement("div");
   wrap.className = "shipment-linked-po-table-wrap shipment-linked-po-table-wrap--with-footer";
@@ -433,7 +459,7 @@ function renderPickupRequestLinkedPoSection(pos, isEdit) {
   const selectTh = document.createElement("th");
   selectTh.className = "th-select-col";
 
-  if (!isEdit) {
+  if (!isReadOnly) {
     const selectAllCb = document.createElement("input");
     selectAllCb.type = "checkbox";
     selectAllCb.setAttribute("aria-label", "Select all");
@@ -459,8 +485,9 @@ function renderPickupRequestLinkedPoSection(pos, isEdit) {
   pos.forEach(row => {
     const tr = document.createElement("tr");
     tr.dataset.po = row["PO #"];
+    attachRequestLinkedPoRowOpen(tr, row["PO #"]);
     const selectTd = document.createElement("td");
-    if (!isEdit) {
+    if (!isReadOnly) {
       renderFormSelectedCell(selectTd, row, isPickupFormPoSelected(row), selected => {
         togglePickupFormPoSelected(row, selected);
         updatePickupRequestActionButtons();
@@ -469,13 +496,7 @@ function renderPickupRequestLinkedPoSection(pos, isEdit) {
     tr.appendChild(selectTd);
     DELIVERY_PICKUP_LINKED_PO_COLUMNS.forEach(({ col, cellClass }) => {
       const td = document.createElement("td");
-      if (cellClass) td.className = cellClass;
-      if (col === "Status") td.innerHTML = renderStatus(row[col]);
-      else {
-        const text = formatShipmentLinkedPoCell(col, row);
-        if (text === EMPTY_DISPLAY) setDisplayText(td, EMPTY_DISPLAY);
-        else { td.textContent = text; td.title = text; }
-      }
+      renderRequestLinkedPoDataCell(td, col, row, { cellClass });
       tr.appendChild(td);
     });
     tbody.appendChild(tr);
@@ -484,7 +505,7 @@ function renderPickupRequestLinkedPoSection(pos, isEdit) {
   table.appendChild(tbody);
   wrap.appendChild(table);
   section.appendChild(wrap);
-  if (!isEdit) section.appendChild(renderPickupRequestLinkedPoFooter(pos));
+  if (!isReadOnly) section.appendChild(renderPickupRequestLinkedPoFooter(pos));
   return section;
 }
 
@@ -541,10 +562,11 @@ function closePickupRequestModal() {
   clearModalFooterMessageForOverlay("pickupRequestOverlay");
   document.getElementById("pickupRequestOverlay")?.classList.remove("open");
   setPickupRequestModalAddPanelClass(document.getElementById("pickupRequestBody"), false);
+  updateToolbarRequestButtons();
 }
 
 async function submitPickupRequest() {
-  if (isAppSaving() || pickupRequestPoNumbers.length === 0) return;
+  if (pickupRequestOpInProgress || pickupRequestPoNumbers.length === 0) return;
   setPickupRequestFooterMessage("");
 
   const form = document.getElementById("pickupRequestForm");
@@ -561,82 +583,107 @@ async function submitPickupRequest() {
   const poNumbers = pickupRequestPoNumbers.slice();
   const savedRow = pickupRequestModalRow;
   const isEdit = Boolean(savedRow?.[PICKUP_REQUEST_ID_FIELD]);
+  if (!isEdit) beginToolbarCreatePending();
   closePickupRequestModal();
-  setAppSaving(true, isEdit ? "Saving…" : "Creating pickup request…");
-  showIndicator(`${isEdit ? "Saving" : "Creating"}${ELLIPSIS}`, "");
+  pickupRequestOpInProgress = true;
+  showIndicator(
+    isEdit ? `Saving${ELLIPSIS}` : `Creating pickup request${ELLIPSIS}`,
+    ""
+  );
 
   try {
     if (isDemoMode()) {
-      demoCreateOrUpdatePickupRequest(poNumbers, data, savedRow);
-      showIndicator(isEdit ? `Saved ${CHECK_MARK}` : `Pickup request created and email sent ${CHECK_MARK}`, "success");
+      if (isEdit) {
+        applyPickupRequestUpdatedLocally(savedRow[PICKUP_REQUEST_ID_FIELD], data);
+      } else {
+        applyPickupRequestCreatedLocally(generateDemoPickupRequestId(), poNumbers, data);
+      }
     } else {
       const json = await postAppsScript(
         isEdit
           ? { action: "updatePickupRequest", pickupRequestId: savedRow[PICKUP_REQUEST_ID_FIELD], request: data }
           : { action: "createPickupRequest", poNumbers, request: data }
       );
-      if (json.pickupRequestId) await loadData();
       if (!json.success) throw new Error(json.error || "Pickup request failed");
-      showIndicator(isEdit ? `Saved ${CHECK_MARK}` : `Pickup request created and email sent ${CHECK_MARK}`, "success");
+      if (isEdit) {
+        applyPickupRequestUpdatedLocally(savedRow[PICKUP_REQUEST_ID_FIELD], data);
+      } else {
+        applyPickupRequestCreatedLocally(json.pickupRequestId, poNumbers, data);
+      }
     }
+    showIndicator(
+      isEdit ? `Saved ${CHECK_MARK}` : `Pickup request created and email sent ${CHECK_MARK}`,
+      "success"
+    );
   } catch (err) {
     showIndicator("Pickup request failed: " + err.message, "error");
   } finally {
-    setAppSaving(false);
+    pickupRequestOpInProgress = false;
+    if (!isEdit) endToolbarCreatePending();
   }
 }
 
-function demoCreateOrUpdatePickupRequest(poNumbers, data, existing) {
-  let requestId = existing?.[PICKUP_REQUEST_ID_FIELD];
-  const now = formatDateToYmd(new Date());
-  if (!requestId) {
-    let max = 0;
-    allPickupRequests.forEach(r => {
-      const m = /^PR-(\d+)$/.exec(String(r[PICKUP_REQUEST_ID_FIELD] ?? ""));
-      if (m) max = Math.max(max, Number(m[1]));
-    });
-    requestId = `PR-${String(max + 1).padStart(4, "0")}`;
-    allPickupRequests.push({
-      [PICKUP_REQUEST_ID_FIELD]: requestId,
-      [PICKUP_DATE_FIELD]: data[PICKUP_DATE_FIELD] ?? "",
-      "Request Date": now,
-      "From": data["From"] ?? "",
-      "Pickup Address": data["Pickup Address"] ?? "",
-      "To": data["To"] ?? "",
-      "Delivery Address": data["Delivery Address"] ?? "",
-      "Email To": data["Email To"] ?? "",
-      "Email CC": data["Email CC"] ?? "",
-      [PICKUP_REQ_NOTES_FIELD]: data[PICKUP_REQ_NOTES_FIELD] ?? "",
-      "PO Numbers": poNumbers.join(", "),
-      "PO Count": poNumbers.length,
-      "Email Status": !isEmptyValue(data["Email To"]) ? "Sent" : "Not Sent",
-      "Email Sent At": !isEmptyValue(data["Email To"]) ? now : "",
-      "Email Error": "",
-      "Created At": now,
-      "Updated At": now,
-    });
-  } else {
-    Object.assign(existing, data);
-  }
+function generateDemoPickupRequestId() {
+  let max = 0;
+  allPickupRequests.forEach(r => {
+    const m = /^PR-(\d+)$/.exec(String(r[PICKUP_REQUEST_ID_FIELD] ?? ""));
+    if (m) max = Math.max(max, Number(m[1]));
+  });
+  return `PR-${String(max + 1).padStart(4, "0")}`;
+}
 
-  if (!existing) {
-    poNumbers.forEach(poNumber => {
-      const row = allRows.find(r => String(r["PO #"]) === String(poNumber));
-      if (!row) return;
-      row[PICKUP_REQUEST_ID_FIELD] = requestId;
-      row["Pickup Requested"] = true;
-      row["Pickup Date"] = data[PICKUP_DATE_FIELD] ?? "";
-      row["Pickup Req Date"] = now;
-      row["Assign Date"] = data[PICKUP_DATE_FIELD] ?? "";
-      if (String(row["Division"] ?? "").trim() === "Freesia") {
-        row["Status"] = "Assigned";
-      }
-    });
-  }
+function applyPickupRequestCreatedLocally(requestId, poNumbers, data) {
+  const now = formatDateToYmd(new Date());
+  allPickupRequests.push({
+    [PICKUP_REQUEST_ID_FIELD]: requestId,
+    [PICKUP_DATE_FIELD]: data[PICKUP_DATE_FIELD] ?? "",
+    "Request Date": data[PICKUP_REQ_SUBMIT_DATE_FIELD] ?? now,
+    "From": data["From"] ?? "",
+    "Pickup Address": data["Pickup Address"] ?? "",
+    "To": data["To"] ?? "",
+    "Delivery Address": data["Delivery Address"] ?? "",
+    "Email To": data["Email To"] ?? "",
+    "Email CC": data["Email CC"] ?? "",
+    [PICKUP_REQ_NOTES_FIELD]: data[PICKUP_REQ_NOTES_FIELD] ?? "",
+    "PO Numbers": poNumbers.join(", "),
+    "PO Count": poNumbers.length,
+    "Email Status": !isEmptyValue(data["Email To"]) ? "Sent" : "Not Sent",
+    "Email Sent At": !isEmptyValue(data["Email To"]) ? now : "",
+    "Email Error": "",
+    "Created At": now,
+    "Updated At": now,
+  });
+
+  poNumbers.forEach(poNumber => {
+    const row = allRows.find(r => String(r["PO #"]) === String(poNumber));
+    if (!row) return;
+    row[PICKUP_REQUEST_ID_FIELD] = requestId;
+    row["Pickup Requested"] = true;
+    row["Pickup Date"] = data[PICKUP_DATE_FIELD] ?? "";
+    row["Pickup Req Date"] = data[PICKUP_REQ_SUBMIT_DATE_FIELD] ?? now;
+    row["Assign Date"] = data[PICKUP_DATE_FIELD] ?? "";
+    if (String(row["Division"] ?? "").trim() === "Freesia") {
+      row["Status"] = "Assigned";
+    }
+  });
   resetLocalSelectedState(allRows);
   applyFilters();
   applyPickupRequestFilters();
   if (typeof updateToolbarRequestButtons === "function") updateToolbarRequestButtons();
+}
+
+function applyPickupRequestUpdatedLocally(requestId, data) {
+  const existing = getPickupRequestById(requestId);
+  if (existing) Object.assign(existing, data);
+  applyPickupRequestFilters();
+}
+
+function demoCreateOrUpdatePickupRequest(poNumbers, data, existing) {
+  if (existing?.[PICKUP_REQUEST_ID_FIELD]) {
+    applyPickupRequestUpdatedLocally(existing[PICKUP_REQUEST_ID_FIELD], data);
+  } else {
+    applyPickupRequestCreatedLocally(generateDemoPickupRequestId(), poNumbers, data);
+  }
 }
 
 function renderAssignDateCell(td, row) {

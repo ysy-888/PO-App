@@ -398,8 +398,9 @@ async function addPosToShipment(poNumbers, { keepPanelOpen = false } = {}) {
   const shipmentId = shipmentModalRow[SHIPMENT_ID_FIELD];
   if (!shipmentId) return;
 
+  if (shipmentOpInProgress) return;
   if (!keepPanelOpen) closeShipmentAddPoPanel();
-  setAppSaving(true, "Adding POs…");
+  shipmentOpInProgress = true;
   showIndicator(`Adding POs${ELLIPSIS}`, "");
 
   try {
@@ -412,7 +413,7 @@ async function addPosToShipment(poNumbers, { keepPanelOpen = false } = {}) {
         poNumbers,
       });
       if (!json.success) throw new Error(json.error);
-      await loadData();
+      applyPosAddedToShipmentLocally(shipmentId, poNumbers, shipmentModalRow);
       shipmentModalRow = getShipmentById(shipmentId) ?? shipmentModalRow;
     }
     if (keepPanelOpen) {
@@ -426,7 +427,7 @@ async function addPosToShipment(poNumbers, { keepPanelOpen = false } = {}) {
   } catch (err) {
     showIndicator("Add failed: " + err.message, "error");
   } finally {
-    setAppSaving(false);
+    shipmentOpInProgress = false;
   }
 }
 
@@ -448,10 +449,11 @@ async function removePosFromShipment() {
   }
 
   if (!shipmentModalRow) return;
+  if (shipmentOpInProgress) return;
   const shipmentId = shipmentModalRow[SHIPMENT_ID_FIELD];
   const poNumbers = linked.map(row => row["PO #"]);
 
-  setAppSaving(true, "Removing POs…");
+  shipmentOpInProgress = true;
   showIndicator(`Removing POs${ELLIPSIS}`, "");
 
   try {
@@ -464,41 +466,23 @@ async function removePosFromShipment() {
         poNumbers,
       });
       if (!json.success) throw new Error(json.error);
-      await loadData();
+      applyPosRemovedFromShipmentLocally(shipmentId, poNumbers);
       openShipmentDetail(shipmentId);
     }
     showIndicator(`POs removed ${CHECK_MARK}`, "success");
   } catch (err) {
     showIndicator("Remove failed: " + err.message, "error");
   } finally {
-    setAppSaving(false);
+    shipmentOpInProgress = false;
   }
 }
 
 function demoAddPosToShipment(shipmentId, poNumbers, shipment) {
-  poNumbers.forEach(poNumber => {
-    const row = allRows.find(r => String(r["PO #"]) === String(poNumber));
-    if (!row) return;
-    row[SHIPMENT_ID_FIELD] = shipmentId;
-    row["Status"] = "OTW";
-    SHIPMENT_PO_CLEAR_FIELDS.forEach(field => {
-      if (shipment[field] !== undefined) row[field] = shipment[field];
-    });
-    row["EST IHD"] = calculateEstIhd(row["Ship Method"], row["EST EXF"]);
-  });
-  applyFilters();
-  refreshShipmentsView();
+  applyPosAddedToShipmentLocally(shipmentId, poNumbers, shipment);
 }
 
 function demoRemovePosFromShipment(shipmentId, poNumbers) {
-  poNumbers.forEach(poNumber => {
-    const row = allRows.find(r => String(r["PO #"]) === String(poNumber));
-    if (!row) return;
-    if (String(row[SHIPMENT_ID_FIELD]) !== String(shipmentId)) return;
-    clearPoShipmentData(row);
-  });
-  applyFilters();
-  refreshShipmentsView();
+  applyPosRemovedFromShipmentLocally(shipmentId, poNumbers);
 }
 
 function readShipmentForm(container) {
@@ -536,6 +520,7 @@ function renderCreateShipmentModal(poNumbers) {
 
   bringModalToFront(document.getElementById("createShipmentOverlay"));
   updateShipmentModalActionButtons();
+  updateToolbarRequestButtons();
 }
 
 function closeCreateShipmentModal() {
@@ -545,12 +530,13 @@ function closeCreateShipmentModal() {
   clearShipmentFooterMessage("createShipmentFooterMessage");
   document.getElementById("createShipmentOverlay")?.classList.remove("open");
   setShipmentModalAddPanelClass(document.getElementById("createShipmentBody"), false);
+  updateToolbarRequestButtons();
 }
 
 async function submitCreateShipment() {
   const form = document.getElementById("createShipmentForm");
   if (!form || createShipmentPoNumbers.length === 0) return;
-  if (isAppSaving()) return;
+  if (shipmentOpInProgress) return;
 
   const shipment = readShipmentForm(form);
   setShipmentFooterMessage("");
@@ -581,8 +567,9 @@ async function submitCreateShipment() {
     showIndicator("Only EXF Requested POs with Status Requested can be added", "error");
     return;
   }
+  beginToolbarCreatePending();
   closeCreateShipmentModal();
-  setAppSaving(true, "Creating shipment…");
+  shipmentOpInProgress = true;
   showIndicator(`Creating shipment${ELLIPSIS}`, "");
 
   try {
@@ -595,14 +582,14 @@ async function submitCreateShipment() {
         shipment,
       });
       if (!json.success) throw new Error(json.error);
-      await loadData();
+      applyShipmentCreatedLocally(json.shipmentId, poNumbers, shipment);
     }
     showIndicator(`Shipment created ${CHECK_MARK}`, "success");
-    switchAppView("shipments");
   } catch (err) {
     showIndicator("Create failed: " + err.message, "error");
   } finally {
-    setAppSaving(false);
+    shipmentOpInProgress = false;
+    endToolbarCreatePending();
   }
 }
 
@@ -631,6 +618,80 @@ function generateDemoShipmentId() {
   return formatShipmentId(max + 1);
 }
 
+// Serializes shipment write operations so overlapping optimistic updates can't
+// race each other. Scoped to shipments only — the rest of the app stays usable.
+let shipmentOpInProgress = false;
+
+function isShipmentOpInProgress() {
+  return shipmentOpInProgress;
+}
+
+// --- Optimistic local state updates ---------------------------------------
+// These mirror the server's syncPosFromShipment_ / clearPoShipmentDataAtRow_
+// so the UI can reflect a successful write without re-downloading every sheet.
+
+function applyShipmentSyncToPosLocally(shipmentId, poNumbers, shipment) {
+  poNumbers.forEach(poNumber => {
+    const row = allRows.find(r => String(r["PO #"]) === String(poNumber));
+    if (!row) return;
+    row[SHIPMENT_ID_FIELD] = shipmentId;
+    row["Status"] = "OTW";
+    SHIPMENT_PO_CLEAR_FIELDS.forEach(field => {
+      if (shipment[field] !== undefined) row[field] = shipment[field];
+    });
+    row["EST IHD"] = calculateEstIhd(row["Ship Method"], row["EST EXF"]);
+  });
+}
+
+function applyShipmentCreatedLocally(shipmentId, poNumbers, shipment) {
+  allShipments.push(normalizeShipment({ [SHIPMENT_ID_FIELD]: shipmentId, ...shipment }));
+  applyShipmentSyncToPosLocally(shipmentId, poNumbers, shipment);
+  resetLocalSelectedState(allRows);
+  applyFilters();
+  refreshShipmentsView();
+}
+
+function applyPosAddedToShipmentLocally(shipmentId, poNumbers, shipment) {
+  applyShipmentSyncToPosLocally(shipmentId, poNumbers, shipment);
+  applyFilters();
+  refreshShipmentsView();
+}
+
+function applyPosRemovedFromShipmentLocally(shipmentId, poNumbers) {
+  poNumbers.forEach(poNumber => {
+    const row = allRows.find(r => String(r["PO #"]) === String(poNumber));
+    if (!row) return;
+    if (String(row[SHIPMENT_ID_FIELD]) !== String(shipmentId)) return;
+    clearPoShipmentData(row);
+  });
+  applyFilters();
+  refreshShipmentsView();
+}
+
+function applyShipmentUpdatedLocally(shipmentId, shipment) {
+  const record = getShipmentById(shipmentId);
+  if (record) Object.assign(record, shipment);
+  getPosForShipment(shipmentId).forEach(row => {
+    SHIPMENT_PO_CLEAR_FIELDS.forEach(field => {
+      if (shipment[field] !== undefined) row[field] = shipment[field];
+    });
+    row["EST IHD"] = calculateEstIhd(row["Ship Method"], row["EST EXF"]);
+  });
+  applyFilters();
+  refreshShipmentsView();
+}
+
+function applyShipmentsDeletedLocally(shipmentIds) {
+  const idSet = new Set(shipmentIds.map(id => String(id).trim()));
+  idSet.forEach(shipmentId => {
+    getPosForShipment(shipmentId).forEach(row => clearPoShipmentData(row));
+  });
+  allShipments = allShipments.filter(s => !idSet.has(String(s[SHIPMENT_ID_FIELD] ?? "").trim()));
+  resetLocalShipmentSelectedState(allShipments);
+  applyFilters();
+  refreshShipmentsView();
+}
+
 async function demoCreateShipment(poNumbers, shipment) {
   const blocked = poNumbers.filter(po => {
     const row = allRows.find(r => String(r["PO #"]) === String(po));
@@ -639,25 +700,7 @@ async function demoCreateShipment(poNumbers, shipment) {
   if (blocked.length > 0) {
     throw new Error(`${blocked.length} PO(s) already assigned to a shipment`);
   }
-
-  const shipmentId = generateDemoShipmentId();
-  const record = { [SHIPMENT_ID_FIELD]: shipmentId, ...shipment };
-  allShipments.push(record);
-
-  poNumbers.forEach(poNumber => {
-    const row = allRows.find(r => String(r["PO #"]) === String(poNumber));
-    if (!row) return;
-    row[SHIPMENT_ID_FIELD] = shipmentId;
-    row["Status"] = "OTW";
-    ["Ship Method", "Vessel", "House #", "EXF", "Shipped", "ETD", "ETA", "IHD"].forEach(field => {
-      if (shipment[field] !== undefined) row[field] = shipment[field];
-    });
-    row["EST IHD"] = calculateEstIhd(row["Ship Method"], row["EST EXF"]);
-  });
-
-  resetLocalSelectedState(allRows);
-  applyFilters();
-  refreshShipmentsView();
+  applyShipmentCreatedLocally(generateDemoShipmentId(), poNumbers, shipment);
 }
 
 function formatShipmentLinkedPoCell(col, row) {
@@ -882,6 +925,7 @@ function renderShipmentLinkedPoSection(source) {
   pos.forEach(row => {
     const tr = document.createElement("tr");
     tr.dataset.po = row["PO #"];
+    attachRequestLinkedPoRowOpen(tr, row["PO #"]);
 
     const selectTd = document.createElement("td");
     const linkedCb = renderFormSelectedCell(selectTd, row, isShipmentFormPoSelected(row), selected => {
@@ -897,20 +941,7 @@ function renderShipmentLinkedPoSection(source) {
       if (cellClass) td.className = cellClass;
       const text = formatShipmentLinkedPoCell(col, row);
       if (col === "PO #") {
-        if (text === EMPTY_DISPLAY) {
-          setDisplayText(td, EMPTY_DISPLAY);
-        } else {
-          const btn = document.createElement("button");
-          btn.type = "button";
-          btn.className = "shipment-linked-po-link";
-          btn.textContent = text;
-          btn.title = "Open PO detail";
-          btn.addEventListener("click", e => {
-            e.stopPropagation();
-            openPoFromShipment(row["PO #"]);
-          });
-          td.appendChild(btn);
-        }
+        renderRequestLinkedPoDataCell(td, col, row, { cellClass });
       } else if (text === EMPTY_DISPLAY) {
         setDisplayText(td, EMPTY_DISPLAY);
       } else {
@@ -951,7 +982,7 @@ function renderShipmentModalContent(shipment) {
 }
 
 async function saveShipmentModal() {
-  if (isAppSaving() || !shipmentModalRow) return;
+  if (shipmentOpInProgress || !shipmentModalRow) return;
   const form = document.getElementById("shipmentEditForm");
   if (!form) return;
 
@@ -964,41 +995,30 @@ async function saveShipmentModal() {
   }
 
   const shipmentId = shipmentModalRow[SHIPMENT_ID_FIELD];
-  const savedRowRef = shipmentModalRow;
   closeShipmentModalForce();
-  setAppSaving(true, "Saving…");
+  shipmentOpInProgress = true;
   showIndicator(`Saving${ELLIPSIS}`, "");
 
   try {
-    if (isDemoMode()) {
-      Object.assign(savedRowRef, shipment);
-      getPosForShipment(shipmentId).forEach(row => {
-        ["Ship Method", "Vessel", "House #", "EXF", "Shipped", "ETD", "ETA", "IHD"].forEach(field => {
-          if (shipment[field] !== undefined) row[field] = shipment[field];
-        });
-        row["EST IHD"] = calculateEstIhd(row["Ship Method"], row["EST EXF"]);
-      });
-      applyFilters();
-      refreshShipmentsView();
-    } else {
+    if (!isDemoMode()) {
       const json = await postAppsScript({
         action: "updateShipment",
         shipmentId,
         shipment,
       });
       if (!json.success) throw new Error(json.error);
-      await loadData();
     }
+    applyShipmentUpdatedLocally(shipmentId, shipment);
     showIndicator(`Saved ${CHECK_MARK}`, "success");
   } catch (err) {
     showIndicator("Save failed: " + err.message, "error");
   } finally {
-    setAppSaving(false);
+    shipmentOpInProgress = false;
   }
 }
 
 async function deleteSelectedShipments() {
-  if (isAppSaving()) return;
+  if (shipmentOpInProgress) return;
   const selected = getCheckedFilteredShipments();
   if (selected.length === 0) {
     showIndicator("Select shipments first", "error");
@@ -1011,19 +1031,18 @@ async function deleteSelectedShipments() {
 
   const shipmentIds = selected.map(s => s[SHIPMENT_ID_FIELD]);
   const openId = shipmentModalRow?.[SHIPMENT_ID_FIELD];
+  shipmentOpInProgress = true;
   showIndicator(`Deleting${ELLIPSIS}`, "");
 
   try {
-    if (isDemoMode()) {
-      demoDeleteShipments(shipmentIds);
-    } else {
+    if (!isDemoMode()) {
       const json = await postAppsScript({
         action: "deleteShipment",
         shipmentIds,
       });
       if (!json.success) throw new Error(json.error);
-      await loadData();
     }
+    applyShipmentsDeletedLocally(shipmentIds);
 
     if (openId && shipmentIds.some(id => String(id) === String(openId))) {
       closeShipmentModalForce();
@@ -1032,6 +1051,8 @@ async function deleteSelectedShipments() {
     showIndicator(`Deleted ${CHECK_MARK}`, "success");
   } catch (err) {
     showIndicator("Delete failed: " + err.message, "error");
+  } finally {
+    shipmentOpInProgress = false;
   }
 }
 
@@ -1075,21 +1096,8 @@ function demoDeleteChargebacks(chargebackIds) {
   updateModalIfOpen();
 }
 
-function demoDeleteShipments(shipmentIds) {
-  const idSet = new Set(shipmentIds.map(id => String(id).trim()));
-
-  idSet.forEach(shipmentId => {
-    getPosForShipment(shipmentId).forEach(row => clearPoShipmentData(row));
-  });
-
-  allShipments = allShipments.filter(s => !idSet.has(String(s[SHIPMENT_ID_FIELD] ?? "").trim()));
-  resetLocalShipmentSelectedState(allShipments);
-  applyFilters();
-  refreshShipmentsView();
-}
-
 function openCreateShipmentFromSelection() {
-  if (isAppSaving()) return;
+  if (isAppSaving() || isToolbarCreateActionBlocked()) return;
   const selected = getCheckedFilteredPos();
   if (selected.length === 0) {
     showIndicator("Select POs first", "error");

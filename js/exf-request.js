@@ -58,7 +58,7 @@ const EXF_REQUEST_LINKED_PO_COL_CLASSES = [
   "shipment-po-col-notes",
 ];
 
-const EXF_REQUEST_LINKED_PO_COLUMN_WIDTHS = [52, 64, 110, 102, 160, 112, 54, 54, 88, null];
+const EXF_REQUEST_LINKED_PO_COLUMN_WIDTHS = [52, 64, 110, 102, 160, 112, 54, 54, 88, 120];
 
 let exfRequestPoNumbers = [];
 let exfRequestAddPoPanelOpen = false;
@@ -67,7 +67,9 @@ let exfRequestDraftEmail = {};
 let exfRequestDraftExfDate = "";
 let exfRequestDraftNotes = "";
 let exfRequestVendor = "";
+let exfRequestModalRow = null;
 let allExfRequests = [];
+let exfRequestOpInProgress = false;
 let filteredExfRequests = [];
 
 function normalizeExfRequestRecord(row) {
@@ -87,6 +89,40 @@ function onExfRequestsDataLoaded(requests) {
 
 function getExfRequestRecordId(request) {
   return String(request?.[EXF_REQUEST_ID_FIELD] ?? "").trim();
+}
+
+function getExfRequestById(id) {
+  const key = String(id ?? "").trim();
+  if (!key) return null;
+  return allExfRequests.find(request => getExfRequestRecordId(request) === key) ?? null;
+}
+
+function openExfRequestDetail(id) {
+  if (isAppSaving()) return;
+  const request = getExfRequestById(id);
+  if (!request) return;
+  exfRequestModalRow = request;
+  exfRequestPoNumbers = getRequestPoNumbers(request, EXF_REQUEST_ID_FIELD);
+  exfRequestVendor = request["Vendor"] ?? "";
+  exfRequestDraftEmail = {
+    email: request["Vendor Email"] ?? "",
+    cc: request[EXF_REQ_CC_FIELD] ?? "",
+  };
+  exfRequestDraftExfDate = request[EXF_DATE_FIELD] ?? "";
+  exfRequestDraftNotes = request[EXF_REQ_NOTES_FIELD] ?? "";
+  exfRequestDraftByPo = {};
+  exfRequestPoNumbers.forEach(po => {
+    const row = allRows.find(r => String(r["PO #"]) === String(po));
+    if (!row) return;
+    exfRequestDraftByPo[String(po)] = {
+      memo: row[EXF_MEMO_FIELD] ?? "",
+      shipMethod: row["Ship Method"] ?? "",
+    };
+  });
+  exfRequestAddPoPanelOpen = false;
+  setExfRequestFooterMessage("");
+  clearExfFormSelection();
+  renderExfRequestModal(exfRequestPoNumbers, { request });
 }
 
 function applyExfRequestFilters() {
@@ -180,13 +216,14 @@ function renderExfRequestTable() {
     });
 
     tbody.appendChild(tr);
+    attachRequestTableRowDblClick(tr, () => openExfRequestDetail(getExfRequestRecordId(request)));
   });
   updateExfRequestRowCounter();
 }
 
 async function resendExfRequestEmail(requestId) {
-  if (isAppSaving() || !requestId) return;
-  setAppSaving(true, "Resending EXF email…");
+  if (exfRequestOpInProgress || !requestId) return;
+  exfRequestOpInProgress = true;
   showIndicator(`Resending EXF email${ELLIPSIS}`, "");
   try {
     if (isDemoMode()) {
@@ -204,7 +241,14 @@ async function resendExfRequestEmail(requestId) {
         exfRequestId: requestId,
       });
       if (!json.success) throw new Error(json.error);
-      await loadData();
+      const request = allExfRequests.find(r => getExfRequestRecordId(r) === requestId);
+      if (request) {
+        request["Email Status"] = json.emailSent ? "Sent" : "Failed";
+        request["Email Error"] = json.emailError ?? "";
+        if (json.emailSent) request["Email Sent At"] = formatDateToYmd(new Date());
+        request["Last Email Attempt At"] = formatDateToYmd(new Date());
+        applyExfRequestFilters();
+      }
       if (!json.emailSent) {
         showIndicator(`EXF email not sent: ${json.emailError || "Missing vendor email"}`, "error");
         return;
@@ -214,7 +258,7 @@ async function resendExfRequestEmail(requestId) {
   } catch (err) {
     showIndicator("Resend failed: " + err.message, "error");
   } finally {
-    setAppSaving(false);
+    exfRequestOpInProgress = false;
   }
 }
 
@@ -282,7 +326,7 @@ function setExfRequestFooterMessage(message = "") {
 }
 
 function openExfRequestFromSelection() {
-  if (isAppSaving()) return;
+  if (isAppSaving() || isToolbarCreateActionBlocked()) return;
   const checked = getCheckedFilteredPos();
   if (checked.length === 0 || !checked.every(isPoEligibleForExfRequest)) {
     showIndicator("Select WIP POs that are not already EXF requested", "error");
@@ -293,6 +337,7 @@ function openExfRequestFromSelection() {
     return;
   }
   exfRequestPoNumbers = checked.map(row => row["PO #"]);
+  exfRequestModalRow = null;
   exfRequestVendor = getExfRequestVendorForRows(checked);
   exfRequestDraftByPo = {};
   exfRequestDraftEmail = {};
@@ -352,28 +397,51 @@ function setExfRequestModalAddPanelClass(body, isOpen) {
   body?.closest(".shipment-modal-card")?.classList.toggle("shipment-modal-card--add-panel-open", isOpen);
 }
 
-function renderExfRequestModal(poNumbers, { exfDate = formatDateToYmd(new Date()) } = {}) {
+function getExfRequestModalRenderOptions(extra = {}) {
+  return {
+    exfDate: getExfRequestExfDateValue(),
+    request: exfRequestModalRow,
+    ...extra,
+  };
+}
+
+function renderExfRequestModal(poNumbers, { exfDate = formatDateToYmd(new Date()), request = null } = {}) {
   const body = document.getElementById("exfRequestBody");
   if (!body) return;
+
+  const activeRequest = request ?? exfRequestModalRow;
+  const isExisting = Boolean(activeRequest?.[EXF_REQUEST_ID_FIELD]);
+  const isView = isExisting && isRequestEmailSent(activeRequest);
+  const titleEl = document.querySelector("#exfRequestOverlay .modal-header-main h3");
+  const submitBtn = document.getElementById("exfRequestSubmitBtn");
+  if (titleEl) {
+    titleEl.textContent = isExisting
+      ? `EXF Request ${activeRequest[EXF_REQUEST_ID_FIELD]}`
+      : "EXF Request";
+  }
+  if (submitBtn) submitBtn.hidden = isView;
 
   exfRequestPoNumbers = poNumbers.slice();
   const originalPos = getExfRequestRows();
   pruneExfFormSelection(originalPos);
   const pos = originalPos.map(applyExfRequestDraft);
-  const vendor = exfRequestVendor || getExfRequestVendorForRows(originalPos);
+  const vendor = exfRequestVendor || getExfRequestVendorForRows(originalPos) || activeRequest?.["Vendor"] || "";
 
   body.innerHTML = "";
   body.appendChild(buildExfRequestModalLayout({
-    exfDate,
+    exfDate: isExisting ? (activeRequest[EXF_DATE_FIELD] ?? "") : (exfRequestDraftExfDate || exfDate),
     vendor,
     linkedPos: pos,
-    showAddPanel: exfRequestAddPoPanelOpen,
+    showAddPanel: !isView && exfRequestAddPoPanelOpen,
+    isView,
+    request: activeRequest,
   }));
   setExfRequestModalAddPanelClass(body, exfRequestAddPoPanelOpen);
   const headerCount = document.getElementById("exfRequestPoCount");
   if (headerCount) headerCount.textContent = "";
   bringModalToFront(document.getElementById("exfRequestOverlay"));
   updateExfRequestModalActionButtons();
+  updateToolbarRequestButtons();
 }
 
 function closeExfRequestModal() {
@@ -384,13 +452,15 @@ function closeExfRequestModal() {
   exfRequestDraftExfDate = "";
   exfRequestDraftNotes = "";
   exfRequestVendor = "";
+  exfRequestModalRow = null;
   clearExfFormSelection();
   setExfRequestFooterMessage("");
   document.getElementById("exfRequestOverlay")?.classList.remove("open");
   setExfRequestModalAddPanelClass(document.getElementById("exfRequestBody"), false);
+  updateToolbarRequestButtons();
 }
 
-function buildExfRequestModalLayout({ exfDate, vendor, linkedPos, showAddPanel = false }) {
+function buildExfRequestModalLayout({ exfDate, vendor, linkedPos, showAddPanel = false, isView = false, request = null } = {}) {
   const outer = document.createElement("div");
   outer.className = "shipment-modal-outer";
 
@@ -404,17 +474,42 @@ function buildExfRequestModalLayout({ exfDate, vendor, linkedPos, showAddPanel =
   form.id = "exfRequestForm";
   const vendorEmailInfo = getExfRequestVendorEmailInfo(vendor);
   const submitDate = formatDateToYmd(new Date());
-  form.appendChild(createRequestFormField("EXF Date", EXF_DATE_FIELD, exfRequestDraftExfDate || exfDate, { type: "date" }));
-  form.appendChild(createRequestFormField("Request Date", EXF_REQ_SUBMIT_DATE_FIELD, submitDate, { type: "date", readOnly: true }));
+  form.appendChild(createRequestFormField(
+    "EXF Date",
+    EXF_DATE_FIELD,
+    isView ? (request?.[EXF_DATE_FIELD] ?? "") : (exfRequestDraftExfDate || exfDate),
+    { type: "date", readOnly: isView }
+  ));
+  form.appendChild(createRequestFormField(
+    "Request Date",
+    EXF_REQ_SUBMIT_DATE_FIELD,
+    isView ? (request?.[EXF_REQ_SUBMIT_DATE_FIELD] ?? submitDate) : submitDate,
+    { type: "date", readOnly: true }
+  ));
   form.appendChild(createRequestFormField("Vendor", "Vendor", vendor, { readOnly: true }));
-  form.appendChild(createRequestFormField("Vendor Email", "Vendor Email", exfRequestDraftEmail.email ?? vendorEmailInfo.email));
-  form.appendChild(createRequestFormField("CC", EXF_REQ_CC_FIELD, exfRequestDraftEmail.cc ?? vendorEmailInfo.cc));
-  form.appendChild(createRequestFormField("Notes", EXF_REQ_NOTES_FIELD, exfRequestDraftNotes, { type: "textarea" }));
+  form.appendChild(createRequestFormField(
+    "Vendor Email",
+    "Vendor Email",
+    isView ? (request?.["Vendor Email"] ?? "") : (exfRequestDraftEmail.email ?? vendorEmailInfo.email),
+    { readOnly: isView }
+  ));
+  form.appendChild(createRequestFormField(
+    "CC",
+    EXF_REQ_CC_FIELD,
+    isView ? (request?.[EXF_REQ_CC_FIELD] ?? "") : (exfRequestDraftEmail.cc ?? vendorEmailInfo.cc),
+    { readOnly: isView }
+  ));
+  form.appendChild(createRequestFormField(
+    "Notes",
+    EXF_REQ_NOTES_FIELD,
+    isView ? (request?.[EXF_REQ_NOTES_FIELD] ?? "") : exfRequestDraftNotes,
+    { type: "textarea", readOnly: isView }
+  ));
   left.appendChild(form);
 
   const right = document.createElement("div");
   right.className = "shipment-modal-right";
-  right.appendChild(renderExfRequestLinkedPoSection(linkedPos));
+  right.appendChild(renderExfRequestLinkedPoSection(linkedPos, isView));
 
   layout.appendChild(left);
   layout.appendChild(right);
@@ -459,13 +554,13 @@ function openExfRequestAddPoPanel() {
   captureExfRequestDraft();
   clearExfFormSelection();
   exfRequestAddPoPanelOpen = true;
-  renderExfRequestModal(exfRequestPoNumbers, { exfDate: getExfRequestExfDateValue() });
+  renderExfRequestModal(exfRequestPoNumbers, getExfRequestModalRenderOptions());
 }
 
 function closeExfRequestAddPoPanel() {
   captureExfRequestDraft();
   exfRequestAddPoPanelOpen = false;
-  renderExfRequestModal(exfRequestPoNumbers, { exfDate: getExfRequestExfDateValue() });
+  renderExfRequestModal(exfRequestPoNumbers, getExfRequestModalRenderOptions());
 }
 
 function addWipPoToExfRequest(poNumber) {
@@ -483,7 +578,7 @@ function addWipPoToExfRequest(poNumber) {
     exfRequestPoNumbers = [...exfRequestPoNumbers, po];
   }
   exfRequestAddPoPanelOpen = true;
-  renderExfRequestModal(exfRequestPoNumbers, { exfDate: getExfRequestExfDateValue() });
+  renderExfRequestModal(exfRequestPoNumbers, getExfRequestModalRenderOptions());
 }
 
 function removePosFromExfRequest() {
@@ -497,7 +592,7 @@ function removePosFromExfRequest() {
   linked.forEach(row => toggleExfFormPoSelected(row, false));
   exfRequestPoNumbers = exfRequestPoNumbers.filter(po => !removeSet.has(String(po)));
   removeSet.forEach(po => { delete exfRequestDraftByPo[po]; });
-  renderExfRequestModal(exfRequestPoNumbers, { exfDate: getExfRequestExfDateValue() });
+  renderExfRequestModal(exfRequestPoNumbers, getExfRequestModalRenderOptions());
 }
 
 function updateExfRequestModalActionButtons() {
@@ -616,10 +711,10 @@ function setAllExfRequestLinkedPosSelected(pos, selected) {
   onFormPoSelectionChanged();
 }
 
-function renderExfRequestLinkedPoSection(pos) {
+function renderExfRequestLinkedPoSection(pos, isView = false) {
   const section = document.createElement("section");
   section.className = "shipment-linked-pos";
-  section.classList.toggle("shipment-linked-pos--selection-disabled", exfRequestAddPoPanelOpen);
+  section.classList.toggle("shipment-linked-pos--selection-disabled", exfRequestAddPoPanelOpen || isView);
 
   const wrap = document.createElement("div");
   wrap.className = "shipment-linked-po-table-wrap shipment-linked-po-table-wrap--with-footer";
@@ -641,15 +736,17 @@ function renderExfRequestLinkedPoSection(pos) {
   const headRow = document.createElement("tr");
   const selectTh = document.createElement("th");
   selectTh.className = "th-select-col";
-  const selectAllCb = document.createElement("input");
-  selectAllCb.type = "checkbox";
-  selectAllCb.id = "exfRequestLinkedPoSelectAll";
-  selectAllCb.disabled = exfRequestAddPoPanelOpen;
-  selectAllCb.setAttribute("aria-label", "Select all EXF request POs");
-  selectAllCb.addEventListener("change", () => {
-    setAllExfRequestLinkedPosSelected(pos, selectAllCb.checked);
-  });
-  selectTh.appendChild(selectAllCb);
+  if (!isView) {
+    const selectAllCb = document.createElement("input");
+    selectAllCb.type = "checkbox";
+    selectAllCb.id = "exfRequestLinkedPoSelectAll";
+    selectAllCb.disabled = exfRequestAddPoPanelOpen;
+    selectAllCb.setAttribute("aria-label", "Select all EXF request POs");
+    selectAllCb.addEventListener("change", () => {
+      setAllExfRequestLinkedPosSelected(pos, selectAllCb.checked);
+    });
+    selectTh.appendChild(selectAllCb);
+  }
   headRow.appendChild(selectTh);
 
   EXF_REQUEST_LINKED_PO_COLUMNS.forEach(({ label, cellClass }) => {
@@ -665,19 +762,22 @@ function renderExfRequestLinkedPoSection(pos) {
   pos.forEach(row => {
     const tr = document.createElement("tr");
     tr.dataset.po = row["PO #"];
+    attachRequestLinkedPoRowOpen(tr, row["PO #"]);
 
     const selectTd = document.createElement("td");
-    const linkedCb = renderFormSelectedCell(selectTd, row, isExfRequestRowSelected(row), selected => {
-      toggleExfFormPoSelected(row, selected);
-      onFormPoSelectionChanged();
-    });
-    linkedCb.disabled = exfRequestAddPoPanelOpen;
+    if (!isView) {
+      const linkedCb = renderFormSelectedCell(selectTd, row, isExfRequestRowSelected(row), selected => {
+        toggleExfFormPoSelected(row, selected);
+        onFormPoSelectionChanged();
+      });
+      linkedCb.disabled = exfRequestAddPoPanelOpen;
+    }
     tr.appendChild(selectTd);
 
     EXF_REQUEST_LINKED_PO_COLUMNS.forEach(({ col, cellClass, editable, editor, rows }) => {
       const td = document.createElement("td");
       if (cellClass) td.className = cellClass;
-      if (editable) {
+      if (editable && !isView) {
         const input = createRequestLinkedPoEditableControl(col, row, { editor, rows });
         if (col === "Ship Method") {
           input.addEventListener("change", () => {
@@ -687,28 +787,7 @@ function renderExfRequestLinkedPoSection(pos) {
         }
         td.appendChild(input);
       } else {
-        const text = formatShipmentLinkedPoCell(col, row);
-        if (col === "PO #") {
-          if (text === EMPTY_DISPLAY) {
-            setDisplayText(td, EMPTY_DISPLAY);
-          } else {
-            const btn = document.createElement("button");
-            btn.type = "button";
-            btn.className = "shipment-linked-po-link";
-            btn.textContent = text;
-            btn.title = "Open PO detail";
-            btn.addEventListener("click", e => {
-              e.stopPropagation();
-              openPoFromShipment(row["PO #"]);
-            });
-            td.appendChild(btn);
-          }
-        } else if (text === EMPTY_DISPLAY) {
-          setDisplayText(td, EMPTY_DISPLAY);
-        } else {
-          td.textContent = text;
-          td.title = text;
-        }
+        renderRequestLinkedPoDataCell(td, col, row, { cellClass });
       }
       tr.appendChild(td);
     });
@@ -718,8 +797,8 @@ function renderExfRequestLinkedPoSection(pos) {
   table.appendChild(tbody);
   wrap.appendChild(table);
   section.appendChild(wrap);
-  section.appendChild(renderExfRequestLinkedPoFooter(pos));
-  updateExfRequestLinkedPoSelectAllHeader(pos);
+  if (!isView) section.appendChild(renderExfRequestLinkedPoFooter(pos));
+  if (!isView) updateExfRequestLinkedPoSelectAllHeader(pos);
   return section;
 }
 
@@ -746,7 +825,7 @@ function markExfRequestMissingShipMethods(missingPoNumbers) {
 }
 
 async function submitExfRequest() {
-  if (isAppSaving()) return;
+  if (exfRequestOpInProgress) return;
   setExfRequestFooterMessage("");
   if (exfRequestPoNumbers.length === 0) {
     setExfRequestFooterMessage("Add at least one PO");
@@ -779,17 +858,25 @@ async function submitExfRequest() {
     setExfRequestFooterMessage("Select Shipping Method for all POs before submitting");
     return;
   }
+  beginToolbarCreatePending();
   closeExfRequestModal();
-  setAppSaving(true, "Sending EXF email…");
+  exfRequestOpInProgress = true;
   showIndicator(`Sending EXF email${ELLIPSIS}`, "");
+
+  const rows = getExfRequestRows();
+  const vendor = getExfRequestVendorForRows(rows);
 
   try {
     if (isDemoMode()) {
-      demoExfRequest(poNumbers, exfDate, memos, shipMethods, data["Vendor Email"], {
-        cc: data[EXF_REQ_CC_FIELD],
-        exfReqNotes,
-      });
-      showIndicator(`EXF requested and email sent ${CHECK_MARK}`, "success");
+      applyExfRequestCreatedLocally(
+        generateDemoExfRequestId(),
+        poNumbers,
+        exfDate,
+        memos,
+        shipMethods,
+        data["Vendor Email"],
+        { cc: data[EXF_REQ_CC_FIELD], exfReqNotes, vendor }
+      );
     } else {
       const json = await postAppsScript({
         action: "exfRequest",
@@ -801,29 +888,49 @@ async function submitExfRequest() {
         memos,
         shipMethods,
       });
-      if (json.exfRequestId) await loadData();
       if (!json.success) throw new Error(json.error || json.emailError || "EXF email failed to send");
-      showIndicator(`EXF requested and email sent ${CHECK_MARK}`, "success");
+      applyExfRequestCreatedLocally(
+        json.exfRequestId,
+        poNumbers,
+        exfDate,
+        memos,
+        shipMethods,
+        data["Vendor Email"],
+        { cc: data[EXF_REQ_CC_FIELD], exfReqNotes, vendor }
+      );
     }
+    showIndicator(`EXF requested and email sent ${CHECK_MARK}`, "success");
   } catch (err) {
     showIndicator("EXF email not sent: " + err.message, "error");
   } finally {
-    setAppSaving(false);
+    exfRequestOpInProgress = false;
+    endToolbarCreatePending();
   }
 }
 
-function demoExfRequest(poNumbers, exfDate, memos, shipMethods, vendorEmail = "demo@example.com", { cc = "", exfReqNotes = "" } = {}) {
+function generateDemoExfRequestId() {
+  return `EXF-${String(allExfRequests.length + 1).padStart(4, "0")}`;
+}
+
+function applyExfRequestCreatedLocally(
+  requestId,
+  poNumbers,
+  exfDate,
+  memos,
+  shipMethods,
+  vendorEmail,
+  { cc = "", exfReqNotes = "", vendor = "" } = {}
+) {
   const rows = poNumbers
     .map(poNumber => allRows.find(r => String(r["PO #"]) === String(poNumber)))
     .filter(Boolean);
-  const vendor = getExfRequestVendorForRows(rows);
-  const requestId = `EXF-${String(allExfRequests.length + 1).padStart(4, "0")}`;
+  const vendorName = vendor || getExfRequestVendorForRows(rows);
   const now = formatDateToYmd(new Date());
   allExfRequests.push({
     [EXF_REQUEST_ID_FIELD]: requestId,
     [EXF_DATE_FIELD]: exfDate,
     [EXF_REQ_SUBMIT_DATE_FIELD]: now,
-    "Vendor": vendor,
+    "Vendor": vendorName,
     "Vendor Email": vendorEmail,
     [EXF_REQ_CC_FIELD]: cc,
     [EXF_REQ_NOTES_FIELD]: exfReqNotes,
@@ -840,6 +947,7 @@ function demoExfRequest(poNumbers, exfDate, memos, shipMethods, vendorEmail = "d
   poNumbers.forEach(poNumber => {
     const row = allRows.find(r => String(r["PO #"]) === String(poNumber));
     if (!row) return;
+    row[EXF_REQUEST_ID_FIELD] = requestId;
     row[EXF_REQUESTED_FIELD] = true;
     row["Status"] = "Requested";
     row[EXF_REQUEST_DATE_FIELD] = exfDate;
@@ -852,6 +960,21 @@ function demoExfRequest(poNumbers, exfDate, memos, shipMethods, vendorEmail = "d
   applyFilters();
   applyExfRequestFilters();
   updateExfRequestButton();
+}
+
+function demoExfRequest(poNumbers, exfDate, memos, shipMethods, vendorEmail = "demo@example.com", { cc = "", exfReqNotes = "" } = {}) {
+  const rows = poNumbers
+    .map(poNumber => allRows.find(r => String(r["PO #"]) === String(poNumber)))
+    .filter(Boolean);
+  applyExfRequestCreatedLocally(
+    generateDemoExfRequestId(),
+    poNumbers,
+    exfDate,
+    memos,
+    shipMethods,
+    vendorEmail,
+    { cc, exfReqNotes, vendor: getExfRequestVendorForRows(rows) }
+  );
 }
 
 function initExfRequest() {

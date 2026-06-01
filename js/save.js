@@ -115,9 +115,12 @@ function showIndicator(msg, type) {
   el.hidden = false;
   el.className = "save-indicator visible" + (type ? ` ${type}` : "");
   clearTimeout(indicatorTimer);
-  indicatorTimer = setTimeout(() => {
-    el.classList.remove("visible", "success", "error");
-    el.hidden = true;
-    el.textContent = "";
-  }, 2500);
+  // In-progress messages (no type) stay visible until replaced by success/error.
+  if (type) {
+    indicatorTimer = setTimeout(() => {
+      el.classList.remove("visible", "success", "error");
+      el.hidden = true;
+      el.textContent = "";
+    }, 2500);
+  }
 }
