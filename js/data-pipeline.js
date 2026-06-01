@@ -30,6 +30,7 @@ async function loadData() {
         window.__pendingAsnRequests = null;
       }
       buildStylePhotoIndex(DEMO_STYLE_PHOTOS);
+      applyDefaultStatusFilter(STATUS_FILTER_OPEN);
     } else {
       const url = new URL(getAppsScriptUrl());
       url.searchParams.set("_", String(Date.now()));
@@ -353,7 +354,7 @@ function formatDateForDisplay(v) {
   if (!m) return s; // fallback: don't change unknown formats
 
   const [, yyyy, mm, dd] = m;
-  return `${Number(mm)}/${Number(dd)}/${yyyy.slice(2)}`;
+  return `${mm}/${dd}/${yyyy.slice(2)}`;
 }
 
 function normalizeToYmd(v) {

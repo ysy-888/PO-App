@@ -46,65 +46,6 @@ function openPoFromShipment(poNumber) {
   bringModalToFront(document.getElementById("modalOverlay"));
 }
 
-function formatShipmentDateInputValue(value) {
-  const ymd = normalizeToYmd(value);
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
-  if (!m) return isEmptyValue(value) ? "" : String(value);
-  return `${m[2]}/${m[3]}/${m[1].slice(2)}`;
-}
-
-function parseShipmentDateDigits(digits) {
-  if (!/^\d{6}$/.test(digits)) return "";
-  const mm = Number(digits.slice(0, 2));
-  const dd = Number(digits.slice(2, 4));
-  const yy = Number(digits.slice(4, 6));
-  if (mm < 1 || mm > 12 || dd < 1) return "";
-
-  const yyyy = 2000 + yy;
-  const date = new Date(yyyy, mm - 1, dd);
-  if (
-    date.getFullYear() !== yyyy ||
-    date.getMonth() !== mm - 1 ||
-    date.getDate() !== dd
-  ) {
-    return "";
-  }
-
-  return `${yyyy}-${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
-}
-
-function normalizeShipmentDateInputValue(value) {
-  const raw = String(value ?? "").trim();
-  if (!raw) return "";
-
-  const ymd = normalizeToYmd(raw);
-  if (/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return ymd;
-
-  const slash = /^(\d{1,2})\/(\d{1,2})\/(\d{2})$/.exec(raw);
-  if (slash) {
-    return parseShipmentDateDigits(
-      slash[1].padStart(2, "0") + slash[2].padStart(2, "0") + slash[3]
-    ) || raw;
-  }
-
-  const digits = raw.replace(/\D/g, "").slice(0, 6);
-  return parseShipmentDateDigits(digits) || raw;
-}
-
-function updateShipmentDateInputState(input) {
-  const digits = input.value.replace(/\D/g, "").slice(0, 6);
-  input.maxLength = input.value.includes("/") ? 8 : 6;
-  input.classList.toggle("shipment-form-input--empty", digits.length === 0);
-  input.dataset.normalizedValue = normalizeShipmentDateInputValue(input.value);
-}
-
-function handleShipmentDateInput(input) {
-  const digits = input.value.replace(/\D/g, "").slice(0, 6);
-  const parsed = parseShipmentDateDigits(digits);
-  input.value = parsed ? formatShipmentDateInputValue(parsed) : digits;
-  updateShipmentDateInputState(input);
-}
-
 function createShipmentFormField(col, value, { readOnly = false } = {}) {
   const wrap = document.createElement("div");
   wrap.className = "shipment-form-field";
@@ -117,18 +58,19 @@ function createShipmentFormField(col, value, { readOnly = false } = {}) {
   if (col === "Notes") {
     input = document.createElement("textarea");
     input.rows = 3;
+    input.classList.add("shipment-form-input");
+    input.value = isEmptyValue(value) ? "" : String(value);
+    wrap.appendChild(label);
+    wrap.appendChild(input);
   } else if (SHIPMENT_DATE_FIELDS.has(col)) {
-    input = document.createElement("input");
-    input.type = "text";
-    input.inputMode = "numeric";
-    input.autocomplete = "off";
-    input.placeholder = "MMDDYY";
-    input.value = formatShipmentDateInputValue(value);
-    input.classList.add("shipment-form-input--date");
-    updateShipmentDateInputState(input);
-    input.addEventListener("input", () => {
-      handleShipmentDateInput(input);
+    const dateInput = createCompactDateInput({
+      initialYmd: value,
+      readOnly,
+      inputClassName: "shipment-form-input shipment-form-input--date",
     });
+    input = dateInput.input;
+    wrap.appendChild(label);
+    wrap.appendChild(dateInput.wrap);
   } else if (col === "Ship Method") {
     input = document.createElement("select");
     ["", ...SHIP_OPTIONS].forEach(opt => {
@@ -138,18 +80,20 @@ function createShipmentFormField(col, value, { readOnly = false } = {}) {
       if (String(value ?? "") === opt) o.selected = true;
       input.appendChild(o);
     });
+    input.classList.add("shipment-form-input");
+    wrap.appendChild(label);
+    wrap.appendChild(input);
   } else {
     input = document.createElement("input");
     input.type = "text";
     input.value = isEmptyValue(value) ? "" : String(value);
+    input.classList.add("shipment-form-input");
+    wrap.appendChild(label);
+    wrap.appendChild(input);
   }
 
-  input.classList.add("shipment-form-input");
   input.dataset.field = col;
   if (readOnly) input.readOnly = true;
-
-  wrap.appendChild(label);
-  wrap.appendChild(input);
   return wrap;
 }
 
@@ -490,10 +434,31 @@ function readShipmentForm(container) {
   container.querySelectorAll("[data-field]").forEach(el => {
     const field = el.dataset.field;
     data[field] = SHIPMENT_DATE_FIELDS.has(field)
-      ? normalizeShipmentDateInputValue(el.value)
+      ? readCompactDateInputValue(el)
       : el.value ?? "";
   });
   return data;
+}
+
+function getMajorityShipMethodFromPoRows(rows) {
+  const counts = new Map();
+  rows.forEach(row => {
+    const method = normalizeShipMethod(row["Ship Method"]);
+    if (isEmptyValue(method)) return;
+    counts.set(method, (counts.get(method) ?? 0) + 1);
+  });
+  if (counts.size === 0) return "";
+
+  let best = "";
+  let bestCount = 0;
+  SHIP_OPTIONS.forEach(opt => {
+    const count = counts.get(opt) ?? 0;
+    if (count > bestCount) {
+      bestCount = count;
+      best = opt;
+    }
+  });
+  return best;
 }
 
 function renderCreateShipmentModal(poNumbers) {
@@ -508,9 +473,12 @@ function renderCreateShipmentModal(poNumbers) {
     .filter(Boolean);
   pruneShipmentFormSelection(pos);
 
+  const shipMethod = getMajorityShipMethodFromPoRows(pos);
+  const defaultShipment = shipMethod ? { "Ship Method": shipMethod } : {};
+
   body.innerHTML = "";
   body.appendChild(buildShipmentModalLayout({
-    shipment: {},
+    shipment: defaultShipment,
     formId: "createShipmentForm",
     linkedSource: pos,
     showAddPanel: false,
@@ -713,7 +681,7 @@ function formatShipmentLinkedPoCell(col, row) {
   }
   if (col === "CXL Date") {
     if (isEmptyValue(val)) return EMPTY_DISPLAY;
-    return formatShipmentDateInputValue(val);
+    return formatDateForDisplay(val);
   }
   if (col === "Actual Qty" || col === "Ctn Qty") {
     if (toQtyNumber(val) <= 0) return EMPTY_DISPLAY;

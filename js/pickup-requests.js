@@ -453,6 +453,7 @@ function renderPickupRequestLinkedPoSection(pos, isReadOnly = false) {
 
   const table = document.createElement("table");
   table.className = "shipment-linked-po-table request-linked-po-table";
+  appendDeliveryPickupLinkedPoColgroup(table);
 
   const thead = document.createElement("thead");
   const headRow = document.createElement("tr");

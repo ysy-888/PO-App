@@ -205,7 +205,7 @@ const REQUEST_LINKED_PO_COLUMNS = [
 
 const DELIVERY_PICKUP_LINKED_PO_COLUMNS = [
   { col: "PO #", label: "PO #", cellClass: "shipment-po-cell-id" },
-  { col: "Status", label: "Status", cellClass: "shipment-po-cell-wrap" },
+  { col: "Status", label: "Status", cellClass: "shipment-po-cell-status" },
   { col: "Style #", label: "Style #", cellClass: "shipment-po-cell-wrap" },
   { col: "Vendor", label: "Vendor", cellClass: "shipment-po-cell-vendor" },
   { col: "Buyer", label: "Buyer", cellClass: "shipment-po-cell-buyer" },
@@ -216,6 +216,21 @@ const DELIVERY_PICKUP_LINKED_PO_COLUMNS = [
   { col: "Actual Qty", label: "Actual Qty", cellClass: "shipment-po-cell-qty" },
   { col: "Ctn Qty", label: "Ctn Qty", cellClass: "shipment-po-cell-qty" },
 ];
+
+/** Select col + linked PO cols for ASN / pickup / delivery request modals. */
+const DELIVERY_PICKUP_LINKED_PO_COLUMN_WIDTHS = [
+  52, 52, 100, 96, 80, 72, 108, 72, 72, 58, 58, 58,
+];
+
+function appendDeliveryPickupLinkedPoColgroup(table) {
+  const colgroup = document.createElement("colgroup");
+  DELIVERY_PICKUP_LINKED_PO_COLUMN_WIDTHS.forEach(width => {
+    const col = document.createElement("col");
+    col.style.width = `${width}px`;
+    colgroup.appendChild(col);
+  });
+  table.appendChild(colgroup);
+}
 
 function getRequestLinkedPoTotals(pos) {
   return pos.reduce((totals, row) => {
@@ -265,37 +280,41 @@ function createRequestFormField(label, fieldName, value, { type = "text", readOn
 
   let input;
   if (type === "date") {
-    input = document.createElement("input");
-    input.type = "date";
-    input.value = normalizeToYmd(value);
-    input.classList.add("shipment-form-input--date");
-    input.classList.toggle("shipment-form-input--empty", isEmptyValue(input.value));
-    input.addEventListener("input", () => {
-      input.classList.toggle("shipment-form-input--empty", isEmptyValue(input.value));
+    const dateInput = createCompactDateInput({
+      initialYmd: value,
+      readOnly,
+      inputClassName: "shipment-form-input shipment-form-input--date",
     });
+    input = dateInput.input;
+    wrap.appendChild(lbl);
+    wrap.appendChild(dateInput.wrap);
   } else if (type === "textarea") {
     input = document.createElement("textarea");
     input.rows = 3;
     input.value = isEmptyValue(value) ? "" : String(value);
+    input.classList.add("shipment-form-input");
+    wrap.appendChild(lbl);
+    wrap.appendChild(input);
   } else {
     input = document.createElement("input");
     input.type = "text";
     input.value = isEmptyValue(value) ? "" : String(value);
+    input.classList.add("shipment-form-input");
+    wrap.appendChild(lbl);
+    wrap.appendChild(input);
   }
 
-  input.classList.add("shipment-form-input");
   input.dataset.field = fieldName;
   if (readOnly) input.readOnly = true;
-
-  wrap.appendChild(lbl);
-  wrap.appendChild(input);
   return wrap;
 }
 
 function readRequestForm(container) {
   const data = {};
   container.querySelectorAll("[data-field]").forEach(el => {
-    data[el.dataset.field] = el.value ?? "";
+    data[el.dataset.field] = el.classList.contains("compact-date-input")
+      ? readCompactDateInputValue(el)
+      : el.value ?? "";
   });
   return data;
 }

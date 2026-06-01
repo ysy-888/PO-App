@@ -1430,6 +1430,7 @@ function shouldIgnoreRowDblClick(e) {
 function openPODetail(row) {
   if (isAppSaving() || modalSaveInProgress) return;
   closeCellSelectDropdown(false);
+  if (typeof closeCellDatePopover === "function") closeCellDatePopover(false);
   packingListPanelOpen = hasPackingList(row?.["PO #"])
     || (typeof poHasShipment === "function" && poHasShipment(row));
   modalRow = snapshotModalRow(row);
@@ -1450,6 +1451,7 @@ function closeModal(event) {
 
 function dismissModalOverlay() {
   closeCellSelectDropdown(false);
+  if (typeof closeCellDatePopover === "function") closeCellDatePopover(false);
   modalRow = null;
   modalSnapshot = null;
   modalPackingEditorSnapshot = null;

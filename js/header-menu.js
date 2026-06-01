@@ -182,12 +182,6 @@ function updateHeaderMenuChecks() {
   updateHeaderMenuCountdownCheck();
   updateAppModeMenuLabel();
   updateTestModeBanner();
-  updatePublishMenuItemVisibility();
-}
-
-function updatePublishMenuItemVisibility() {
-  const btn = document.getElementById("headerMenuPublishToProduction");
-  if (btn) btn.hidden = !isTestMode();
 }
 
 function updateAppModeMenuLabel() {
@@ -226,30 +220,6 @@ function toggleAppMode() {
     return;
   }
   location.reload();
-}
-
-function openPublishToProductionModal() {
-  closeHeaderMenu();
-  document.getElementById("publishToProductionOverlay")?.classList.add("open");
-}
-
-function closePublishToProductionModal() {
-  document.getElementById("publishToProductionOverlay")?.classList.remove("open");
-}
-
-function initPublishToProductionModal() {
-  const overlay = document.getElementById("publishToProductionOverlay");
-  const closeBtn = document.getElementById("publishToProductionCloseBtn");
-  const okBtn = document.getElementById("publishToProductionOkBtn");
-  if (!overlay) return;
-
-  const dismiss = () => closePublishToProductionModal();
-  closeBtn?.addEventListener("click", dismiss);
-  okBtn?.addEventListener("click", dismiss);
-  bindDirectBackdropDismiss(overlay, dismiss);
-  document.addEventListener("keydown", e => {
-    if (e.key === "Escape" && overlay.classList.contains("open")) dismiss();
-  });
 }
 
 function closeHeaderMenu() {
@@ -348,16 +318,9 @@ function initHeaderMenu() {
 
   initCsvImport();
 
-  initPublishToProductionModal();
-
   document.getElementById("headerMenuToggleAppMode")?.addEventListener("click", e => {
     e.stopPropagation();
     toggleAppMode();
-  });
-
-  document.getElementById("headerMenuPublishToProduction")?.addEventListener("click", e => {
-    e.stopPropagation();
-    openPublishToProductionModal();
   });
 
   document.getElementById("headerMenuToggleCountdown")?.addEventListener("click", e => {

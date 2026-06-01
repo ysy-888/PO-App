@@ -65,7 +65,9 @@ function applyDefaultStatusFilter(status) {
 }
 
 function applyDefaultStatusFilterFromServer(statusFilter) {
-  if (statusFilter === null || statusFilter === undefined) return false;
+  if (statusFilter === null || statusFilter === undefined) {
+    return applyDefaultStatusFilter(STATUS_FILTER_OPEN);
+  }
   return applyDefaultStatusFilter(statusFilter);
 }
 

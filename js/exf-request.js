@@ -615,6 +615,63 @@ function getExfRequestLinkedPoTotals(pos) {
   }, { totalQty: 0 });
 }
 
+function applyExfRequestShipMethodToAll(shipMethod) {
+  if (isEmptyValue(shipMethod)) return;
+  document
+    .querySelectorAll("#exfRequestOverlay .exf-request-linked-po-table tbody [data-field=\"Ship Method\"]")
+    .forEach(input => {
+      input.value = shipMethod;
+      input.classList.remove("request-linked-po-input--error");
+      input.removeAttribute("aria-invalid");
+    });
+  exfRequestPoNumbers.forEach(po => {
+    const key = String(po);
+    exfRequestDraftByPo[key] = {
+      memo: exfRequestDraftByPo[key]?.memo ?? "",
+      shipMethod,
+    };
+  });
+  setExfRequestFooterMessage("");
+}
+
+function renderExfRequestSetAllShipMethodControl() {
+  const wrap = document.createElement("div");
+  wrap.className = "exf-request-set-all-ship-method";
+
+  const label = document.createElement("label");
+  label.className = "exf-request-set-all-ship-method-label";
+  label.textContent = "Set All Ship Methods";
+  label.htmlFor = "exfRequestSetAllShipMethod";
+
+  const select = document.createElement("select");
+  select.id = "exfRequestSetAllShipMethod";
+  select.className = "shipment-form-input exf-request-set-all-ship-method-select";
+  select.disabled = exfRequestAddPoPanelOpen;
+  select.setAttribute("aria-label", "Set ship method for all POs");
+
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "— Select —";
+  select.appendChild(placeholder);
+  SHIP_OPTIONS.forEach(opt => {
+    const option = document.createElement("option");
+    option.value = opt;
+    option.textContent = opt;
+    select.appendChild(option);
+  });
+
+  select.addEventListener("change", () => {
+    const value = select.value;
+    if (isEmptyValue(value)) return;
+    applyExfRequestShipMethodToAll(value);
+    select.value = "";
+  });
+
+  wrap.appendChild(label);
+  wrap.appendChild(select);
+  return wrap;
+}
+
 function renderExfRequestLinkedPoFooter(pos) {
   const totals = getExfRequestLinkedPoTotals(pos);
   const footer = document.createElement("footer");
@@ -622,6 +679,10 @@ function renderExfRequestLinkedPoFooter(pos) {
 
   const actions = document.createElement("div");
   actions.className = "shipment-linked-po-footer-actions";
+
+  if (pos.length > 0) {
+    actions.appendChild(renderExfRequestSetAllShipMethodControl());
+  }
 
   const addBtn = document.createElement("button");
   addBtn.type = "button";

@@ -106,8 +106,8 @@ function updateClearAllFiltersButton() {
 
 function clearAllColumnFilters() {
   flagFilterActive = false;
-  statusFilterSelection = null;
-  activeStatus = "";
+  activeStatus = STATUS_FILTER_OPEN;
+  statusFilterSelection = new Set([STATUS_FILTER_OPEN]);
   COLUMN_FILTER_COLS.forEach(col => { columnFilters[col] = null; });
   DATE_FILTER_COLS.forEach(col => { dateColumnRangeFilters[col] = null; });
   closeColumnFilterPopover();
@@ -366,68 +366,29 @@ function buildDateWheel(options, selectedKey, onSelect) {
   return { wrap, scrollToKey, markSelected, navigateAdjacent, wheel };
 }
 
-function updateDateRangeInputMaxLength(input) {
-  input.maxLength = input.value.includes("/") ? 8 : 6;
-}
-
-function handleDateRangeFieldInput(input, onCommit) {
-  const digits = input.value.replace(/\D/g, "").slice(0, 6);
-  if (!digits) {
-    input.value = "";
-    updateDateRangeInputMaxLength(input);
-    onCommit(null);
-    return;
-  }
-  if (digits.length === 6) {
-    const ymd = parseCompactDateDigits(digits);
-    if (ymd) {
-      input.value = formatDateForDisplay(ymd);
-      updateDateRangeInputMaxLength(input);
-      onCommit(ymd);
-      return;
-    }
-  }
-  input.value = digits;
-  input.maxLength = 6;
-}
-
 function createDateRangeInput(initialYmd, onCommit, { tabIndex, onNavigateWheel } = {}) {
-  const input = document.createElement("input");
-  input.type = "text";
-  input.className = "date-range-field";
-  input.placeholder = "MMDDYY";
-  input.inputMode = "numeric";
-  input.autocomplete = "off";
-  input.spellcheck = false;
-  input.value = initialYmd ? formatDateForDisplay(initialYmd) : "";
-  updateDateRangeInputMaxLength(input);
-  if (tabIndex != null) input.tabIndex = tabIndex;
-
-  input.addEventListener("input", () => handleDateRangeFieldInput(input, onCommit));
-
-  input.addEventListener("keydown", e => {
-    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+  return createCompactDateInput({
+    initialYmd,
+    onCommit,
+    inputClassName: "date-range-field",
+    tabIndex,
+    onNavigateWheel,
+    onKeydown: (e, field) => {
+      if (e.key !== "Enter") return;
       e.preventDefault();
-      onNavigateWheel?.(e.key === "ArrowUp" ? -1 : 1);
-      return;
-    }
-    if (e.key === "Enter") {
-      e.preventDefault();
-      input.blur();
+      field.blur();
       if (tabIndex === 1) {
-        input.closest(".date-range-filter")?.querySelector('input.date-range-field[tabindex="2"]')?.focus();
+        field.closest(".date-range-filter")?.querySelector('input.date-range-field[tabindex="2"]')?.focus();
       } else if (tabIndex === 2) {
         document.getElementById("columnFilterOk")?.focus();
       }
-    }
+    },
   });
-
-  return input;
 }
 
 function validateDateRangeToBeforeFrom(fromField, toField) {
-  const fromYmd = fromField.value.trim() ? parseDisplayDateToYmd(fromField.value.trim()) : null;
-  const toYmd = toField.value.trim() ? parseDisplayDateToYmd(toField.value.trim()) : null;
+  const fromYmd = readCompactDateInputValue(fromField) || null;
+  const toYmd = readCompactDateInputValue(toField) || null;
   const invalid = Boolean(fromYmd && toYmd && toYmd < fromYmd);
   toField.classList.toggle("is-invalid", invalid);
   return !invalid;
@@ -475,6 +436,7 @@ function renderDateRangeFilter(list, col) {
     const newHandle = buildDateWheel(toOptions, toSnap, key => {
       dateRangeDraft.to = key;
       toField.value = formatDateForDisplay(key);
+      updateCompactDateInputState(toField);
       toField.classList.remove("is-invalid");
     });
     toWheelHandle = newHandle;
@@ -483,11 +445,12 @@ function renderDateRangeFilter(list, col) {
 
   let fromWheelHandle = null;
 
-  fromField = createDateRangeInput(dateRangeDraft.from, ymd => {
+  const fromDateInput = createDateRangeInput(dateRangeDraft.from, ymd => {
     dateRangeDraft.from = ymd;
     if (ymd) {
       dateRangeDraft.to = ymd;
       toField.value = formatDateForDisplay(ymd);
+      updateCompactDateInputState(toField);
       toField.classList.remove("is-invalid");
     }
     refreshToWheel();
@@ -496,24 +459,28 @@ function renderDateRangeFilter(list, col) {
     tabIndex: 1,
     onNavigateWheel: delta => fromWheelHandle?.navigateAdjacent(delta),
   });
-  fromCol.appendChild(fromField);
+  fromField = fromDateInput.input;
+  fromCol.appendChild(fromDateInput.wrap);
 
-  toField = createDateRangeInput(dateRangeDraft.to, ymd => {
+  const toDateInput = createDateRangeInput(dateRangeDraft.to, ymd => {
     dateRangeDraft.to = ymd;
     validateDateRangeToBeforeFrom(fromField, toField);
   }, {
     tabIndex: 2,
     onNavigateWheel: delta => toWheelHandle?.navigateAdjacent(delta),
   });
-  toCol.appendChild(toField);
+  toField = toDateInput.input;
+  toCol.appendChild(toDateInput.wrap);
 
   // From wheel (all dates)
   fromWheelHandle = buildDateWheel(allDates, dateRangeDraft.from, key => {
     dateRangeDraft.from = key;
     dateRangeDraft.to = key;
     fromField.value = formatDateForDisplay(key);
+    updateCompactDateInputState(fromField);
     fromField.classList.remove("is-invalid");
     toField.value = formatDateForDisplay(key);
+    updateCompactDateInputState(toField);
     toField.classList.remove("is-invalid");
     refreshToWheel();
   });
@@ -525,6 +492,7 @@ function renderDateRangeFilter(list, col) {
   const toHandle = buildDateWheel(toOptions, dateRangeDraft.to, key => {
     dateRangeDraft.to = key;
     toField.value = formatDateForDisplay(key);
+    updateCompactDateInputState(toField);
     toField.classList.remove("is-invalid");
   });
   toWheelHandle = toHandle;
@@ -579,12 +547,11 @@ function syncDateRangeDraftFromPopoverFields() {
 
   const fromField = inputs[0];
   const toField = inputs[1];
-  const fromRaw = fromField.value.trim();
-  const toRaw = toField.value.trim();
-  const fromYmd = fromRaw ? parseDisplayDateToYmd(fromRaw) : null;
-  const toYmd = toRaw ? parseDisplayDateToYmd(toRaw) : null;
+  const fromYmd = readCompactDateInputValue(fromField) || null;
+  const toYmd = readCompactDateInputValue(toField) || null;
 
-  fromField.classList.remove("is-invalid");
+  fromField.classList.toggle("is-invalid", Boolean(fromField.value.trim()) && !fromYmd);
+  toField.classList.toggle("is-invalid", Boolean(toField.value.trim()) && !toYmd);
   if (fromYmd) fromField.value = formatDateForDisplay(fromYmd);
   if (toYmd) toField.value = formatDateForDisplay(toYmd);
   dateRangeDraft = { from: fromYmd, to: toYmd };

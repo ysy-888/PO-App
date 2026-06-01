@@ -74,40 +74,57 @@ body.test-mode-active .app-header {
 
 .app-title-nav {
   display: flex;
-  align-items: baseline;
+  align-items: stretch;
+  align-self: stretch;
   gap: 16px;
   flex-shrink: 0;
 }
 
 .app-logo-text {
+  display: flex;
+  align-items: center;
   color: var(--text);
   font-family: var(--font);
-  font-size: 17px;
-  font-weight: 600;
+  font-size: 21px;
+  font-weight: 700;
   letter-spacing: -0.03em;
   margin-right: 4px;
   white-space: nowrap;
 }
 
 .app-title-tab {
-  padding: 0;
+  display: flex;
+  align-items: center;
+  position: relative;
+  padding: 0 4px;
   border: none;
   background: transparent;
   font-family: var(--font);
   font-size: 15px;
   font-weight: 600;
   letter-spacing: -0.02em;
-  color: var(--text-muted);
+  color: #b8bec8;
   cursor: pointer;
 }
 
-.app-title-tab:hover {
-  color: var(--text);
+.app-title-tab:hover:not(.is-active) {
+  color: var(--text-muted);
 }
 
 .app-title-tab.is-active {
   color: var(--text);
   cursor: default;
+}
+
+.app-title-tab.is-active::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--text);
+  border-radius: 2px 2px 0 0;
 }
 
 .header-right {
@@ -821,7 +838,7 @@ th:not(.th-filterable).sorted-desc::after { content: '↓'; }
   opacity: 1;
 }
 
-#poTable thead th.th-filterable:not(.sorted-asc):not(.sorted-desc):not(.th-shipment-id-col):has(.th-label:hover)::before {
+#poTable thead th.th-filterable:not(.sorted-asc):not(.sorted-desc):not(.th-shipment-id-col):not(.filter-active):has(.th-label:hover)::before {
   content: '↑';
   position: absolute;
   top: 50%;
@@ -853,11 +870,17 @@ th[data-col="Notes"] {
 
 th:hover { background: var(--accent-heavy); color: var(--text); }
 
-#poTable thead th:hover,
-#poTable thead th.th-flag-col:hover,
-#poTable thead th.th-select-col:hover {
+#poTable thead th:hover:not(.filter-active),
+#poTable thead th.th-flag-col:hover:not(.filter-active),
+#poTable thead th.th-select-col:hover:not(.filter-active) {
   background: var(--header-bg);
   color: var(--text);
+}
+
+#poTable thead th.th-filterable.filter-active:hover,
+#poTable thead th.th-flag-col.filter-active:hover {
+  background: var(--accent);
+  color: #fff;
 }
 
 /* Leading control cluster: Flag | Select | Status — no internal dividers */
@@ -1099,6 +1122,56 @@ th.th-filterable .th-label {
   color: var(--accent);
 }
 
+.cell-date-popover {
+  position: fixed;
+  z-index: 1100;
+  width: max-content;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  padding: 4px;
+  outline: none;
+}
+
+.cell-date-popover .compact-date-input-wrap {
+  width: auto;
+  min-width: 0;
+  gap: 2px;
+}
+
+.cell-date-popover .cell-date-popover-input {
+  width: 9ch;
+  min-width: 0;
+  flex: 0 0 auto;
+  padding: 3px 5px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  font-family: var(--font);
+  font-size: 12px;
+  background: #fff;
+  color: var(--text);
+  outline: none;
+  box-sizing: border-box;
+}
+
+.cell-date-popover .cell-date-popover-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(139, 146, 156, 0.12);
+}
+
+.cell-date-popover .cell-date-popover-input.is-invalid {
+  border-color: var(--danger);
+  background: var(--danger-tint);
+}
+
+.cell-date-popover .compact-date-picker-btn {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  border-radius: 4px;
+}
+
 
 /* ── Column filter popover ── */
 .column-filter-popover {
@@ -1197,6 +1270,90 @@ th.th-filterable .th-label {
 .date-range-field.is-invalid {
   border-color: var(--danger);
   background: var(--danger-tint);
+}
+
+.compact-date-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.compact-date-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.compact-date-input.is-invalid,
+.shipment-form-input.compact-date-input.is-invalid {
+  border-color: var(--danger);
+  background: var(--danger-tint);
+}
+
+.compact-date-picker-btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+  background: var(--surface-alt, var(--row-hover));
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.compact-date-picker-btn:hover {
+  border-color: var(--editable-hover-border);
+  color: var(--text);
+  background: #fff;
+}
+
+.compact-date-picker-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.compact-date-picker-hidden {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+  border: 0;
+  padding: 0;
+}
+
+.shipment-form-field .compact-date-input-wrap {
+  width: 100%;
+}
+
+.shipment-form-field .compact-date-input-wrap .compact-date-picker-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+}
+
+.shipment-form-field .compact-date-input-wrap .compact-date-input {
+  padding: 7px 8px;
+}
+
+.date-range-filter .compact-date-input-wrap {
+  width: 100%;
+}
+
+.date-range-filter .compact-date-picker-btn {
+  width: 26px;
+  height: 26px;
+}
+
+.request-linked-po-table .shipment-po-cell-status {
+  white-space: normal;
+  word-break: break-word;
 }
 
 .date-wheel-wrap {
@@ -1605,6 +1762,39 @@ td select.cell-select {
   color: var(--text);
   outline: none;
   text-align: inherit;
+}
+
+td .compact-date-input-wrap,
+#modalOverlay .modal-field-value .compact-date-input-wrap {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+td .compact-date-input-wrap .compact-date-input.cell-input,
+#modalOverlay .modal-field-value .compact-date-input-wrap .compact-date-input.cell-input {
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+td .compact-date-input-wrap .compact-date-picker-btn,
+#modalOverlay .modal-field-value .compact-date-input-wrap .compact-date-picker-btn {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  padding: 0;
+}
+
+#modalOverlay .modal-field-value.editing .compact-date-input-wrap {
+  width: 100%;
+}
+
+#modalOverlay .modal-field-value.editing .compact-date-input-wrap .compact-date-picker-btn {
+  width: 24px;
+  height: 24px;
+  flex-basis: 24px;
 }
 
 td.select-cell {
@@ -2070,58 +2260,6 @@ td.editable:not(.select-cell):hover .editable-preview {
   margin-left: -16px;
   list-style: none;
   color: var(--text-muted, #6b7280);
-}
-
-.publish-checklist-card {
-  max-width: 520px;
-}
-
-.publish-checklist-body {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.publish-checklist-intro {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--text);
-}
-
-.publish-checklist-steps {
-  margin: 0;
-  padding-left: 20px;
-  font-size: 13px;
-  line-height: 1.55;
-  color: var(--text);
-}
-
-.publish-checklist-steps li + li {
-  margin-top: 10px;
-}
-
-.publish-checklist-code {
-  display: block;
-  margin-top: 6px;
-  padding: 6px 10px;
-  border-radius: 6px;
-  background: var(--surface-muted, #fafaf8);
-  border: 1px solid var(--border);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
-  word-break: break-all;
-}
-
-.publish-checklist-note {
-  margin: 0;
-  font-size: 12px;
-  color: var(--text-muted, #6b7280);
-}
-
-.publish-checklist-note code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
 }
 
 .save-indicator {
@@ -4822,6 +4960,26 @@ td.editable:not(.select-cell):hover .editable-preview {
 .exf-request-linked-po-table th.shipment-po-cell-buyer,
 .exf-request-linked-po-table td.shipment-po-cell-buyer {
   text-align: left;
+}
+
+.exf-request-set-all-ship-method {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.exf-request-set-all-ship-method-label {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.exf-request-set-all-ship-method-select {
+  min-width: 108px;
+  height: 30px;
+  padding: 4px 8px;
+  font-size: 12px;
 }
 
 .shipment-linked-po-table th:last-child,

@@ -70,8 +70,6 @@ Then in the **production** Apps Script editor:
 2. **Menu → Live Mode** (if you were in test).
 3. **Refresh** and confirm production data and behavior.
 
-You can also use **Menu → Publish to production…** (visible in Test Mode) for this checklist inside the app.
-
 ## Troubleshooting
 
 ### Test Mode shows demo rows or “not configured”

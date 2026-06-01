@@ -97,6 +97,7 @@ function renderPackingListIndicatorCell(td, row) {
 function renderTable() {
 
   closeCellSelectDropdown(false);
+  closeCellDatePopover(false);
 
   const tbody = document.getElementById("tableBody");
 

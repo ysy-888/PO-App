@@ -32,15 +32,13 @@
       <div id="headerMenuDropdown" class="header-menu-dropdown" hidden role="menu">
         <button type="button" class="header-menu-item" id="headerMenuEditTable" role="menuitem">Edit table</button>
         <button type="button" class="header-menu-item" id="headerMenuImportCsv" role="menuitem">Import CSV</button>
+        <button type="button" class="header-menu-item" id="headerMenuExportCsv" role="menuitem">Export CSV</button>
         <button type="button" class="header-menu-item header-menu-checkable" id="headerMenuToggleCountdown" role="menuitemcheckbox" aria-checked="false">
           <span>Toggle countdown</span>
           <span class="header-menu-check" id="headerMenuCountdownCheck" hidden aria-hidden="true">✓</span>
         </button>
         <button type="button" class="header-menu-item header-menu-item-separator" id="headerMenuToggleAppMode" role="menuitem">
           <span id="headerMenuAppModeLabel">Test Mode</span>
-        </button>
-        <button type="button" class="header-menu-item" id="headerMenuPublishToProduction" role="menuitem" hidden>
-          Publish to production…
         </button>
       </div>
     </div>
@@ -571,6 +569,7 @@
 </div>
 
 <div id="cellSelectDropdown" class="cell-select-dropdown" hidden></div>
+<div id="cellDatePopover" class="cell-date-popover" hidden tabindex="-1"></div>
 
 <div id="appSavingOverlay" class="app-saving-overlay" hidden aria-hidden="true">
   <div class="app-saving-backdrop"></div>
@@ -763,41 +762,6 @@
   </div>
 </div>
 
-<div id="publishToProductionOverlay" class="modal-backdrop">
-  <div class="modal-card publish-checklist-card" onclick="event.stopPropagation()">
-    <div class="modal-header">
-      <div class="modal-header-main">
-        <h3>Publish to Production</h3>
-      </div>
-      <div class="modal-header-actions">
-        <button type="button" class="btn-close" id="publishToProductionCloseBtn" aria-label="Close">✕</button>
-      </div>
-    </div>
-    <div class="modal-body publish-checklist-body">
-      <p class="publish-checklist-intro">
-        This publishes <strong>application code</strong> only. Test and production Google Sheets stay separate — no data or settings are copied.
-      </p>
-      <ol class="publish-checklist-steps">
-        <li>Confirm changes in Test Mode (Refresh against the test sheet).</li>
-        <li>
-          Push frontend to GitHub Pages:
-          <code class="publish-checklist-code">git push origin main</code>
-        </li>
-        <li>
-          Push backend to production Apps Script:
-          <code class="publish-checklist-code">npm run push:prod</code>
-          then update the Web app deployment (New version) in the Apps Script editor.
-        </li>
-        <li>Switch to <strong>Live Mode</strong>, Refresh, and verify production.</li>
-      </ol>
-      <p class="publish-checklist-note">See <code>DEPLOY.md</code> in the repo for full setup and troubleshooting.</p>
-    </div>
-    <div class="modal-footer">
-      <button type="button" class="btn btn-primary" id="publishToProductionOkBtn">Got it</button>
-    </div>
-  </div>
-</div>
-
 <div id="modalOverlay" class="modal-backdrop">
   <div class="modal-card" onclick="event.stopPropagation()">
     <div class="modal-header">
@@ -829,6 +793,7 @@
 <script src="js/state-api.js"></script>
 <script src="js/csv-import.js"></script>
 <script src="js/data-pipeline.js"></script>
+<script src="js/date-input.js"></script>
 <script src="js/selection.js"></script>
 <script src="js/row-context-menu.js"></script>
 <script src="js/table-render.js"></script>
@@ -843,6 +808,7 @@
 <script src="js/asn-requests.js"></script>
 <script src="js/delivery-requests.js"></script>
 <script src="js/pickup-requests.js"></script>
+<script src="js/export-csv.js"></script>
 <script src="js/shipments-init.js"></script>
 </body>
 </html>

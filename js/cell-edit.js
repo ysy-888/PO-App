@@ -1,6 +1,171 @@
 /** @type {{ anchor: HTMLElement, col: string, row: Record<string, unknown> } | null} */
 let openCellSelect = null;
 
+/** @type {{ anchor: HTMLElement, col: string, row: Record<string, unknown>, input: HTMLInputElement, originalVal: unknown, suspendCloseUntil: number } | null} */
+let openCellDateEdit = null;
+
+function positionCellDatePopover(anchorEl) {
+  const pop = document.getElementById("cellDatePopover");
+  if (!pop || !anchorEl) return;
+
+  const rect = anchorEl.getBoundingClientRect();
+  pop.style.top = `${rect.bottom + 2}px`;
+  pop.style.left = `${rect.left}px`;
+  pop.style.minWidth = "";
+
+  const popRect = pop.getBoundingClientRect();
+  const maxLeft = window.innerWidth - popRect.width - 8;
+  pop.style.left = `${Math.min(Math.max(8, rect.left), maxLeft)}px`;
+}
+
+function refreshCellDateAnchorDisplay(anchor, col, row) {
+  applyDateCellDisplay(anchor, col, row, { context: "table" });
+  if (isPoFieldEditable(col, row) && !SELECT_EDIT_COLS.has(col)) {
+    wrapEditablePreview(anchor);
+  }
+}
+
+function closeCellDatePopover(shouldCommit = true) {
+  if (!openCellDateEdit) return;
+
+  const { anchor, col, row, input, originalVal } = openCellDateEdit;
+  let didChange = false;
+
+  if (shouldCommit && input && isCompactDateInputCommitReady(input)) {
+    const newVal = readCompactDateInputValue(input);
+    if (getEditorComparableValue(col, newVal) !== getEditorComparableValue(col, originalVal)) {
+      row[col] = newVal;
+      if (col === "Ship Method" || col === "EST EXF") {
+        syncEstIhdForRow(row);
+      }
+      didChange = true;
+      const updates = { [col]: newVal };
+      if (col === "EST EXF") updates["EST IHD"] = row["EST IHD"];
+      saveUpdate(row["PO #"], updates);
+    }
+  }
+
+  const pop = document.getElementById("cellDatePopover");
+  if (pop) {
+    pop.hidden = true;
+    pop.innerHTML = "";
+  }
+
+  delete anchor.dataset.editing;
+  anchor.classList.remove("editing");
+  openCellDateEdit = null;
+
+  if (didChange) {
+    renderTable();
+    updateModalIfOpen();
+  } else {
+    refreshCellDateAnchorDisplay(anchor, col, row);
+  }
+}
+
+function suspendCellDatePopoverClose(ms = 60000) {
+  if (!openCellDateEdit) return;
+  openCellDateEdit.suspendCloseUntil = Date.now() + ms;
+}
+
+function isCellDatePopoverCloseSuspended() {
+  return Boolean(openCellDateEdit && Date.now() < openCellDateEdit.suspendCloseUntil);
+}
+
+function openCellDatePopover(anchorEl, col, row) {
+  if (isAppSaving()) return;
+  if (!isPoFieldEditable(col, row)) return;
+  if (openCellDateEdit?.anchor === anchorEl) {
+    closeCellDatePopover(true);
+    return;
+  }
+
+  closeCellSelectDropdown(false);
+  closeCellDatePopover(false);
+
+  const originalVal = row[col] ?? "";
+  const pop = document.getElementById("cellDatePopover");
+  if (!pop) return;
+
+  pop.innerHTML = "";
+  const { wrap, input, btn, picker } = createCompactDateInput({
+    initialYmd: originalVal,
+    inputClassName: "cell-date-popover-input",
+  });
+
+  btn?.addEventListener("click", () => suspendCellDatePopoverClose());
+  picker?.addEventListener("change", () => {
+    if (openCellDateEdit) openCellDateEdit.suspendCloseUntil = 0;
+  });
+  picker?.addEventListener("blur", () => {
+    if (openCellDateEdit) openCellDateEdit.suspendCloseUntil = 0;
+  });
+
+  input.addEventListener("keydown", e => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      closeCellDatePopover(true);
+      return;
+    }
+  });
+
+  pop.appendChild(wrap);
+  pop.hidden = false;
+
+  anchorEl.dataset.editing = "active";
+  anchorEl.classList.add("editing");
+  openCellDateEdit = {
+    anchor: anchorEl,
+    col,
+    row,
+    input,
+    originalVal,
+    suspendCloseUntil: 0,
+  };
+
+  requestAnimationFrame(() => {
+    positionCellDatePopover(anchorEl);
+    input.focus();
+    if (input.value) input.select();
+  });
+}
+
+function initCellDatePopover() {
+  const pop = document.getElementById("cellDatePopover");
+  if (!pop) return;
+
+  pop.addEventListener("focusout", () => {
+    if (!openCellDateEdit || pop.hidden) return;
+    requestAnimationFrame(() => {
+      if (!openCellDateEdit || pop.hidden || isCellDatePopoverCloseSuspended()) return;
+      if (!pop.contains(document.activeElement)) {
+        closeCellDatePopover(true);
+      }
+    });
+  });
+
+  document.addEventListener("mousedown", e => {
+    if (!openCellDateEdit || pop.hidden) return;
+    if (isCellDatePopoverCloseSuspended()) return;
+    if (pop.contains(e.target) || openCellDateEdit.anchor.contains(e.target)) return;
+    closeCellDatePopover(true);
+  });
+
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && openCellDateEdit) {
+      closeCellDatePopover(false);
+    }
+  });
+
+  window.addEventListener("resize", () => {
+    if (openCellDateEdit) positionCellDatePopover(openCellDateEdit.anchor);
+  });
+
+  document.querySelector(".table-scroll-y")?.addEventListener("scroll", () => {
+    if (openCellDateEdit) positionCellDatePopover(openCellDateEdit.anchor);
+  }, { passive: true });
+}
+
 function getCellSelectOptions(col, row) {
   if (col === "Status") {
     return getAvailableStatusOptions(row ?? {});
@@ -115,7 +280,8 @@ function openCellSelectDropdown(anchorEl, col, row) {
     return;
   }
 
-  closeCellSelectDropdown();
+  closeCellSelectDropdown(false);
+  closeCellDatePopover(false);
   openCellSelect = { anchor: anchorEl, col, row };
 
   anchorEl.dataset.editing = "active";
@@ -167,11 +333,11 @@ function createCellInput(col, val) {
   }
 
   if (DATE_FIELDS.has(col)) {
-    const input = document.createElement("input");
-    input.type = "date";
-    input.className = "cell-input";
-    input.value = normalizeToYmd(val);
-    return input;
+    const { wrap } = createCompactDateInput({
+      initialYmd: val,
+      inputClassName: "cell-input cell-input--date",
+    });
+    return wrap;
   }
 
   const input = document.createElement("input");
@@ -181,8 +347,22 @@ function createCellInput(col, val) {
   return input;
 }
 
+function getCellEditorInput(editorEl) {
+  if (editorEl instanceof HTMLInputElement || editorEl instanceof HTMLTextAreaElement) {
+    return editorEl;
+  }
+  return editorEl.querySelector(".compact-date-input, .cell-input, .cell-textarea");
+}
+
+function readCellEditorValue(col, input) {
+  if (DATE_FIELDS.has(col)) return readCompactDateInputValue(input);
+  return input.value ?? "";
+}
+
 function getEditorComparableValue(col, val) {
-  if (DATE_FIELDS.has(col)) return normalizeToYmd(val) || "";
+  if (DATE_FIELDS.has(col)) {
+    return normalizeToYmd(val) || normalizeCompactDateInputValue(val) || "";
+  }
   return String(val ?? "").trim();
 }
 
@@ -247,14 +427,22 @@ function refreshAfterModalFieldEdit(fieldEl, col, row) {
 function commitActiveModalEditor() {
   const active = document.querySelector("#modalOverlay .modal-field-value[data-editing='active']");
   if (!active || !modalRow) return;
-  const input = active.querySelector(".cell-input, .cell-textarea");
+  const editorEl = active.querySelector(".compact-date-input-wrap, .cell-input, .cell-textarea");
+  const input = editorEl ? getCellEditorInput(editorEl) : null;
   if (!input) return;
   const col = active.dataset.col;
   if (!col) return;
 
+  if (DATE_FIELDS.has(col) && !isCompactDateInputCommitReady(input)) {
+    active.onblur = null;
+    input.onblur = null;
+    refreshAfterModalFieldEdit(active, col, modalRow);
+    return;
+  }
+
   active.onblur = null;
   input.onblur = null;
-  modalRow[col] = input.value;
+  modalRow[col] = readCellEditorValue(col, input);
   if (col === "Ship Method" || col === "EST EXF") {
     syncEstIhdForRow(modalRow);
   }
@@ -266,7 +454,12 @@ function attachCellEditorHandlers(fieldEl, col, row, input, originalVal) {
   const inModal = isModalFieldEl(fieldEl);
 
   function commit() {
-    const newVal = input.value;
+    if (DATE_FIELDS.has(col) && !isCompactDateInputCommitReady(input)) {
+      cancelEdit();
+      return;
+    }
+
+    const newVal = readCellEditorValue(col, input);
     if (getEditorComparableValue(col, newVal) === originalComparable) {
       if (inModal) {
         refreshAfterModalFieldEdit(fieldEl, col, row);
@@ -323,14 +516,18 @@ function mountFieldEditor(fieldEl, col, row) {
   if (fieldEl.dataset.editing === "active") return;
 
   const val = row[col] ?? "";
-  const input = createCellInput(col, val);
+  const editorEl = createCellInput(col, val);
+  const input = getCellEditorInput(editorEl);
 
   fieldEl.innerHTML = "";
-  fieldEl.appendChild(input);
+  fieldEl.appendChild(editorEl);
   fieldEl.classList.add("editing");
   fieldEl.dataset.editing = "active";
   attachCellEditorHandlers(fieldEl, col, row, input, val);
   input.focus();
+  if (input instanceof HTMLInputElement && DATE_FIELDS.has(col)) {
+    input.select();
+  }
 }
 
 function mountCellEditor(td, col, row) {
@@ -370,6 +567,10 @@ function bindEditableCell(td, col, row) {
 
 function startEdit(td, col, row) {
   if (!isPoFieldEditable(col, row)) return;
+  if (DATE_FIELDS.has(col) && !isModalFieldEl(td)) {
+    openCellDatePopover(td, col, row);
+    return;
+  }
   if (td.dataset.editing === "active") return;
   mountFieldEditor(td, col, row);
 }

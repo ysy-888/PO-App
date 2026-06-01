@@ -498,7 +498,11 @@ function saveDefaultColumns_(columns, columnOrder) {
 }
 
 function getDefaultStatusFilter_() {
-  return PropertiesService.getScriptProperties().getProperty(STATUS_DEFAULT_KEY);
+  const saved = PropertiesService.getScriptProperties().getProperty(STATUS_DEFAULT_KEY);
+  if (saved === null) {
+    return "__open__";
+  }
+  return saved;
 }
 
 function saveDefaultStatusFilter_(statusFilter) {

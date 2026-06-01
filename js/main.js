@@ -7,6 +7,7 @@ initStatusFilters();
 initColumnFilterHeaders();
 initFlagFilterHeader();
 initCellSelectDropdown();
+initCellDatePopover();
 initPoModalActions();
 initPagination();
 initPaginationKeyboard();

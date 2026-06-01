@@ -2,10 +2,6 @@
   Test Mode (menu) = use the test Google Sheet backend. Live Mode = production sheet.
   Data and sheet settings stay separate; switching modes does not copy data.
 
-  Publish to production (menu, test mode only) = ship application CODE:
-  frontend via git push to GitHub Pages, backend via clasp push to prod Apps Script.
-  See DEPLOY.md for the full checklist.
-
   Test sheet setup (one-time):
   1. File → Make a copy of the production Google Sheet (or create empty test sheet).
   2. Extensions → Apps Script — paste apps-script.gs and save.

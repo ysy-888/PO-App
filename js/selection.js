@@ -126,7 +126,7 @@ const ROW_SELECT_DRAG_THRESHOLD = 4;
 function isRowMiniSelectBlocked(target) {
   if (!(target instanceof Element)) return true;
   return Boolean(target.closest(
-    "input, textarea, select, button, .cell-select-dropdown, .po-flag-btn, " +
+    "input, textarea, select, button, .cell-select-dropdown, .cell-date-popover, .po-flag-btn, " +
     ".td-select-cell, .select-cell, .editable, .shipment-id-link"
   ));
 }
@@ -415,7 +415,7 @@ function initRowMiniSelection() {
   document.addEventListener("mousedown", e => {
     if (rowSelectPointerId !== null) return;
     if (e.target.closest("#tableBody")) return;
-    if (e.target.closest(".column-filter-popover, .cell-select-dropdown, .header-menu-dropdown")) return;
+    if (e.target.closest(".column-filter-popover, .cell-select-dropdown, .cell-date-popover, .header-menu-dropdown")) return;
     clearMiniSelection();
   });
 
