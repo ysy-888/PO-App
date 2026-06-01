@@ -378,10 +378,61 @@ function formatDateToYmd(date) {
   return `${y}-${m}-${d}`;
 }
 
+/** Parse MMDDYY (6 digits) to YYYY-MM-DD, or null if invalid. */
+function parseCompactDateDigits(digits) {
+  if (!/^\d{6}$/.test(digits)) return null;
+  const mm = Number(digits.slice(0, 2));
+  const dd = Number(digits.slice(2, 4));
+  const yy = Number(digits.slice(4, 6));
+  if (mm < 1 || mm > 12 || dd < 1) return null;
+
+  const yyyy = 2000 + yy;
+  const date = new Date(yyyy, mm - 1, dd);
+  if (
+    date.getFullYear() !== yyyy ||
+    date.getMonth() !== mm - 1 ||
+    date.getDate() !== dd
+  ) {
+    return null;
+  }
+
+  return `${yyyy}-${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
+}
+
+/** Parse mm/dd/yy (or m/d/yy) and ISO-style dates to YYYY-MM-DD. */
+function parseDisplayDateToYmd(v) {
+  if (isEmptyValue(v)) return null;
+  const s = String(v).trim();
+  if (s === "—") return null;
+
+  const iso = normalizeToYmd(s);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso) && parseYmdToLocalDate(iso)) return iso;
+
+  const compact = s.replace(/\D/g, "");
+  if (/^\d{6}$/.test(compact)) {
+    const ymd = parseCompactDateDigits(compact);
+    if (ymd) return ymd;
+  }
+
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/.exec(s);
+  if (!m) return null;
+
+  const mm = String(Number(m[1])).padStart(2, "0");
+  const dd = String(Number(m[2])).padStart(2, "0");
+  let yyyy = m[3];
+  if (yyyy.length === 2) yyyy = `20${yyyy.padStart(2, "0")}`;
+  else yyyy = String(Number(yyyy));
+
+  const ymd = `${yyyy}-${mm}-${dd}`;
+  return parseYmdToLocalDate(ymd) ? ymd : null;
+}
+
 function calculateEstIhd(shipMethod, estExf) {
   if (isEmptyValue(shipMethod) || isEmptyValue(estExf)) return "";
 
-  const method = String(shipMethod).trim();
+  const method = typeof normalizeShipMethod === "function"
+    ? normalizeShipMethod(shipMethod)
+    : String(shipMethod).trim();
   const exfYmd = normalizeToYmd(estExf);
   if (!exfYmd) return "";
 

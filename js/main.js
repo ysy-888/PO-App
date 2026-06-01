@@ -1,5 +1,6 @@
 
 loadColumnVisibility();
+applyTwoLineTableHeaders();
 loadCxlCountdownPreference();
 initDivisionFilters();
 initStatusFilters();

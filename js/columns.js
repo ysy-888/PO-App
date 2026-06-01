@@ -188,6 +188,39 @@ function getColumnLabel(col) {
   return COLUMN_LABELS[col] ?? col;
 }
 
+/** Split exactly two-word labels onto two lines for compact column headers. */
+function formatTwoLineHeaderLabel(text) {
+  const trimmed = String(text ?? "").trim();
+  if (trimmed.includes("#")) return trimmed;
+  const parts = trimmed.split(/\s+/);
+  if (parts.length === 2) return `${parts[0]}\n${parts[1]}`;
+  return trimmed;
+}
+
+function applyTwoLineTableHeaders() {
+  const table = document.getElementById("poTable");
+  if (!table) return;
+
+  table.querySelectorAll("thead th").forEach(th => {
+    if (th.classList.contains("th-flag-col")
+      || th.classList.contains("th-select-col")
+      || th.classList.contains("th-shipment-id-col")
+      || th.classList.contains("th-packing-list-col")) {
+      return;
+    }
+
+    const label = th.querySelector(".th-label");
+    if (label) {
+      label.textContent = formatTwoLineHeaderLabel(label.textContent);
+      return;
+    }
+
+    if (th.querySelector("input, svg, button")) return;
+    const text = th.textContent.trim();
+    if (text) th.textContent = formatTwoLineHeaderLabel(text);
+  });
+}
+
 function getColumnWidthTier(col) {
   if (col === "Flag") return "flag";
   if (col === "Selected") return "select";
@@ -511,6 +544,7 @@ function normalizeRow(row) {
   }
   delete out[""];
   if ("Division" in out) out["Division"] = normalizeDivision(out["Division"]);
+  if ("Ship Method" in out) out["Ship Method"] = normalizeShipMethod(out["Ship Method"]);
   if ("Shipment ID" in out && isEmptyValue(out["Shipment ID"])) {
     out["Shipment ID"] = "";
   }

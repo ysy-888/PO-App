@@ -89,13 +89,14 @@ function getUniqueColumnValues(col) {
 }
 
 function isColumnFilterActive(col) {
+  if (DATE_FILTER_COLS.has(col)) return dateColumnRangeFilters[col] != null;
   return columnFilters[col] != null;
 }
 
 function hasActiveColumnFilters() {
   return flagFilterActive ||
     isStatusHeaderFilterActive() ||
-    COLUMN_FILTER_COLS.some(col => columnFilters[col] != null);
+    COLUMN_FILTER_COLS.some(col => isColumnFilterActive(col));
 }
 
 function updateClearAllFiltersButton() {
@@ -108,6 +109,7 @@ function clearAllColumnFilters() {
   statusFilterSelection = null;
   activeStatus = "";
   COLUMN_FILTER_COLS.forEach(col => { columnFilters[col] = null; });
+  DATE_FILTER_COLS.forEach(col => { dateColumnRangeFilters[col] = null; });
   closeColumnFilterPopover();
   syncStatusFilterToolbar();
   updateColumnFilterHeaderStates();
@@ -115,8 +117,23 @@ function clearAllColumnFilters() {
   applyFilters();
 }
 
+function rowPassesDateColumnRange(col, row) {
+  const range = dateColumnRangeFilters[col];
+  if (!range) return true;
+  const key = getFilterValueKey(col, row);
+  if (key === BLANK_FILTER_LABEL) return false;
+  const from = range.from || range.to;
+  const to = range.to || range.from;
+  if (!from || !to) return true;
+  return key >= from && key <= to;
+}
+
 function rowPassesColumnFilters(row) {
   for (const col of COLUMN_FILTER_COLS) {
+    if (DATE_FILTER_COLS.has(col)) {
+      if (!rowPassesDateColumnRange(col, row)) return false;
+      continue;
+    }
     const selected = columnFilters[col];
     if (selected == null) continue;
     if (selected.size === 0) return false;
@@ -214,11 +231,318 @@ function renderStatusFilterHeaderList(list) {
   }
 }
 
+/**
+ * Build a scroll-snap wheel for date options.
+ * @param {string[]} options - sorted YMD keys
+ * @param {string|null} selectedKey
+ * @param {function(string):void} onSelect - called with the newly centred key
+ * @returns {{ wrap: HTMLElement, scrollToKey: function(string|null):void }}
+ */
+function buildDateWheel(options, selectedKey, onSelect) {
+  const wrap = document.createElement("div");
+  wrap.className = "date-wheel-wrap";
+
+  const centerLine = document.createElement("div");
+  centerLine.className = "date-wheel-center-line";
+  wrap.appendChild(centerLine);
+
+  const wheel = document.createElement("div");
+  wheel.className = "date-wheel";
+  wrap.appendChild(wheel);
+
+  const ITEM_H = 36;
+
+  // Padding sentinels so first/last items can scroll to centre
+  const topPad = document.createElement("div");
+  topPad.style.height = "48px";
+  topPad.style.flexShrink = "0";
+  wheel.appendChild(topPad);
+
+  options.forEach(key => {
+    const item = document.createElement("div");
+    item.className = "date-wheel-item";
+    if (key === selectedKey) item.classList.add("is-selected");
+    item.dataset.key = key;
+    item.textContent = formatDateForDisplay(key);
+    wheel.appendChild(item);
+  });
+
+  const bottomPad = document.createElement("div");
+  bottomPad.style.height = "48px";
+  bottomPad.style.flexShrink = "0";
+  wheel.appendChild(bottomPad);
+
+  function getItems() {
+    return [...wheel.querySelectorAll(".date-wheel-item")];
+  }
+
+  function markSelected(key) {
+    getItems().forEach(el => el.classList.toggle("is-selected", el.dataset.key === key));
+  }
+
+  function scrollToKey(key) {
+    if (!key) return;
+    const items = getItems();
+    const idx = items.findIndex(el => el.dataset.key === key);
+    if (idx === -1) return;
+    const centerOffset = 48 + idx * ITEM_H + ITEM_H / 2 - wheel.clientHeight / 2;
+    wheel.scrollTo({ top: Math.max(0, centerOffset), behavior: "instant" });
+  }
+
+  // Scroll-snap settle detection
+  let scrollTimer = null;
+  function onScrollSettle() {
+    const wheelTop = wheel.getBoundingClientRect().top;
+    const centerY = wheelTop + wheel.clientHeight / 2;
+    const items = getItems();
+    let closest = null;
+    let closestDist = Infinity;
+    items.forEach(el => {
+      const r = el.getBoundingClientRect();
+      const itemCenterY = r.top + r.height / 2;
+      const dist = Math.abs(itemCenterY - centerY);
+      if (dist < closestDist) { closestDist = dist; closest = el; }
+    });
+    if (closest) {
+      markSelected(closest.dataset.key);
+      onSelect(closest.dataset.key);
+    }
+  }
+
+  wheel.addEventListener("scrollend", onScrollSettle);
+  // Fallback debounce for browsers without scrollend
+  wheel.addEventListener("scroll", () => {
+    clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(onScrollSettle, 120);
+  }, { passive: true });
+
+  function scrollItemToCenter(item, behavior = "smooth") {
+    const items = getItems();
+    const idx = items.indexOf(item);
+    if (idx === -1) return;
+    const centerOffset = 48 + idx * ITEM_H + ITEM_H / 2 - wheel.clientHeight / 2;
+    wheel.scrollTo({ top: Math.max(0, centerOffset), behavior });
+  }
+
+  function selectItem(item, behavior = "smooth") {
+    if (!item) return;
+    const key = item.dataset.key;
+    markSelected(key);
+    onSelect(key);
+    scrollItemToCenter(item, behavior);
+  }
+
+  function navigateAdjacent(delta) {
+    const items = getItems();
+    if (!items.length) return;
+    const currentIdx = items.findIndex(el => el.classList.contains("is-selected"));
+    const nextIdx = Math.max(0, Math.min(items.length - 1, (currentIdx === -1 ? 0 : currentIdx) + delta));
+    selectItem(items[nextIdx]);
+  }
+
+  // Click to select
+  wheel.addEventListener("click", e => {
+    wheel.focus();
+    const item = e.target.closest(".date-wheel-item");
+    if (!item) return;
+    selectItem(item);
+  });
+
+  wheel.tabIndex = -1;
+  wheel.setAttribute("role", "listbox");
+  wheel.addEventListener("keydown", e => {
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      navigateAdjacent(-1);
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      navigateAdjacent(1);
+    }
+  });
+
+  // Scroll selected item into centre after DOM is painted
+  requestAnimationFrame(() => scrollToKey(selectedKey || options[0]));
+
+  return { wrap, scrollToKey, markSelected, navigateAdjacent, wheel };
+}
+
+function updateDateRangeInputMaxLength(input) {
+  input.maxLength = input.value.includes("/") ? 8 : 6;
+}
+
+function handleDateRangeFieldInput(input, onCommit) {
+  const digits = input.value.replace(/\D/g, "").slice(0, 6);
+  if (!digits) {
+    input.value = "";
+    updateDateRangeInputMaxLength(input);
+    onCommit(null);
+    return;
+  }
+  if (digits.length === 6) {
+    const ymd = parseCompactDateDigits(digits);
+    if (ymd) {
+      input.value = formatDateForDisplay(ymd);
+      updateDateRangeInputMaxLength(input);
+      onCommit(ymd);
+      return;
+    }
+  }
+  input.value = digits;
+  input.maxLength = 6;
+}
+
+function createDateRangeInput(initialYmd, onCommit, { tabIndex, onNavigateWheel } = {}) {
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "date-range-field";
+  input.placeholder = "MMDDYY";
+  input.inputMode = "numeric";
+  input.autocomplete = "off";
+  input.spellcheck = false;
+  input.value = initialYmd ? formatDateForDisplay(initialYmd) : "";
+  updateDateRangeInputMaxLength(input);
+  if (tabIndex != null) input.tabIndex = tabIndex;
+
+  input.addEventListener("input", () => handleDateRangeFieldInput(input, onCommit));
+
+  input.addEventListener("keydown", e => {
+    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+      e.preventDefault();
+      onNavigateWheel?.(e.key === "ArrowUp" ? -1 : 1);
+      return;
+    }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      input.blur();
+      if (tabIndex === 1) {
+        input.closest(".date-range-filter")?.querySelector('input.date-range-field[tabindex="2"]')?.focus();
+      } else if (tabIndex === 2) {
+        document.getElementById("columnFilterOk")?.focus();
+      }
+    }
+  });
+
+  return input;
+}
+
+function validateDateRangeToBeforeFrom(fromField, toField) {
+  const fromYmd = fromField.value.trim() ? parseDisplayDateToYmd(fromField.value.trim()) : null;
+  const toYmd = toField.value.trim() ? parseDisplayDateToYmd(toField.value.trim()) : null;
+  const invalid = Boolean(fromYmd && toYmd && toYmd < fromYmd);
+  toField.classList.toggle("is-invalid", invalid);
+  return !invalid;
+}
+
+function renderDateRangeFilter(list, col) {
+  list.style.cssText = "border:none;padding:0;max-height:none;overflow:visible;margin-bottom:0;";
+
+  const allDates = getUniqueColumnValues(col).filter(k => k !== BLANK_FILTER_LABEL);
+
+  const container = document.createElement("div");
+  container.className = "date-range-filter";
+  list.appendChild(container);
+
+  // -- From column --
+  const fromCol = document.createElement("div");
+  fromCol.className = "date-range-col";
+
+  const fromLabel = document.createElement("div");
+  fromLabel.className = "date-range-label";
+  fromLabel.textContent = "From";
+  fromCol.appendChild(fromLabel);
+
+  const toCol = document.createElement("div");
+  toCol.className = "date-range-col";
+
+  const toLabel = document.createElement("div");
+  toLabel.className = "date-range-label";
+  toLabel.textContent = "To";
+  toCol.appendChild(toLabel);
+
+  let fromField;
+  let toField;
+
+  // Build wheels with forward refs so From can refresh To
+  let toWheelHandle = null;
+
+  function refreshToWheel() {
+    const toOptions = allDates.filter(k => !dateRangeDraft.from || k >= dateRangeDraft.from);
+    const oldWrap = toCol.querySelector(".date-wheel-wrap");
+    if (oldWrap) oldWrap.remove();
+    const toSnap = dateRangeDraft.to && toOptions.includes(dateRangeDraft.to)
+      ? dateRangeDraft.to
+      : toOptions[0];
+    const newHandle = buildDateWheel(toOptions, toSnap, key => {
+      dateRangeDraft.to = key;
+      toField.value = formatDateForDisplay(key);
+      toField.classList.remove("is-invalid");
+    });
+    toWheelHandle = newHandle;
+    toCol.appendChild(newHandle.wrap);
+  }
+
+  let fromWheelHandle = null;
+
+  fromField = createDateRangeInput(dateRangeDraft.from, ymd => {
+    dateRangeDraft.from = ymd;
+    if (ymd) {
+      dateRangeDraft.to = ymd;
+      toField.value = formatDateForDisplay(ymd);
+      toField.classList.remove("is-invalid");
+    }
+    refreshToWheel();
+    validateDateRangeToBeforeFrom(fromField, toField);
+  }, {
+    tabIndex: 1,
+    onNavigateWheel: delta => fromWheelHandle?.navigateAdjacent(delta),
+  });
+  fromCol.appendChild(fromField);
+
+  toField = createDateRangeInput(dateRangeDraft.to, ymd => {
+    dateRangeDraft.to = ymd;
+    validateDateRangeToBeforeFrom(fromField, toField);
+  }, {
+    tabIndex: 2,
+    onNavigateWheel: delta => toWheelHandle?.navigateAdjacent(delta),
+  });
+  toCol.appendChild(toField);
+
+  // From wheel (all dates)
+  fromWheelHandle = buildDateWheel(allDates, dateRangeDraft.from, key => {
+    dateRangeDraft.from = key;
+    dateRangeDraft.to = key;
+    fromField.value = formatDateForDisplay(key);
+    fromField.classList.remove("is-invalid");
+    toField.value = formatDateForDisplay(key);
+    toField.classList.remove("is-invalid");
+    refreshToWheel();
+  });
+  fromCol.appendChild(fromWheelHandle.wrap);
+  container.appendChild(fromCol);
+
+  // To wheel (dates >= from)
+  const toOptions = allDates.filter(k => !dateRangeDraft.from || k >= dateRangeDraft.from);
+  const toHandle = buildDateWheel(toOptions, dateRangeDraft.to, key => {
+    dateRangeDraft.to = key;
+    toField.value = formatDateForDisplay(key);
+    toField.classList.remove("is-invalid");
+  });
+  toWheelHandle = toHandle;
+  toCol.appendChild(toHandle.wrap);
+  container.appendChild(toCol);
+}
+
 function renderColumnFilterList() {
   const list = document.getElementById("columnFilterList");
   if (!list || !openFilterCol) return;
 
   list.innerHTML = "";
+  list.style.cssText = "";
+
+  if (DATE_FILTER_COLS.has(openFilterCol)) {
+    renderDateRangeFilter(list, openFilterCol);
+    return;
+  }
 
   if (openFilterCol === "Status") {
     renderStatusFilterHeaderList(list);
@@ -247,21 +571,77 @@ function positionColumnFilterPopover(anchorTh) {
   pop.style.left = `${left}px`;
 }
 
+function syncDateRangeDraftFromPopoverFields() {
+  const list = document.getElementById("columnFilterList");
+  if (!list) return true;
+  const inputs = list.querySelectorAll("input.date-range-field");
+  if (inputs.length < 2) return true;
+
+  const fromField = inputs[0];
+  const toField = inputs[1];
+  const fromRaw = fromField.value.trim();
+  const toRaw = toField.value.trim();
+  const fromYmd = fromRaw ? parseDisplayDateToYmd(fromRaw) : null;
+  const toYmd = toRaw ? parseDisplayDateToYmd(toRaw) : null;
+
+  fromField.classList.remove("is-invalid");
+  if (fromYmd) fromField.value = formatDateForDisplay(fromYmd);
+  if (toYmd) toField.value = formatDateForDisplay(toYmd);
+  dateRangeDraft = { from: fromYmd, to: toYmd };
+  return validateDateRangeToBeforeFrom(fromField, toField);
+}
+
+function seedDateRangeDraftFromFilter(col) {
+  const range = dateColumnRangeFilters[col];
+  if (range) {
+    dateRangeDraft = { from: range.from, to: range.to };
+    return;
+  }
+  dateRangeDraft = { from: null, to: null };
+}
+
+function setDateFilterPopoverTabOrder(active) {
+  const okBtn = document.getElementById("columnFilterOk");
+  const cancelBtn = document.getElementById("columnFilterCancel");
+  const clearBtn = document.getElementById("columnFilterClearAll");
+  if (okBtn) okBtn.tabIndex = active ? 3 : 0;
+  if (cancelBtn) cancelBtn.tabIndex = active ? -1 : 0;
+  if (clearBtn) clearBtn.tabIndex = active ? -1 : 0;
+}
+
 function openColumnFilterPopover(col, anchorTh) {
   const pop = document.getElementById("columnFilterPopover");
   if (!pop) return;
 
   openFilterCol = col;
-  filterDraft = getEffectiveFilterSelection(col);
+  const isDate = DATE_FILTER_COLS.has(col);
 
+  if (isDate) {
+    seedDateRangeDraftFromFilter(col);
+  } else {
+    filterDraft = getEffectiveFilterSelection(col);
+  }
+  const selectAllBtn = document.getElementById("columnFilterSelectAll");
+  const sep = document.getElementById("columnFilterSelectSep");
+  if (selectAllBtn) selectAllBtn.hidden = isDate;
+  if (sep) sep.hidden = isDate;
+
+  setDateFilterPopoverTabOrder(isDate);
   pop.hidden = false;
+  pop.style.minWidth = isDate ? "260px" : "";
   renderColumnFilterList();
-  requestAnimationFrame(() => positionColumnFilterPopover(anchorTh));
+  requestAnimationFrame(() => {
+    positionColumnFilterPopover(anchorTh);
+    if (isDate) {
+      pop.querySelector('input.date-range-field[tabindex="1"]')?.focus();
+    }
+  });
 }
 
 function closeColumnFilterPopover() {
   const pop = document.getElementById("columnFilterPopover");
   if (pop) pop.hidden = true;
+  setDateFilterPopoverTabOrder(false);
   openFilterCol = null;
 }
 
@@ -269,6 +649,12 @@ function setFilterDraftSelectAll(selectAll) {
   if (!openFilterCol) return;
   const values = getUniqueColumnValues(openFilterCol);
   filterDraft = selectAll ? new Set(values) : new Set();
+  renderColumnFilterList();
+}
+
+function clearDateRangeFilter() {
+  if (!openFilterCol || !DATE_FILTER_COLS.has(openFilterCol)) return;
+  dateRangeDraft = { from: null, to: null };
   renderColumnFilterList();
 }
 
@@ -280,6 +666,25 @@ function applyColumnFilterFromPopover() {
     applyStatusFilterFromPopover(filterDraft);
     closeColumnFilterPopover();
     updateColumnFilterHeaderStates();
+    return;
+  }
+
+  if (DATE_FILTER_COLS.has(col)) {
+    if (!syncDateRangeDraftFromPopoverFields()) return;
+    const { from, to } = dateRangeDraft;
+    if (!from && !to) {
+      dateColumnRangeFilters[col] = null;
+      columnFilters[col] = null;
+    } else {
+      dateColumnRangeFilters[col] = {
+        from: from || to,
+        to: to || from,
+      };
+      columnFilters[col] = null;
+    }
+    closeColumnFilterPopover();
+    updateColumnFilterHeaderStates();
+    applyFilters();
     return;
   }
 
@@ -302,6 +707,14 @@ function initColumnFilterHeaders() {
   document.querySelectorAll("th.th-filterable").forEach(th => {
     const col = th.dataset.col;
     if (col !== "Status" && !COLUMN_FILTER_COLS.includes(col)) return;
+
+    if (!th.querySelector(".th-filter-hit")) {
+      const hit = document.createElement("span");
+      hit.className = "th-filter-hit";
+      hit.setAttribute("aria-hidden", "true");
+      th.appendChild(hit);
+    }
+
     const label = th.querySelector(".th-label");
     if (label) {
       label.addEventListener("click", e => {
@@ -309,11 +722,21 @@ function initColumnFilterHeaders() {
         sortBy(col);
       });
     }
-    th.addEventListener("click", () => openColumnFilterPopover(col, th));
+
+    th.addEventListener("click", e => {
+      if (e.target.closest(".th-label")) return;
+      openColumnFilterPopover(col, th);
+    });
   });
 
   document.getElementById("columnFilterSelectAll")?.addEventListener("click", () => setFilterDraftSelectAll(true));
-  document.getElementById("columnFilterClearAll")?.addEventListener("click", () => setFilterDraftSelectAll(false));
+  document.getElementById("columnFilterClearAll")?.addEventListener("click", () => {
+    if (openFilterCol && DATE_FILTER_COLS.has(openFilterCol)) {
+      clearDateRangeFilter();
+    } else {
+      setFilterDraftSelectAll(false);
+    }
+  });
   document.getElementById("columnFilterOk")?.addEventListener("click", applyColumnFilterFromPopover);
   document.getElementById("columnFilterCancel")?.addEventListener("click", closeColumnFilterPopover);
   document.getElementById("clearAllColumnFiltersBtn")?.addEventListener("click", clearAllColumnFilters);

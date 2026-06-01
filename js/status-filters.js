@@ -4,10 +4,22 @@ let modalRow = null;
 let modalSnapshot = null;
 
 const EST_IHD_DAYS_BY_SHIP_METHOD = {
-  "Air": 7,
-  "Sea&Air": 14,
-  "Matson": 21,
+  "AIR": 7,
+  "SEA&AIR": 14,
+  "MATSON": 21,
 };
+
+const SHIP_METHOD_ALIASES = {
+  air: "AIR",
+  "sea&air": "SEA&AIR",
+  matson: "MATSON",
+};
+
+function normalizeShipMethod(value) {
+  const s = String(value ?? "").trim();
+  if (!s) return "";
+  return SHIP_METHOD_ALIASES[s.toLowerCase()] ?? s;
+}
 
 // Single source of truth for status filter, cell editor, and filter popover order.
 // Table default sort uses STATUS_TABLE_SORT_ORDER below.
@@ -289,7 +301,7 @@ function setDivisionFilter(division) {
   applyFilters();
 }
 
-const SHIP_OPTIONS = ["Air","Sea&Air","Matson"];
+const SHIP_OPTIONS = ["AIR", "SEA&AIR", "MATSON"];
 
 const SELECT_EDIT_COLS = new Set(["Status", "Ship Method"]);
 
@@ -307,6 +319,13 @@ const BLANK_FILTER_LABEL = "(Blanks)";
 /** @type {Record<string, Set<string> | null>} null = show all values */
 const columnFilters = Object.fromEntries(COLUMN_FILTER_COLS.map(col => [col, null]));
 
+/** @type {Record<string, { from: string|null, to: string|null } | null>} */
+const dateColumnRangeFilters = Object.fromEntries(
+  [...DATE_FILTER_COLS].map(col => [col, null])
+);
+
 let openFilterCol = null;
 /** @type {Set<string>} */
 let filterDraft = new Set();
+/** @type {{ from: string|null, to: string|null }} */
+let dateRangeDraft = { from: null, to: null };

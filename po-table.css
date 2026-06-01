@@ -8,8 +8,9 @@
   --text: #1a1a18;
   --text-muted: #8b929c;
   --empty-display: #d4d9df;
-  --filter-icon: #8b929c;
+  --filter-icon: #b8bec8;
   --filter-icon-active: #4b5563;
+  --header-bg: #eef1f4;
   --accent: #2d2d29;
   --accent-light: #eef0f3;
   --accent-medium: #ffffff;
@@ -762,7 +763,7 @@ thead {
   position: sticky;
   top: 0px;
   z-index: 50;
-  background: var(--surface);
+  background: var(--header-bg);
 }
 
 th {
@@ -776,11 +777,13 @@ th {
   color: var(--text);
   border-bottom: 1px solid var(--border-strong);
   border-right: 1px solid var(--border);
-  white-space: nowrap;
+  white-space: pre-line;
+  line-height: 1.25;
   overflow: hidden;
   text-overflow: ellipsis;
   user-select: none;
   cursor: pointer;
+  background: var(--header-bg);
 }
 
 th:not(.th-filterable).sorted-asc,
@@ -800,6 +803,41 @@ th:not(.th-filterable).sorted-desc::after {
 th:not(.th-filterable).sorted-asc::after { content: '↑'; }
 th:not(.th-filterable).sorted-desc::after { content: '↓'; }
 
+/* PO table: sort hint on header hover (lighter), full arrow when sorted */
+#poTable thead th[data-col]:not(.th-filterable):not(.th-flag-col):not(.th-select-col):not(.th-packing-list-col):not(.sorted-asc):not(.sorted-desc):hover::after {
+  content: '↑';
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-weight: 600;
+  color: var(--text-muted);
+  opacity: 0.45;
+}
+
+#poTable thead th[data-col]:not(.th-filterable):not(.th-flag-col):not(.th-select-col):not(.th-packing-list-col).sorted-asc::after,
+#poTable thead th[data-col]:not(.th-filterable):not(.th-flag-col):not(.th-select-col):not(.th-packing-list-col).sorted-desc::after {
+  color: var(--text);
+  opacity: 1;
+}
+
+#poTable thead th.th-filterable:not(.sorted-asc):not(.sorted-desc):not(.th-shipment-id-col):has(.th-label:hover)::before {
+  content: '↑';
+  position: absolute;
+  top: 50%;
+  right: 26px;
+  transform: translateY(-50%);
+  font-weight: 600;
+  color: var(--text-muted);
+  opacity: 0.45;
+}
+
+#poTable thead th.th-filterable.sorted-asc::before,
+#poTable thead th.th-filterable.sorted-desc::before {
+  color: var(--text);
+  opacity: 1;
+}
+
 th.col-leading,
 td.col-leading {
   padding-left: 24px;
@@ -815,9 +853,10 @@ th[data-col="Notes"] {
 
 th:hover { background: var(--accent-heavy); color: var(--text); }
 
-th.th-flag-col:hover,
-th.th-select-col:hover {
-  background: transparent;
+#poTable thead th:hover,
+#poTable thead th.th-flag-col:hover,
+#poTable thead th.th-select-col:hover {
+  background: var(--header-bg);
   color: var(--text);
 }
 
@@ -879,35 +918,34 @@ th.th-select-col:hover {
   padding: 2px 5px;
 }
 
-th[data-col="EXF"],
-th[data-col="ETA"],
-th[data-col="IHD"],
-th[data-col="Ship Method"],
-th[data-col="Shipment ID"],
-th.th-packing-list-col {
-  background: var(--accent-heavy);
-}
-
-th[data-col="EXF"]:hover,
-th[data-col="ETA"]:hover,
-th[data-col="IHD"]:hover,
-th[data-col="Ship Method"]:hover,
-th[data-col="Shipment ID"]:hover,
-th.th-packing-list-col:hover {
-  background: var(--accent-light);
-}
-
-th[data-col="CXL Date"] {
-  background: var(--danger-tint);
-}
-
-th[data-col="CXL Date"]:hover {
-  background: #e6cfcf;
-}
-
 th.th-filterable {
   cursor: pointer;
   padding-right: 26px;
+}
+
+.th-filter-hit {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 28px;
+  z-index: 1;
+  cursor: pointer;
+}
+
+th.th-filterable::after {
+  color: var(--filter-icon);
+  width: 14px;
+  height: 14px;
+  opacity: 0.4;
+  mask-image: var(--icon-filter);
+  -webkit-mask-image: var(--icon-filter);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+th.th-filterable:has(.th-filter-hit:hover):not(.filter-active)::after {
+  opacity: 0.85;
+  transform: translateY(-50%) scale(1.08);
 }
 
 th.th-filterable.sorted-asc,
@@ -945,15 +983,6 @@ td.select-cell.select-cell-open::after {
   -webkit-mask-position: center;
   -webkit-mask-size: contain;
   pointer-events: none;
-}
-
-th.th-filterable::after {
-  color: var(--filter-icon);
-  width: 18px;
-  height: 18px;
-  opacity: 1;
-  mask-image: var(--icon-filter);
-  -webkit-mask-image: var(--icon-filter);
 }
 
 td.select-cell.select-cell-hover::after,
@@ -1011,16 +1040,12 @@ th.th-filterable .th-label {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: pre-line;
+  line-height: 1.25;
   cursor: pointer;
-  text-decoration: underline dotted transparent;
   padding-right: 2px;
   max-width: 100%;
   box-sizing: border-box;
-}
-
-th.th-filterable .th-label:hover {
-  text-decoration-color: var(--text-muted);
 }
 
 .th-tooltip-card {
@@ -1123,6 +1148,141 @@ th.th-filterable .th-label:hover {
   padding: 4px 0;
 }
 
+/* ── Date range filter ──────────────────────────────────── */
+.date-range-filter {
+  display: flex;
+  gap: 10px;
+  padding: 4px 2px 2px;
+  margin-bottom: 14px;
+}
+
+.date-range-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.date-range-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  padding: 0 2px;
+}
+
+.date-range-field {
+  box-sizing: border-box;
+  width: 100%;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--surface-alt, var(--row-hover));
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+  padding: 4px 7px;
+  height: 26px;
+  min-width: 0;
+}
+
+.date-range-field::placeholder {
+  color: var(--text-muted);
+  font-style: italic;
+  font-weight: 400;
+}
+
+.date-range-field.is-invalid {
+  border-color: var(--danger);
+  background: var(--danger-tint);
+}
+
+.date-wheel-wrap {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.date-wheel {
+  height: 132px;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  overscroll-behavior: contain;
+}
+
+.date-wheel:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.date-wheel::-webkit-scrollbar { display: none; }
+
+.date-wheel-item {
+  scroll-snap-align: center;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.1s, font-weight 0.1s;
+  white-space: nowrap;
+}
+
+.date-wheel-item:hover { color: var(--text); }
+
+.date-wheel-item.is-selected {
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+/* Fading top/bottom masks to give the "drum" illusion */
+.date-wheel-wrap::before,
+.date-wheel-wrap::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 48px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.date-wheel-wrap::before {
+  top: 0;
+  background: linear-gradient(to bottom, var(--surface) 0%, transparent 100%);
+}
+
+.date-wheel-wrap::after {
+  bottom: 0;
+  background: linear-gradient(to top, var(--surface) 0%, transparent 100%);
+}
+
+/* Center selection indicator line */
+.date-wheel-center-line {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 36px;
+  border-top: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border-strong);
+  pointer-events: none;
+  z-index: 2;
+  border-radius: 4px;
+}
+
+/* ── End date range filter ──────────────────────────────── */
+
 .column-filter-option {
   display: flex;
   align-items: center;
@@ -1164,6 +1324,17 @@ th.th-filterable .th-label:hover {
 .column-filter-cancel {
   padding: 6px 14px;
   font-size: 12px;
+}
+
+.column-filter-popover .column-filter-ok {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
+.column-filter-popover .column-filter-ok:hover {
+  background: #333;
+  border-color: #333;
 }
 
 .edit-table-backdrop {
@@ -1707,6 +1878,7 @@ th.th-flag-col.filter-active .th-flag-icon svg path {
   height: 28px;
   border-radius: 6px;
   color: var(--text-muted);
+  opacity: 0.38;
 }
 
 .po-packing-list-indicator svg {
@@ -4923,4 +5095,6 @@ th.th-shipment-id-col.th-filterable.sorted-desc {
 
 .shipment-id-icon-btn svg {
   display: block;
+  width: 17px;
+  height: 17px;
 }
