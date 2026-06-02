@@ -130,8 +130,13 @@ const PACKING_CARTON_DATA_FIELDS = [
 const VENDOR_PORTAL_TOKEN_FIELDS = ["Vendor", "Active", "Created At", "Last Used At"];
 
 const PENDING_PACKING_LIST_DATA_FIELDS = [
-  "PO #", "Vendor", "Carton Count", "Notes", "Cartons JSON",
+  "PO #", "Style #", "SO #", "Buyer PO #", "Buyer", "PO Qty", "Actual Qty",
+  "Vendor", "Carton Count", "Notes", "Cartons JSON",
   "Status", "Submitted At", "Reviewed At"
+];
+
+const PENDING_PACKING_LIST_PO_LOOKUP_FIELDS_ = [
+  "Style #", "SO #", "Buyer PO #", "Buyer", "PO Qty", "Actual Qty"
 ];
 
 function getSheet() {
@@ -687,14 +692,33 @@ function getNextSubmissionId_(sheet) {
   return formatSubmissionId_(max + 1);
 }
 
+/** Fills Style # / SO # / Buyer PO # / Buyer from PO rows when missing on pending submissions. */
+function enrichPendingPackingListsWithPoFields_(pendingLists, poRows) {
+  return (pendingLists || []).map(entry => {
+    const out = Object.assign({}, entry);
+    const poRow = (poRows || []).find(r => poNumbersEqual_(r["PO #"], out["PO #"]));
+    if (!poRow) return out;
+    PENDING_PACKING_LIST_PO_LOOKUP_FIELDS_.forEach(field => {
+      if (!String(out[field] ?? "").trim()) out[field] = poRow[field] ?? "";
+    });
+    return out;
+  });
+}
+
 // --- Vendor portal token helpers ---
 
 function generateVendorToken_() {
   return (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, "");
 }
 
-function resolveVendorPortalToken_(token) {
+/**
+ * @param {string} token
+ * @param {{ recordUsage?: boolean }} [opts]
+ */
+function resolveVendorPortalToken_(token, opts) {
   if (!token) return null;
+  const recordUsage = opts && opts.recordUsage === false ? false : true;
+  const normalizedToken = String(token).trim();
   const sheet = getVendorPortalTokensSheet_();
   const rows = sheet.getDataRange().getValues();
   if (rows.length < 2) return null;
@@ -705,19 +729,62 @@ function resolveVendorPortalToken_(token) {
   const lastUsedCol = headers.indexOf("Last Used At");
   if (tokenCol === -1 || vendorCol === -1) return null;
   for (let i = 1; i < rows.length; i++) {
-    if (String(rows[i][tokenCol]) === token) {
+    if (String(rows[i][tokenCol]).trim() === normalizedToken) {
       const active = rows[i][activeCol];
       const activeStr = String(active).toLowerCase().trim();
       if (active === false || activeStr === "false" || activeStr === "no") return null;
       const vendor = String(rows[i][vendorCol] ?? "").trim();
       if (!vendor) return null;
-      if (lastUsedCol !== -1) {
+      if (recordUsage && lastUsedCol !== -1) {
         sheet.getRange(i + 1, lastUsedCol + 1).setValue(new Date());
       }
       return { vendor, rowIndex: i + 1, headers };
     }
   }
   return null;
+}
+
+// --- Vendor portal session helpers (CacheService, ~6-hour TTL) ---
+
+const VP_SESSION_PREFIX = "vp_";
+const VP_SESSION_TTL_SECONDS = 6 * 60 * 60; // 6 hours
+
+function createVendorPortalSession_(token, vendor) {
+  const sessionId = Utilities.getUuid().replace(/-/g, "");
+  const cache = CacheService.getScriptCache();
+  cache.put(
+    VP_SESSION_PREFIX + sessionId,
+    JSON.stringify({ token: token, vendor: vendor }),
+    VP_SESSION_TTL_SECONDS
+  );
+  return sessionId;
+}
+
+/** Returns { token, vendor } or null if session is missing/expired. */
+function resolveVendorPortalSession_(sessionId) {
+  if (!sessionId) return null;
+  const cache = CacheService.getScriptCache();
+  const raw = cache.get(VP_SESSION_PREFIX + String(sessionId).trim());
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch (_e) {
+    return null;
+  }
+}
+
+/**
+ * Resolves vendor from session first; falls back to raw token lookup.
+ * Records Last Used At only on the token-fallback path.
+ * Returns { vendor } or null.
+ */
+function resolveVendorPortalAuth_(sessionId, token) {
+  const session = resolveVendorPortalSession_(sessionId);
+  if (session && session.vendor) return { vendor: session.vendor };
+  if (!token) return null;
+  const tokenInfo = resolveVendorPortalToken_(token, { recordUsage: true });
+  if (!tokenInfo) return null;
+  return { vendor: tokenInfo.vendor };
 }
 
 function pickChargebackData_(source) {
@@ -1937,8 +2004,8 @@ function getPackingDataMaps_() {
   const cartons = sheetToObjects_(getPackingCartonsSheet_(), PACKING_LIST_ID_FIELD);
   const listsByPo = {};
   lists.forEach(list => {
-    const po = String(list["PO #"] ?? "").trim();
-    if (po) listsByPo[po] = list;
+    const poKey = normalizePoKey_(list["PO #"]);
+    if (poKey && !listsByPo[poKey]) listsByPo[poKey] = list;
   });
   const cartonsByListId = {};
   cartons.forEach(carton => {
@@ -1951,6 +2018,23 @@ function getPackingDataMaps_() {
     arr.sort((a, b) => Number(a["Carton #"] || 0) - Number(b["Carton #"] || 0))
   );
   return { listsByPo, cartonsByListId };
+}
+
+function normalizePoKey_(poNumber) {
+  const raw = String(poNumber ?? "").trim();
+  if (!raw) return "";
+  const n = Number(raw);
+  return Number.isFinite(n) ? String(n) : raw;
+}
+
+function getPackingListForPoFromMap_(listsByPo, poNumber) {
+  const key = normalizePoKey_(poNumber);
+  if (key && listsByPo[key]) return listsByPo[key];
+  const lists = Object.values(listsByPo);
+  for (let i = 0; i < lists.length; i++) {
+    if (poNumbersEqual_(lists[i]["PO #"], poNumber)) return lists[i];
+  }
+  return null;
 }
 
 /** Escape HTML special characters for inline insertion. */
@@ -2159,24 +2243,34 @@ function buildPdfPoSectionHtml_(poRow, packingList, cartons, isLast) {
  */
 function buildGroupPackingListPdfBlob_(poRows, opts) {
   opts = opts || {};
+  const rows = Array.isArray(poRows) ? poRows : [];
   const { listsByPo, cartonsByListId } = getPackingDataMaps_();
 
-  const sections = poRows.map((poRow, i) => {
+  const sections = rows.map((poRow, i) => {
     const po = String(poRow["PO #"] ?? "").trim();
-    const packingList = listsByPo[po] || null;
+    const packingList = getPackingListForPoFromMap_(listsByPo, po);
     const cartons = packingList
       ? (cartonsByListId[String(packingList[PACKING_LIST_ID_FIELD] ?? "")] || [])
       : [];
-    const isLast = i === poRows.length - 1;
+    const isLast = i === rows.length - 1;
     return buildPdfPoSectionHtml_(poRow, packingList, cartons, isLast);
   });
 
-  const html = renderEmailTemplate_("templates/packing-list-pdf", {
-    poSectionsHtml: sections.join("\n"),
-  });
+  const bodyHtml = sections.join("\n");
+  const html = "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\">" +
+    "<title>Packing List</title></head>" +
+    "<body style=\"margin:0;padding:20px 24px;font-family:Arial,Helvetica,sans-serif;" +
+    "font-size:11px;color:#1a1a18;background:#ffffff;\">" +
+    bodyHtml +
+    "</body></html>";
 
   const filename = opts.filename || ("PackingList_" + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMdd") + ".pdf");
-  return Utilities.newBlob(html, "text/html", filename).getAs("application/pdf").setName(filename);
+  // HtmlService is required for HTML -> PDF conversion; Utilities.newBlob().getAs("application/pdf") does not work.
+  return HtmlService.createHtmlOutput(html)
+    .setWidth(1056)
+    .setHeight(816)
+    .getAs("application/pdf")
+    .setName(filename);
 }
 
 // ── End Packing List PDF Builders ─────────────────────────────────────────────
@@ -3458,15 +3552,25 @@ function handleVendorPortalGet_(e) {
       "<html><body style=\"font-family:sans-serif;padding:2rem\"><h2>Invalid link.</h2><p>Please contact us for a valid link.</p></body></html>"
     ).setTitle("Invalid Link");
   }
-  const tokenInfo = resolveVendorPortalToken_(token);
+  // Validate without writing Last Used At — that is recorded on first getPos call.
+  const tokenInfo = resolveVendorPortalToken_(token, { recordUsage: false });
   if (!tokenInfo) {
     return HtmlService.createHtmlOutput(
       "<html><body style=\"font-family:sans-serif;padding:2rem\"><h2>This link is invalid or has been deactivated.</h2><p>Please contact us for a new link.</p></body></html>"
     ).setTitle("Invalid Link");
   }
+  // Create a short-lived session so google.script.run calls don't need to
+  // re-read the sheet; this avoids token corruption issues in the round-trip.
+  const sessionId = createVendorPortalSession_(token, tokenInfo.vendor);
   const template = HtmlService.createTemplateFromFile("templates/vendor-portal");
   template.vendorName = tokenInfo.vendor;
-  template.token = token;
+  // Base64 avoids <?!= ?> truncating at "//" inside JSON (vendor names, tokens, etc.).
+  template.vendorPortalBootstrapB64 = Utilities.base64EncodeWebSafe(
+    Utilities.newBlob(
+      JSON.stringify({ sessionId: sessionId, token: token, vendorName: tokenInfo.vendor }),
+      "UTF-8"
+    ).getBytes()
+  );
   return template.evaluate()
     .setTitle("Packing List Submission")
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
@@ -3504,7 +3608,10 @@ function doGet(e) {
     const packingLists = sheetToObjects_(packingListsSheet, PACKING_LIST_ID_FIELD);
     const packingCartons = sheetToObjects_(packingCartonsSheet, PACKING_LIST_ID_FIELD);
     const stylePhotos = stylePhotosSheetToObjects_(stylePhotosSheet);
-    const pendingPackingLists = sheetToObjects_(pendingPackingListsSheet, PENDING_PACKING_LIST_ID_FIELD);
+    const pendingPackingLists = enrichPendingPackingListsWithPoFields_(
+      sheetToObjects_(pendingPackingListsSheet, PENDING_PACKING_LIST_ID_FIELD),
+      data
+    );
 
     return corsResponse({
       success: true,
@@ -3537,14 +3644,16 @@ function doGet(e) {
 // ============================================================
 
 /**
- * Returns all open POs for the vendor identified by `token`.
+ * Returns all open POs for the vendor.
+ * Accepts (sessionId, token) — tries the short-lived session first, then falls
+ * back to a direct token sheet lookup for backward compatibility.
  * Called from the vendor portal HTML form.
  */
-function vendorPortalGetPos(token) {
+function vendorPortalGetPos(sessionId, token) {
   try {
-    const tokenInfo = resolveVendorPortalToken_(String(token || "").trim());
-    if (!tokenInfo) return { success: false, error: "Invalid or expired link." };
-    const vendor = tokenInfo.vendor;
+    const auth = resolveVendorPortalAuth_(sessionId, token);
+    if (!auth) return { success: false, error: "This link is no longer valid. Please reopen it from your email or contact us for a new one." };
+    const vendor = auth.vendor;
 
     const poSheet = getSheet();
     if (!poSheet) return { success: false, error: "POs sheet not found." };
@@ -3583,13 +3692,14 @@ function vendorPortalGetPos(token) {
 /**
  * Accepts a packing list submission from a vendor.
  * Routes to direct save or pending queue based on vendorSubmitMode.
+ * Accepts (sessionId, token, poNumber, ...) — tries session first, then token.
  * Called from the vendor portal HTML form.
  */
-function vendorPortalSubmit(token, poNumber, cartons, notes) {
+function vendorPortalSubmit(sessionId, token, poNumber, cartons, notes) {
   try {
-    const tokenInfo = resolveVendorPortalToken_(String(token || "").trim());
-    if (!tokenInfo) return { success: false, error: "Invalid or expired link." };
-    const vendor = tokenInfo.vendor;
+    const auth = resolveVendorPortalAuth_(sessionId, token);
+    if (!auth) return { success: false, error: "This link is no longer valid. Please reopen it from your email or contact us for a new one." };
+    const vendor = auth.vendor;
 
     // Confirm PO belongs to this vendor
     const poSheet = getSheet();
@@ -3629,6 +3739,12 @@ function vendorPortalSubmit(token, poNumber, cartons, notes) {
       const row = headers.map(h => {
         if (h === PENDING_PACKING_LIST_ID_FIELD) return submissionId;
         if (h === "PO #") return poNumber;
+        if (h === "Style #") return poRow["Style #"] ?? "";
+        if (h === "SO #") return poRow["SO #"] ?? "";
+        if (h === "Buyer PO #") return poRow["Buyer PO #"] ?? "";
+        if (h === "Buyer") return poRow["Buyer"] ?? "";
+        if (h === "PO Qty") return poRow["PO Qty"] ?? "";
+        if (h === "Actual Qty") return poRow["Actual Qty"] ?? "";
         if (h === "Vendor") return vendor;
         if (h === "Carton Count") return normalizedCartons.length;
         if (h === "Notes") return notes || "";
@@ -3670,7 +3786,23 @@ function handleCreateVendorPortalLink(payload) {
     return "";
   });
   sheet.appendRow(row);
-  const scriptUrl = ScriptApp.getService().getUrl();
+
+  // Force the Token cell to plain-text format so Sheets never converts the
+  // 64-char hex string to scientific notation or truncates it.
+  const newRowIndex = sheet.getLastRow();
+  const tokenCol = headers.indexOf("Token") + 1;
+  if (tokenCol > 0) {
+    sheet.getRange(newRowIndex, tokenCol).setNumberFormat("@");
+  }
+
+  // Build the portal URL from the staff app's configured URL when available;
+  // this guarantees the link matches the deployment the staff app is using.
+  let scriptUrl;
+  if (payload.webAppUrl) {
+    scriptUrl = String(payload.webAppUrl).split("?")[0];
+  } else {
+    scriptUrl = ScriptApp.getService().getUrl();
+  }
   const portalUrl = scriptUrl + "?page=vendor&token=" + encodeURIComponent(token);
   return corsResponse({ success: true, token, url: portalUrl, vendor });
 }
@@ -3684,9 +3816,17 @@ function handleSetVendorSubmitMode(payload) {
   return corsResponse({ success: true, mode });
 }
 
+function markPendingPackingListApproved_(pendingSheet, rowIndex, headers) {
+  const statusCol = headers.indexOf("Status");
+  const reviewedAtCol = headers.indexOf("Reviewed At");
+  if (statusCol !== -1) pendingSheet.getRange(rowIndex, statusCol + 1).setValue("Approved");
+  if (reviewedAtCol !== -1) pendingSheet.getRange(rowIndex, reviewedAtCol + 1).setValue(new Date());
+}
+
 function handleApprovePendingPackingList(payload) {
   const submissionId = String(payload.submissionId ?? "").trim();
   if (!submissionId) return corsResponse({ success: false, error: "Submission ID is required." });
+  const skipCartonSave = payload.skipCartonSave === true;
   const pendingSheet = getPendingPackingListsSheet_();
   const rows = pendingSheet.getDataRange().getValues();
   if (rows.length < 2) return corsResponse({ success: false, error: "Submission not found." });
@@ -3703,6 +3843,10 @@ function handleApprovePendingPackingList(payload) {
     if (String(rows[i][statusCol] ?? "").trim() !== "Pending") {
       return corsResponse({ success: false, error: "Submission is not in Pending status." });
     }
+    if (skipCartonSave) {
+      markPendingPackingListApproved_(pendingSheet, i + 1, headers);
+      return corsResponse({ success: true, submissionId });
+    }
     const poNumber = String(rows[i][poCol] ?? "").trim();
     const notes = String(rows[i][notesCol] ?? "").trim();
     let cartons = [];
@@ -3712,8 +3856,7 @@ function handleApprovePendingPackingList(payload) {
     const normalizedCartons = normalizePackingCartons_(cartons);
     const meta = { "Carton Count": normalizedCartons.length, "Notes": notes };
     const result = savePackingListCore_(poNumber, normalizedCartons, meta, {});
-    if (statusCol !== -1) pendingSheet.getRange(i + 1, statusCol + 1).setValue("Approved");
-    if (reviewedAtCol !== -1) pendingSheet.getRange(i + 1, reviewedAtCol + 1).setValue(new Date());
+    markPendingPackingListApproved_(pendingSheet, i + 1, headers);
     return corsResponse({ success: true, submissionId, ...result });
   }
   return corsResponse({ success: false, error: "Submission not found: " + submissionId });

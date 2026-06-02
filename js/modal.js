@@ -2,6 +2,42 @@ const latestPackingUnitTotalsByPo = new Map();
 let modalSaveInProgress = false;
 let modalPackingEditorSnapshot = null;
 
+let modalPendingSubmissionId = null;
+let modalPendingSubmissionDraft = null;
+
+function isModalPendingSubmissionReview() {
+  return Boolean(modalPendingSubmissionId);
+}
+
+function clearModalPendingSubmission() {
+  modalPendingSubmissionId = null;
+  modalPendingSubmissionDraft = null;
+}
+
+function parsePendingSubmissionCartons(submission) {
+  try {
+    const raw = JSON.parse(String(submission?.["Cartons JSON"] ?? "[]"));
+    return Array.isArray(raw) ? raw : [];
+  } catch (_e) {
+    return [];
+  }
+}
+
+function buildPendingSubmissionDraft(submission) {
+  const cartons = parsePendingSubmissionCartons(submission);
+  const cartonCount = Math.max(
+    1,
+    Number(submission?.["Carton Count"]) || cartons.length || 1
+  );
+  return {
+    packingList: {
+      "Carton Count": cartonCount,
+      "Notes": String(submission?.["Notes"] ?? ""),
+    },
+    cartons,
+  };
+}
+
 function isModalSaveInProgress() {
   return modalSaveInProgress;
 }
@@ -896,7 +932,11 @@ function createPackingListEditor(row, packingList, sourceCartons) {
   const labels = getSizeLabelsFromRow(row);
   const editor = document.createElement("div");
   editor.className = "packing-list-editor";
-  const initialCount = Math.max(1, Number(packingList?.["Carton Count"] || sourceCartons.length || 1));
+  const draftCount = modalPendingSubmissionDraft?.packingList?.["Carton Count"];
+  const initialCount = Math.max(
+    1,
+    Number(packingList?.["Carton Count"] || draftCount || sourceCartons.length || 1)
+  );
   let cartons = normalizePackingEditorCartons(sourceCartons, initialCount);
 
   const controls = document.createElement("div");
@@ -1171,8 +1211,13 @@ function updateModalPackingListButton(row) {
 
 function createPackingListSidePanel(row) {
   const poNumber = String(row["PO #"] ?? "").trim();
-  const packingList = getPackingListForPo(poNumber);
-  const cartons = packingList ? getPackingCartonsForList(getPackingListId(packingList)) : [];
+  let packingList = getPackingListForPo(poNumber);
+  let cartons = packingList ? getPackingCartonsForList(getPackingListId(packingList)) : [];
+
+  if (modalPendingSubmissionDraft) {
+    packingList = null;
+    cartons = modalPendingSubmissionDraft.cartons;
+  }
 
   const panel = document.createElement("aside");
   panel.className = "packing-list-side-panel";
@@ -1445,8 +1490,27 @@ function openPODetail(row) {
   if (isAppSaving() || modalSaveInProgress) return;
   closeCellSelectDropdown(false);
   if (typeof closeCellDatePopover === "function") closeCellDatePopover(false);
+  clearModalPendingSubmission();
   packingListPanelOpen = hasPackingList(row?.["PO #"])
     || (typeof poHasShipment === "function" && poHasShipment(row));
+  modalRow = snapshotModalRow(row);
+  modalSnapshot = snapshotModalRow(row);
+  renderModalContent(modalRow);
+  if (typeof bringModalToFront === "function") {
+    bringModalToFront(document.getElementById("modalOverlay"));
+  } else {
+    document.getElementById("modalOverlay").classList.add("open");
+  }
+}
+
+function openPODetailForPendingSubmission(row, submission) {
+  if (isAppSaving() || modalSaveInProgress) return;
+  closeCellSelectDropdown(false);
+  if (typeof closeCellDatePopover === "function") closeCellDatePopover(false);
+
+  modalPendingSubmissionId = String(submission?.["Submission ID"] ?? "").trim();
+  modalPendingSubmissionDraft = buildPendingSubmissionDraft(submission);
+  packingListPanelOpen = true;
   modalRow = snapshotModalRow(row);
   modalSnapshot = snapshotModalRow(row);
   renderModalContent(modalRow);
@@ -1470,6 +1534,7 @@ function dismissModalOverlay() {
   modalSnapshot = null;
   modalPackingEditorSnapshot = null;
   packingListPanelOpen = false;
+  clearModalPendingSubmission();
   clearModalFooterMessageForOverlay("modalOverlay");
   document.getElementById("modalOverlay")?.classList.remove("open");
   updateModalSaveState();
@@ -1702,7 +1767,9 @@ function preparePackingListSave({ editor, row, existingPackingList, cartons }, p
   const filteredPoUpdates = filterAppsScriptPoUpdates(poEditUpdates);
   const packingList = {
     "Carton Count": cartons.length,
-    "Notes": existingPackingList?.["Notes"] || "",
+    "Notes": existingPackingList?.["Notes"]
+      || modalPendingSubmissionDraft?.packingList?.["Notes"]
+      || "",
   };
 
   if (isDemoMode()) {
@@ -1865,11 +1932,13 @@ async function saveModalChanges() {
   const updates = getModalPendingUpdates();
   const packingPayload = getActivePackingListPayload();
   const hasPackingChanges = hasPackingListPendingChanges();
-  if (Object.keys(updates).length === 0 && !hasPackingChanges) return;
+  const pendingSubmissionId = modalPendingSubmissionId;
+  const reviewingPending = Boolean(pendingSubmissionId);
+  if (Object.keys(updates).length === 0 && !hasPackingChanges && !reviewingPending) return;
 
   const poNumber = modalRow["PO #"];
 
-  if (packingPayload && hasPackingChanges) {
+  if (packingPayload && (hasPackingChanges || reviewingPending)) {
     const prepared = preparePackingListSave(packingPayload, updates);
     if (!prepared) return;
 
@@ -1882,16 +1951,32 @@ async function saveModalChanges() {
     queuePoTableRefresh();
 
     if (!prepared.syncToServer) {
-      showIndicator(`Saved ${CHECK_MARK}`, "success");
+      if (pendingSubmissionId && typeof completePendingSubmissionAfterModalSave === "function") {
+        await completePendingSubmissionAfterModalSave(pendingSubmissionId);
+      }
+      showIndicator(
+        pendingSubmissionId ? `Submission approved ${CHECK_MARK}` : `Saved ${CHECK_MARK}`,
+        "success"
+      );
       return;
     }
 
     modalSaveInProgress = true;
-    showIndicator(`Saving packing list${ELLIPSIS}`, "");
+    showIndicator(
+      pendingSubmissionId ? `Approving submission${ELLIPSIS}` : `Saving packing list${ELLIPSIS}`,
+      ""
+    );
     try {
       await prepared.syncToServer();
+      if (pendingSubmissionId && typeof completePendingSubmissionAfterModalSave === "function") {
+        const approved = await completePendingSubmissionAfterModalSave(pendingSubmissionId);
+        if (!approved) throw new Error("Packing list saved but submission could not be approved.");
+      }
       queuePoTableRefresh();
-      showIndicator(`Saved ${CHECK_MARK}`, "success");
+      showIndicator(
+        pendingSubmissionId ? `Submission approved ${CHECK_MARK}` : `Saved ${CHECK_MARK}`,
+        "success"
+      );
     } catch (err) {
       queuePoTableRefresh();
       showIndicator("Save failed: " + err.message, "error");

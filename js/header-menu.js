@@ -49,17 +49,10 @@ function saveCxlCountdownPreference() {
   }
 }
 
-function updateHeaderMenuCountdownCheck() {
-  const check = document.getElementById("headerMenuCountdownCheck");
-  const toggleBtn = document.getElementById("headerMenuToggleCountdown");
-  if (check) check.hidden = !cxlCountdownEnabled;
-  if (toggleBtn) toggleBtn.setAttribute("aria-checked", cxlCountdownEnabled ? "true" : "false");
-}
-
 function setCxlCountdownEnabled(enabled) {
   cxlCountdownEnabled = enabled;
   saveCxlCountdownPreference();
-  updateHeaderMenuCountdownCheck();
+  if (typeof updateSettingsCountdownUi === "function") updateSettingsCountdownUi();
   renderTable();
   updateModalIfOpen();
 }
@@ -179,60 +172,9 @@ function initToolbarKeyboard() {
 }
 
 function updateHeaderMenuChecks() {
-  updateHeaderMenuCountdownCheck();
-  updateHeaderMenuDateFormatChecks();
+  if (typeof updateSettingsUi === "function") updateSettingsUi();
   updateAppModeMenuLabel();
   updateTestModeBanner();
-  if (typeof updateVendorSubmitModeCheck === "function") updateVendorSubmitModeCheck();
-}
-
-function closeDateFormatSubmenu() {
-  const submenu = document.getElementById("headerMenuDateFormatSubmenu");
-  const btn = document.getElementById("headerMenuDateFormatBtn");
-  if (submenu) submenu.hidden = true;
-  if (btn) btn.setAttribute("aria-expanded", "false");
-}
-
-function toggleDateFormatSubmenu() {
-  const submenu = document.getElementById("headerMenuDateFormatSubmenu");
-  const btn = document.getElementById("headerMenuDateFormatBtn");
-  if (!submenu || !btn) return;
-  const open = submenu.hidden;
-  submenu.hidden = !open;
-  btn.setAttribute("aria-expanded", open ? "true" : "false");
-}
-
-function updateHeaderMenuDateFormatChecks() {
-  const currentId = typeof getDateFormatId === "function" ? getDateFormatId() : DEFAULT_DATE_FORMAT_ID;
-  document.querySelectorAll("[data-date-format-id]").forEach(item => {
-    const selected = item.dataset.dateFormatId === currentId;
-    const check = item.querySelector(".header-menu-check");
-    if (check) check.hidden = !selected;
-    item.setAttribute("aria-checked", selected ? "true" : "false");
-  });
-}
-
-function buildDateFormatSubmenu() {
-  const submenu = document.getElementById("headerMenuDateFormatSubmenu");
-  if (!submenu || typeof DATE_FORMAT_OPTIONS === "undefined") return;
-
-  submenu.innerHTML = DATE_FORMAT_OPTIONS.map(opt => (
-    `<button type="button" class="header-menu-item header-menu-checkable" data-date-format-id="${escapeHtml(opt.id)}" role="menuitemradio" aria-checked="false">` +
-    `<span>${escapeHtml(opt.label)}</span>` +
-    `<span class="header-menu-check" hidden aria-hidden="true">✓</span>` +
-    `</button>`
-  )).join("");
-
-  submenu.querySelectorAll("[data-date-format-id]").forEach(item => {
-    item.addEventListener("click", e => {
-      e.stopPropagation();
-      if (typeof setDateFormat === "function") setDateFormat(item.dataset.dateFormatId);
-      updateHeaderMenuDateFormatChecks();
-      closeDateFormatSubmenu();
-    });
-  });
-
-  updateHeaderMenuDateFormatChecks();
 }
 
 function updateAppModeMenuLabel() {
@@ -276,7 +218,6 @@ function toggleAppMode() {
 function closeHeaderMenu() {
   const menu = document.getElementById("headerMenuDropdown");
   const btn = document.getElementById("headerMenuBtn");
-  closeDateFormatSubmenu();
   if (menu) menu.hidden = true;
   if (btn) btn.setAttribute("aria-expanded", "false");
 }
@@ -351,51 +292,6 @@ function initHeaderTooltips() {
   window.addEventListener("resize", hideThTooltip);
 }
 
-async function openGenerateVendorLinkDialog() {
-  if (isDemoMode()) {
-    showIndicator("Vendor links are not available in demo mode", "error");
-    return;
-  }
-
-  // Gather distinct vendor names from loaded PO rows
-  const vendors = [...new Set(
-    (allRows ?? [])
-      .map(r => String(r["Vendor"] ?? "").trim())
-      .filter(Boolean)
-  )].sort();
-
-  let vendor;
-  if (vendors.length === 0) {
-    vendor = prompt("Enter the vendor name for the portal link:");
-  } else {
-    const options = vendors.map((v, i) => `${i + 1}. ${v}`).join("\n");
-    const raw = prompt(`Choose a vendor (enter number or type name):\n\n${options}`);
-    if (!raw) return;
-    const idx = Number(raw.trim()) - 1;
-    vendor = (idx >= 0 && idx < vendors.length) ? vendors[idx] : raw.trim();
-  }
-
-  if (!vendor) return;
-
-  showIndicator(`Generating link for ${vendor}${ELLIPSIS}`, "");
-  try {
-    const json = await postAppsScript({ action: "createVendorPortalLink", vendor });
-    if (!json.success) throw new Error(json.error);
-    // Copy to clipboard if available, then show the URL
-    const url = json.url;
-    try {
-      await navigator.clipboard.writeText(url);
-      showIndicator(`Link copied to clipboard for ${json.vendor} ${CHECK_MARK}`, "success");
-    } catch (_clipErr) {
-      showIndicator(`Link generated for ${json.vendor} ${CHECK_MARK}`, "success");
-    }
-    // Always prompt-display so the user can copy manually if clipboard failed
-    prompt(`Vendor portal link for ${json.vendor} (already copied to clipboard):`, url);
-  } catch (err) {
-    showIndicator("Failed to generate link: " + err.message, "error");
-  }
-}
-
 function initHeaderMenu() {
   const btn = document.getElementById("headerMenuBtn");
   const menu = document.getElementById("headerMenuDropdown");
@@ -415,16 +311,10 @@ function initHeaderMenu() {
 
   initCsvImport();
 
-  document.getElementById("headerMenuGenerateVendorLink")?.addEventListener("click", e => {
+  document.getElementById("headerMenuSettings")?.addEventListener("click", e => {
     e.stopPropagation();
     closeHeaderMenu();
-    openGenerateVendorLinkDialog();
-  });
-
-  document.getElementById("headerMenuVendorModeToggle")?.addEventListener("click", e => {
-    e.stopPropagation();
-    closeHeaderMenu();
-    if (typeof toggleVendorSubmitMode === "function") toggleVendorSubmitMode();
+    if (typeof openSettingsModal === "function") openSettingsModal("general");
   });
 
   document.getElementById("headerMenuToggleAppMode")?.addEventListener("click", e => {
@@ -432,22 +322,8 @@ function initHeaderMenu() {
     toggleAppMode();
   });
 
-  document.getElementById("headerMenuToggleCountdown")?.addEventListener("click", e => {
-    e.stopPropagation();
-    toggleCxlCountdown();
-  });
-
-  buildDateFormatSubmenu();
-
-  document.getElementById("headerMenuDateFormatBtn")?.addEventListener("click", e => {
-    e.stopPropagation();
-    toggleDateFormatSubmenu();
-  });
-
   document.addEventListener("click", e => {
     if (menu.hidden) return;
-    const submenuWrap = document.querySelector(".header-menu-submenu-wrap");
-    if (submenuWrap && !submenuWrap.contains(e.target)) closeDateFormatSubmenu();
     if (menu.contains(e.target) || btn.contains(e.target)) return;
     closeHeaderMenu();
   });

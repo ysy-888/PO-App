@@ -17,6 +17,7 @@ initPoModalActions();
 initPagination();
 initPaginationKeyboard();
 initHeaderMenu();
+initSettings();
 initHeaderTooltips();
 initCsvImportSummary();
 initEditTable();

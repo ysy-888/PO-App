@@ -402,13 +402,18 @@ function getModalPendingUpdates() {
 }
 
 function hasModalPendingChanges() {
+  if (typeof isModalPendingSubmissionReview === "function" && isModalPendingSubmissionReview()) {
+    return true;
+  }
   return Object.keys(getModalPendingUpdates()).length > 0 || hasPackingListPendingChanges();
 }
 
 function updateModalSaveState() {
   const saveBtn = document.getElementById("modalSaveBtn");
   if (!saveBtn) return;
+  const reviewing = typeof isModalPendingSubmissionReview === "function" && isModalPendingSubmissionReview();
   saveBtn.disabled = !hasModalPendingChanges();
+  saveBtn.textContent = reviewing ? "Save & approve" : "Save";
 }
 
 function refreshAfterModalFieldEdit(fieldEl, col, row) {

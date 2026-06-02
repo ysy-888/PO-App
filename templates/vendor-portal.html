@@ -37,6 +37,14 @@
     margin-bottom: 20px;
   }
   .card-title { font-size: 15px; font-weight: 600; margin: 0 0 16px; }
+  .card-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .card-header-row .card-title { margin: 0; flex: 1; min-width: 0; }
 
   label { font-weight: 500; display: block; margin-bottom: 6px; }
 
@@ -113,8 +121,6 @@
     color: #374151;
   }
   .carton-table tfoot td:first-child { text-align: left; }
-
-  .carton-actions { margin-top: 12px; display: flex; gap: 8px; }
 
   .btn {
     display: inline-flex;
@@ -215,7 +221,10 @@
     </div>
 
     <div class="card" id="cartonCard" style="display:none">
-      <h2 class="card-title">Packing List</h2>
+      <div class="card-header-row">
+        <h2 class="card-title">Packing List</h2>
+        <button type="button" class="btn btn-secondary" id="addCartonBtn">+ Add carton</button>
+      </div>
 
       <div id="statusMsg" class="status-msg"></div>
 
@@ -229,10 +238,6 @@
             <tr id="cartonTotalsRow"></tr>
           </tfoot>
         </table>
-      </div>
-
-      <div class="carton-actions">
-        <button type="button" class="btn btn-secondary" id="addCartonBtn">+ Add carton</button>
       </div>
 
       <div class="form-field" style="margin-top:16px">
@@ -261,8 +266,12 @@
 
 <script>
 (function () {
-  const TOKEN = <?= JSON.stringify(token) ?>;
-  const VENDOR_NAME = <?= JSON.stringify(vendorName) ?>;
+  const BOOT = JSON.parse(
+    atob("<?= vendorPortalBootstrapB64 ?>".replace(/-/g, "+").replace(/_/g, "/"))
+  );
+  const SESSION_ID = BOOT.sessionId;
+  const TOKEN = BOOT.token;
+  const VENDOR_NAME = BOOT.vendorName;
 
   let allPos = [];
   let sizeLabels = [];
@@ -552,7 +561,7 @@
     google.script.run
       .withSuccessHandler(onSubmitSuccess)
       .withFailureHandler(onSubmitFailure)
-      .vendorPortalSubmit(TOKEN, po, cartonsPayload, notesInput.value.trim());
+      .vendorPortalSubmit(SESSION_ID, TOKEN, po, cartonsPayload, notesInput.value.trim());
   });
 
   function onSubmitSuccess(result) {
@@ -615,7 +624,7 @@
       loadingCard.textContent = "Failed to load POs. Please refresh the page.";
       console.error(err);
     })
-    .vendorPortalGetPos(TOKEN);
+    .vendorPortalGetPos(SESSION_ID, TOKEN);
 })();
 </script>
 </body>

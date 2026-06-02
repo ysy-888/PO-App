@@ -466,6 +466,7 @@ function setDateFormat(value) {
   if (next === dateFormatId) return;
   dateFormatId = next;
   saveDateFormatPreference(next);
+  if (typeof updateSettingsDateFormatUi === "function") updateSettingsDateFormatUi();
   refreshDateDisplays();
 }
 

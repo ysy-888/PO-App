@@ -34,24 +34,7 @@
         <button type="button" class="header-menu-item" id="headerMenuEditTable" role="menuitem">Edit table</button>
         <button type="button" class="header-menu-item" id="headerMenuImportCsv" role="menuitem">Import CSV</button>
         <button type="button" class="header-menu-item" id="headerMenuExportCsv" role="menuitem">Export CSV</button>
-        <button type="button" class="header-menu-item header-menu-checkable" id="headerMenuToggleCountdown" role="menuitemcheckbox" aria-checked="false">
-          <span>Toggle countdown</span>
-          <span class="header-menu-check" id="headerMenuCountdownCheck" hidden aria-hidden="true">✓</span>
-        </button>
-        <div class="header-menu-submenu-wrap">
-          <button type="button" class="header-menu-item" id="headerMenuDateFormatBtn" role="menuitem" aria-haspopup="menu" aria-expanded="false">
-            <span>Date format</span>
-            <span class="header-menu-submenu-arrow" aria-hidden="true">›</span>
-          </button>
-          <div id="headerMenuDateFormatSubmenu" class="header-menu-submenu" hidden role="menu" aria-label="Date format"></div>
-        </div>
-        <button type="button" class="header-menu-item header-menu-item-separator" id="headerMenuGenerateVendorLink" role="menuitem">
-          Generate vendor link
-        </button>
-        <button type="button" class="header-menu-item header-menu-checkable" id="headerMenuVendorModeToggle" role="menuitemcheckbox" aria-checked="false">
-          <span id="headerMenuVendorModeLabel">Vendor submissions: Review</span>
-          <span class="header-menu-check" id="headerMenuVendorModeCheck" aria-hidden="true">✓</span>
-        </button>
+        <button type="button" class="header-menu-item header-menu-item-separator" id="headerMenuSettings" role="menuitem">Settings</button>
         <button type="button" class="header-menu-item header-menu-item-separator" id="headerMenuToggleAppMode" role="menuitem">
           <span id="headerMenuAppModeLabel">Test Mode</span>
         </button>
@@ -155,6 +138,7 @@
     <input type="search" id="packingReviewSearchInput" placeholder="Search" />
   </div>
   <div class="toolbar-end">
+    <button type="button" class="btn btn-primary" id="packingReviewApproveAllBtn" hidden>Approve All</button>
     <div class="counter" id="packingReviewRowCounter">— submissions</div>
   </div>
 </div>
@@ -524,27 +508,41 @@
   <div class="table-scroll-x">
   <table id="packingReviewTable">
     <colgroup>
+      <col class="col-select" />
       <col class="col-submission-id" />
       <col class="col-po" />
+      <col class="col-style" />
+      <col class="col-so" />
+      <col class="col-buyer-po" />
+      <col class="col-buyer" />
+      <col class="col-po-qty" />
+      <col class="col-actual-qty" />
       <col class="col-vendor" />
       <col class="col-ctn-qty" />
       <col class="col-status" />
       <col class="col-date" />
-      <col class="col-packing-review-action" />
     </colgroup>
     <thead>
       <tr>
+        <th class="th-select-col">
+          <input type="checkbox" id="packingReviewSelectAllCheckbox" aria-label="Select all pending submissions" />
+        </th>
         <th>Submission ID</th>
         <th>PO #</th>
+        <th>Style #</th>
+        <th>SO #</th>
+        <th>Buyer PO #</th>
+        <th>Buyer</th>
+        <th>PO Qty</th>
+        <th>Actual Qty</th>
         <th>Vendor</th>
         <th>Cartons</th>
         <th>Status</th>
         <th>Submitted At</th>
-        <th>Action</th>
       </tr>
     </thead>
     <tbody id="packingReviewTableBody">
-      <tr class="state-row"><td colspan="7">Loading submissions…</td></tr>
+      <tr class="state-row"><td colspan="13">Loading submissions…</td></tr>
     </tbody>
   </table>
   </div>
@@ -820,6 +818,56 @@
   </div>
 </div>
 
+<div id="settingsOverlay" class="modal-backdrop" aria-hidden="true">
+  <div class="modal-card settings-modal-card" onclick="event.stopPropagation()">
+    <div class="settings-modal-header">
+      <h3 class="settings-modal-title">Settings</h3>
+      <button type="button" class="btn-close" id="settingsCloseBtn" aria-label="Close">✕</button>
+    </div>
+    <div class="settings-modal-body">
+      <nav class="settings-nav" id="settingsNav" aria-label="Settings sections">
+        <button type="button" class="settings-nav-item is-active" data-settings-section="general">General</button>
+        <button type="button" class="settings-nav-item" data-settings-section="vendor-portal">Vendor Portal Links</button>
+      </nav>
+      <div class="settings-panel-wrap">
+        <section class="settings-section" id="settingsSectionGeneral" data-settings-section="general">
+          <h4 class="settings-section-title">General</h4>
+          <div class="settings-group">
+            <div class="settings-group-label">Date format</div>
+            <div class="settings-option-list" id="settingsDateFormatList" role="radiogroup" aria-label="Date format"></div>
+          </div>
+          <div class="settings-group">
+            <button type="button" class="settings-toggle-row" id="settingsCountdownToggle" role="switch" aria-checked="false">
+              <span class="settings-toggle-label">Toggle countdown</span>
+              <span class="settings-toggle-check" id="settingsCountdownCheck" hidden aria-hidden="true">✓</span>
+            </button>
+            <p class="settings-hint">Shows days-until labels on CXL and related date columns in the PO table.</p>
+          </div>
+        </section>
+        <section class="settings-section" id="settingsSectionVendorPortal" data-settings-section="vendor-portal" hidden>
+          <h4 class="settings-section-title">Vendor Portal Links</h4>
+          <div class="settings-group">
+            <div class="settings-group-label">Vendor submissions</div>
+            <div class="settings-option-list" id="settingsVendorSubmitModeList" role="radiogroup" aria-label="Vendor submissions mode">
+              <button type="button" class="settings-option-item" data-vendor-submit-mode="review" role="radio" aria-checked="true">
+                <span>Review queue</span>
+                <span class="settings-option-check" aria-hidden="true">✓</span>
+              </button>
+              <button type="button" class="settings-option-item" data-vendor-submit-mode="direct" role="radio" aria-checked="false">
+                <span>Direct (immediate)</span>
+                <span class="settings-option-check" hidden aria-hidden="true">✓</span>
+              </button>
+            </div>
+            <p class="settings-hint">Review sends vendor packing lists to the Vendor Submissions tab for approve or reject. Direct saves them to the PO immediately.</p>
+          </div>
+          <p class="settings-hint settings-hint--block">Generate a packing-list submission link for each vendor. Links stay valid until deactivated in the Vendor Portal Tokens sheet.</p>
+          <div id="settingsVendorLinksList" class="settings-vendor-links-list"></div>
+        </section>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="modalOverlay" class="modal-backdrop">
   <div class="modal-card" onclick="event.stopPropagation()">
     <div class="modal-header">
@@ -851,6 +899,7 @@
 <script src="js/state-api.js"></script>
 <script src="js/csv-import.js"></script>
 <script src="js/data-pipeline.js"></script>
+<script src="js/settings.js"></script>
 <script src="js/date-input.js"></script>
 <script src="js/selection.js"></script>
 <script src="js/row-context-menu.js"></script>
