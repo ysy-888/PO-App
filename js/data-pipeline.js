@@ -1,5 +1,8 @@
 
 async function loadData() {
+  // #region agent log
+  fetch('http://127.0.0.1:7896/ingest/1212f48a-df35-4839-b188-b7be9a87de77',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c417e3'},body:JSON.stringify({sessionId:'c417e3',location:'data-pipeline.js:loadData:entry',message:'loadData called',data:{isDemoMode:typeof isDemoMode==='function'?isDemoMode():'n/a',isTestMode:typeof isTestMode==='function'?isTestMode():'n/a'},timestamp:Date.now(),hypothesisId:'B,D'})}).catch(()=>{});
+  // #endregion
   showIndicator(`Refreshing${ELLIPSIS}`, "");
   try {
     if (isDemoMode()) {
@@ -39,6 +42,9 @@ async function loadData() {
       url.searchParams.set("_", String(Date.now()));
       const res = await fetch(url.toString(), { cache: "no-store" });
       const json = await res.json();
+      // #region agent log
+      fetch('http://127.0.0.1:7896/ingest/1212f48a-df35-4839-b188-b7be9a87de77',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c417e3'},body:JSON.stringify({sessionId:'c417e3',location:'data-pipeline.js:loadData:afterFetch',message:'fetch+json done',data:{httpStatus:res.status,httpOk:res.ok,jsonSuccess:json&&json.success,jsonError:json&&json.error,dataLen:json&&Array.isArray(json.data)?json.data.length:'not-array'},timestamp:Date.now(),hypothesisId:'B,D'})}).catch(()=>{});
+      // #endregion
       if (!json.success) throw new Error(json.error);
       allRows = json.data.map(normalizeRow);
       allChargebacks = (json.chargebacks ?? []).map(normalizeChargeback);
@@ -100,6 +106,9 @@ async function loadData() {
     if (typeof onPoSelectionChanged === "function") onPoSelectionChanged();
     showIndicator("Loaded", "success");
   } catch (err) {
+    // #region agent log
+    fetch('http://127.0.0.1:7896/ingest/1212f48a-df35-4839-b188-b7be9a87de77',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c417e3'},body:JSON.stringify({sessionId:'c417e3',location:'data-pipeline.js:loadData:catch',message:'loadData threw',data:{errName:err&&err.name,errMessage:err&&err.message,stack:err&&err.stack?String(err.stack).slice(0,600):null},timestamp:Date.now(),hypothesisId:'B,C,D'})}).catch(()=>{});
+    // #endregion
     showIndicator("Load failed: " + err.message, "error");
   }
 }
@@ -351,6 +360,94 @@ function sortBy(col) {
   applyFilters();
 }
 
+const DATE_FORMAT_STORAGE_BASE = "dateFormat";
+const DEFAULT_DATE_FORMAT_ID = "mm/dd/yy";
+
+const DATE_FORMAT_OPTIONS = [
+  { id: "mm/dd/yy", label: "mm/dd/yy" },
+  { id: "mm.dd.yy", label: "mm.dd.yy" },
+  { id: "mm/dd/yyyy", label: "mm/dd/yyyy" },
+  { id: "mm.dd.yyyy", label: "mm.dd.yyyy" },
+  { id: "mm/dd", label: "mm/dd" },
+  { id: "mm.dd", label: "mm.dd" },
+  { id: "m/d/yy", label: "m/d/yy" },
+  { id: "m.d.yy", label: "m.d.yy" },
+  { id: "m/d", label: "m/d" },
+  { id: "m.d", label: "m.d" },
+];
+
+let dateFormatId = DEFAULT_DATE_FORMAT_ID;
+
+function normalizeDateFormatId(value) {
+  const raw = String(value ?? "").trim();
+  return DATE_FORMAT_OPTIONS.some(opt => opt.id === raw) ? raw : DEFAULT_DATE_FORMAT_ID;
+}
+
+function getDateFormatId() {
+  return dateFormatId;
+}
+
+function getDateFormatOption(id = dateFormatId) {
+  return DATE_FORMAT_OPTIONS.find(opt => opt.id === id) ?? DATE_FORMAT_OPTIONS[0];
+}
+
+function loadDateFormatPreference() {
+  try {
+    const stored = localStorage.getItem(scopedStorageKey(DATE_FORMAT_STORAGE_BASE));
+    dateFormatId = normalizeDateFormatId(stored ?? DEFAULT_DATE_FORMAT_ID);
+  } catch {
+    dateFormatId = DEFAULT_DATE_FORMAT_ID;
+  }
+}
+
+function saveDateFormatPreference(value) {
+  try {
+    localStorage.setItem(scopedStorageKey(DATE_FORMAT_STORAGE_BASE), normalizeDateFormatId(value));
+  } catch {
+    /* ignore storage failures */
+  }
+}
+
+function getDateFormatDisplayMaxLength(formatId = dateFormatId) {
+  switch (normalizeDateFormatId(formatId)) {
+    case "mm/dd/yyyy":
+    case "mm.dd.yyyy":
+      return 10;
+    case "mm/dd/yy":
+    case "mm.dd.yy":
+      return 8;
+    case "mm/dd":
+    case "mm.dd":
+      return 5;
+    case "m/d/yy":
+    case "m.d.yy":
+      return 8;
+    case "m/d":
+    case "m.d":
+      return 6;
+    default:
+      return 10;
+  }
+}
+
+function formatYmdWithDateFormat(yyyy, mm, dd, formatId = dateFormatId) {
+  const id = normalizeDateFormatId(formatId);
+  const mNum = Number(mm);
+  const dNum = Number(dd);
+  const yy = yyyy.slice(2);
+  const sep = id.includes(".") ? "." : "/";
+  const usePadded = id.startsWith("mm");
+  const month = usePadded ? mm : String(mNum);
+  const day = usePadded ? dd : String(dNum);
+  const hasYear = /yy/.test(id);
+
+  if (hasYear) {
+    const yearPart = id.includes("yyyy") ? yyyy : yy;
+    return `${month}${sep}${day}${sep}${yearPart}`;
+  }
+  return `${month}${sep}${day}`;
+}
+
 function formatDateForDisplay(v) {
   if (isEmptyValue(v)) return EMPTY_DISPLAY;
 
@@ -361,7 +458,23 @@ function formatDateForDisplay(v) {
   if (!m) return s; // fallback: don't change unknown formats
 
   const [, yyyy, mm, dd] = m;
-  return `${mm}/${dd}/${yyyy.slice(2)}`;
+  return formatYmdWithDateFormat(yyyy, mm, dd);
+}
+
+function setDateFormat(value) {
+  const next = normalizeDateFormatId(value);
+  if (next === dateFormatId) return;
+  dateFormatId = next;
+  saveDateFormatPreference(next);
+  refreshDateDisplays();
+}
+
+function refreshDateDisplays() {
+  renderTable();
+  updateModalIfOpen();
+  if (typeof currentAppView !== "undefined" && typeof switchAppView === "function") {
+    switchAppView(currentAppView);
+  }
 }
 
 function normalizeToYmd(v) {
@@ -422,13 +535,14 @@ function parseDisplayDateToYmd(v) {
     if (ymd) return ymd;
   }
 
-  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/.exec(s);
+  const m = /^(\d{1,2})[./](\d{1,2})(?:[./](\d{2,4}))?$/.exec(s);
   if (!m) return null;
 
   const mm = String(Number(m[1])).padStart(2, "0");
   const dd = String(Number(m[2])).padStart(2, "0");
   let yyyy = m[3];
-  if (yyyy.length === 2) yyyy = `20${yyyy.padStart(2, "0")}`;
+  if (!yyyy) yyyy = String(new Date().getFullYear());
+  else if (yyyy.length === 2) yyyy = `20${yyyy.padStart(2, "0")}`;
   else yyyy = String(Number(yyyy));
 
   const ymd = `${yyyy}-${mm}-${dd}`;

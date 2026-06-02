@@ -180,9 +180,59 @@ function initToolbarKeyboard() {
 
 function updateHeaderMenuChecks() {
   updateHeaderMenuCountdownCheck();
+  updateHeaderMenuDateFormatChecks();
   updateAppModeMenuLabel();
   updateTestModeBanner();
   if (typeof updateVendorSubmitModeCheck === "function") updateVendorSubmitModeCheck();
+}
+
+function closeDateFormatSubmenu() {
+  const submenu = document.getElementById("headerMenuDateFormatSubmenu");
+  const btn = document.getElementById("headerMenuDateFormatBtn");
+  if (submenu) submenu.hidden = true;
+  if (btn) btn.setAttribute("aria-expanded", "false");
+}
+
+function toggleDateFormatSubmenu() {
+  const submenu = document.getElementById("headerMenuDateFormatSubmenu");
+  const btn = document.getElementById("headerMenuDateFormatBtn");
+  if (!submenu || !btn) return;
+  const open = submenu.hidden;
+  submenu.hidden = !open;
+  btn.setAttribute("aria-expanded", open ? "true" : "false");
+}
+
+function updateHeaderMenuDateFormatChecks() {
+  const currentId = typeof getDateFormatId === "function" ? getDateFormatId() : DEFAULT_DATE_FORMAT_ID;
+  document.querySelectorAll("[data-date-format-id]").forEach(item => {
+    const selected = item.dataset.dateFormatId === currentId;
+    const check = item.querySelector(".header-menu-check");
+    if (check) check.hidden = !selected;
+    item.setAttribute("aria-checked", selected ? "true" : "false");
+  });
+}
+
+function buildDateFormatSubmenu() {
+  const submenu = document.getElementById("headerMenuDateFormatSubmenu");
+  if (!submenu || typeof DATE_FORMAT_OPTIONS === "undefined") return;
+
+  submenu.innerHTML = DATE_FORMAT_OPTIONS.map(opt => (
+    `<button type="button" class="header-menu-item header-menu-checkable" data-date-format-id="${escapeHtml(opt.id)}" role="menuitemradio" aria-checked="false">` +
+    `<span>${escapeHtml(opt.label)}</span>` +
+    `<span class="header-menu-check" hidden aria-hidden="true">✓</span>` +
+    `</button>`
+  )).join("");
+
+  submenu.querySelectorAll("[data-date-format-id]").forEach(item => {
+    item.addEventListener("click", e => {
+      e.stopPropagation();
+      if (typeof setDateFormat === "function") setDateFormat(item.dataset.dateFormatId);
+      updateHeaderMenuDateFormatChecks();
+      closeDateFormatSubmenu();
+    });
+  });
+
+  updateHeaderMenuDateFormatChecks();
 }
 
 function updateAppModeMenuLabel() {
@@ -226,6 +276,7 @@ function toggleAppMode() {
 function closeHeaderMenu() {
   const menu = document.getElementById("headerMenuDropdown");
   const btn = document.getElementById("headerMenuBtn");
+  closeDateFormatSubmenu();
   if (menu) menu.hidden = true;
   if (btn) btn.setAttribute("aria-expanded", "false");
 }
@@ -386,8 +437,17 @@ function initHeaderMenu() {
     toggleCxlCountdown();
   });
 
+  buildDateFormatSubmenu();
+
+  document.getElementById("headerMenuDateFormatBtn")?.addEventListener("click", e => {
+    e.stopPropagation();
+    toggleDateFormatSubmenu();
+  });
+
   document.addEventListener("click", e => {
     if (menu.hidden) return;
+    const submenuWrap = document.querySelector(".header-menu-submenu-wrap");
+    if (submenuWrap && !submenuWrap.contains(e.target)) closeDateFormatSubmenu();
     if (menu.contains(e.target) || btn.contains(e.target)) return;
     closeHeaderMenu();
   });

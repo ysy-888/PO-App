@@ -1,0 +1,4 @@
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780381307944,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780381307948,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":false},"timestamp":1780381307948,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:catch","message":"loadData threw","data":{"errName":"TypeError","errMessage":"Failed to fetch","stack":"TypeError: Failed to fetch\n    at loadData (http://127.0.0.1:5500/js/data-pipeline.js:43:25)\n    at http://127.0.0.1:5500/js/main.js:34:1"},"timestamp":1780381308697,"hypothesisId":"B,C,D"}

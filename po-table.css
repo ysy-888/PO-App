@@ -205,6 +205,29 @@ body.test-mode-active .app-header {
   line-height: 1;
 }
 
+.header-menu-submenu-wrap {
+  position: relative;
+}
+
+.header-menu-submenu {
+  position: absolute;
+  top: 0;
+  right: calc(100% + 4px);
+  min-width: 148px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  padding: 4px 0;
+  z-index: 130;
+}
+
+.header-menu-submenu-arrow {
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+}
+
 .row-context-menu {
   position: fixed;
   z-index: 2000;
@@ -2427,6 +2450,15 @@ td.editable:not(.select-cell):hover .editable-preview {
 #poTable :is(th, td)[data-col="Ship Method"].col-w-m {
   min-width: 88px;
   max-width: var(--col-w-m-max);
+}
+
+#poTable col[data-col="Buyer"] {
+  width: 200px;
+}
+
+#poTable :is(th, td)[data-col="Buyer"].col-w-m {
+  min-width: 120px;
+  max-width: 200px;
 }
 
 /* Full-screen dark overlay */

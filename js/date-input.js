@@ -13,7 +13,7 @@ function normalizeCompactDateInputValue(value) {
 function updateCompactDateInputState(input) {
   const digits = input.value.replace(/\D/g, "").slice(0, 6);
   const ymd = normalizeCompactDateInputValue(input.value);
-  input.maxLength = input.value.includes("/") ? 8 : 6;
+  input.maxLength = /[./]/.test(input.value) ? getDateFormatDisplayMaxLength() : 6;
   input.classList.toggle("shipment-form-input--empty", digits.length === 0 && !ymd);
   input.classList.toggle("is-invalid", digits.length === 6 && !ymd);
   input.dataset.normalizedValue = ymd;
@@ -33,7 +33,7 @@ function handleCompactDateInput(input, onCommit) {
     const ymd = parseCompactDateDigits(digits);
     if (ymd) {
       input.value = formatDateForDisplay(ymd);
-      input.maxLength = 8;
+      input.maxLength = getDateFormatDisplayMaxLength();
       input.classList.remove("is-invalid");
       input.dataset.normalizedValue = ymd;
       onCommit?.(ymd);

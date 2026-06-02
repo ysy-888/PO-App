@@ -123,6 +123,10 @@ const COLUMN_WIDTH_TIER_M = new Set([
 
 const COLUMN_WIDTH_TIER_L = new Set(["Notes"]);
 
+const COLUMN_CUSTOM_WIDTHS = {
+  Buyer: 200,
+};
+
 const COLUMN_LABELS = {
   "Actual Qty": "Act Qty",
   "Ctn Qty": "CTN",
@@ -241,6 +245,7 @@ function getColumnWidthClass(col) {
 }
 
 function getColumnWidth(col) {
+  if (COLUMN_CUSTOM_WIDTHS[col] != null) return COLUMN_CUSTOM_WIDTHS[col];
   return COLUMN_WIDTH_TIER_MAX[getColumnWidthTier(col)] ?? COLUMN_WIDTH_TIER_MAX.s;
 }
 

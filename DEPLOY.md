@@ -6,12 +6,15 @@ This app has two parts: **frontend** (HTML/JS/CSS on GitHub Pages) and **backend
 
 1. Edit files locally (`index.html`, `js/`, `po-table.css`, `apps-script.gs`).
 2. Open the app and use **Menu → Test Mode** to point at the test spreadsheet.
-3. Push backend changes to the test Apps Script project:
+3. Publish backend changes to the test Web app (push **and** update the live `/exec` URL):
    ```bash
    npm install
-   npm run push:test
+   npm run redeploy:test
    ```
+   Optional description: `npm run redeploy:test -- vendor portal fix`
 4. In the app: **Refresh** and verify against test data.
+
+**Note:** `npm run push:test` only uploads code to the Apps Script editor. The app calls the `/exec` Web app URL, which stays on an old version until you **redeploy** (command above) or use **Deploy → Manage deployments → New version** in the Apps Script UI.
 
 ## One-time setup
 
@@ -22,12 +25,14 @@ This app has two parts: **frontend** (HTML/JS/CSS on GitHub Pages) and **backend
 3. **Deploy → New deployment → Web app** (Execute as: Me; choose appropriate access).
 4. Copy the `/exec` URL into `APPS_SCRIPT_URL_TEST` in [js/config.js](js/config.js).
 5. Copy the **Script ID** (Project Settings) into [.clasp.test.json](.clasp.test.json).
+6. Copy the **deployment ID** (middle segment of the `/exec` URL, between `/s/` and `/exec`) into `deploymentId` in [.clasp.test.json](.clasp.test.json).
 
 ### Production Apps Script (clasp)
 
 1. Open the production spreadsheet’s Apps Script project.
 2. Copy its **Script ID** into [.clasp.prod.json](.clasp.prod.json).
-3. Log in to clasp once:
+3. Copy the **deployment ID** from `APPS_SCRIPT_URL_LIVE` in [js/config.js](js/config.js) into `deploymentId` in [.clasp.prod.json](.clasp.prod.json).
+4. Log in to clasp once:
    ```bash
    npx clasp login
    ```
@@ -54,15 +59,16 @@ GitHub Pages updates automatically from `main`.
 ### 2. Backend (Apps Script)
 
 ```bash
-npm run push:prod
+npm run redeploy:prod
 ```
 
-Then in the **production** Apps Script editor:
+Optional description: `npm run redeploy:prod -- describe your change`
 
-- **Deploy → Manage deployments**
-- Edit the Web app deployment → **New version** → Deploy
+This pushes `apps-script.gs` and updates the **existing** Web app URL (no change to [js/config.js](js/config.js)).
 
-(Or run `npm run deploy:prod` to create a deployment entry; you may still need to attach it to the Web app URL in the UI.)
+**Alternative (UI):** After `npm run push:prod`, open the production Apps Script editor → **Deploy → Manage deployments** → edit the Web app → **New version** → Deploy.
+
+Do **not** use `npm run deploy:prod` for routine updates — that creates a **new** deployment URL. Use `redeploy:prod` instead.
 
 ### 3. Verify
 
@@ -86,3 +92,8 @@ In [js/config.js](js/config.js), `URL_PLACEHOLDER` and `TEST_URL_PLACEHOLDER` mu
 
 - Ensure `scriptId` in `.clasp.test.json` / `.clasp.prod.json` is correct.
 - Run `npx clasp login` with the Google account that owns the script.
+
+### App still runs old backend after push
+
+- `push` alone does not update the Web app. Run `npm run redeploy:test` or `npm run redeploy:prod`.
+- If you created a new Web app deployment, update `deploymentId` in the matching `.clasp.*.json` and the URL in [js/config.js](js/config.js).

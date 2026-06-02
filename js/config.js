@@ -1,3 +1,18 @@
+// #region agent log
+(function () {
+  function __dbg(message, data) {
+    fetch('http://127.0.0.1:7896/ingest/1212f48a-df35-4839-b188-b7be9a87de77', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'c417e3' }, body: JSON.stringify({ sessionId: 'c417e3', location: 'config.js:globalError', message: message, data: data, timestamp: Date.now(), hypothesisId: 'A,C,E' }) }).catch(function () {});
+  }
+  window.addEventListener('error', function (e) {
+    __dbg('window.onerror', { message: e.message, source: e.filename, line: e.lineno, col: e.colno, errName: e.error && e.error.name, stack: e.error && e.error.stack ? String(e.error.stack).slice(0, 600) : null });
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    __dbg('unhandledrejection', { message: r && r.message ? r.message : String(r), stack: r && r.stack ? String(r.stack).slice(0, 600) : null });
+  });
+})();
+// #endregion
+
 /*
   Test Mode (menu) = use the test Google Sheet backend. Live Mode = production sheet.
   Data and sheet settings stay separate; switching modes does not copy data.

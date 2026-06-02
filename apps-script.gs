@@ -690,8 +690,7 @@ function getNextSubmissionId_(sheet) {
 // --- Vendor portal token helpers ---
 
 function generateVendorToken_() {
-  const bytes = Utilities.getSecureRandomBytes(24);
-  return Utilities.base64EncodeWebSafe(bytes).replace(/=/g, "");
+  return (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, "");
 }
 
 function resolveVendorPortalToken_(token) {

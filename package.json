@@ -5,6 +5,8 @@
   "scripts": {
     "push:test": "node -e \"require('fs').copyFileSync('.clasp.test.json','.clasp.json')\" && npx clasp push --force",
     "push:prod": "node -e \"require('fs').copyFileSync('.clasp.prod.json','.clasp.json')\" && npx clasp push --force",
+    "redeploy:test": "node scripts/redeploy.js test",
+    "redeploy:prod": "node scripts/redeploy.js prod",
     "deploy:test": "node -e \"require('fs').copyFileSync('.clasp.test.json','.clasp.json')\" && clasp deploy --description \"test\"",
     "deploy:prod": "node -e \"require('fs').copyFileSync('.clasp.prod.json','.clasp.json')\" && clasp deploy --description \"production\""
   },
