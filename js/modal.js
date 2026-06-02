@@ -975,6 +975,20 @@ function createPackingListEditor(row, packingList, sourceCartons) {
 
   controlsRight.appendChild(countBlock);
 
+  if (packingList) {
+    const printBtn = document.createElement("button");
+    printBtn.type = "button";
+    printBtn.className = "btn btn-secondary packing-list-print-btn";
+    printBtn.textContent = "Print";
+    printBtn.title = "Print packing list";
+    printBtn.addEventListener("click", () => {
+      if (typeof printPackingList === "function") {
+        printPackingList({ poNumbers: [row["PO #"]], mode: "individual" });
+      }
+    });
+    controlsRight.appendChild(printBtn);
+  }
+
   controls.appendChild(headingWrap);
   controls.appendChild(controlsRight);
   editor.appendChild(controls);

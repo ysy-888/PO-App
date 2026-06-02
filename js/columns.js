@@ -106,6 +106,7 @@ const COLUMN_WIDTH_TIER_XS = new Set([
 ]);
 
 const COLUMN_WIDTH_TIER_S = new Set([
+  "Vendor",
   "PO Date", "Shipped", "ETD", "EST EXF", "EST IHD",
   "EXF Date", "EXF Req Date", "ASN Date", "ASN Req Date",
   "Delivery Date", "Delivery Req Date", "Pickup Date", "Pickup Req Date",
@@ -117,14 +118,15 @@ const COLUMN_WIDTH_TIER_S = new Set([
 ]);
 
 const COLUMN_WIDTH_TIER_M = new Set([
-  "Status", "Division", "Vendor", "Buyer", "Buyer PO #", "Style #", "Color",
+  "Status", "Division", "Buyer", "Buyer PO #", "Style #", "Color",
   "Style Category", "Vessel", "House #", "Ship Method", "EXF Memo",
 ]);
 
 const COLUMN_WIDTH_TIER_L = new Set(["Notes"]);
 
 const COLUMN_CUSTOM_WIDTHS = {
-  Buyer: 200,
+  Buyer: 160,
+  Vendor: 84,
 };
 
 const COLUMN_LABELS = {

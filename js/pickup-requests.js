@@ -377,6 +377,18 @@ function renderPickupRequestModal(poNumbers, request = {}) {
   body.appendChild(outer);
   setPickupRequestModalAddPanelClass(body, pickupRequestAddPoPanelOpen);
   setRequestModalPoCount(document.getElementById("pickupRequestPoCount"), pos.length);
+
+  const printBtn = document.getElementById("pickupRequestPrintBtn");
+  if (printBtn) {
+    const hasPacking = poNumbers.length > 0;
+    printBtn.hidden = !hasPacking;
+    printBtn.onclick = () => {
+      if (typeof printPackingList === "function") {
+        printPackingList({ poNumbers: poNumbers.slice(), mode: "group" });
+      }
+    };
+  }
+
   bringModalToFront(document.getElementById("pickupRequestOverlay"));
   updateToolbarRequestButtons();
 }
@@ -563,6 +575,8 @@ function closePickupRequestModal() {
   clearModalFooterMessageForOverlay("pickupRequestOverlay");
   document.getElementById("pickupRequestOverlay")?.classList.remove("open");
   setPickupRequestModalAddPanelClass(document.getElementById("pickupRequestBody"), false);
+  const printBtn = document.getElementById("pickupRequestPrintBtn");
+  if (printBtn) printBtn.hidden = true;
   updateToolbarRequestButtons();
 }
 

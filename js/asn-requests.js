@@ -383,6 +383,18 @@ function renderAsnRequestModal(poNumbers, { asnDate = formatDateToYmd(new Date()
   setAsnRequestModalAddPanelClass(body, asnRequestAddPoPanelOpen);
   const headerCount = document.getElementById("asnRequestPoCount");
   setRequestModalPoCount(headerCount, pos.length);
+
+  const printBtn = document.getElementById("asnRequestPrintBtn");
+  if (printBtn) {
+    const hasPacking = poNumbers.length > 0;
+    printBtn.hidden = !hasPacking;
+    printBtn.onclick = () => {
+      if (typeof printPackingList === "function") {
+        printPackingList({ poNumbers: poNumbers.slice(), mode: "group" });
+      }
+    };
+  }
+
   bringModalToFront(document.getElementById("asnRequestOverlay"));
   updateToolbarRequestButtons();
 }
@@ -580,6 +592,8 @@ function closeAsnRequestModal() {
   asnRequestBuyer = "";
   asnRequestModalRow = null;
   clearAsnFormSelection();
+  const printBtn = document.getElementById("asnRequestPrintBtn");
+  if (printBtn) printBtn.hidden = true;
   setAsnRequestFooterMessage("");
   document.getElementById("asnRequestOverlay")?.classList.remove("open");
   setAsnRequestModalAddPanelClass(document.getElementById("asnRequestBody"), false);

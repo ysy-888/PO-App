@@ -2453,12 +2453,12 @@ td.editable:not(.select-cell):hover .editable-preview {
 }
 
 #poTable col[data-col="Buyer"] {
-  width: 200px;
+  width: 160px;
 }
 
 #poTable :is(th, td)[data-col="Buyer"].col-w-m {
-  min-width: 120px;
-  max-width: 200px;
+  min-width: 160px;
+  max-width: 160px;
 }
 
 /* Full-screen dark overlay */
@@ -5375,3 +5375,47 @@ th.th-shipment-id-col.th-filterable.sorted-desc {
 
 .col-submission-id { width: 110px; }
 .col-packing-review-action { width: 180px; }
+
+/* ── Packing list print button ─────────────────────────────────────────────── */
+
+.packing-list-print-btn {
+  font-size: 12px;
+  padding: 3px 10px;
+}
+
+/* ── Print layout ────────────────────────────────────────────────────────────
+   When body.printing-packing-list is set, hide everything except
+   #packingPrintRoot, then restore after printing. */
+
+#packingPrintRoot {
+  display: none;
+}
+
+@media print {
+  body.printing-packing-list > *:not(#packingPrintRoot) {
+    display: none !important;
+  }
+
+  body.printing-packing-list #packingPrintRoot {
+    display: block !important;
+  }
+
+  #packingPrintRoot {
+    display: block;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-size: 11px;
+    color: #1a1a18;
+    background: #ffffff;
+    margin: 0;
+    padding: 0;
+  }
+
+  @page {
+    size: letter landscape;
+    margin: 0.6in 0.6in 0.6in 0.6in;
+  }
+
+  .pl-print-po-section {
+    page-break-inside: avoid;
+  }
+}

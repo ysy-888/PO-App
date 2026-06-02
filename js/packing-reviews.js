@@ -76,37 +76,54 @@ function formatPackingReviewCell(col, row) {
 function renderPackingReviewActionCell(td, row) {
   td.className = "readonly readonly-no-select packing-review-action-cell";
   const status = String(row["Status"] ?? "").trim();
+  const poNumber = String(row["PO #"] ?? "").trim();
+
   if (status !== "Pending") {
     const badge = document.createElement("span");
     badge.className = "packing-review-status-badge packing-review-status-badge--" + status.toLowerCase();
     badge.textContent = status;
     td.appendChild(badge);
-    return;
+  } else {
+    const submissionId = String(row[PENDING_PACKING_LIST_ID_FIELD] ?? "").trim();
+
+    const approveBtn = document.createElement("button");
+    approveBtn.type = "button";
+    approveBtn.className = "btn btn-secondary packing-review-approve-btn";
+    approveBtn.textContent = "Approve";
+    approveBtn.disabled = !submissionId || packingReviewOpInProgress || isAppSaving();
+    approveBtn.addEventListener("click", e => {
+      e.stopPropagation();
+      approvePendingPackingList(submissionId);
+    });
+
+    const rejectBtn = document.createElement("button");
+    rejectBtn.type = "button";
+    rejectBtn.className = "btn btn-danger packing-review-reject-btn";
+    rejectBtn.textContent = "Reject";
+    rejectBtn.disabled = !submissionId || packingReviewOpInProgress || isAppSaving();
+    rejectBtn.addEventListener("click", e => {
+      e.stopPropagation();
+      rejectPendingPackingList(submissionId);
+    });
+
+    td.appendChild(approveBtn);
+    td.appendChild(rejectBtn);
   }
-  const submissionId = String(row[PENDING_PACKING_LIST_ID_FIELD] ?? "").trim();
 
-  const approveBtn = document.createElement("button");
-  approveBtn.type = "button";
-  approveBtn.className = "btn btn-secondary packing-review-approve-btn";
-  approveBtn.textContent = "Approve";
-  approveBtn.disabled = !submissionId || packingReviewOpInProgress || isAppSaving();
-  approveBtn.addEventListener("click", e => {
-    e.stopPropagation();
-    approvePendingPackingList(submissionId);
-  });
-
-  const rejectBtn = document.createElement("button");
-  rejectBtn.type = "button";
-  rejectBtn.className = "btn btn-danger packing-review-reject-btn";
-  rejectBtn.textContent = "Reject";
-  rejectBtn.disabled = !submissionId || packingReviewOpInProgress || isAppSaving();
-  rejectBtn.addEventListener("click", e => {
-    e.stopPropagation();
-    rejectPendingPackingList(submissionId);
-  });
-
-  td.appendChild(approveBtn);
-  td.appendChild(rejectBtn);
+  if (poNumber) {
+    const printBtn = document.createElement("button");
+    printBtn.type = "button";
+    printBtn.className = "btn btn-secondary packing-list-print-btn";
+    printBtn.textContent = "Print";
+    printBtn.title = "Print packing list";
+    printBtn.addEventListener("click", e => {
+      e.stopPropagation();
+      if (typeof printPackingList === "function") {
+        printPackingList({ poNumbers: [poNumber], mode: "individual" });
+      }
+    });
+    td.appendChild(printBtn);
+  }
 }
 
 function renderPackingReviewTable() {

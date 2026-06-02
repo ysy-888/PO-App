@@ -727,6 +727,7 @@
       </div>
       <div class="modal-header-actions">
         <span id="asnRequestPoCount" class="shipment-modal-po-count"></span>
+        <button type="button" class="btn btn-secondary packing-list-print-btn" id="asnRequestPrintBtn" hidden title="Print packing list for linked POs">Print Packing List</button>
         <button type="button" class="btn-close" id="asnRequestCancelBtn" aria-label="Close">✕</button>
       </div>
     </div>
@@ -750,6 +751,7 @@
       </div>
       <div class="modal-header-actions">
         <span id="deliveryRequestPoCount" class="shipment-modal-po-count"></span>
+        <button type="button" class="btn btn-secondary packing-list-print-btn" id="deliveryRequestPrintBtn" hidden title="Print packing list for linked POs">Print Packing List</button>
         <button type="button" class="btn-close" id="deliveryRequestCancelBtn" aria-label="Close">✕</button>
       </div>
     </div>
@@ -773,6 +775,7 @@
       </div>
       <div class="modal-header-actions">
         <span id="pickupRequestPoCount" class="shipment-modal-po-count"></span>
+        <button type="button" class="btn btn-secondary packing-list-print-btn" id="pickupRequestPrintBtn" hidden title="Print packing list for linked POs">Print Packing List</button>
         <button type="button" class="btn-close" id="pickupRequestCancelBtn" aria-label="Close">✕</button>
       </div>
     </div>
@@ -866,5 +869,7 @@
 <script src="js/packing-reviews.js"></script>
 <script src="js/export-csv.js"></script>
 <script src="js/shipments-init.js"></script>
+<script src="js/packing-print.js"></script>
+<div id="packingPrintRoot" aria-hidden="true"></div>
 </body>
 </html>

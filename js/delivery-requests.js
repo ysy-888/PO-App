@@ -342,6 +342,18 @@ function renderDeliveryRequestModal(poNumbers, request = {}) {
   body.appendChild(outer);
   setDeliveryRequestModalAddPanelClass(body, deliveryRequestAddPoPanelOpen);
   setRequestModalPoCount(document.getElementById("deliveryRequestPoCount"), pos.length);
+
+  const printBtn = document.getElementById("deliveryRequestPrintBtn");
+  if (printBtn) {
+    const hasPacking = poNumbers.length > 0;
+    printBtn.hidden = !hasPacking;
+    printBtn.onclick = () => {
+      if (typeof printPackingList === "function") {
+        printPackingList({ poNumbers: poNumbers.slice(), mode: "group" });
+      }
+    };
+  }
+
   bringModalToFront(document.getElementById("deliveryRequestOverlay"));
   updateToolbarRequestButtons();
 }
@@ -523,6 +535,8 @@ function closeDeliveryRequestModal() {
   clearModalFooterMessageForOverlay("deliveryRequestOverlay");
   document.getElementById("deliveryRequestOverlay")?.classList.remove("open");
   setDeliveryRequestModalAddPanelClass(document.getElementById("deliveryRequestBody"), false);
+  const printBtn = document.getElementById("deliveryRequestPrintBtn");
+  if (printBtn) printBtn.hidden = true;
   updateToolbarRequestButtons();
 }
 

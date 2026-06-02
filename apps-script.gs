@@ -1926,6 +1926,261 @@ function toQtyNumber_(value) {
   return Number.isFinite(n) ? n : 0;
 }
 
+// ── Packing List PDF Builders ─────────────────────────────────────────────────
+
+/**
+ * Returns { listsByPo, cartonsByListId } from the sheet data.
+ * Used by the PDF builder to avoid reading sheets multiple times.
+ */
+function getPackingDataMaps_() {
+  const lists = sheetToObjects_(getPackingListsSheet_(), PACKING_LIST_ID_FIELD);
+  const cartons = sheetToObjects_(getPackingCartonsSheet_(), PACKING_LIST_ID_FIELD);
+  const listsByPo = {};
+  lists.forEach(list => {
+    const po = String(list["PO #"] ?? "").trim();
+    if (po) listsByPo[po] = list;
+  });
+  const cartonsByListId = {};
+  cartons.forEach(carton => {
+    const id = String(carton[PACKING_LIST_ID_FIELD] ?? "").trim();
+    if (!id) return;
+    if (!cartonsByListId[id]) cartonsByListId[id] = [];
+    cartonsByListId[id].push(carton);
+  });
+  Object.values(cartonsByListId).forEach(arr =>
+    arr.sort((a, b) => Number(a["Carton #"] || 0) - Number(b["Carton #"] || 0))
+  );
+  return { listsByPo, cartonsByListId };
+}
+
+/** Escape HTML special characters for inline insertion. */
+function pdfEsc_(val) {
+  return String(val ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function pdfVal_(val) {
+  const s = String(val ?? "").trim();
+  return s === "" ? "&mdash;" : pdfEsc_(s);
+}
+
+function pdfDate_(val) {
+  return formatEmailDate_(val) || "&mdash;";
+}
+
+function pdfMoney_(val) {
+  const s = String(val ?? "").trim();
+  if (!s) return "&mdash;";
+  const n = Number(s.replace(/[$,]/g, ""));
+  if (!Number.isFinite(n)) return pdfEsc_(s);
+  return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/** Build HTML for a single PO section (PO Details + Style Details + Packing List). */
+function buildPdfPoSectionHtml_(poRow, packingList, cartons, isLast) {
+  const TH = "padding:5px 8px;text-align:left;font-size:10px;font-weight:bold;letter-spacing:0.04em;text-transform:uppercase;color:#374151;background-color:#f0f1f3;border:1px solid #d1d5db;white-space:nowrap;";
+  const TH_R = TH + "text-align:right;";
+  const TD = "padding:5px 8px;border:1px solid #d1d5db;font-size:11px;color:#1a1a18;vertical-align:middle;";
+  const TD_R = TD + "text-align:right;font-variant-numeric:tabular-nums;";
+  const TD_C = TD + "text-align:center;color:#6b7280;font-variant-numeric:tabular-nums;";
+  const TD_TOT = "padding:5px 8px;border:1px solid #d1d5db;font-size:11px;font-weight:bold;color:#1a1a18;background-color:#eef0f3;text-align:right;font-variant-numeric:tabular-nums;";
+  const ML = "padding:5px 8px;font-size:10px;font-weight:bold;color:#374151;background-color:#f0f1f3;border:1px solid #d1d5db;white-space:nowrap;";
+  const MV = "padding:5px 8px;font-size:11px;color:#1a1a18;border:1px solid #d1d5db;";
+  const SEC = "margin:0 0 6px 0;font-size:10px;font-weight:bold;letter-spacing:0.06em;text-transform:uppercase;color:#374151;";
+
+  const po = String(poRow["PO #"] ?? "");
+  const styleNum = String(poRow["Style #"] ?? "").trim();
+  const color = String(poRow["Color"] ?? "").trim();
+
+  // ── PO Details ──────────────────────────────────────────────────────────────
+  const poMetaLeft = [
+    ["PO #", pdfVal_(poRow["PO #"])],
+    ["Buyer PO #", pdfVal_(poRow["Buyer PO #"])],
+    ["SO #", pdfVal_(poRow["SO #"])],
+    ["Vendor", pdfVal_(poRow["Vendor"])],
+    ["Buyer", pdfVal_(poRow["Buyer"])],
+    ["Division", pdfVal_(poRow["Division"])],
+  ];
+  const poMetaRight = [
+    ["Ship Method", pdfVal_(poRow["Ship Method"])],
+    ["Status", pdfVal_(poRow["Status"])],
+    ["PO Date", pdfDate_(poRow["PO Date"])],
+    ["EXF", pdfDate_(poRow["EXF"])],
+    ["IHD", pdfDate_(poRow["IHD"])],
+    ["CXL Date", pdfDate_(poRow["CXL Date"])],
+  ];
+
+  function metaTableRows_(pairs) {
+    return pairs.map(([label, val]) =>
+      "<tr><td style=\"" + ML + "\">" + pdfEsc_(label) + "</td><td style=\"" + MV + "\">" + val + "</td></tr>"
+    ).join("");
+  }
+
+  const poDetailsHtml = "<p style=\"" + SEC + "\">PO Details</p>" +
+    "<table cellpadding=\"0\" cellspacing=\"0\" style=\"width:100%;border-collapse:collapse;margin-bottom:12px;\">" +
+    "<tr>" +
+    "<td style=\"width:50%;vertical-align:top;padding-right:6px;\">" +
+    "<table cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;width:100%;\">" + metaTableRows_(poMetaLeft) + "</table>" +
+    "</td>" +
+    "<td style=\"width:50%;vertical-align:top;\">" +
+    "<table cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;width:100%;\">" + metaTableRows_(poMetaRight) + "</table>" +
+    "</td>" +
+    "</tr></table>";
+
+  // ── Style Details ────────────────────────────────────────────────────────────
+  const sizeFields = Array.from({ length: 15 }, (_, i) => "Size " + (i + 1));
+  const sizeLabels = sizeFields.map(f => String(poRow[f] ?? "").trim()).filter(s => s !== "");
+  const colCount = sizeLabels.length;
+
+  const poUnits = sizeLabels.map((_, i) => toQtyNumber_(poRow["PO Unit " + (i + 1)]));
+  const actUnits = sizeLabels.map((_, i) => toQtyNumber_(poRow["Act Unit " + (i + 1)]));
+  const hasActual = actUnits.some(n => n > 0);
+  const poTotal = poUnits.reduce((s, n) => s + n, 0);
+  const actTotal = actUnits.reduce((s, n) => s + n, 0);
+
+  const styleInfoRows = [
+    ["Style #", pdfVal_(poRow["Style #"])],
+    ["Color", pdfVal_(poRow["Color"])],
+    ["FOB Cost", pdfMoney_(poRow["FOB Cost"])],
+    ["PO Total Cost", pdfMoney_(poRow["PO Total Cost"])],
+    ["PO Qty", pdfEsc_(String(toQtyNumber_(poRow["PO Qty"])))],
+    ["Carton Qty", pdfEsc_(String(toQtyNumber_(poRow["Ctn Qty"])))],
+  ];
+
+  let sizeBreakdownHtml = "";
+  if (colCount > 0) {
+    const colW = Math.floor(60 / colCount);
+    const sizeHeads = sizeLabels.map(l => "<th style=\"" + TH_R + "width:" + colW + "%;\">" + pdfEsc_(l) + "</th>").join("");
+    const poUnitCells = poUnits.map(n => "<td style=\"" + TD_R + "\">" + n + "</td>").join("");
+    const actUnitCells = actUnits.map(n => "<td style=\"" + TD_R + "\">" + n + "</td>").join("");
+    sizeBreakdownHtml =
+      "<table cellpadding=\"0\" cellspacing=\"0\" style=\"width:100%;border-collapse:collapse;margin-top:8px;\">" +
+      "<thead><tr><th style=\"" + TH + "width:20%;\">Row</th>" + sizeHeads +
+      "<th style=\"" + TH_R + "width:60px;\">Total</th></tr></thead>" +
+      "<tbody>" +
+      "<tr><td style=\"" + TD + "font-weight:bold;\">PO Qty</td>" + poUnitCells +
+      "<td style=\"" + TD_R + "font-weight:bold;\">" + poTotal + "</td></tr>" +
+      (hasActual ?
+        "<tr><td style=\"" + TD + "font-weight:bold;\">Packed Qty</td>" + actUnitCells +
+        "<td style=\"" + TD_R + "font-weight:bold;\">" + actTotal + "</td></tr>"
+        : "") +
+      "</tbody></table>";
+  }
+
+  const styleDetailsHtml = "<p style=\"" + SEC + "\">Style Details</p>" +
+    "<table cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;margin-bottom:4px;\">" +
+    styleInfoRows.map(([l, v]) => "<tr><td style=\"" + ML + "\">" + pdfEsc_(l) + "</td><td style=\"" + MV + "\">" + v + "</td></tr>").join("") +
+    "</table>" +
+    sizeBreakdownHtml +
+    "<div style=\"margin-bottom:12px;\"></div>";
+
+  // ── Packing List ─────────────────────────────────────────────────────────────
+  let packingHtml;
+  if (!packingList || !cartons || cartons.length === 0) {
+    packingHtml = "<p style=\"" + SEC + "\">Packing List</p>" +
+      "<p style=\"font-size:11px;color:#6b7280;font-style:italic;\">No packing list on file.</p>";
+  } else {
+    const unitTotals = sizeLabels.map((_, i) =>
+      cartons.reduce((sum, c) => sum + toQtyNumber_(c["Unit " + (i + 1)]), 0)
+    );
+    const grandTotal = unitTotals.reduce((s, n) => s + n, 0);
+    const totalWeight = cartons.reduce((s, c) => s + toQtyNumber_(c["Carton Weight"]), 0);
+    const colW2 = colCount > 0 ? Math.floor(50 / colCount) : 0;
+
+    const sizeHeads2 = sizeLabels.map(l => "<th style=\"" + TH_R + "width:" + colW2 + "%;\">" + pdfEsc_(l) + "</th>").join("");
+    const cartonRows = cartons.map(carton => {
+      const rowTotal = sizeLabels.reduce((s, _, i) => s + toQtyNumber_(carton["Unit " + (i + 1)]), 0);
+      const unitCells = sizeLabels.map((_, i) => {
+        const n = toQtyNumber_(carton["Unit " + (i + 1)]);
+        return "<td style=\"" + TD_R + "\">" + (n > 0 ? n : "") + "</td>";
+      }).join("");
+      const w = toQtyNumber_(carton["Carton Weight"]);
+      return "<tr>" +
+        "<td style=\"" + TD_C + "\">" + pdfEsc_(String(carton["Carton #"] ?? "")) + "</td>" +
+        unitCells +
+        "<td style=\"" + TD_R + "font-weight:bold;\">" + rowTotal + "</td>" +
+        "<td style=\"" + TD_R + "\">" + (w > 0 ? w : "") + "</td>" +
+        "</tr>";
+    }).join("");
+
+    const unitTotalCells = unitTotals.map(n => "<td style=\"" + TD_TOT + "\">" + n + "</td>").join("");
+    const plNotes = String(packingList["Notes"] ?? "").trim();
+    const plNotesHtml = plNotes
+      ? "<p style=\"font-size:11px;color:#4b5563;margin:6px 0 0 0;\"><strong>Notes:</strong> " + pdfEsc_(plNotes) + "</p>"
+      : "";
+
+    packingHtml = "<p style=\"" + SEC + "\">Packing List <span style=\"font-weight:normal;text-transform:none;letter-spacing:0;\">(" + cartons.length + " carton" + (cartons.length !== 1 ? "s" : "") + ")</span></p>" +
+      "<table cellpadding=\"0\" cellspacing=\"0\" style=\"width:100%;border-collapse:collapse;\">" +
+      "<thead><tr>" +
+      "<th style=\"" + TH + "width:40px;text-align:center;\">Ctn #</th>" +
+      sizeHeads2 +
+      "<th style=\"" + TH_R + "width:50px;\">Total</th>" +
+      "<th style=\"" + TH_R + "width:60px;\">Weight</th>" +
+      "</tr></thead>" +
+      "<tbody>" + cartonRows + "</tbody>" +
+      "<tfoot><tr>" +
+      "<td style=\"" + TD_TOT + "text-align:center;\">Totals</td>" +
+      unitTotalCells +
+      "<td style=\"" + TD_TOT + "\">" + grandTotal + "</td>" +
+      "<td style=\"" + TD_TOT + "\">" + (totalWeight > 0 ? totalWeight : "&mdash;") + "</td>" +
+      "</tr></tfoot>" +
+      "</table>" +
+      plNotesHtml;
+  }
+
+  // ── Section wrapper ──────────────────────────────────────────────────────────
+  const pageBreak = isLast ? "" : "page-break-after:always;";
+  return "<div style=\"font-family:Arial,Helvetica,sans-serif;" + pageBreak + "padding:0 0 24px 0;\">" +
+    // Header banner
+    "<table cellpadding=\"0\" cellspacing=\"0\" style=\"width:100%;border-collapse:collapse;margin-bottom:14px;background-color:#2d2d29;\">" +
+    "<tr>" +
+    "<td style=\"padding:10px 14px;\">" +
+    "<span style=\"font-size:13px;font-weight:bold;letter-spacing:0.14em;text-transform:uppercase;color:#ffffff;\">ELEVATOR DISCO</span>" +
+    "<span style=\"font-size:11px;color:#d4d9df;margin-left:16px;letter-spacing:0.06em;text-transform:uppercase;\">Packing List</span>" +
+    "</td>" +
+    "<td style=\"padding:10px 14px;text-align:right;white-space:nowrap;\">" +
+    "<span style=\"font-size:12px;font-weight:bold;color:#ffffff;\">PO " + pdfEsc_(po) + "</span>" +
+    (styleNum ? "<span style=\"font-size:11px;color:#d4d9df;margin-left:10px;\">" + pdfEsc_(styleNum) + " / " + pdfEsc_(color) + "</span>" : "") +
+    "</td>" +
+    "</tr></table>" +
+    poDetailsHtml +
+    styleDetailsHtml +
+    packingHtml +
+    "</div>";
+}
+
+/**
+ * Build a group packing list PDF blob for the given PO rows.
+ * poRows: array of PO data objects (from getPoObjectsByNumbers_).
+ * opts: { filename: string } optional.
+ */
+function buildGroupPackingListPdfBlob_(poRows, opts) {
+  opts = opts || {};
+  const { listsByPo, cartonsByListId } = getPackingDataMaps_();
+
+  const sections = poRows.map((poRow, i) => {
+    const po = String(poRow["PO #"] ?? "").trim();
+    const packingList = listsByPo[po] || null;
+    const cartons = packingList
+      ? (cartonsByListId[String(packingList[PACKING_LIST_ID_FIELD] ?? "")] || [])
+      : [];
+    const isLast = i === poRows.length - 1;
+    return buildPdfPoSectionHtml_(poRow, packingList, cartons, isLast);
+  });
+
+  const html = renderEmailTemplate_("templates/packing-list-pdf", {
+    poSectionsHtml: sections.join("\n"),
+  });
+
+  const filename = opts.filename || ("PackingList_" + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMdd") + ".pdf");
+  return Utilities.newBlob(html, "text/html", filename).getAs("application/pdf").setName(filename);
+}
+
+// ── End Packing List PDF Builders ─────────────────────────────────────────────
+
 function computeRequestEmailTotals_(rows, weightByPo) {
   return rows.reduce((totals, row) => {
     const po = String(row["PO #"] ?? "").trim();
@@ -2184,6 +2439,14 @@ function sendDeliveryPickupRequestEmail_(requestType, requestId, emailInfo, rows
     htmlBody: buildDeliveryPickupRequestEmailHtml_(requestType, requestId, rows, requestData),
   };
   if (emailInfo.cc) options.cc = emailInfo.cc;
+  try {
+    const pdfFilename = requestType + "_" + requestId + "_PackingList.pdf";
+    const pdfBlob = buildGroupPackingListPdfBlob_(rows, { filename: pdfFilename });
+    options.attachments = [pdfBlob];
+  } catch (pdfErr) {
+    // Non-fatal: send without attachment if PDF generation fails
+    Logger.log("Packing list PDF generation failed (" + requestType + " " + requestId + "): " + pdfErr);
+  }
   MailApp.sendEmail(options);
   return true;
 }
@@ -2243,6 +2506,13 @@ function sendAsnRequestEmail_(requestId, emailInfo, rows, requestData) {
     htmlBody: buildAsnRequestEmailHtml_(requestId, rows, requestData),
   };
   if (emailInfo.cc) options.cc = emailInfo.cc;
+  try {
+    const pdfFilename = "ASN_" + requestId + "_PackingList.pdf";
+    const pdfBlob = buildGroupPackingListPdfBlob_(rows, { filename: pdfFilename });
+    options.attachments = [pdfBlob];
+  } catch (pdfErr) {
+    Logger.log("Packing list PDF generation failed (ASN " + requestId + "): " + pdfErr);
+  }
   MailApp.sendEmail(options);
   return true;
 }
