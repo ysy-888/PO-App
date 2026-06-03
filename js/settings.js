@@ -12,9 +12,7 @@ function getDistinctVendorsFromRows() {
 }
 
 function updateSettingsCountdownUi() {
-  const check = document.getElementById("settingsCountdownCheck");
   const toggleBtn = document.getElementById("settingsCountdownToggle");
-  if (check) check.hidden = !cxlCountdownEnabled;
   if (toggleBtn) toggleBtn.setAttribute("aria-checked", cxlCountdownEnabled ? "true" : "false");
 }
 
@@ -75,6 +73,9 @@ function selectSettingsSection(sectionId) {
   document.querySelectorAll(".settings-section").forEach(panel => {
     panel.hidden = panel.dataset.settingsSection !== sectionId;
   });
+  const editTableFooter = document.getElementById("settingsEditTableFooter");
+  if (editTableFooter) editTableFooter.hidden = sectionId !== "edit-table";
+  if (sectionId === "edit-table" && typeof prepareEditTableDraft === "function") prepareEditTableDraft();
   if (sectionId === "vendor-portal") renderVendorPortalLinksList();
 }
 

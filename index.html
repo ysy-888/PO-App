@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>PO Table</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml" />
 <link rel="stylesheet" href="po-table.css" />
 </head>
 <body>
@@ -31,11 +32,20 @@
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.75"/><circle cx="12" cy="12" r="1.75"/><circle cx="12" cy="19" r="1.75"/></svg>
       </button>
       <div id="headerMenuDropdown" class="header-menu-dropdown" hidden role="menu">
-        <button type="button" class="header-menu-item" id="headerMenuEditTable" role="menuitem">Edit table</button>
-        <button type="button" class="header-menu-item" id="headerMenuImportCsv" role="menuitem">Import CSV</button>
-        <button type="button" class="header-menu-item" id="headerMenuExportCsv" role="menuitem">Export CSV</button>
-        <button type="button" class="header-menu-item header-menu-item-separator" id="headerMenuSettings" role="menuitem">Settings</button>
-        <button type="button" class="header-menu-item header-menu-item-separator" id="headerMenuToggleAppMode" role="menuitem">
+        <button type="button" class="header-menu-item" id="headerMenuImportCsv" role="menuitem">
+          <svg class="header-menu-item-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+          <span>Import CSV</span>
+        </button>
+        <button type="button" class="header-menu-item" id="headerMenuExportCsv" role="menuitem">
+          <svg class="header-menu-item-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 3v12"/></svg>
+          <span>Export CSV</span>
+        </button>
+        <button type="button" class="header-menu-item header-menu-item-separator" id="headerMenuSettings" role="menuitem">
+          <svg class="header-menu-item-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+          <span>Settings</span>
+        </button>
+        <button type="button" class="header-menu-item" id="headerMenuToggleAppMode" role="menuitem">
+          <svg class="header-menu-item-icon header-menu-item-icon--mode" id="headerMenuAppModeIcon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6v7.5l4 3.5-4 3.5V21H9v-4.5l-4-3.5 4-3.5V3z"/><path d="M9 3v5.5"/><path d="M15 3v5.5"/></svg>
           <span id="headerMenuAppModeLabel">Test Mode</span>
         </button>
       </div>
@@ -577,37 +587,6 @@
   </div>
 </footer>
 
-<div id="editTableBackdrop" class="edit-table-backdrop" hidden>
-  <div id="editTablePopover" class="edit-table-modal" role="dialog" aria-labelledby="editTableTitle" aria-modal="true">
-    <div class="edit-table-header">
-      <span class="edit-table-title" id="editTableTitle">Edit table</span>
-      <p class="edit-table-subtitle">Choose columns on the left. Drag the list on the right to set display order.</p>
-      <div class="edit-table-toolbar-links">
-        <button type="button" class="column-filter-link" id="editTableSelectAll">Select all</button>
-        <span class="column-filter-sep">|</span>
-        <button type="button" class="column-filter-link" id="editTableClearAll">Clear all</button>
-      </div>
-    </div>
-    <div class="edit-table-panels">
-      <div class="edit-table-panel edit-table-panel-picker">
-        <div class="edit-table-picker-list" id="editTableColumnPicker"></div>
-      </div>
-      <div class="edit-table-panel edit-table-panel-order">
-        <div class="edit-table-order-list" id="editTableColumnOrder"></div>
-      </div>
-    </div>
-    <div class="edit-table-default-actions">
-      <button type="button" class="btn edit-table-default-btn" id="editTableSaveDefault">Save as default</button>
-      <button type="button" class="btn edit-table-default-btn" id="editTableResetDefault">Reset to default</button>
-    </div>
-    <div class="column-filter-footer edit-table-footer">
-      <div id="editTableFooterMessage" class="modal-footer-message" role="status" aria-live="polite" hidden></div>
-      <button type="button" class="btn btn-primary column-filter-ok" id="editTableOk">OK</button>
-      <button type="button" class="btn column-filter-cancel" id="editTableCancel">Cancel</button>
-    </div>
-  </div>
-</div>
-
 <div id="columnFilterPopover" class="column-filter-popover" hidden>
   <div class="column-filter-toolbar" id="columnFilterToolbar">
     <button type="button" class="column-filter-link" id="columnFilterSelectAll">Select all</button>
@@ -827,21 +806,48 @@
     <div class="settings-modal-body">
       <nav class="settings-nav" id="settingsNav" aria-label="Settings sections">
         <button type="button" class="settings-nav-item is-active" data-settings-section="general">General</button>
+        <button type="button" class="settings-nav-item" data-settings-section="date-format">Date format</button>
+        <button type="button" class="settings-nav-item" data-settings-section="edit-table">Edit table</button>
         <button type="button" class="settings-nav-item" data-settings-section="vendor-portal">Vendor Portal Links</button>
       </nav>
       <div class="settings-panel-wrap">
         <section class="settings-section" id="settingsSectionGeneral" data-settings-section="general">
           <h4 class="settings-section-title">General</h4>
           <div class="settings-group">
-            <div class="settings-group-label">Date format</div>
+            <div class="settings-switch-row">
+              <span class="settings-switch-label" id="settingsCountdownLabel">Toggle countdown</span>
+              <button type="button" class="settings-round-switch" id="settingsCountdownToggle" role="switch" aria-labelledby="settingsCountdownLabel" aria-checked="false">
+                <span class="settings-round-switch-thumb" aria-hidden="true"></span>
+              </button>
+            </div>
+            <p class="settings-hint">Shows days-until labels on CXL and related date columns in the PO table.</p>
+          </div>
+        </section>
+        <section class="settings-section" id="settingsSectionDateFormat" data-settings-section="date-format" hidden>
+          <h4 class="settings-section-title">Date format</h4>
+          <div class="settings-group">
             <div class="settings-option-list" id="settingsDateFormatList" role="radiogroup" aria-label="Date format"></div>
           </div>
-          <div class="settings-group">
-            <button type="button" class="settings-toggle-row" id="settingsCountdownToggle" role="switch" aria-checked="false">
-              <span class="settings-toggle-label">Toggle countdown</span>
-              <span class="settings-toggle-check" id="settingsCountdownCheck" hidden aria-hidden="true">✓</span>
-            </button>
-            <p class="settings-hint">Shows days-until labels on CXL and related date columns in the PO table.</p>
+        </section>
+        <section class="settings-section settings-section--edit-table" id="settingsSectionEditTable" data-settings-section="edit-table" hidden>
+          <h4 class="settings-section-title">Edit table</h4>
+          <p class="edit-table-subtitle">Choose columns on the left. Drag the list on the right to set display order.</p>
+          <div class="edit-table-toolbar-links">
+            <button type="button" class="column-filter-link" id="editTableSelectAll">Select all</button>
+            <span class="column-filter-sep">|</span>
+            <button type="button" class="column-filter-link" id="editTableClearAll">Clear all</button>
+          </div>
+          <div class="edit-table-panels">
+            <div class="edit-table-panel edit-table-panel-picker">
+              <div class="edit-table-picker-list" id="editTableColumnPicker"></div>
+            </div>
+            <div class="edit-table-panel edit-table-panel-order">
+              <div class="edit-table-order-list" id="editTableColumnOrder"></div>
+            </div>
+          </div>
+          <div class="edit-table-default-actions">
+            <button type="button" class="btn edit-table-default-btn" id="editTableSaveDefault">Save as default</button>
+            <button type="button" class="btn edit-table-default-btn" id="editTableResetDefault">Reset to default</button>
           </div>
         </section>
         <section class="settings-section" id="settingsSectionVendorPortal" data-settings-section="vendor-portal" hidden>
@@ -864,6 +870,11 @@
           <div id="settingsVendorLinksList" class="settings-vendor-links-list"></div>
         </section>
       </div>
+    </div>
+    <div class="modal-footer settings-modal-footer" id="settingsEditTableFooter" hidden>
+      <div id="editTableFooterMessage" class="modal-footer-message" role="status" aria-live="polite" hidden></div>
+      <button type="button" class="btn btn-primary" id="editTableOk">OK</button>
+      <button type="button" class="btn" id="editTableCancel">Cancel</button>
     </div>
   </div>
 </div>

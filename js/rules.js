@@ -114,6 +114,23 @@ function toQtyNumber(val) {
   return Number.isFinite(n) ? n : 0;
 }
 
+const PO_CURRENCY_FIELDS = new Set(["FOB Cost", "Price", "PO Total Cost"]);
+
+function parsePoCurrencyNumber(val) {
+  if (isEmptyValue(val)) return null;
+  const n = Number(String(val).replace(/[$,]/g, "").trim());
+  return Number.isFinite(n) ? n : null;
+}
+
+function formatPoCurrency(val) {
+  const n = parsePoCurrencyNumber(val);
+  if (n === null) {
+    const raw = String(val ?? "").trim();
+    return raw === "" ? "" : raw;
+  }
+  return n.toLocaleString(undefined, { style: "currency", currency: "USD" });
+}
+
 /** Block scientific-notation keys on type=number inputs (browsers allow e/E by default). */
 function bindNumberInput(input) {
   input.addEventListener("keydown", e => {

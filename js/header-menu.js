@@ -179,8 +179,13 @@ function updateHeaderMenuChecks() {
 
 function updateAppModeMenuLabel() {
   const label = document.getElementById("headerMenuAppModeLabel");
-  if (!label) return;
-  label.textContent = isTestMode() ? "Live Mode" : "Test Mode";
+  const icon = document.getElementById("headerMenuAppModeIcon");
+  if (label) label.textContent = isTestMode() ? "Live Mode" : "Test Mode";
+  if (icon) {
+    icon.innerHTML = isTestMode()
+      ? '<circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>'
+      : '<path d="M9 3h6v7.5l4 3.5-4 3.5V21H9v-4.5l-4-3.5 4-3.5V3z"/><path d="M9 3v5.5"/><path d="M15 3v5.5"/>';
+  }
 }
 
 function updateTestModeBanner() {
@@ -301,12 +306,6 @@ function initHeaderMenu() {
     e.stopPropagation();
     if (menu.hidden) openHeaderMenu();
     else closeHeaderMenu();
-  });
-
-  document.getElementById("headerMenuEditTable")?.addEventListener("click", e => {
-    e.stopPropagation();
-    closeHeaderMenu();
-    openEditTablePopover();
   });
 
   initCsvImport();

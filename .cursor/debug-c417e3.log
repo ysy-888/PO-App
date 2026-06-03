@@ -345,3 +345,17 @@
 {"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780384739508,"hypothesisId":"A"}
 {"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780384739508,"hypothesisId":"B,D"}
 {"sessionId":"c417e3","location":"data-pipeline.js:loadData:afterFetch","message":"fetch+json done","data":{"httpStatus":200,"httpOk":true,"jsonSuccess":true,"dataLen":559},"timestamp":1780384751404,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780384788364,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780384788368,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780384788368,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:afterFetch","message":"fetch+json done","data":{"httpStatus":200,"httpOk":true,"jsonSuccess":true,"dataLen":559},"timestamp":1780384799817,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780384848582,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:afterFetch","message":"fetch+json done","data":{"httpStatus":200,"httpOk":true,"jsonSuccess":true,"dataLen":559},"timestamp":1780384858622,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780384937084,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780384937087,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780384937087,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:afterFetch","message":"fetch+json done","data":{"httpStatus":200,"httpOk":true,"jsonSuccess":true,"dataLen":559},"timestamp":1780384949698,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780385025700,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780385027215,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:afterFetch","message":"fetch+json done","data":{"httpStatus":200,"httpOk":true,"jsonSuccess":true,"dataLen":559},"timestamp":1780385037240,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:afterFetch","message":"fetch+json done","data":{"httpStatus":200,"httpOk":true,"jsonSuccess":true,"dataLen":559},"timestamp":1780385039800,"hypothesisId":"B,D"}

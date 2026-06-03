@@ -88,6 +88,8 @@ function setFieldDisplayContent(fieldEl, col, row) {
 
   if (col === "Status") {
     fieldEl.innerHTML = renderStatus(val);
+  } else if (col === "N41 Status") {
+    applyN41StatusFieldDisplay(fieldEl, row, val);
   } else if (col === "Flag") {
     renderFlagCell(fieldEl, row);
   } else if (DATE_FIELDS.has(col)) {
@@ -96,6 +98,14 @@ function setFieldDisplayContent(fieldEl, col, row) {
     mountCopyableText(fieldEl, col, val);
   } else if ((col === "Actual Qty" || col === "Ctn Qty") && toQtyNumber(val) <= 0) {
     setDisplayText(fieldEl, EMPTY_DISPLAY);
+  } else if (PO_CURRENCY_FIELDS.has(col)) {
+    const formatted = formatPoCurrency(val);
+    if (formatted === "") {
+      setDisplayText(fieldEl, EMPTY_DISPLAY);
+    } else {
+      fieldEl.textContent = formatted;
+      fieldEl.classList.remove("empty-display");
+    }
   } else if (isEmptyValue(val)) {
     setDisplayText(fieldEl, EMPTY_DISPLAY);
   } else {
@@ -125,6 +135,25 @@ function createModalField(col, row, { dateSlot = false } = {}) {
   if (isPoFieldEditable(col, row) && !SELECT_EDIT_COLS.has(col)) {
     wrapEditablePreview(valueEl);
   }
+  return fieldWrap;
+}
+
+function createModalPlainCurrencyField(col, row) {
+  const fieldWrap = document.createElement("div");
+  fieldWrap.className = `modal-field modal-field--${getModalFieldSize(col)}`;
+  fieldWrap.dataset.col = col;
+
+  const labelEl = document.createElement("label");
+  labelEl.className = "modal-field-label";
+  labelEl.textContent = getColumnLabel(col);
+
+  const valueEl = document.createElement("div");
+  valueEl.className = "modal-field-plain-value";
+  valueEl.dataset.col = col;
+  setFieldDisplayContent(valueEl, col, row);
+
+  fieldWrap.appendChild(labelEl);
+  fieldWrap.appendChild(valueEl);
   return fieldWrap;
 }
 
@@ -169,11 +198,10 @@ function createModalStyleSection(row) {
     row,
     { rowClass: "modal-field-row--style-costs" }
   ));
-  info.appendChild(createModalFieldRow(
-    ["PO Total Cost", "Received Qty"],
-    row,
-    { rowClass: "modal-field-row--style-costs" }
-  ));
+  const poCostRow = document.createElement("div");
+  poCostRow.className = "modal-field-row modal-field-row--style-costs";
+  poCostRow.appendChild(createModalPlainCurrencyField("PO Total Cost", row));
+  info.appendChild(poCostRow);
 
   grid.appendChild(info);
   grid.appendChild(createModalSizeGrid(row));
@@ -324,10 +352,14 @@ function getPackingUnitsForStyleChart(row) {
 }
 
 function refreshSizeGridTotals(row, poTotalCell, actTotalCell, packingActualUnits = getPackingUnitsForStyleChart(row)) {
-  if (poTotalCell) poTotalCell.textContent = formatSizeGridTotal(computePoQtyFromUnits(row));
+  const poTotal = computePoQtyFromUnits(row);
+  if (poTotalCell) poTotalCell.textContent = formatSizeGridTotal(poTotal);
   if (actTotalCell) {
-    actTotalCell.textContent = formatSizeGridTotal(
-      packingActualUnits.reduce((sum, qty) => sum + toQtyNumber(qty), 0)
+    const actualTotal = packingActualUnits.reduce((sum, qty) => sum + toQtyNumber(qty), 0);
+    actTotalCell.textContent = formatSizeGridTotal(actualTotal);
+    actTotalCell.classList.toggle(
+      "modal-size-total--match",
+      poTotal > 0 && actualTotal === poTotal
     );
   }
 }

@@ -280,6 +280,10 @@ function renderTable() {
 
         td.innerHTML = renderStatus(val);
 
+      } else if (col === "N41 Status") {
+
+        renderN41StatusCell(td, row, val);
+
       } else if (DATE_FIELDS.has(col)) {
 
         applyDateCellDisplay(td, col, row, { context: "table" });
@@ -352,6 +356,54 @@ function renderStatus(val) {
 
   return `<span class="badge ${cls}">${getSearchHighlightedFragment(val, val)}</span>`;
 
+}
+
+const N41_STATUS_MISMATCH_TITLE =
+  "N41 Status is Closed but PO Status is not — update N41 Status to match the PO.";
+
+function renderN41StatusCell(td, row, val) {
+  const display = isEmptyValue(val) ? EMPTY_DISPLAY : String(val).trim();
+  const mismatch = typeof isN41ClosedStatusMismatch === "function" && isN41ClosedStatusMismatch(row);
+
+  if (mismatch) {
+    td.classList.add("n41-status-mismatch");
+    td.title = N41_STATUS_MISMATCH_TITLE;
+  }
+
+  if (isEmptyValue(val)) {
+    setDisplayText(td, EMPTY_DISPLAY);
+    return;
+  }
+
+  mountSearchHighlightedText(td, display, val);
+  if (mismatch) {
+    const mark = document.createElement("span");
+    mark.className = "n41-status-mismatch-mark";
+    mark.setAttribute("aria-hidden", "true");
+    mark.textContent = "!";
+    td.appendChild(mark);
+  }
+}
+
+function applyN41StatusFieldDisplay(fieldEl, row, val) {
+  const mismatch = typeof isN41ClosedStatusMismatch === "function" && isN41ClosedStatusMismatch(row);
+  fieldEl.classList.toggle("n41-status-mismatch", mismatch);
+  if (mismatch) fieldEl.title = N41_STATUS_MISMATCH_TITLE;
+
+  if (isEmptyValue(val)) {
+    setDisplayText(fieldEl, EMPTY_DISPLAY);
+    return;
+  }
+
+  fieldEl.textContent = String(val).trim();
+  fieldEl.classList.remove("empty-display");
+  if (mismatch) {
+    const mark = document.createElement("span");
+    mark.className = "n41-status-mismatch-mark";
+    mark.setAttribute("aria-hidden", "true");
+    mark.textContent = "!";
+    fieldEl.appendChild(mark);
+  }
 }
 
 

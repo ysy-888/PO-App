@@ -702,7 +702,7 @@ function resetEditTableToDefault() {
 }
 
 function setEditTableFooterMessage(msg, type = "") {
-  const overlay = document.getElementById("editTableBackdrop");
+  const overlay = document.getElementById("settingsOverlay");
   if (!overlay) return;
   if (!msg) {
     clearModalFooterMessageForOverlay(overlay);
@@ -712,7 +712,7 @@ function setEditTableFooterMessage(msg, type = "") {
 }
 
 function clearEditTableFooterMessage() {
-  clearModalFooterMessageForOverlay("editTableBackdrop");
+  clearModalFooterMessageForOverlay("settingsOverlay");
 }
 
 function applyColumnVisibility() {
@@ -868,22 +868,20 @@ function renderEditTableList() {
   renderEditTableOrder();
 }
 
-function openEditTablePopover() {
+function prepareEditTableDraft() {
   columnVisibilityDraft = getSelectableColumnsFromVisible(visibleColumns);
   columnOrderDraft = normalizeColumnOrder([...columnOrder]);
   syncOrderDraftWithVisibility();
-  const backdrop = document.getElementById("editTableBackdrop");
-  if (!backdrop) return;
-
   clearEditTableFooterMessage();
-  backdrop.hidden = false;
   renderEditTableList();
-  document.getElementById("editTableOk")?.focus();
+}
+
+function openEditTablePopover() {
+  if (typeof openSettingsModal === "function") openSettingsModal("edit-table");
+  else prepareEditTableDraft();
 }
 
 function closeEditTablePopover() {
-  const backdrop = document.getElementById("editTableBackdrop");
-  if (backdrop) backdrop.hidden = true;
   clearEditTableFooterMessage();
 }
 
@@ -901,7 +899,7 @@ function applyEditTableFromPopover() {
   applyColumnVisibility();
   saveColumnLayoutPreference();
   if (typeof updateColumnFilterHeaderStates === "function") updateColumnFilterHeaderStates();
-  closeEditTablePopover();
+  clearEditTableFooterMessage();
 }
 
 function initEditTable() {
@@ -912,15 +910,5 @@ function initEditTable() {
   document.getElementById("editTableSaveDefault")?.addEventListener("click", saveDefaultColumnVisibility);
   document.getElementById("editTableResetDefault")?.addEventListener("click", resetEditTableToDefault);
   document.getElementById("editTableOk")?.addEventListener("click", applyEditTableFromPopover);
-  document.getElementById("editTableCancel")?.addEventListener("click", closeEditTablePopover);
-
-  document.getElementById("editTableBackdrop")?.addEventListener("click", e => {
-    if (e.target.id === "editTableBackdrop") closeEditTablePopover();
-  });
-
-  document.addEventListener("keydown", e => {
-    const backdrop = document.getElementById("editTableBackdrop");
-    if (!backdrop || backdrop.hidden) return;
-    if (e.key === "Escape") closeEditTablePopover();
-  });
+  document.getElementById("editTableCancel")?.addEventListener("click", prepareEditTableDraft);
 }
