@@ -173,7 +173,7 @@ const APPS_SCRIPT_EDITABLE_PO_FIELDS = new Set([
   "PO Qty", "Status", "N41 Status", "Ship Method",
   "Vessel", "House #", "Shipped", "ETD", "ETA", "IHD",
   "EST EXF", "EST IHD", "EXF", "CXL Date", "Assign Date", "Notes",
-  "EXF Requested", "EXF Date", "EXF Req Date", "EXF Request Date", "EXF Memo",
+  "EXF Requested", "EXF Date", "EXF Req Date", "EXF Request Date", "EXF Request ID", "EXF Memo",
   "ASN Requested", "ASN Date", "ASN Req Date", "ASN Request ID",
   "Delivery Requested", "Delivery Date", "Delivery Req Date", "Delivery Request ID",
   "Pickup Requested", "Pickup Date", "Pickup Req Date", "Pickup Request ID",

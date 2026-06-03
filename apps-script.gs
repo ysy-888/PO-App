@@ -97,7 +97,7 @@ const EDITABLE_FIELDS = [
   "Vessel", "House #", "Shipped", "ETD", "ETA", "IHD",
   "EST EXF", "EST IHD", "EXF", "CXL Date", "Assign Date", "Notes",
   EXF_REQUESTED_FIELD, EXF_REQUEST_DATE_FIELD, EXF_MEMO_FIELD,
-  EXF_DATE_FIELD, EXF_REQ_DATE_FIELD,
+  EXF_DATE_FIELD, EXF_REQ_DATE_FIELD, EXF_REQUEST_ID_FIELD,
   ASN_REQUEST_ID_FIELD, ASN_REQUESTED_FIELD, ASN_DATE_FIELD, ASN_REQ_DATE_FIELD,
   DELIVERY_REQUEST_ID_FIELD, DELIVERY_REQUESTED_FIELD, DELIVERY_DATE_FIELD, DELIVERY_REQ_DATE_FIELD,
   PICKUP_REQUEST_ID_FIELD, PICKUP_REQUESTED_FIELD, PICKUP_DATE_FIELD, PICKUP_REQ_DATE_FIELD,
@@ -206,7 +206,7 @@ function ensurePoWorkflowHeaders_() {
   const sheet = getSheet();
   ensureSheetHeaders_(sheet, [
     // EXF
-    EXF_DATE_FIELD, EXF_REQ_DATE_FIELD, EXF_REQUESTED_FIELD,
+    EXF_DATE_FIELD, EXF_REQ_DATE_FIELD, EXF_REQUESTED_FIELD, EXF_REQUEST_ID_FIELD,
     // ASN
     ASN_DATE_FIELD, ASN_REQ_DATE_FIELD, ASN_REQUESTED_FIELD, ASN_REQUEST_ID_FIELD,
     // Delivery
@@ -2852,7 +2852,7 @@ function sendAndFinalizeExfRequestEmail_(exfRequestsSheet, found) {
       requestId, vendor, vendorEmailInfo, poRows, exfDate, exfReqNotes, memos, shipMethods,
       formatEmailDate_(request["Request Date"])
     );
-    markExfRequestPosRequested_(poSheet, poNumbers, exfDate, memos, shipMethods);
+    markExfRequestPosRequested_(poSheet, poNumbers, requestId, exfDate, memos, shipMethods);
     emailSent = true;
   } catch (err) {
     emailError = err && err.message ? err.message : String(err);
@@ -2885,9 +2885,10 @@ function applyExfRequestPoDraftFields_(poSheet, poNumbers, memos, shipMethods) {
   applyPoUpdatesBatch_(poSheet, items);
 }
 
-function markExfRequestPosRequested_(poSheet, poNumbers, exfDate, memos, shipMethods) {
+function markExfRequestPosRequested_(poSheet, poNumbers, requestId, exfDate, memos, shipMethods) {
   const items = poNumbers.map(poNumber => {
     const updates = {};
+    updates[EXF_REQUEST_ID_FIELD] = requestId;
     updates[EXF_REQUESTED_FIELD] = true;
     updates["Status"] = "Requested";
     updates[EXF_REQUEST_DATE_FIELD] = exfDate;
@@ -2971,7 +2972,7 @@ function handleExfRequest(payload) {
       requestId, vendor, vendorEmailInfo, poRows, exfDate, exfReqNotes, memos, shipMethods,
       formatEmailDate_(new Date())
     );
-    markExfRequestPosRequested_(poSheet, poNumbers, exfDate, memos, shipMethods);
+    markExfRequestPosRequested_(poSheet, poNumbers, requestId, exfDate, memos, shipMethods);
     emailSent = true;
   } catch (err) {
     emailError = err && err.message ? err.message : String(err);
@@ -3002,6 +3003,13 @@ function handleExfRequest(payload) {
       error: (err && err.message ? err.message : String(err)) || "Failed to save EXF request.",
       emailError: emailError,
     });
+  }
+
+  if (!emailSent) {
+    applyPoUpdatesBatch_(poSheet, poNumbers.map(poNumber => ({
+      poNumber: poNumber,
+      updates: { [EXF_REQUEST_ID_FIELD]: requestId },
+    })));
   }
 
   if (!emailSent) {

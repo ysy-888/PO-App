@@ -78,7 +78,7 @@ const COLUMNS = [
   "Old PO #","Style #","Color","Style Category","PO Qty","Actual Qty","Ctn Qty","Received Qty","FOB Cost","PO Total Cost",
   "Vessel","House #","Shipped","ETD",
   "EST EXF","EST IHD","Ship Method","Shipment ID","Packing List",
-  "EXF Requested","EXF Date","EXF Req Date","EXF Memo",
+  "EXF Requested","EXF Date","EXF Req Date","EXF Request ID","EXF Memo",
   "ASN Requested","ASN Date","ASN Req Date","ASN Request ID",
   "Delivery Requested","Delivery Date","Delivery Req Date","Delivery Request ID",
   "Pickup Requested","Pickup Date","Pickup Req Date","Pickup Request ID",
@@ -114,7 +114,7 @@ const COLUMN_WIDTH_TIER_S = new Set([
   "PO #", "Old PO #", "SO #", "FOB Cost", "PO Total Cost",
   "N41 Status",
   "EXF Requested", "ASN Requested", "Delivery Requested", "Pickup Requested",
-  "ASN Request ID", "Delivery Request ID", "Pickup Request ID",
+  "EXF Request ID", "ASN Request ID", "Delivery Request ID", "Pickup Request ID",
 ]);
 
 const COLUMN_WIDTH_TIER_M = new Set([
@@ -138,6 +138,7 @@ const COLUMN_LABELS = {
   "EXF Requested": "EXF Req",
   "EXF Date": "EXF Date",
   "EXF Req Date": "EXF Req Date",
+  "EXF Request ID": "EXF Req ID",
   "EXF Memo": "EXF Memo",
   "ASN Requested": "ASN Req",
   "ASN Date": "ASN Date",
@@ -624,9 +625,28 @@ function loadProgramColumnDefaultFromStorage() {
 
 function loadColumnVisibility() {
   loadProgramColumnDefaultFromStorage();
-  if (loadColumnLayoutPreference()) return;
+  if (loadColumnLayoutPreference()) {
+    migrateVisibleColumnsForNewFields();
+    return;
+  }
   columnOrder = normalizeColumnOrder([...DEFAULT_COLUMN_ORDER]);
   visibleColumns = getDefaultVisibleColumnsSet();
+}
+
+/** When new PO columns ship, show them if their sibling request-ID column is already visible. */
+function migrateVisibleColumnsForNewFields() {
+  let changed = false;
+  if (!visibleColumns.has("EXF Request ID") && visibleColumns.has("ASN Request ID")) {
+    visibleColumns.add("EXF Request ID");
+    changed = true;
+  }
+  if (!columnOrder.includes("EXF Request ID")) {
+    const idx = columnOrder.indexOf("EXF Req Date");
+    if (idx !== -1) columnOrder.splice(idx + 1, 0, "EXF Request ID");
+    else columnOrder = normalizeColumnOrder([...columnOrder, "EXF Request ID"]);
+    changed = true;
+  }
+  if (changed) saveColumnLayoutPreference();
 }
 
 function applyDefaultColumnsFromServer(data) {

@@ -198,6 +198,16 @@ function renderTable() {
 
       }
 
+      if (col === "EXF Request ID" && typeof renderExfRequestIdCell === "function") {
+
+        renderExfRequestIdCell(td, row);
+
+        tr.appendChild(td);
+
+        return;
+
+      }
+
       if (col === "Delivery Request ID" && typeof renderDeliveryRequestIdCell === "function") {
 
         renderDeliveryRequestIdCell(td, row);

@@ -84,7 +84,39 @@ function normalizeExfRequestRecord(row) {
 
 function onExfRequestsDataLoaded(requests) {
   allExfRequests = (requests ?? []).map(normalizeExfRequestRecord);
+  if (typeof allRows !== "undefined") syncExfRequestIdsFromRequests(allRows, allExfRequests);
   applyExfRequestFilters();
+}
+
+function syncExfRequestIdsFromRequests(rows, requests) {
+  if (!Array.isArray(rows) || !Array.isArray(requests)) return;
+  const poToRequestId = new Map();
+  requests.forEach(request => {
+    const id = getExfRequestRecordId(request);
+    if (!id) return;
+    parseRequestPoNumbers(request).forEach(po => poToRequestId.set(String(po), id));
+  });
+  rows.forEach(row => {
+    if (String(row[EXF_REQUEST_ID_FIELD] ?? "").trim()) return;
+    const id = poToRequestId.get(String(row["PO #"] ?? ""));
+    if (id) row[EXF_REQUEST_ID_FIELD] = id;
+  });
+}
+
+function renderExfRequestIdCell(td, row) {
+  td.className = "readonly readonly-no-select td-shipment-id-cell";
+  const id = String(row[EXF_REQUEST_ID_FIELD] ?? "").trim();
+  if (!id) { setDisplayText(td, EMPTY_DISPLAY); return; }
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "shipment-id-link";
+  btn.textContent = id;
+  btn.title = "Open EXF request";
+  btn.addEventListener("click", e => {
+    e.stopPropagation();
+    openExfRequestDetail(id);
+  });
+  td.appendChild(btn);
 }
 
 function getExfRequestRecordId(request) {
