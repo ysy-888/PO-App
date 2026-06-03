@@ -285,7 +285,10 @@ function initCsvImportSummary() {
 
   const dismiss = () => overlay.classList.remove("open");
   closeBtn?.addEventListener("click", dismiss);
-  okBtn?.addEventListener("click", dismiss);
+  okBtn?.addEventListener("click", async () => {
+    dismiss();
+    await loadData();
+  });
   bindDirectBackdropDismiss(overlay, dismiss);
   document.addEventListener("keydown", e => {
     if (e.key === "Escape" && overlay.classList.contains("open")) dismiss();
@@ -342,7 +345,6 @@ async function handleCsvImportFile(file) {
       result.updatedPoNumbers = dedupePoNumbers(changedRows.map(row => row["PO #"]));
     }
     setAppSaving(false);
-    await loadData();
 
     const parts = [
       `${result.inserted} added`,

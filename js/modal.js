@@ -157,6 +157,72 @@ function createModalPlainCurrencyField(col, row) {
   return fieldWrap;
 }
 
+function createModalStyleMetaText(col, row) {
+  const wrap = document.createElement("div");
+  wrap.className = "modal-style-meta-item";
+  wrap.dataset.col = col;
+
+  const labelEl = document.createElement("span");
+  labelEl.className = "modal-style-meta-label";
+  labelEl.textContent = getColumnLabel(col);
+
+  const valueEl = document.createElement("span");
+  valueEl.className = "modal-style-meta-value";
+  valueEl.dataset.col = col;
+  const value = getColumnFilterRawValue(col, row);
+
+  if (PO_CURRENCY_FIELDS.has(col)) {
+    const formatted = formatPoCurrency(value);
+    setDisplayText(valueEl, formatted === "" ? EMPTY_DISPLAY : formatted);
+  } else {
+    setDisplayText(valueEl, isEmptyValue(value) ? EMPTY_DISPLAY : String(value));
+  }
+
+  wrap.append(labelEl, valueEl);
+  return wrap;
+}
+
+function createModalStyleMetaGroup(row, cols = ["Vendor", "PO Total Cost"]) {
+  const group = document.createElement("div");
+  group.className = "modal-style-meta-group";
+  cols.forEach(col => {
+    group.appendChild(createModalStyleMetaText(col, row));
+  });
+  return group;
+}
+
+function createModalPlainStyleText(col, row) {
+  const valueEl = document.createElement("span");
+  valueEl.className = "modal-style-text-value";
+  valueEl.dataset.col = col;
+  const value = getColumnFilterRawValue(col, row);
+  setDisplayText(valueEl, isEmptyValue(value) ? EMPTY_DISPLAY : String(value));
+  return valueEl;
+}
+
+function createModalStyleInfoRow(row) {
+  const rowEl = document.createElement("div");
+  rowEl.className = "modal-style-info-row";
+
+  const textGroup = document.createElement("div");
+  textGroup.className = "modal-style-text-group";
+  ["Style #", "Color", "Style Category"].forEach(col => {
+    textGroup.appendChild(createModalPlainStyleText(col, row));
+  });
+
+  rowEl.appendChild(textGroup);
+  return rowEl;
+}
+
+function createModalStyleCostRow(row) {
+  const rowEl = document.createElement("div");
+  rowEl.className = "modal-style-cost-row";
+  rowEl.appendChild(createModalStyleMetaGroup(row));
+  rowEl.appendChild(createModalField("FOB Cost", row));
+  rowEl.appendChild(createModalField("Price", row));
+  return rowEl;
+}
+
 function shouldShowAssignDate(row) {
   return String(row["Division"] ?? "").trim() === "Freesia";
 }
@@ -165,7 +231,16 @@ function createModalOrderSection(row) {
   const { block, content } = createModalBlock(null);
   block.classList.add("modal-block--order");
 
-  appendModalFieldRows(content, MODAL_ORDER_INFO_ROWS, row);
+  [
+    ["Status", "N41 Status", "SO #", "Old PO #"],
+    ["Division", "Buyer", "Buyer PO #"],
+  ].forEach(cols => {
+    content.appendChild(createModalFieldRow(
+      cols,
+      row,
+      { rowClass: "modal-field-row--order-grid" }
+    ));
+  });
   content.appendChild(createModalFieldRow(
     ["Notes"],
     row,
@@ -189,24 +264,32 @@ function createModalStyleSection(row) {
   const grid = document.createElement("div");
   grid.className = "modal-style-section-grid";
 
+  const details = document.createElement("div");
+  details.className = "modal-style-details";
+
   const info = document.createElement("div");
   info.className = "modal-style-info";
-  info.appendChild(createModalField("Style #", row));
-  info.appendChild(createModalField("Color", row));
-  info.appendChild(createModalFieldRow(
-    ["FOB Cost", "Price"],
-    row,
-    { rowClass: "modal-field-row--style-costs" }
-  ));
-  const poCostRow = document.createElement("div");
-  poCostRow.className = "modal-field-row modal-field-row--style-costs";
-  poCostRow.appendChild(createModalPlainCurrencyField("PO Total Cost", row));
-  info.appendChild(poCostRow);
+  info.appendChild(createModalStyleInfoRow(row));
 
-  grid.appendChild(info);
-  grid.appendChild(createModalSizeGrid(row));
+  details.appendChild(info);
+
+  const qtyRow = document.createElement("div");
+  qtyRow.className = "modal-style-qty-row";
+  qtyRow.appendChild(createModalSizeGrid(row));
+  details.appendChild(qtyRow);
+  details.appendChild(createModalStyleCostRow(row));
+
+  grid.appendChild(details);
   grid.appendChild(createModalStylePhotosColumn(row));
+
   content.appendChild(grid);
+  return block;
+}
+
+function createModalProductionSection(row) {
+  const { block, content } = createModalBlock(null);
+  block.classList.add("modal-block--production");
+  appendModalFieldRows(content, MODAL_PRODUCTION_ROWS, row);
   return block;
 }
 
@@ -308,6 +391,10 @@ function buildSizeGridRow(chart, row, label, unitFields, colCount, rowType) {
     input.value = isEmptyValue(row[field]) ? "" : String(row[field]);
     input.dataset.field = field;
     input.dataset.rowType = rowType;
+    if (typeof isPoClosed === "function" && isPoClosed(row)) {
+      input.readOnly = true;
+      input.tabIndex = -1;
+    }
     bindNumberInput(input);
     chart.appendChild(input);
   }
@@ -419,6 +506,7 @@ function refreshSizeGridVariance(row, chartEl, packingActualUnits = getPackingUn
 
 function handleSizeGridInput(target, row) {
   if (!(target instanceof HTMLInputElement)) return;
+  if (typeof isPoClosed === "function" && isPoClosed(row)) return;
   const field = target.dataset.field;
   if (!field) return;
   const raw = target.value.trim();
@@ -660,15 +748,7 @@ function createModalShippingSection(row) {
   ));
   datesCol.appendChild(createModalActualDateRow(row));
 
-  const productionCol = document.createElement("div");
-  productionCol.className = "modal-production-inline";
-  appendModalFieldRows(productionCol, MODAL_PRODUCTION_ROWS, row);
-
-  const detailGrid = document.createElement("div");
-  detailGrid.className = "modal-shipping-production-grid";
-  detailGrid.appendChild(datesCol);
-  detailGrid.appendChild(productionCol);
-  content.appendChild(detailGrid);
+  content.appendChild(datesCol);
 
   block.appendChild(content);
   return block;
@@ -882,7 +962,7 @@ function createChargebackAddRow(poNumber) {
     rowEl.remove();
     removeChargebackGridHeadersIfEmpty(block);
     setChargebackEditActive(block, false);
-    block?.querySelector(".chargeback-new-btn")?.removeAttribute("hidden");
+    removeModalChargebacksSectionIfEmpty(poNumber);
   });
   actions.appendChild(addBtn);
   actions.appendChild(cancelBtn);
@@ -911,10 +991,151 @@ function removeChargebackGridHeadersIfEmpty(block) {
 
 const CARTON_WEIGHT_FIELD = "Carton Weight";
 
-const PACKING_LIST_DELETE_ICON_SVG =
-  `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">` +
-  `<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>` +
-  `<path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`;
+let poModalMenuOpen = false;
+let poModalMenuDismissBound = false;
+
+function closePoModalMenu() {
+  const menu = document.getElementById("modalHeaderMenuDropdown");
+  const btn = document.getElementById("modalHeaderMenuBtn");
+  if (menu) menu.hidden = true;
+  if (btn) btn.setAttribute("aria-expanded", "false");
+  poModalMenuOpen = false;
+}
+
+function bindPoModalMenuDismiss() {
+  if (poModalMenuDismissBound) return;
+  poModalMenuDismissBound = true;
+
+  document.addEventListener("click", e => {
+    if (!poModalMenuOpen) return;
+    const wrap = document.querySelector(".modal-header-menu-wrap");
+    if (wrap?.contains(e.target)) return;
+    closePoModalMenu();
+  });
+
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && poModalMenuOpen) closePoModalMenu();
+  });
+}
+
+function createPoModalMenuItem(label, onSelect) {
+  const item = document.createElement("button");
+  item.type = "button";
+  item.className = "header-menu-item";
+  item.setAttribute("role", "menuitem");
+  item.textContent = label;
+  item.addEventListener("click", e => {
+    e.stopPropagation();
+    closePoModalMenu();
+    onSelect();
+  });
+  return item;
+}
+
+function openModalPackingListPanel() {
+  if (modalRow && typeof isPoClosed === "function" && isPoClosed(modalRow)) return;
+  packingListPanelOpen = true;
+  updateModalIfOpen();
+  requestAnimationFrame(focusPackingListCartonInput);
+}
+
+function rebuildPoModalMenuItems(row) {
+  const menu = document.getElementById("modalHeaderMenuDropdown");
+  if (!menu || !row) return;
+  menu.innerHTML = "";
+
+  const poNumber = String(row["PO #"] ?? "").trim();
+  const packingList = getPackingListForPo(poNumber);
+  const closed = typeof isPoClosed === "function" && isPoClosed(row);
+
+  if (!closed) {
+    menu.appendChild(createPoModalMenuItem(
+      isTruthy(row["Flag"]) ? "Unflag PO" : "Flag PO",
+      () => toggleRowFlag(row)
+    ));
+  }
+  menu.appendChild(createPoModalMenuItem("New Chargeback", () => beginNewChargeback(row)));
+  if (!closed) {
+    menu.appendChild(createPoModalMenuItem(
+      packingList ? "Edit Packing List" : "Add Packing List",
+      openModalPackingListPanel
+    ));
+  }
+
+  if (packingList) {
+    menu.appendChild(createPoModalMenuItem("Print Packing List", () => {
+      if (typeof printPackingList === "function") {
+        printPackingList({ poNumbers: [row["PO #"]], mode: "individual" });
+      }
+    }));
+
+    if (!closed) {
+      menu.appendChild(createPoModalMenuItem("Delete Packing List", () => {
+        deletePackingListFromPanel(row, packingList);
+      }));
+    }
+  }
+}
+
+function openPoModalMenu(row) {
+  const menu = document.getElementById("modalHeaderMenuDropdown");
+  const btn = document.getElementById("modalHeaderMenuBtn");
+  if (!menu || !btn) return;
+  rebuildPoModalMenuItems(row);
+  menu.hidden = false;
+  btn.setAttribute("aria-expanded", "true");
+  poModalMenuOpen = true;
+}
+
+function updatePoModalMenu(row) {
+  if (poModalMenuOpen && row) rebuildPoModalMenuItems(row);
+}
+
+function initPoModalHeaderMenu() {
+  const btn = document.getElementById("modalHeaderMenuBtn");
+  const menu = document.getElementById("modalHeaderMenuDropdown");
+  if (!btn || !menu) return;
+
+  btn.addEventListener("click", e => {
+    e.stopPropagation();
+    if (poModalMenuOpen) {
+      closePoModalMenu();
+      return;
+    }
+    if (!modalRow) return;
+    openPoModalMenu(modalRow);
+  });
+
+  bindPoModalMenuDismiss();
+}
+
+function ensureModalChargebacksSection(row) {
+  let block = document.querySelector("#modalOverlay .modal-block--chargebacks");
+  if (block) return block;
+  block = createModalChargebacksSection(row, { showEmpty: true });
+  document.querySelector("#modalOverlay .modal-layout-main")?.appendChild(block);
+  return block;
+}
+
+function beginNewChargeback(row) {
+  const poNumber = String(row["PO #"] ?? "").trim();
+  const block = ensureModalChargebacksSection(row);
+  if (!block || isChargebackEditActive(block)) return;
+  const grid = block.querySelector(".chargebacks-grid");
+  if (!grid) return;
+  setChargebackEditActive(block, true);
+  appendChargebackGridHeaders(grid);
+  grid.appendChild(createChargebackAddRow(poNumber));
+  block.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+
+function removeModalChargebacksSectionIfEmpty(poNumber) {
+  const block = document.querySelector("#modalOverlay .modal-block--chargebacks");
+  if (!block) return;
+  if (getChargebacksForPo(poNumber).length > 0) return;
+  if (block.querySelector(".chargeback-row")) return;
+  block.remove();
+}
 
 function clonePackingCarton(carton, fallbackIndex) {
   const out = { "Carton #": carton?.["Carton #"] || fallbackIndex + 1 };
@@ -962,8 +1183,9 @@ function setPackingEditorTotals(container, row, cartons) {
 
 function createPackingListEditor(row, packingList, sourceCartons) {
   const labels = getSizeLabelsFromRow(row);
+  const readOnly = typeof isPoClosed === "function" && isPoClosed(row);
   const editor = document.createElement("div");
-  editor.className = "packing-list-editor";
+  editor.className = "packing-list-editor" + (readOnly ? " packing-list-editor--readonly" : "");
   const draftCount = modalPendingSubmissionDraft?.packingList?.["Carton Count"];
   const initialCount = Math.max(
     1,
@@ -982,15 +1204,6 @@ function createPackingListEditor(row, packingList, sourceCartons) {
   heading.textContent = "Packing List";
 
   headingWrap.appendChild(heading);
-  if (packingList) {
-    const deleteBtn = document.createElement("button");
-    deleteBtn.type = "button";
-    deleteBtn.className = "btn btn-icon packing-list-delete-icon-btn";
-    deleteBtn.setAttribute("aria-label", "Delete packing list");
-    deleteBtn.innerHTML = PACKING_LIST_DELETE_ICON_SVG;
-    deleteBtn.addEventListener("click", () => deletePackingListFromPanel(row, packingList));
-    headingWrap.appendChild(deleteBtn);
-  }
 
   const controlsRight = document.createElement("div");
   controlsRight.className = "packing-list-controls-right";
@@ -1036,6 +1249,7 @@ function createPackingListEditor(row, packingList, sourceCartons) {
   countBlock.append(countLabel, weightSummary);
 
   function adjustCartonCount(delta) {
+    if (readOnly) return;
     const next = Math.max(1, Math.floor(Number(countInput.value) || 1) + delta);
     countInput.value = String(next);
     renderGrid();
@@ -1044,22 +1258,13 @@ function createPackingListEditor(row, packingList, sourceCartons) {
 
   countDecrease.addEventListener("click", () => adjustCartonCount(-1));
   countIncrease.addEventListener("click", () => adjustCartonCount(1));
+  if (readOnly) {
+    countDecrease.disabled = true;
+    countIncrease.disabled = true;
+    countInput.readOnly = true;
+  }
 
   controlsRight.appendChild(countBlock);
-
-  if (packingList) {
-    const printBtn = document.createElement("button");
-    printBtn.type = "button";
-    printBtn.className = "btn btn-secondary packing-list-print-btn";
-    printBtn.textContent = "Print";
-    printBtn.title = "Print packing list";
-    printBtn.addEventListener("click", () => {
-      if (typeof printPackingList === "function") {
-        printPackingList({ poNumbers: [row["PO #"]], mode: "individual" });
-      }
-    });
-    controlsRight.appendChild(printBtn);
-  }
 
   controls.appendChild(headingWrap);
   controls.appendChild(controlsRight);
@@ -1155,6 +1360,7 @@ function createPackingListEditor(row, packingList, sourceCartons) {
         input.value = isEmptyValue(carton[field]) ? "" : String(carton[field]);
         input.dataset.cartonIndex = String(cartonIndex);
         input.dataset.field = field;
+        if (readOnly) input.readOnly = true;
         bindNumberInput(input);
         bodyGrid.appendChild(input);
       });
@@ -1173,6 +1379,7 @@ function createPackingListEditor(row, packingList, sourceCartons) {
       weightInput.value = isEmptyValue(carton[CARTON_WEIGHT_FIELD]) ? "" : String(carton[CARTON_WEIGHT_FIELD]);
       weightInput.dataset.cartonIndex = String(cartonIndex);
       weightInput.dataset.field = CARTON_WEIGHT_FIELD;
+      if (readOnly) weightInput.readOnly = true;
       bindNumberInput(weightInput);
       const weightSuffix = document.createElement("span");
       weightSuffix.className = "packing-list-weight-suffix";
@@ -1188,6 +1395,7 @@ function createPackingListEditor(row, packingList, sourceCartons) {
   countInput.addEventListener("change", renderGrid);
   countInput.addEventListener("input", updateModalSaveState);
   gridPanel.addEventListener("input", e => {
+    if (readOnly) return;
     const target = e.target;
     if (!(target instanceof HTMLInputElement)) return;
     setChargebackError(editor, "");
@@ -1227,18 +1435,11 @@ function focusPackingListCartonInput() {
   }
 }
 
-function updateModalPackingListButton(row) {
+function updateModalPackingListButton() {
   const btn = document.getElementById("modalPackingListBtn");
   if (!btn) return;
-  btn.hidden = packingListPanelOpen;
-  if (packingListPanelOpen) return;
-  const poNumber = String(row["PO #"] ?? "").trim();
-  btn.textContent = getPackingListForPo(poNumber) ? "Edit Packing List" : "Add Packing List";
-  btn.onclick = () => {
-    packingListPanelOpen = true;
-    updateModalIfOpen();
-    requestAnimationFrame(focusPackingListCartonInput);
-  };
+  btn.hidden = true;
+  btn.onclick = null;
 }
 
 function createPackingListSidePanel(row) {
@@ -1261,8 +1462,11 @@ function createPackingListSidePanel(row) {
   return panel;
 }
 
-function createModalChargebacksSection(row) {
+function createModalChargebacksSection(row, { showEmpty = false } = {}) {
   const poNumber = String(row["PO #"] ?? "").trim();
+  const poChargebacks = getChargebacksForPo(poNumber);
+  if (poChargebacks.length === 0 && !showEmpty) return null;
+
   const block = document.createElement("section");
   block.className = "modal-block modal-block--chargebacks";
 
@@ -1285,25 +1489,12 @@ function createModalChargebacksSection(row) {
   const grid = document.createElement("div");
   grid.className = "chargebacks-grid";
 
-  const poChargebacks = getChargebacksForPo(poNumber);
   if (poChargebacks.length > 0) appendChargebackGridHeaders(grid);
   poChargebacks.forEach(chargeback => {
     grid.appendChild(createChargebackRow(chargeback, poNumber));
   });
 
   block.appendChild(grid);
-  const newBtn = document.createElement("button");
-  newBtn.type = "button";
-  newBtn.className = "btn btn-secondary chargeback-action-btn chargeback-new-btn";
-  newBtn.textContent = "+ New Chargeback";
-  newBtn.addEventListener("click", () => {
-    if (isChargebackEditActive(block)) return;
-    setChargebackEditActive(block, true);
-    appendChargebackGridHeaders(grid);
-    grid.appendChild(createChargebackAddRow(poNumber));
-    newBtn.hidden = true;
-  });
-  block.appendChild(newBtn);
   return block;
 }
 
@@ -1340,19 +1531,6 @@ function createModalStylePhotosColumn(row) {
   const wrap = document.createElement("div");
   wrap.className = "modal-style-photos-column";
 
-  const category = document.createElement("div");
-  category.className = "modal-style-category";
-
-  const value = document.createElement("span");
-  value.className = "modal-style-category-value";
-  const categoryValue = getColumnFilterRawValue("Style Category", row);
-  setDisplayText(
-    value,
-    isEmptyValue(categoryValue) ? EMPTY_DISPLAY : String(categoryValue)
-  );
-
-  category.appendChild(value);
-  wrap.appendChild(category);
   wrap.appendChild(createModalStylePhotos(row));
   return wrap;
 }
@@ -1459,13 +1637,27 @@ function syncPackingListPanelOpenForRow(row) {
   }
 }
 
+function renderModalHeadingMeta(container, row) {
+  if (!container) return;
+  container.replaceChildren();
+  const styleVal = String(getColumnFilterRawValue("Style #", row) ?? "").trim();
+  const colorVal = String(getColumnFilterRawValue("Color", row) ?? "").trim();
+  if (!styleVal && !colorVal) return;
+
+  const item = document.createElement("span");
+  item.className = "modal-po-heading-meta-item";
+  if (styleVal && colorVal) item.textContent = `${styleVal}/${colorVal}`;
+  else item.textContent = styleVal || colorVal;
+  container.appendChild(item);
+}
+
 function renderModalContent(row) {
   syncPackingListPanelOpenForRow(row);
 
   const poNumEl = document.getElementById("modalPoNum");
-  const flagEl = document.getElementById("modalFlagBtn");
+  const poMetaEl = document.getElementById("modalPoMeta");
   const bodyEl = document.getElementById("modalBody");
-  if (!poNumEl || !flagEl || !bodyEl) return;
+  if (!poNumEl || !bodyEl) return;
 
   const poNum = isEmptyValue(row["PO #"]) ? EMPTY_DISPLAY : row["PO #"];
   poNumEl.className = "modal-po-num";
@@ -1476,9 +1668,10 @@ function renderModalContent(row) {
     setDisplayText(poNumEl, poNum);
   }
 
-  flagEl.replaceChildren(createPoFlagButton(row));
+  renderModalHeadingMeta(poMetaEl, row);
 
   updateModalPackingListButton(row);
+  updatePoModalMenu(row);
 
   bodyEl.innerHTML = "";
 
@@ -1491,7 +1684,9 @@ function renderModalContent(row) {
 
   main.appendChild(createModalOrderProductSplit(row));
   main.appendChild(createModalStyleSection(row));
-  main.appendChild(createModalChargebacksSection(row));
+  main.appendChild(createModalProductionSection(row));
+  const chargebacksSection = createModalChargebacksSection(row);
+  if (chargebacksSection) main.appendChild(chargebacksSection);
 
   layout.appendChild(main);
   if (packingListPanelOpen) {
@@ -1560,6 +1755,7 @@ function closeModal(event) {
 }
 
 function dismissModalOverlay() {
+  closePoModalMenu();
   closeCellSelectDropdown(false);
   if (typeof closeCellDatePopover === "function") closeCellDatePopover(false);
   modalRow = null;
@@ -1694,6 +1890,10 @@ function upsertLocalPackingList(poNumber, packingListId, packingList, cartons) {
 
 async function deletePackingListFromPanel(row, packingList) {
   if (modalSaveInProgress || isAppSaving()) return;
+  if (typeof isPoClosed === "function" && isPoClosed(row)) {
+    showIndicator("Closed POs cannot be edited", "error");
+    return;
+  }
   const packingListId = getPackingListId(packingList);
   const poNumber = String(row["PO #"] ?? "").trim();
   if (!packingListId && !poNumber) return;
@@ -1958,6 +2158,10 @@ function applyModalUpdatesToTableRow(poNumber, updates) {
 
 async function saveModalChanges() {
   if (isAppSaving() || modalSaveInProgress || !modalRow || !modalSnapshot) return;
+  if (typeof isPoClosed === "function" && isPoClosed(modalRow) && !isModalPendingSubmissionReview()) {
+    showIndicator("Closed POs cannot be edited", "error");
+    return;
+  }
   if (!hasModalPendingChanges()) return;
   commitActiveModalEditor();
 
@@ -2039,13 +2243,11 @@ async function saveModalChanges() {
 
 function initPoModalActions() {
   bindDirectBackdropDismiss(document.getElementById("modalOverlay"), cancelModalChanges);
+  initPoModalHeaderMenu();
   document.getElementById("modalSaveBtn")?.addEventListener("click", () => {
     saveModalChanges();
   });
   document.getElementById("modalCancelBtn")?.addEventListener("click", () => {
-    cancelModalChanges();
-  });
-  document.getElementById("modalCloseBtn")?.addEventListener("click", () => {
     cancelModalChanges();
   });
 }

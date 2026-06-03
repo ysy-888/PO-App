@@ -33,6 +33,15 @@ function getRowStatus(row) {
   return String(row["Status"] ?? "").trim();
 }
 
+/** True when the PO workflow is Closed (explicit Status or inferred from N41). */
+function isPoClosed(row) {
+  if (!row) return false;
+  if (typeof getRowWorkflowStatus === "function") {
+    return getRowWorkflowStatus(row) === "Closed";
+  }
+  return getRowStatus(row) === "Closed";
+}
+
 function getN41Status(row) {
   return String(row["N41 Status"] ?? "").trim();
 }

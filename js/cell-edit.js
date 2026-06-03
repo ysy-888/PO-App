@@ -412,7 +412,8 @@ function updateModalSaveState() {
   const saveBtn = document.getElementById("modalSaveBtn");
   if (!saveBtn) return;
   const reviewing = typeof isModalPendingSubmissionReview === "function" && isModalPendingSubmissionReview();
-  saveBtn.disabled = !hasModalPendingChanges();
+  const closed = modalRow && typeof isPoClosed === "function" && isPoClosed(modalRow);
+  saveBtn.disabled = closed || !hasModalPendingChanges();
   saveBtn.textContent = reviewing ? "Save & approve" : "Save";
 }
 

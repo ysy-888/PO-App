@@ -478,7 +478,7 @@ function sanitizeUpdatesMap_(updates) {
 const IMPORT_ALLOWED_PO_FIELDS = (function () {
   const fields = [
     "PO Date", "EST IHD", "Vendor", "N41 Status", "Division", "Ship Method",
-    "SO #", "Buyer", "Buyer PO #", "Style #", "Color", "Style Category",
+    "SO #", "Old PO #", "Buyer", "Buyer PO #", "Style #", "Color", "Style Category",
     "PO Qty", "Received Qty", "CXL Date", "FOB Cost", "PO Total Cost",
   ];
   for (let i = 1; i <= 15; i++) {
@@ -950,6 +950,10 @@ function savePackingListCore_(poNumber, cartons, packingListMeta, poEditUpdates)
   if (!poSheet) throw new Error("POs sheet not found.");
   const poFound = findPoRowIndex_(poSheet, poNumber);
   if (!poFound) throw new Error("PO # not found: " + poNumber);
+  const poRowValues = poSheet.getRange(poFound.rowIndex, 1, 1, poFound.headers.length).getValues()[0];
+  if (isPoClosedFromRowValues_(poRowValues, poFound.headers)) {
+    throw new Error("Closed POs cannot be edited.");
+  }
 
   const packingListsSheet = getPackingListsSheet_();
   const cartonsSheet = getPackingCartonsSheet_();
@@ -1008,6 +1012,21 @@ function findPoRowIndex_(poSheet, poNumber) {
     if (poNumbersEqual_(rows[i][poCol], poNumber)) return { rowIndex: i + 1, headers: headers };
   }
   return null;
+}
+
+function getPoWorkflowStatusFromRowValues_(rowValues, headers) {
+  const statusCol = headers.indexOf("Status");
+  const n41Col = headers.indexOf("N41 Status");
+  const status = statusCol >= 0 ? String(rowValues[statusCol] ?? "").trim() : "";
+  if (status) return status;
+  const n41 = n41Col >= 0 ? String(rowValues[n41Col] ?? "").trim() : "";
+  if (n41 === "Closed") return "Closed";
+  if (n41 === "CXL") return "CXL";
+  return "";
+}
+
+function isPoClosedFromRowValues_(rowValues, headers) {
+  return getPoWorkflowStatusFromRowValues_(rowValues, headers) === "Closed";
 }
 
 function writePoFields_(poSheet, rowIndex, headers, updates) {
@@ -1346,6 +1365,16 @@ function handleSavePackingList(payload) {
     return corsResponse({ success: false, error: "PO # is required." });
   }
 
+  const poSheet = getSheet();
+  const poFound = findPoRowIndex_(poSheet, poNumber);
+  if (!poFound) {
+    return corsResponse({ success: false, error: "PO # not found: " + poNumber });
+  }
+  const poRowValues = poSheet.getRange(poFound.rowIndex, 1, 1, poFound.headers.length).getValues()[0];
+  if (isPoClosedFromRowValues_(poRowValues, poFound.headers)) {
+    return corsResponse({ success: false, error: "Closed POs cannot be edited." });
+  }
+
   const cartons = normalizePackingCartons_(payload.cartons || []);
   if (cartons.length === 0) {
     return corsResponse({ success: false, error: "At least one carton is required." });
@@ -1386,13 +1415,32 @@ function handleDeletePackingList(payload) {
     : findPackingListForPo_(packingListsSheet, poNumber);
   if (!found) return corsResponse({ success: true, deleted: 0 });
 
+  let resolvedPoNumber = poNumber;
+  if (!resolvedPoNumber) {
+    const poCol = found.headers.indexOf("PO #");
+    if (poCol !== -1) {
+      const listRowValues = packingListsSheet.getRange(found.rowIndex, 1, 1, found.headers.length).getValues()[0];
+      resolvedPoNumber = String(listRowValues[poCol] ?? "").trim();
+    }
+  }
+  if (resolvedPoNumber) {
+    const poSheet = getSheet();
+    const poFound = findPoRowIndex_(poSheet, resolvedPoNumber);
+    if (poFound) {
+      const poRowValues = poSheet.getRange(poFound.rowIndex, 1, 1, poFound.headers.length).getValues()[0];
+      if (isPoClosedFromRowValues_(poRowValues, poFound.headers)) {
+        return corsResponse({ success: false, error: "Closed POs cannot be edited." });
+      }
+    }
+  }
+
   const id = String(found.packingListId || packingListId);
   deletePackingCartons_(cartonsSheet, id);
   packingListsSheet.deleteRow(found.rowIndex);
 
-  if (poNumber) {
+  if (resolvedPoNumber) {
     const poSheet = getSheet();
-    const poFound = findPoRowIndex_(poSheet, poNumber);
+    const poFound = findPoRowIndex_(poSheet, resolvedPoNumber);
     if (poFound) {
       writePoFields_(poSheet, poFound.rowIndex, poFound.headers, { "Has Packing List": false });
     }
@@ -1580,6 +1628,10 @@ function handleBulkUpsertPos(payload) {
       const targetRow = existingIdx < sheetValues.length
         ? sheetValues[existingIdx]
         : rowsToAppend[existingIdx - sheetValues.length];
+      if (isPoClosedFromRowValues_(targetRow, headers)) {
+        skipped++;
+        return;
+      }
       const changedUpdates = pickChangedImportUpdates_(targetRow, headers, updates);
       if (Object.keys(changedUpdates).length === 0) return;
 
@@ -3539,6 +3591,11 @@ function handleUpdate(payload) {
   const found = findPoRowIndex_(poSheet, poNumber);
   if (!found) {
     return corsResponse({ success: false, error: "PO # not found: " + poNumber });
+  }
+
+  const rowValues = poSheet.getRange(found.rowIndex, 1, 1, found.headers.length).getValues()[0];
+  if (isPoClosedFromRowValues_(rowValues, found.headers)) {
+    return corsResponse({ success: false, error: "Closed POs cannot be edited." });
   }
 
   writePoFields_(poSheet, found.rowIndex, found.headers, updates);

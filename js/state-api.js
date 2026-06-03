@@ -324,6 +324,7 @@ const CSV_TO_SHEET_MAP = {
   division: "Division",
   shipVia: "Ship Method",
   orderNo: "SO #",
+  user1: "Old PO #",
   custName: "Buyer",
   customerPo: "Buyer PO #",
   style: "Style #",

@@ -447,15 +447,18 @@ function refreshModalPackingQtyDisplay(row) {
 }
 
 function closePackingListPanelInModal(row) {
+  if (typeof closePoModalMenu === "function") closePoModalMenu();
   packingListPanelOpen = false;
   document.querySelector("#modalOverlay .modal-layout")?.classList.remove("modal-layout--packing-open");
   document.querySelector("#modalOverlay .packing-list-side-panel")?.remove();
   updateModalPackingListButton(row);
+  if (typeof updatePoModalMenu === "function") updatePoModalMenu(modalRow ?? row);
   refreshModalPackingQtyDisplay(row);
 }
 
 function toggleRowFlag(row) {
   if (isAppSaving()) return;
+  if (typeof isPoClosed === "function" && isPoClosed(row)) return;
   const next = !isTruthy(row["Flag"]);
   row["Flag"] = next;
   if (isPoModalOpenForRow(row)) {

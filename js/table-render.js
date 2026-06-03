@@ -42,6 +42,11 @@ function createPoFlagButton(row) {
 
   btn.title = flagged ? "Unflag" : "Flag";
 
+  if (typeof isPoClosed === "function" && isPoClosed(row)) {
+    btn.disabled = true;
+    btn.title = "Closed POs cannot be edited";
+  }
+
   btn.innerHTML = FLAG_ICON_SVG;
 
   btn.addEventListener("click", e => {

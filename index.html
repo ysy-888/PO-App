@@ -883,12 +883,16 @@
   <div class="modal-card" onclick="event.stopPropagation()">
     <div class="modal-header">
       <div class="modal-header-main">
-        <h3>PO # <span id="modalPoNum" class="modal-po-num">—</span></h3>
-        <span id="modalFlagBtn" class="modal-flag-slot"></span>
+        <h3 class="modal-po-heading">PO #<span id="modalPoNum" class="modal-po-num">—</span><span id="modalPoMeta" class="modal-po-heading-meta"></span></h3>
       </div>
       <div class="modal-header-actions">
-        <button type="button" class="btn btn-secondary packing-list-header-btn" id="modalPackingListBtn">Add Packing List</button>
-        <button type="button" class="btn-close" id="modalCloseBtn" aria-label="Close">✕</button>
+        <button type="button" class="btn btn-secondary packing-list-header-btn" id="modalPackingListBtn" hidden>Add Packing List</button>
+        <div class="header-menu-wrap modal-header-menu-wrap">
+          <button type="button" class="btn btn-icon" id="modalHeaderMenuBtn" aria-label="PO menu" aria-haspopup="menu" aria-expanded="false">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.75"/><circle cx="12" cy="12" r="1.75"/><circle cx="12" cy="19" r="1.75"/></svg>
+          </button>
+          <div id="modalHeaderMenuDropdown" class="header-menu-dropdown modal-header-menu-dropdown" hidden role="menu"></div>
+        </div>
       </div>
     </div>
     <div class="modal-body" id="modalBody"></div>
