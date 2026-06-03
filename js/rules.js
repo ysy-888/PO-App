@@ -132,8 +132,9 @@ function formatPoCurrency(val) {
   return n.toLocaleString(undefined, { style: "currency", currency: "USD" });
 }
 
-/** Block scientific-notation keys on type=number inputs (browsers allow e/E by default). */
+/** Block scientific-notation keys on type=number inputs and auto-select on focus. */
 function bindNumberInput(input) {
+  input.addEventListener("focus", () => { input.select(); });
   input.addEventListener("keydown", e => {
     if (e.key === "e" || e.key === "E") e.preventDefault();
   });

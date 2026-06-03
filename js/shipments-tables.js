@@ -634,7 +634,7 @@ function isToolbarCreateActionBlocked() {
 }
 
 function hideToolbarCreateButtons() {
-  ["exfRequestBtn", "asnRequestBtn", "deliveryRequestBtn", "pickupRequestBtn", "createShipmentBtn"].forEach(id => {
+  ["batchEditBtn", "exfRequestBtn", "asnRequestBtn", "deliveryRequestBtn", "pickupRequestBtn", "createShipmentBtn"].forEach(id => {
     const btn = document.getElementById(id);
     if (btn) btn.hidden = true;
   });
@@ -660,4 +660,5 @@ function updateToolbarRequestButtons() {
   if (typeof updateDeliveryRequestButton === "function") updateDeliveryRequestButton();
   if (typeof updatePickupRequestButton === "function") updatePickupRequestButton();
   updateCreateShipmentButton();
+  if (typeof updateBatchEditButton === "function") updateBatchEditButton();
 }

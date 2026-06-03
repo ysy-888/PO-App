@@ -485,6 +485,7 @@ select.filter-select:focus { border-color: var(--accent); }
 }
 
 #createShipmentBtn[hidden],
+#batchEditBtn[hidden],
 #deleteShipmentBtn[hidden],
 #deleteChargebackBtn[hidden] {
   display: none !important;
@@ -711,6 +712,12 @@ table {
   table-layout: fixed;
 }
 
+/* separate borders required for position:sticky on thead cells */
+.table-scroll-y table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
 #chargebackTable {
   min-width: 2140px;
 }
@@ -809,11 +816,10 @@ table {
   width: 128px;
 }
 
-thead {
+.table-scroll-y table thead th {
   position: sticky;
-  top: 0px;
+  top: 0;
   z-index: 50;
-  background: var(--header-bg);
 }
 
 th {
@@ -2525,13 +2531,28 @@ td.n41-status-mismatch {
 }
 
 #modalOverlay .modal-layout--packing-open {
-  grid-template-columns: max-content max-content;
+  grid-template-columns: minmax(0, 1fr) max-content;
   gap: 18px;
-  align-items: stretch;
+  align-items: start;
+  width: 100%;
+  max-width: none;
 }
 
 #modalOverlay .modal-layout--packing-open .modal-layout-main {
-  flex-shrink: 0;
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: none;
+}
+
+#modalOverlay .modal-card.modal-card--packing-open {
+  width: calc(100vw - 32px);
+  max-width: calc(100vw - 32px);
+}
+
+#modalOverlay .modal-card.modal-card--packing-open .modal-body {
+  width: 100%;
+  max-width: none;
+  overflow: visible;
 }
 
 #modalOverlay .modal-layout-photos .modal-style-photos {
@@ -2817,6 +2838,11 @@ td.n41-status-mismatch {
   max-width: 100%;
 }
 
+#modalOverlay .modal-layout.modal-layout--packing-open {
+  width: 100%;
+  max-width: none;
+}
+
 #modalOverlay .modal-top-split {
   grid-template-columns: max-content max-content;
   width: max-content;
@@ -2852,6 +2878,11 @@ td.n41-status-mismatch {
   align-items: flex-start;
   width: max-content;
   max-width: 100%;
+}
+
+#modalOverlay .modal-layout--packing-open .modal-layout-main {
+  width: auto;
+  max-width: none;
 }
 
 .modal-layout-photos {
@@ -3416,6 +3447,7 @@ td.n41-status-mismatch {
 
 .packing-list-editor .modal-block--freight {
   min-width: 0;
+  margin-top: 0;
   overflow: hidden;
 }
 
@@ -3965,23 +3997,23 @@ td.n41-status-mismatch {
 
 .packing-list-side-panel {
   width: max-content;
-  min-width: 0;
-  max-width: 42vw;
+  max-width: min(1120px, calc(100vw - 360px));
   min-height: 0;
-  align-self: stretch;
+  align-self: start;
   padding-left: 18px;
   border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
 }
 
 .packing-list-editor {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  min-width: 0;
-  width: max-content;
-  max-width: 100%;
+  min-width: 100%;
+  width: 100%;
+  max-width: none;
   height: 100%;
   min-height: 0;
   flex: 1 1 auto;
@@ -4173,29 +4205,32 @@ td.n41-status-mismatch {
 .packing-list-grid-panel {
   flex: 1;
   min-height: 0;
-  min-width: 0;
-  width: max-content;
-  max-width: 100%;
+  min-width: 100%;
+  width: 100%;
+  max-width: none;
   align-self: flex-start;
   display: flex;
   flex-direction: column;
   gap: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .packing-list-grid-wrap {
-  width: max-content;
-  max-width: 100%;
-  min-width: 0;
-  overflow-x: auto;
+  width: 100%;
+  max-width: none;
+  min-width: 100%;
+  overflow: visible;
 }
 
+/* overflow-y:auto forces overflow-x:auto unless width fits content (CSS spec) */
 .packing-list-grid-scroll {
   flex: 1;
   min-height: 0;
   max-height: 480px;
+  width: 100%;
+  min-width: 100%;
   overflow-y: auto;
-  overflow-x: visible;
+  overflow-x: hidden;
   scrollbar-gutter: stable;
 }
 
@@ -4213,7 +4248,7 @@ td.n41-status-mismatch {
     var(--packing-weight-width);
   gap: 5px var(--packing-gap);
   align-items: center;
-  width: max-content;
+  width: 100%;
 }
 
 .packing-list-grid--head {
@@ -4889,6 +4924,40 @@ td.n41-status-mismatch {
   max-width: 1320px;
   max-height: calc(100vh - 48px);
   overflow: hidden;
+}
+
+.batch-edit-modal-card {
+  width: min(480px, calc(100vw - 40px));
+}
+
+.batch-edit-help {
+  margin: 0 0 14px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.batch-edit-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.batch-edit-modal-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.batch-edit-modal-footer .btn-primary {
+  margin-left: auto;
+}
+
+@media (max-width: 560px) {
+  .batch-edit-fields {
+    grid-template-columns: 1fr;
+  }
 }
 
 .shipment-modal-card--add-panel-open {
@@ -6059,4 +6128,59 @@ th.th-shipment-id-col.th-filterable.sorted-desc {
   .pl-print-po-section {
     page-break-inside: avoid;
   }
+}
+
+/* Packing list side panel: explicit layout (also sized in modal.js) */
+#modalOverlay .modal-card.modal-card--packing-open {
+  width: calc(100vw - 32px) !important;
+  max-width: calc(100vw - 32px) !important;
+}
+
+#modalOverlay .modal-layout.modal-layout--packing-open {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+#modalOverlay .modal-layout--packing-open .packing-list-side-panel {
+  flex: 0 0 auto !important;
+  max-width: none !important;
+}
+
+#modalOverlay .packing-list-side-panel .packing-list-editor {
+  width: max-content;
+  max-width: 100%;
+  min-width: 0;
+  height: auto;
+  flex: 0 0 auto;
+}
+
+#modalOverlay .packing-list-side-panel .packing-list-grid-panel {
+  flex: 0 0 auto;
+  min-height: 0;
+  width: max-content;
+  max-width: 100%;
+}
+
+#modalOverlay .packing-list-side-panel .packing-list-grid-wrap,
+#modalOverlay .packing-list-side-panel .packing-list-grid-scroll {
+  overflow-x: visible !important;
+}
+
+#modalOverlay .packing-list-side-panel .packing-list-grid-wrap {
+  width: max-content;
+  max-width: 100%;
+  min-width: 0;
+}
+
+#modalOverlay .packing-list-side-panel .packing-list-grid-scroll {
+  flex: 0 0 auto;
+  width: max-content;
+  max-width: 100%;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+#modalOverlay .packing-list-side-panel .packing-list-grid {
+  width: max-content;
+  max-width: 100%;
 }

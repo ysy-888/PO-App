@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>PO Table</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-<link rel="stylesheet" href="po-table.css" />
+<link rel="stylesheet" href="po-table.css?v=20260603-1" />
 </head>
 <body>
 
@@ -74,6 +74,10 @@
   </div>
 
   <div class="toolbar-end">
+    <button type="button" class="btn btn-secondary" id="batchEditBtn" hidden>
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><path d="M8 4v16"/></svg>
+      Batch edit
+    </button>
     <button type="button" class="btn btn-secondary" id="exfRequestBtn" hidden>
       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h5"/></svg>
       EXF Request
@@ -611,6 +615,38 @@
   </div>
 </div>
 
+<div id="batchEditOverlay" class="modal-backdrop">
+  <div class="modal-card batch-edit-modal-card" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-header-main">
+        <h3>Batch edit</h3>
+      </div>
+      <div class="modal-header-actions">
+        <span id="batchEditPoCount" class="shipment-modal-po-count"></span>
+        <button type="button" class="btn-close" id="batchEditCloseBtn" aria-label="Close">✕</button>
+      </div>
+    </div>
+    <div class="modal-body" id="batchEditBody">
+      <p class="batch-edit-help">Choose fields to apply to the selected POs. Leave a field as No change to skip it.</p>
+      <div class="batch-edit-fields">
+        <div class="shipment-form-field">
+          <label class="shipment-form-label" for="batchEditStatusSelect">Status</label>
+          <select class="shipment-form-input" id="batchEditStatusSelect"></select>
+        </div>
+        <div class="shipment-form-field">
+          <label class="shipment-form-label" for="batchEditShipMethodSelect">Ship Method</label>
+          <select class="shipment-form-input" id="batchEditShipMethodSelect"></select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer batch-edit-modal-footer">
+      <div id="batchEditFooterMessage" class="modal-footer-message" role="status" aria-live="polite" hidden></div>
+      <button type="button" class="btn btn-primary" id="batchEditApplyBtn">Apply</button>
+      <button type="button" class="btn" id="batchEditCancelBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <div id="createShipmentOverlay" class="modal-backdrop">
   <div class="modal-card shipment-modal-card" onclick="event.stopPropagation()">
     <div class="modal-header">
@@ -922,6 +958,7 @@
 <script src="js/cell-edit.js"></script>
 <script src="js/modal.js"></script>
 <script src="js/save.js"></script>
+<script src="js/batch-edit.js"></script>
 <script src="js/main.js"></script>
 <script src="js/shipments-tables.js"></script>
 <script src="js/shipments-modals.js"></script>

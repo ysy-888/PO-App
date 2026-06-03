@@ -3721,22 +3721,103 @@ function vendorPortalGetPos(sessionId, token) {
       String(row["Status"] ?? "").trim().toLowerCase() !== "closed"
     );
 
-    const packingPoSet = getPackingListPoSet_();
+    // Build packing list maps: packingListId by PO, then cartons by packingListId
+    const packingListsSheet = getPackingListsSheet_();
+    const packingCartonsSheet = getPackingCartonsSheet_();
+    const packingLists = sheetToObjects_(packingListsSheet, PACKING_LIST_ID_FIELD);
+    const allCartons = sheetToObjects_(packingCartonsSheet, PACKING_LIST_ID_FIELD);
+
+    const packingListByPo = {};
+    packingLists.forEach(pl => {
+      const po = String(pl["PO #"] ?? "").trim();
+      if (po && !packingListByPo[po]) packingListByPo[po] = pl;
+    });
+
+    const cartonsByListId = {};
+    allCartons.forEach(carton => {
+      const id = String(carton[PACKING_LIST_ID_FIELD] ?? "").trim();
+      if (!id) return;
+      if (!cartonsByListId[id]) cartonsByListId[id] = [];
+      cartonsByListId[id].push(carton);
+    });
+
+    const pendingSheet = getPendingPackingListsSheet_();
+    const pendingLists = sheetToObjects_(pendingSheet, PENDING_PACKING_LIST_ID_FIELD);
+    const pendingByPo = {};
+    pendingLists.forEach(entry => {
+      if (String(entry["Status"] ?? "").trim().toLowerCase() !== "pending") return;
+      if (String(entry["Vendor"] ?? "").trim().toLowerCase() !== vendorKey) return;
+      const poKey = String(entry["PO #"] ?? "").trim();
+      if (!poKey) return;
+      const submittedAt = entry["Submitted At"];
+      const existing = pendingByPo[poKey];
+      if (!existing || (submittedAt && new Date(submittedAt) > new Date(existing["Submitted At"] || 0))) {
+        pendingByPo[poKey] = entry;
+      }
+    });
+
     const pos = vendorPos.map(row => {
       const po = String(row["PO #"] ?? "").trim();
       const sizeLabels = [];
+      const poUnits = [];
       for (let i = 1; i <= 15; i++) {
         const label = String(row["Size " + i] ?? "").trim();
-        if (label) sizeLabels.push(label);
+        if (label) {
+          sizeLabels.push(label);
+          poUnits.push(toPackingQty_(row["PO Unit " + i]) || 0);
+        }
       }
+      const pl = packingListByPo[po];
+      const plId = pl ? String(pl[PACKING_LIST_ID_FIELD] ?? "").trim() : "";
+      const pending = pendingByPo[po];
+      const hasPendingSubmission = !!pending;
+      let existingCartons = plId ? (cartonsByListId[plId] || []) : [];
+      if (hasPendingSubmission && existingCartons.length === 0) {
+        try {
+          existingCartons = JSON.parse(String(pending["Cartons JSON"] ?? "[]"));
+        } catch (_) {
+          existingCartons = [];
+        }
+      }
+
+      // Actual units per size from PO row (written by savePackingListCore_)
+      const actUnits = sizeLabels.map((_, i) => toPackingQty_(row["Act Unit " + (i + 1)]) || 0);
+
       return {
         "PO #": po,
         "Style #": String(row["Style #"] ?? "").trim(),
         "Color": String(row["Color"] ?? "").trim(),
         "Status": String(row["Status"] ?? "").trim(),
+        "Buyer": String(row["Buyer"] ?? "").trim(),
+        "Buyer PO #": String(row["Buyer PO #"] ?? "").trim(),
         "PO Qty": row["PO Qty"] ?? "",
+        "Actual Qty": toPackingQty_(row["Actual Qty"]) || 0,
+        "Ctn Qty": toPackingQty_(row["Ctn Qty"]) || 0,
+        "EST EXF": row["EST EXF"] ? String(row["EST EXF"]) : "",
+        "EXF Request ID": String(row[EXF_REQUEST_ID_FIELD] ?? "").trim(),
+        "EXF Request Date": row[EXF_REQUEST_DATE_FIELD] ? String(row[EXF_REQUEST_DATE_FIELD]) : "",
+        "EXF Req Date": row[EXF_REQ_DATE_FIELD] ? String(row[EXF_REQ_DATE_FIELD]) : "",
+        "EXF Memo": String(row[EXF_MEMO_FIELD] ?? "").trim(),
         "sizeLabels": sizeLabels,
-        "hasPackingList": packingPoSet.has(po),
+        "poUnits": poUnits,
+        "actUnits": actUnits,
+        "hasPackingList": !!pl,
+        "hasPendingSubmission": hasPendingSubmission,
+        "submittedAt": hasPendingSubmission
+          ? String(pending["Submitted At"] ?? "")
+          : (pl ? String(pl["Created At"] ?? "") : ""),
+        "cartonCount": pl
+          ? (toPackingQty_(pl["Carton Count"]) || 0)
+          : (hasPendingSubmission ? (toPackingQty_(pending["Carton Count"]) || 0) : 0),
+        "packingNotes": pl
+          ? String(pl["Notes"] ?? "").trim()
+          : (hasPendingSubmission ? String(pending["Notes"] ?? "").trim() : ""),
+        "existingCartons": existingCartons.map(c => {
+          const out = { "Carton #": c["Carton #"] };
+          PACKING_UNIT_FIELDS.forEach(f => { out[f] = toPackingQty_(c[f]) || ""; });
+          out["Carton Weight"] = c["Carton Weight"] ?? "";
+          return out;
+        }),
       };
     });
     return { success: true, vendor, pos };

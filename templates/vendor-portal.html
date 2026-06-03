@@ -3,125 +3,711 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Packing List Submission</title>
+<title>Packing List Portal</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; }
 
+  :root {
+    --bg: #f4f5f7;
+    --surface: #ffffff;
+    --border: #e5e7eb;
+    --border-strong: #d1d5db;
+    --text: #1a1a18;
+    --text-muted: #6b7280;
+    --accent: #1a1a18;
+    --accent-light: #f3f4f6;
+    --danger: #b91c1c;
+    --danger-bg: #fef2f2;
+    --danger-border: #fca5a5;
+    --success: #166534;
+    --success-bg: #f0fdf4;
+    --success-border: #86efac;
+    --info-bg: #eff6ff;
+    --info-border: #93c5fd;
+    --info-text: #1d4ed8;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --radius: 8px;
+    --shadow: 0 1px 4px rgba(0,0,0,0.07);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.10);
+  }
+
   body {
     margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: var(--font);
     font-size: 14px;
-    color: #1a1a18;
-    background: #f4f5f7;
+    color: var(--text);
+    background: var(--bg);
     min-height: 100vh;
   }
 
-  .page-header {
-    background: #1a1a18;
+  /* ── Header ── */
+  .portal-header {
+    background: var(--accent);
     color: #fff;
-    padding: 16px 24px;
-    display: flex;
-    align-items: baseline;
-    gap: 12px;
-  }
-  .page-header h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
-  .page-header .subtitle { font-size: 13px; color: #a0a8b0; }
-
-  .page-body { max-width: 820px; margin: 0 auto; padding: 24px 16px 48px; }
-
-  .card {
-    background: #fff;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    padding: 20px 24px;
-    margin-bottom: 20px;
-  }
-  .card-title { font-size: 15px; font-weight: 600; margin: 0 0 16px; }
-  .card-header-row {
+    padding: 0 24px;
+    height: 54px;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 16px;
+    gap: 16px;
+    flex-shrink: 0;
   }
-  .card-header-row .card-title { margin: 0; flex: 1; min-width: 0; }
-
-  label { font-weight: 500; display: block; margin-bottom: 6px; }
-
-  select, input[type="text"], input[type="number"], textarea {
-    width: 100%;
-    border: 1px solid #d1d5db;
-    border-radius: 5px;
-    padding: 8px 10px;
-    font-size: 14px;
-    font-family: inherit;
-    background: #fff;
-    color: #1a1a18;
-    outline: none;
-    transition: border-color 0.15s;
+  .portal-header-brand {
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
   }
-  select:focus, input:focus, textarea:focus { border-color: #6b7280; }
+  .portal-header-sep { color: #555; }
+  .portal-header-subtitle { font-size: 13px; color: #a0a8b0; }
+  .portal-header-vendor {
+    margin-left: auto;
+    font-size: 13px;
+    color: #d1d5db;
+  }
+  .portal-header-vendor strong { color: #fff; }
 
-  .form-field { margin-bottom: 14px; }
+  /* ── Main layout ── */
+  .portal-body {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 54px);
+    overflow: hidden;
+  }
 
-  .po-meta { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: #374151; margin-bottom: 4px; }
-  .po-meta span { background: #f3f4f6; border-radius: 4px; padding: 3px 8px; }
+  .portal-tabs-summary {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    padding: 6px 0;
+  }
+  .summary-counter {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+  }
+  .summary-counter__num {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .summary-counter__label {
+    font-size: 12px;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+  .summary-counter--exf .summary-counter__num { color: #c2410c; }
+  .summary-counter--wip .summary-counter__num { color: #1d4ed8; }
+  .summary-counter--submitted .summary-counter__num { color: #166534; }
+  .summary-sep {
+    width: 1px;
+    height: 24px;
+    background: var(--border);
+    flex-shrink: 0;
+  }
 
-  /* Carton table */
-  .carton-table-wrap { overflow-x: auto; }
-  table.carton-table {
+  /* ── Tabs ── */
+  .portal-tabs {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 20px;
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    flex-shrink: 0;
+  }
+  .portal-tab {
+    padding: 10px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color 0.12s, border-color 0.12s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .portal-tab:hover:not(.is-active) { color: var(--text); }
+  .portal-tab.is-active {
+    color: var(--text);
+    border-bottom-color: var(--text);
+  }
+  .portal-tab-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    font-size: 11px;
+    font-weight: 600;
+    background: var(--accent-light);
+    color: var(--text-muted);
+  }
+  .portal-tab.is-active .portal-tab-badge {
+    background: #e8e8e0;
+    color: var(--text);
+  }
+
+  /* ── Split content area ── */
+  .portal-content {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  .po-list-pane {
+    flex: 1;
+    overflow-y: auto;
+    min-width: 0;
+    padding: 0;
+  }
+
+  .packing-pane {
+    --packing-pane-width: 480px;
+    flex: 0 0 auto;
+    width: var(--packing-pane-width);
+    min-width: 0;
+    min-height: 0;
+    max-width: 560px;
+    border-left: 1px solid var(--border);
+    background: var(--surface);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+  .packing-pane[hidden] { display: none !important; }
+
+  /* ── PO Table ── */
+  .po-table-wrap {
+    overflow-x: auto;
+    padding: 16px 16px 0;
+  }
+  .po-table {
     width: 100%;
     border-collapse: collapse;
     font-size: 13px;
-    min-width: 400px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    min-width: 680px;
   }
-  .carton-table th {
+  .po-table th {
     background: #f7f7f8;
-    border-bottom: 2px solid #e5e7eb;
+    border-bottom: 2px solid var(--border);
     padding: 8px 10px;
-    text-align: center;
+    text-align: left;
+    font-weight: 600;
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .po-table td {
+    border-bottom: 1px solid var(--border);
+    padding: 8px 10px;
+    vertical-align: top;
+  }
+  .po-table tbody tr:last-child td { border-bottom: none; }
+  .po-table tbody tr {
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .po-table tbody tr:hover { background: #f9fafb; }
+  .po-table tbody tr.is-selected { background: #f0f4ff; }
+  .po-table tbody tr.is-selected:hover { background: #e8eefb; }
+
+  .po-num { font-weight: 600; color: var(--text); }
+  .po-secondary { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+  /* Per-size qty cells */
+  .size-qty-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .size-qty-chip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 36px;
+    background: #f7f7f8;
+    border-radius: 4px;
+    padding: 3px 5px;
+    border: 1px solid var(--border);
+  }
+  .size-qty-chip__label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-muted);
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+  .size-qty-chip__po {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.4;
+  }
+  .size-qty-chip__act {
+    font-size: 11px;
+    color: var(--success);
+    font-weight: 500;
+    line-height: 1.3;
+    min-height: 14px;
+  }
+
+  .pl-badge {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-size: 11px;
     font-weight: 600;
     white-space: nowrap;
-    font-size: 12px;
-    color: #374151;
   }
-  .carton-table th:first-child { text-align: left; }
-  .carton-table td {
-    border-bottom: 1px solid #e5e7eb;
-    padding: 4px 4px;
-    vertical-align: middle;
+  .pl-badge--done { background: #dcfce7; color: #166534; }
+  .pl-badge--none { background: #f3f4f6; color: #9ca3af; }
+
+  .exf-id-chip {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: monospace;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    color: #c2410c;
+    border-radius: 4px;
+    padding: 2px 6px;
+    white-space: nowrap;
   }
-  .carton-table td:first-child { padding-left: 10px; color: #6b7280; font-size: 12px; }
-  .carton-table input[type="number"] {
-    width: 68px;
-    padding: 5px 6px;
-    text-align: right;
-    font-size: 13px;
+
+  .empty-state {
+    padding: 56px 24px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 14px;
   }
-  .carton-table .weight-input { width: 80px; }
-  .carton-table .total-cell { text-align: right; padding-right: 10px; font-weight: 500; color: #374151; }
-  .carton-table .remove-btn {
+
+  /* ── Loading / Error ── */
+  .portal-loading {
+    padding: 48px 24px;
+    text-align: center;
+    color: var(--text-muted);
+  }
+
+  /* ── Packing List Pane ── */
+  .packing-pane-header {
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    background: var(--surface);
+    z-index: 2;
+  }
+  .packing-pane-title {
+    font-size: 14px;
+    font-weight: 700;
+    flex: 1;
+    min-width: 0;
+  }
+  .packing-pane-close {
     background: none;
     border: none;
     cursor: pointer;
-    color: #9ca3af;
+    color: var(--text-muted);
+    font-size: 18px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    line-height: 1;
+  }
+  .packing-pane-close:hover { background: #f3f4f6; color: var(--text); }
+
+  /* Menu button in packing pane header */
+  .packing-pane-menu-wrap {
+    position: relative;
+  }
+  .btn-icon-sm {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    cursor: pointer;
+    border-radius: 5px;
+    padding: 5px 7px;
+    color: var(--text-muted);
     font-size: 16px;
     line-height: 1;
-    padding: 2px 6px;
-    border-radius: 3px;
   }
-  .carton-table .remove-btn:hover { color: #ef4444; background: #fef2f2; }
-  .carton-table tfoot td {
+  .btn-icon-sm:hover { background: #f3f4f6; color: var(--text); }
+  .packing-pane-menu-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    min-width: 180px;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-md);
+    padding: 4px 0;
+    z-index: 100;
+  }
+  .packing-pane-menu-dropdown[hidden] { display: none; }
+  .packing-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 14px;
+    border: none;
+    background: transparent;
+    font-family: var(--font);
+    font-size: 13px;
+    color: var(--text);
+    text-align: left;
+    cursor: pointer;
+  }
+  .packing-menu-item:hover { background: #f3f4f6; }
+  .packing-menu-item--danger { color: var(--danger); }
+  .packing-menu-item--danger:hover { background: var(--danger-bg); }
+
+  /* PO summary card in packing pane */
+  .po-summary-card {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    background: #fafafa;
+    flex-shrink: 0;
+  }
+  .po-summary-row {
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+    margin-bottom: 4px;
+    flex-wrap: wrap;
+  }
+  .po-summary-row:last-child { margin-bottom: 0; }
+  .po-summary-label {
+    font-size: 11px;
+    color: var(--text-muted);
     font-weight: 600;
-    padding: 8px 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    min-width: 64px;
+    flex-shrink: 0;
+  }
+  .po-summary-value {
+    font-size: 13px;
+    color: var(--text);
+    font-weight: 500;
+  }
+  .po-summary-totals {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+  }
+  .po-summary-size-totals {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    margin-top: 4px;
+  }
+  .po-summary-size-total-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-width: 36px;
+  }
+  .po-summary-size-total-item__label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .po-summary-size-total-item__num {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+  .po-summary-total-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .po-summary-total-item__num {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1;
+  }
+  .po-summary-total-item__label {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  /* Packing editor inner section */
+  .packing-editor-section {
+    padding: 14px 16px 16px;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    overflow: hidden;
+    position: relative;
+  }
+  .packing-editor-main {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow: hidden;
+  }
+  .packing-editor-footer {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-top: 12px;
+    margin-top: 12px;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  /* Carton count stepper */
+  .carton-count-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .carton-count-row label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    flex: 1;
+    min-width: 0;
+  }
+  .count-stepper {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .count-step-btn {
+    background: #f3f4f6;
+    border: none;
+    cursor: pointer;
+    padding: 5px 10px;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-muted);
+    line-height: 1;
+    transition: background 0.1s;
+  }
+  .count-step-btn:hover:not(:disabled) { background: #e5e7eb; color: var(--text); }
+  .count-step-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .count-stepper-input {
+    width: 46px;
+    text-align: center;
+    border: none;
+    border-left: 1px solid var(--border-strong);
+    border-right: 1px solid var(--border-strong);
+    padding: 5px 4px;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: var(--font);
+    outline: none;
+    background: #fff;
+    color: var(--text);
+  }
+  .count-stepper-input:focus { background: #f0f4ff; }
+
+  /* Carton grid — CSS grid rows for aligned columns */
+  .carton-grid-wrap {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    --carton-grid-cols: 28px 10px 46px 10px 42px 72px;
+  }
+  .carton-grid-head-wrap {
+    flex-shrink: 0;
+    overflow: hidden;
     background: #f7f7f8;
-    border-top: 2px solid #e5e7eb;
+    border-bottom: 2px solid var(--border);
+  }
+  .carton-grid-head,
+  .carton-grid-row {
+    display: grid;
+    grid-template-columns: var(--carton-grid-cols);
+    align-items: center;
+    width: var(--carton-grid-width, 100%);
+    max-width: 100%;
+  }
+  .carton-grid-head > *,
+  .carton-grid-row > * {
+    min-width: 0;
+    text-align: center;
+  }
+  .carton-grid-head > * {
+    padding: 5px 2px;
+    font-weight: 600;
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .carton-grid-row {
+    border-bottom: 1px solid var(--border);
+  }
+  .carton-grid-row:last-child {
+    border-bottom: none;
+  }
+  .carton-grid-row > * {
+    padding: 3px 2px;
+  }
+  .carton-grid-gap {
+    padding: 0;
+  }
+  .carton-grid-num {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+  .carton-grid-body-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  .carton-grid-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 4px 2px;
+    text-align: center;
+    font-size: 12px;
+    font-family: var(--font);
+    font-variant-numeric: tabular-nums;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.12s, background 0.12s;
+  }
+  .carton-grid-input:hover { border-color: var(--border-strong); background: #fff; }
+  .carton-grid-input:focus { border-color: #6b7280; background: #fff; }
+  .carton-grid-total {
+    font-weight: 600;
+    color: var(--text);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+  .carton-weight-field {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    max-width: 100%;
+  }
+  .carton-weight-input {
+    width: 3.5em;
+    min-width: 0;
+    flex: 0 1 auto;
+    padding: 4px 2px;
     text-align: right;
     font-size: 12px;
-    color: #374151;
+    font-family: var(--font);
+    font-variant-numeric: tabular-nums;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.12s, background 0.12s;
+    -moz-appearance: textfield;
+    appearance: textfield;
   }
-  .carton-table tfoot td:first-child { text-align: left; }
+  .carton-weight-input::-webkit-outer-spin-button,
+  .carton-weight-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    appearance: none;
+    margin: 0;
+  }
+  .carton-weight-input:hover { border-color: var(--border-strong); background: #fff; }
+  .carton-weight-input:focus { border-color: #6b7280; background: #fff; }
+  .carton-weight-suffix {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
 
+  /* Notes + submit */
+  .notes-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .notes-field label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .notes-field textarea {
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    padding: 7px 9px;
+    font-size: 13px;
+    font-family: var(--font);
+    color: var(--text);
+    resize: none;
+    min-height: 56px;
+    outline: none;
+  }
+  .notes-field textarea:focus { border-color: #6b7280; }
+
+  .submit-bar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding-top: 4px;
+    width: 100%;
+  }
+  .submit-bar .btn-primary {
+    min-width: 120px;
+    justify-content: center;
+  }
+
+  /* Buttons */
   .btn {
     display: inline-flex;
     align-items: center;
@@ -130,405 +716,374 @@
     border-radius: 6px;
     border: none;
     cursor: pointer;
-    font-size: 14px;
-    font-family: inherit;
+    font-size: 13px;
+    font-family: var(--font);
     font-weight: 500;
-    transition: background 0.15s, opacity 0.15s;
+    transition: background 0.12s, opacity 0.12s;
   }
   .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-  .btn-primary { background: #1a1a18; color: #fff; }
+  .btn-primary { background: var(--accent); color: #fff; }
   .btn-primary:hover:not(:disabled) { background: #333; }
-  .btn-secondary { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
-  .btn-secondary:hover:not(:disabled) { background: #e5e7eb; }
-  .btn-danger { background: #fef2f2; color: #b91c1c; border: 1px solid #fca5a5; }
-  .btn-danger:hover:not(:disabled) { background: #fee2e2; }
-
-  .submit-row { margin-top: 24px; display: flex; align-items: center; gap: 16px; }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
 
   .status-msg {
-    padding: 10px 14px;
+    padding: 8px 12px;
     border-radius: 6px;
-    font-size: 13px;
-    margin-bottom: 16px;
+    font-size: 12px;
     display: none;
+    flex-shrink: 0;
   }
   .status-msg.show { display: block; }
-  .status-msg.error { background: #fef2f2; border: 1px solid #fca5a5; color: #b91c1c; }
-  .status-msg.success { background: #f0fdf4; border: 1px solid #86efac; color: #166534; }
-  .status-msg.info { background: #eff6ff; border: 1px solid #93c5fd; color: #1d4ed8; }
+  .status-msg.error { background: var(--danger-bg); border: 1px solid var(--danger-border); color: var(--danger); }
+  .status-msg.success { background: var(--success-bg); border: 1px solid var(--success-border); color: var(--success); }
+  .status-msg.info { background: var(--info-bg); border: 1px solid var(--info-border); color: var(--info-text); }
 
-  .confirmation-box {
-    text-align: center;
-    padding: 40px 20px;
-    display: none;
+  /* Multi-carton modal */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
-  .confirmation-box.show { display: block; }
-  .confirmation-box h2 { font-size: 20px; margin: 0 0 8px; }
-  .confirmation-box p { color: #6b7280; margin: 0; }
-  .check-icon { font-size: 48px; margin-bottom: 12px; }
-
-  .loading-state { text-align: center; padding: 40px; color: #6b7280; }
-
-  .badge {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 12px;
-    font-size: 11px;
+  .modal-overlay[hidden] { display: none; }
+  .modal-box {
+    background: var(--surface);
+    border-radius: 10px;
+    box-shadow: var(--shadow-md);
+    padding: 20px 22px 18px;
+    width: 340px;
+    max-width: 95vw;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .modal-title {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 14px;
+  }
+  .modal-field {
+    margin-bottom: 12px;
+  }
+  .modal-field label {
+    display: block;
+    font-size: 12px;
     font-weight: 600;
+    color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.04em;
+    margin-bottom: 4px;
   }
-  .badge-has-pl { background: #dcfce7; color: #166534; }
-  .badge-no-pl { background: #f3f4f6; color: #6b7280; }
+  .modal-field input[type="number"] {
+    width: 100%;
+    border: 1px solid var(--border-strong);
+    border-radius: 5px;
+    padding: 7px 9px;
+    font-size: 13px;
+    font-family: var(--font);
+    outline: none;
+  }
+  .modal-field input[type="number"]:focus { border-color: #6b7280; }
+  .modal-size-fields {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+  .modal-size-item label { font-size: 11px; }
+  .modal-footer {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 16px;
+  }
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    color: var(--text);
+  }
+  .btn-ghost:hover { background: var(--accent-light); }
 
-  @media (max-width: 520px) {
-    .page-body { padding: 12px 8px 40px; }
-    .card { padding: 16px 12px; }
+  /* Confirmation overlay */
+  .confirmation-overlay {
+    display: none;
+    position: absolute;
+    inset: 0;
+    padding: 40px 20px;
+    text-align: center;
+    background: var(--surface);
+    z-index: 10;
+  }
+  .confirmation-overlay.show { display: block; }
+  .confirmation-overlay h2 { font-size: 18px; margin: 0 0 8px; }
+  .confirmation-overlay p { color: var(--text-muted); margin: 0; font-size: 13px; }
+  .check-icon { font-size: 44px; margin-bottom: 10px; }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+
+  @media (max-width: 640px) {
+    .packing-pane { flex: 1; width: 100% !important; max-width: none; min-width: unset; border-left: none; border-top: 1px solid var(--border); }
+    .portal-content { flex-direction: column; }
+    .po-list-pane { overflow-y: visible; }
+    .portal-tabs-summary { display: none; }
   }
 </style>
 </head>
 <body>
 
-<header class="page-header">
-  <h1>Elevator Disco</h1>
-  <span class="subtitle">Vendor Packing List Portal</span>
+<header class="portal-header">
+  <span class="portal-header-brand">Elevator Disco</span>
+  <span class="portal-header-sep">|</span>
+  <span class="portal-header-subtitle">Vendor Packing List Portal</span>
+  <span class="portal-header-vendor">Logged in as <strong id="headerVendorName"></strong></span>
 </header>
 
-<div class="page-body">
+<div class="portal-body">
+  <!-- Loading -->
+  <div class="portal-loading" id="loadingState">Loading your POs&hellip;</div>
 
-  <div class="card" id="vendorCard">
-    <p style="margin:0;color:#374151;">
-      Logged in as <strong><?= vendorName ?></strong>
-    </p>
-  </div>
-
-  <!-- Loading state -->
-  <div class="card loading-state" id="loadingCard">
-    Loading your POs&hellip;
-  </div>
-
-  <!-- PO selection form (hidden until POs load) -->
-  <div id="formSection" style="display:none">
-    <div class="card">
-      <h2 class="card-title">Select a Purchase Order</h2>
-      <div class="form-field">
-        <label for="poSelect">PO #</label>
-        <select id="poSelect">
-          <option value="">— select a PO —</option>
-        </select>
-      </div>
-      <div id="poMeta" style="display:none" class="po-meta"></div>
-    </div>
-
-    <div class="card" id="cartonCard" style="display:none">
-      <div class="card-header-row">
-        <h2 class="card-title">Packing List</h2>
-        <button type="button" class="btn btn-secondary" id="addCartonBtn">+ Add carton</button>
-      </div>
-
-      <div id="statusMsg" class="status-msg"></div>
-
-      <div class="carton-table-wrap">
-        <table class="carton-table" id="cartonTable">
-          <thead>
-            <tr id="cartonHeaderRow"></tr>
-          </thead>
-          <tbody id="cartonBody"></tbody>
-          <tfoot>
-            <tr id="cartonTotalsRow"></tr>
-          </tfoot>
-        </table>
-      </div>
-
-      <div class="form-field" style="margin-top:16px">
-        <label for="notesInput">Notes (optional)</label>
-        <textarea id="notesInput" rows="2" placeholder="Any notes for this packing list…"></textarea>
-      </div>
-
-      <div class="submit-row">
-        <button type="button" class="btn btn-primary" id="submitBtn">Submit packing list</button>
-        <span id="submitSpinner" style="display:none;color:#6b7280;font-size:13px">Submitting&hellip;</span>
+  <!-- Main app (hidden until loaded) -->
+  <div id="appRoot" style="display:none; flex-direction:column; height:100%; overflow:hidden;">
+    <!-- Tabs + summary counts -->
+    <div class="portal-tabs">
+      <button class="portal-tab is-active" id="tabExf" data-tab="exf">
+        EXF <span class="portal-tab-badge" id="badgeExf">0</span>
+      </button>
+      <button class="portal-tab" id="tabWip" data-tab="wip">
+        WIP <span class="portal-tab-badge" id="badgeWip">0</span>
+      </button>
+      <button class="portal-tab" id="tabSubmitted" data-tab="submitted">
+        Submitted <span class="portal-tab-badge" id="badgeSubmitted">0</span>
+      </button>
+      <div class="portal-tabs-summary">
+        <div class="summary-counter">
+          <span class="summary-counter__num" id="countAll">0</span>
+          <span class="summary-counter__label">Total POs</span>
+        </div>
+        <div class="summary-sep"></div>
+        <div class="summary-counter summary-counter--exf">
+          <span class="summary-counter__num" id="countExf">0</span>
+          <span class="summary-counter__label">EXF Requested</span>
+        </div>
+        <div class="summary-sep"></div>
+        <div class="summary-counter summary-counter--wip">
+          <span class="summary-counter__num" id="countWip">0</span>
+          <span class="summary-counter__label">WIP</span>
+        </div>
+        <div class="summary-sep"></div>
+        <div class="summary-counter summary-counter--submitted">
+          <span class="summary-counter__num" id="countSubmitted">0</span>
+          <span class="summary-counter__label">Submitted</span>
+        </div>
       </div>
     </div>
-  </div>
 
-  <!-- Confirmation (shown after submit) -->
-  <div class="card confirmation-box" id="confirmationBox">
-    <div class="check-icon">&#10003;</div>
-    <h2>Packing list submitted!</h2>
-    <p id="confirmationMsg"></p>
-    <div style="margin-top:20px">
-      <button type="button" class="btn btn-secondary" id="submitAnotherBtn">Submit another PO</button>
+    <!-- Content: PO list + packing pane -->
+    <div class="portal-content">
+      <div class="po-list-pane" id="poListPane">
+        <div class="po-table-wrap" id="poTableWrap">
+          <!-- Table injected here -->
+        </div>
+      </div>
+
+      <!-- Packing list side panel -->
+      <div class="packing-pane" id="packingPane" hidden>
+        <div class="packing-pane-header">
+          <span class="packing-pane-title">Packing List</span>
+          <!-- Menu -->
+          <div class="packing-pane-menu-wrap">
+            <button class="btn-icon-sm" id="packingMenuBtn" title="More options">&#8943;</button>
+            <div class="packing-pane-menu-dropdown" id="packingMenuDropdown" hidden>
+              <button class="packing-menu-item" id="menuMultiCarton">&#10064; Multi Carton</button>
+              <button class="packing-menu-item packing-menu-item--danger" id="menuClearPacking">&#9003; Clear packing list</button>
+            </div>
+          </div>
+          <button class="packing-pane-close" id="packingPaneClose" title="Close">&#10005;</button>
+        </div>
+
+        <!-- PO summary -->
+        <div class="po-summary-card" id="poSummaryCard"></div>
+
+        <!-- Editor -->
+        <div class="packing-editor-section" id="packingEditorSection">
+          <div class="packing-editor-main">
+            <div id="packingStatusMsg" class="status-msg"></div>
+
+            <div class="carton-count-row">
+              <label for="cartonCountInput">Cartons</label>
+              <div class="count-stepper">
+                <button class="count-step-btn" id="cartonDecrBtn" type="button">&#8722;</button>
+                <input class="count-stepper-input" type="number" id="cartonCountInput" min="1" step="1" value="1" />
+                <button class="count-step-btn" id="cartonIncrBtn" type="button">&#43;</button>
+              </div>
+            </div>
+
+            <div class="carton-grid-wrap" id="cartonGridWrap">
+              <div class="carton-grid-head-wrap" id="cartonGridHeadWrap">
+                <div class="carton-grid-head" id="cartonGridHead"></div>
+              </div>
+              <div class="carton-grid-body-scroll" id="cartonGridScroll">
+                <div class="carton-grid-body" id="cartonGridBody"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="packing-editor-footer">
+            <div class="notes-field">
+              <label for="packingNotes">Notes</label>
+              <textarea id="packingNotes" rows="2" placeholder="Any notes…"></textarea>
+            </div>
+
+            <div class="submit-bar">
+              <button class="btn btn-primary" id="submitBtn" type="button">Submit</button>
+              <span id="submitSpinner" style="display:none; font-size:12px; color:#6b7280;">Submitting&hellip;</span>
+            </div>
+          </div>
+
+          <div class="confirmation-overlay" id="confirmationOverlay">
+            <div class="check-icon">&#10003;</div>
+            <h2>Submitted!</h2>
+            <p id="confirmationMsg"></p>
+            <div style="margin-top:16px">
+              <button class="btn btn-primary btn-sm" id="submitAnotherBtn" type="button">Submit another</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
+</div>
 
+<!-- Multi Carton Modal -->
+<div class="modal-overlay" id="multiCartonModal" hidden>
+  <div class="modal-box">
+    <div class="modal-title">Multi Carton</div>
+    <div id="multiCartonSizeFields" class="modal-size-fields"></div>
+    <div class="modal-field" style="margin-top:10px;">
+      <label>Number of Cartons</label>
+      <input type="number" id="multiCartonCount" min="1" step="1" value="1" />
+    </div>
+    <div class="modal-field">
+      <label>Weight per Carton (kg)</label>
+      <input type="number" id="multiCartonWeight" min="0" step="0.01" value="" placeholder="0.00" />
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" id="multiCartonCancel">Cancel</button>
+      <button class="btn btn-primary btn-sm" id="multiCartonApply">Apply</button>
+    </div>
+  </div>
 </div>
 
 <script>
 (function () {
+  "use strict";
+
+  // ── Bootstrap ─────────────────────────────────────────────
   const BOOT = JSON.parse(
     atob("<?= vendorPortalBootstrapB64 ?>".replace(/-/g, "+").replace(/_/g, "/"))
   );
   const SESSION_ID = BOOT.sessionId;
   const TOKEN = BOOT.token;
-  const VENDOR_NAME = BOOT.vendorName;
 
+  // ── State ─────────────────────────────────────────────────
   let allPos = [];
-  let sizeLabels = [];
-  let cartons = [];   // [{qty1, qty2, ..., weight}]
+  let activeTab = "exf";       // "exf" | "wip" | "submitted"
+  let selectedPo = null;       // current PO object
+  let cartons = [];            // working carton array [{u0..uN, weight}]
+  let sizeLabels = [];         // for selected PO
 
-  // ── DOM refs ───────────────────────────────────────────────
-  const loadingCard = document.getElementById("loadingCard");
-  const formSection = document.getElementById("formSection");
-  const poSelect = document.getElementById("poSelect");
-  const poMeta = document.getElementById("poMeta");
-  const cartonCard = document.getElementById("cartonCard");
-  const cartonHeaderRow = document.getElementById("cartonHeaderRow");
-  const cartonBody = document.getElementById("cartonBody");
-  const cartonTotalsRow = document.getElementById("cartonTotalsRow");
-  const addCartonBtn = document.getElementById("addCartonBtn");
-  const notesInput = document.getElementById("notesInput");
-  const submitBtn = document.getElementById("submitBtn");
-  const submitSpinner = document.getElementById("submitSpinner");
-  const statusMsg = document.getElementById("statusMsg");
-  const confirmationBox = document.getElementById("confirmationBox");
-  const confirmationMsg = document.getElementById("confirmationMsg");
-  const submitAnotherBtn = document.getElementById("submitAnotherBtn");
+  // ── DOM ───────────────────────────────────────────────────
+  const loadingState       = document.getElementById("loadingState");
+  const appRoot            = document.getElementById("appRoot");
+  const headerVendorName   = document.getElementById("headerVendorName");
+  const countAll           = document.getElementById("countAll");
+  const countExf           = document.getElementById("countExf");
+  const countWip           = document.getElementById("countWip");
+  const countSubmitted     = document.getElementById("countSubmitted");
+  const badgeExf           = document.getElementById("badgeExf");
+  const badgeWip           = document.getElementById("badgeWip");
+  const badgeSubmitted     = document.getElementById("badgeSubmitted");
+  const tabExf             = document.getElementById("tabExf");
+  const tabWip             = document.getElementById("tabWip");
+  const tabSubmitted       = document.getElementById("tabSubmitted");
+  const poTableWrap        = document.getElementById("poTableWrap");
+  const packingPane        = document.getElementById("packingPane");
+  const packingPaneClose   = document.getElementById("packingPaneClose");
+  const poSummaryCard      = document.getElementById("poSummaryCard");
+  const packingStatusMsg   = document.getElementById("packingStatusMsg");
+  const cartonCountInput   = document.getElementById("cartonCountInput");
+  const cartonDecrBtn      = document.getElementById("cartonDecrBtn");
+  const cartonIncrBtn      = document.getElementById("cartonIncrBtn");
+  const cartonGridWrap       = document.getElementById("cartonGridWrap");
+  const cartonGridHeadWrap   = document.getElementById("cartonGridHeadWrap");
+  const cartonGridScroll     = document.getElementById("cartonGridScroll");
+  const cartonGridHead       = document.getElementById("cartonGridHead");
+  const cartonGridBody       = document.getElementById("cartonGridBody");
+  const packingNotes       = document.getElementById("packingNotes");
+  const submitBtn          = document.getElementById("submitBtn");
+  const submitSpinner      = document.getElementById("submitSpinner");
+  const confirmationOverlay= document.getElementById("confirmationOverlay");
+  const confirmationMsg    = document.getElementById("confirmationMsg");
+  const submitAnotherBtn   = document.getElementById("submitAnotherBtn");
+  const packingMenuBtn     = document.getElementById("packingMenuBtn");
+  const packingMenuDropdown= document.getElementById("packingMenuDropdown");
+  const menuMultiCarton    = document.getElementById("menuMultiCarton");
+  const menuClearPacking   = document.getElementById("menuClearPacking");
+  const multiCartonModal   = document.getElementById("multiCartonModal");
+  const multiCartonCount   = document.getElementById("multiCartonCount");
+  const multiCartonWeight  = document.getElementById("multiCartonWeight");
+  const multiCartonApply   = document.getElementById("multiCartonApply");
+  const multiCartonCancel  = document.getElementById("multiCartonCancel");
+  const multiCartonSizeFields = document.getElementById("multiCartonSizeFields");
 
-  // ── Helpers ────────────────────────────────────────────────
-  function showMsg(text, type) {
-    statusMsg.textContent = text;
-    statusMsg.className = "status-msg show " + type;
-  }
-  function hideMsg() {
-    statusMsg.className = "status-msg";
-  }
-
+  // ── Helpers ───────────────────────────────────────────────
   function qty(val) {
     const n = Number(val);
     return Number.isFinite(n) && n > 0 ? n : 0;
+  }
+
+  function fmtDate(val) {
+    if (!val) return "";
+    try {
+      const d = new Date(val);
+      if (isNaN(d.getTime())) return String(val);
+      return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    } catch (_) { return String(val); }
+  }
+
+  function bindNumberInput(input) {
+    input.addEventListener("focus", () => { input.select(); });
+    input.addEventListener("keydown", e => {
+      if (e.key === "e" || e.key === "E") e.preventDefault();
+    });
+    input.addEventListener("beforeinput", e => {
+      if (e.data && /[eE]/.test(e.data)) e.preventDefault();
+    });
+  }
+
+  function fmtWeightKg(val) {
+    const n = Number(val);
+    if (!Number.isFinite(n) || n <= 0) return "0 kg";
+    const text = Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100);
+    return text + " kg";
   }
 
   function cartonTotal(c) {
     return sizeLabels.reduce((sum, _, i) => sum + qty(c["u" + i]), 0);
   }
 
-  // ── Build carton table header/footer ──────────────────────
-  function buildTableStructure() {
-    // Header
-    cartonHeaderRow.innerHTML = "";
-    const thNum = document.createElement("th");
-    thNum.textContent = "Carton #";
-    thNum.style.textAlign = "left";
-    cartonHeaderRow.appendChild(thNum);
-
-    sizeLabels.forEach(label => {
-      const th = document.createElement("th");
-      th.textContent = label;
-      cartonHeaderRow.appendChild(th);
-    });
-
-    const thTotal = document.createElement("th");
-    thTotal.textContent = "Total";
-    cartonHeaderRow.appendChild(thTotal);
-
-    const thWeight = document.createElement("th");
-    thWeight.textContent = "Weight (lbs)";
-    cartonHeaderRow.appendChild(thWeight);
-
-    const thRemove = document.createElement("th");
-    thRemove.setAttribute("aria-label", "Remove");
-    cartonHeaderRow.appendChild(thRemove);
-
-    // Footer totals row (rebuilt per-render)
-    buildTotalsRow();
+  function showPanelMsg(text, type) {
+    packingStatusMsg.textContent = text;
+    packingStatusMsg.className = "status-msg show " + type;
   }
-
-  function buildTotalsRow() {
-    cartonTotalsRow.innerHTML = "";
-    const tdLabel = document.createElement("td");
-    tdLabel.style.textAlign = "left";
-    tdLabel.textContent = "Total";
-    cartonTotalsRow.appendChild(tdLabel);
-
-    sizeLabels.forEach((_, i) => {
-      const td = document.createElement("td");
-      td.id = "colTotal_" + i;
-      td.style.textAlign = "right";
-      cartonTotalsRow.appendChild(td);
-    });
-
-    const tdGrand = document.createElement("td");
-    tdGrand.id = "grandTotal";
-    tdGrand.style.textAlign = "right";
-    cartonTotalsRow.appendChild(tdGrand);
-
-    const tdWeight = document.createElement("td");
-    tdWeight.id = "weightTotal";
-    tdWeight.style.textAlign = "right";
-    cartonTotalsRow.appendChild(tdWeight);
-
-    const tdSpacer = document.createElement("td");
-    cartonTotalsRow.appendChild(tdSpacer);
-
-    updateTotals();
+  function hidePanelMsg() {
+    packingStatusMsg.className = "status-msg";
   }
-
-  function updateTotals() {
-    sizeLabels.forEach((_, i) => {
-      const el = document.getElementById("colTotal_" + i);
-      if (!el) return;
-      const total = cartons.reduce((sum, c) => sum + qty(c["u" + i]), 0);
-      el.textContent = total > 0 ? total : "";
-    });
-    const grand = cartons.reduce((sum, c) => sum + cartonTotal(c), 0);
-    const grandEl = document.getElementById("grandTotal");
-    if (grandEl) grandEl.textContent = grand > 0 ? grand : "";
-
-    const totalWeight = cartons.reduce((sum, c) => sum + qty(c.weight), 0);
-    const weightEl = document.getElementById("weightTotal");
-    if (weightEl) weightEl.textContent = totalWeight > 0 ? totalWeight : "";
-  }
-
-  // ── Render carton rows ────────────────────────────────────
-  function renderCartons() {
-    cartonBody.innerHTML = "";
-    cartons.forEach((c, idx) => {
-      const tr = document.createElement("tr");
-
-      const tdNum = document.createElement("td");
-      tdNum.textContent = idx + 1;
-      tr.appendChild(tdNum);
-
-      sizeLabels.forEach((_, i) => {
-        const td = document.createElement("td");
-        const input = document.createElement("input");
-        input.type = "number";
-        input.min = "0";
-        input.step = "1";
-        input.value = c["u" + i] > 0 ? c["u" + i] : "";
-        input.placeholder = "0";
-        input.style.width = "68px";
-        input.style.textAlign = "right";
-        input.style.padding = "5px 6px";
-        input.style.fontSize = "13px";
-        input.addEventListener("input", () => {
-          c["u" + i] = qty(input.value);
-          updateTotals();
-        });
-        input.addEventListener("keydown", e => {
-          if (e.key === "e" || e.key === "E") e.preventDefault();
-        });
-        td.appendChild(input);
-        tr.appendChild(td);
-      });
-
-      // Total
-      const tdTotal = document.createElement("td");
-      tdTotal.className = "total-cell";
-      tdTotal.style.paddingRight = "10px";
-      tdTotal.style.fontWeight = "500";
-      tdTotal.style.textAlign = "right";
-      const updateRowTotal = () => {
-        const t = cartonTotal(c);
-        tdTotal.textContent = t > 0 ? t : "";
-      };
-      updateRowTotal();
-      // Re-bind so row total updates when unit inputs change
-      tr.querySelectorAll("input[type=number]").forEach(inp => {
-        inp.addEventListener("input", updateRowTotal);
-      });
-      tr.appendChild(tdTotal);
-
-      // Weight
-      const tdWeight = document.createElement("td");
-      const weightInput = document.createElement("input");
-      weightInput.type = "number";
-      weightInput.min = "0";
-      weightInput.step = "0.1";
-      weightInput.value = c.weight > 0 ? c.weight : "";
-      weightInput.placeholder = "0";
-      weightInput.style.width = "80px";
-      weightInput.style.textAlign = "right";
-      weightInput.style.padding = "5px 6px";
-      weightInput.style.fontSize = "13px";
-      weightInput.addEventListener("input", () => {
-        c.weight = qty(weightInput.value);
-        updateTotals();
-      });
-      weightInput.addEventListener("keydown", e => {
-        if (e.key === "e" || e.key === "E") e.preventDefault();
-      });
-      tdWeight.appendChild(weightInput);
-      tr.appendChild(tdWeight);
-
-      // Remove
-      const tdRemove = document.createElement("td");
-      if (cartons.length > 1) {
-        const removeBtn = document.createElement("button");
-        removeBtn.type = "button";
-        removeBtn.className = "remove-btn";
-        removeBtn.textContent = "×";
-        removeBtn.title = "Remove carton";
-        removeBtn.addEventListener("click", () => {
-          cartons.splice(idx, 1);
-          renderCartons();
-          updateTotals();
-        });
-        tdRemove.appendChild(removeBtn);
-      }
-      tr.appendChild(tdRemove);
-
-      cartonBody.appendChild(tr);
-    });
-
-    updateTotals();
-  }
-
-  // ── Add carton ────────────────────────────────────────────
-  addCartonBtn.addEventListener("click", () => {
-    const empty = {};
-    sizeLabels.forEach((_, i) => { empty["u" + i] = 0; });
-    empty.weight = 0;
-    cartons.push(empty);
-    renderCartons();
-  });
-
-  // ── PO selection ──────────────────────────────────────────
-  poSelect.addEventListener("change", () => {
-    const po = poSelect.value;
-    if (!po) {
-      poMeta.style.display = "none";
-      cartonCard.style.display = "none";
-      return;
-    }
-    const poRow = allPos.find(p => p["PO #"] === po);
-    if (!poRow) return;
-    hideMsg();
-
-    // Meta badges
-    poMeta.innerHTML = "";
-    if (poRow["Style #"]) { const s = document.createElement("span"); s.textContent = "Style: " + poRow["Style #"]; poMeta.appendChild(s); }
-    if (poRow["Color"]) { const s = document.createElement("span"); s.textContent = "Color: " + poRow["Color"]; poMeta.appendChild(s); }
-    if (poRow["PO Qty"]) { const s = document.createElement("span"); s.textContent = "PO Qty: " + poRow["PO Qty"]; poMeta.appendChild(s); }
-    if (poRow["Status"]) { const s = document.createElement("span"); s.textContent = "Status: " + poRow["Status"]; poMeta.appendChild(s); }
-    if (poRow.hasPackingList) {
-      const s = document.createElement("span");
-      s.textContent = "Has packing list";
-      s.style.background = "#dcfce7";
-      s.style.color = "#166534";
-      poMeta.appendChild(s);
-    }
-    poMeta.style.display = "flex";
-
-    // Build carton editor with this PO's size labels
-    sizeLabels = poRow.sizeLabels && poRow.sizeLabels.length ? poRow.sizeLabels : ["Units"];
-    cartons = [makeEmptyCarton()];
-    notesInput.value = "";
-    buildTableStructure();
-    renderCartons();
-    cartonCard.style.display = "";
-  });
 
   function makeEmptyCarton() {
     const c = {};
@@ -537,12 +1092,637 @@
     return c;
   }
 
+  function isSubmittedPo(p) {
+    return !!(p.hasPackingList || p.hasPendingSubmission);
+  }
+
+  // ── Counters ──────────────────────────────────────────────
+  function updateCounters() {
+    const exfPos = allPos.filter(p => p["Status"] === "Requested");
+    const wipPos = allPos.filter(p => p["Status"] === "WIP");
+    const submittedPos = allPos.filter(isSubmittedPo);
+    countAll.textContent = allPos.length;
+    countExf.textContent = exfPos.length;
+    countWip.textContent = wipPos.length;
+    countSubmitted.textContent = submittedPos.length;
+    badgeExf.textContent = exfPos.length;
+    badgeWip.textContent = wipPos.length;
+    badgeSubmitted.textContent = submittedPos.length;
+  }
+
+  // ── Tab switching ─────────────────────────────────────────
+  tabExf.addEventListener("click", () => switchTab("exf"));
+  tabWip.addEventListener("click", () => switchTab("wip"));
+  tabSubmitted.addEventListener("click", () => switchTab("submitted"));
+
+  function switchTab(tab) {
+    activeTab = tab;
+    tabExf.classList.toggle("is-active", tab === "exf");
+    tabWip.classList.toggle("is-active", tab === "wip");
+    tabSubmitted.classList.toggle("is-active", tab === "submitted");
+    closePackingPane();
+    renderPoTable();
+  }
+
+  // ── PO Table ──────────────────────────────────────────────
+  function renderPoTable() {
+    let rows;
+    if (activeTab === "exf") {
+      rows = allPos.filter(p => p["Status"] === "Requested");
+    } else if (activeTab === "wip") {
+      rows = allPos
+        .filter(p => p["Status"] === "WIP")
+        .slice()
+        .sort((a, b) => {
+          const da = a["EST EXF"] ? new Date(a["EST EXF"]).getTime() : Infinity;
+          const db = b["EST EXF"] ? new Date(b["EST EXF"]).getTime() : Infinity;
+          return da - db;
+        });
+    } else {
+      rows = allPos
+        .filter(isSubmittedPo)
+        .slice()
+        .sort((a, b) => {
+          const da = a.submittedAt ? new Date(a.submittedAt).getTime() : 0;
+          const db = b.submittedAt ? new Date(b.submittedAt).getTime() : 0;
+          return db - da;
+        });
+    }
+
+    if (rows.length === 0) {
+      const emptyLabel = activeTab === "exf"
+        ? "EXF Requested"
+        : activeTab === "wip"
+          ? "WIP"
+          : "Submitted";
+      poTableWrap.innerHTML =
+        '<div class="empty-state">No ' + emptyLabel + ' POs found.</div>';
+      return;
+    }
+
+    const isExf = activeTab === "exf";
+    const isSubmitted = activeTab === "submitted";
+
+    const table = document.createElement("table");
+    table.className = "po-table";
+
+    // Head
+    const thead = document.createElement("thead");
+    const headRow = document.createElement("tr");
+    const cols = isExf
+      ? ["EXF Request ID", "EXF Req Date", "EXF Memo", "PO #", "Buyer PO #", "Buyer", "Style #", "Color", "Qty", "Packing List"]
+      : isSubmitted
+        ? ["PO #", "Buyer PO #", "Buyer", "Style #", "Color", "Status", "Qty", "Submitted At", "Packing List"]
+        : ["PO #", "Buyer PO #", "Buyer", "Style #", "Color", "Est EXF", "Qty", "Packing List"];
+    cols.forEach(c => {
+      const th = document.createElement("th");
+      th.textContent = c;
+      headRow.appendChild(th);
+    });
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    // Body
+    const tbody = document.createElement("tbody");
+    rows.forEach(po => {
+      const tr = document.createElement("tr");
+      if (selectedPo && selectedPo["PO #"] === po["PO #"]) tr.classList.add("is-selected");
+      tr.addEventListener("click", () => openPackingPane(po));
+
+      if (isExf) {
+        tr.appendChild(makeExfIdCell(po));
+        tr.appendChild(makeTd(fmtDate(po["EXF Req Date"] || po["EXF Request Date"])));
+        tr.appendChild(makeTd(po["EXF Memo"] || "—"));
+      }
+
+      // PO #
+      const poNumTd = document.createElement("td");
+      const poNumDiv = document.createElement("div");
+      poNumDiv.className = "po-num";
+      poNumDiv.textContent = po["PO #"];
+      poNumTd.appendChild(poNumDiv);
+      tr.appendChild(poNumTd);
+
+      tr.appendChild(makeTd(po["Buyer PO #"] || "—"));
+      tr.appendChild(makeTd(po["Buyer"] || "—"));
+      tr.appendChild(makeTd(po["Style #"] || "—"));
+      tr.appendChild(makeTd(po["Color"] || "—"));
+
+      if (!isExf && !isSubmitted) {
+        tr.appendChild(makeTd(po["EST EXF"] ? fmtDate(po["EST EXF"]) : "—"));
+      }
+
+      if (isSubmitted) {
+        tr.appendChild(makeTd(po["Status"] || "—"));
+      }
+
+      // Qty chips
+      tr.appendChild(makeQtyCell(po));
+
+      if (isSubmitted) {
+        tr.appendChild(makeTd(po.submittedAt ? fmtDate(po.submittedAt) : "—"));
+      }
+
+      // PL badge
+      const plTd = document.createElement("td");
+      const badge = document.createElement("span");
+      const plDone = isSubmittedPo(po);
+      badge.className = "pl-badge " + (plDone ? "pl-badge--done" : "pl-badge--none");
+      badge.textContent = plDone
+        ? (po.hasPendingSubmission && !po.hasPackingList ? "Pending review" : "Submitted")
+        : "Pending";
+      plTd.appendChild(badge);
+      tr.appendChild(plTd);
+
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+
+    poTableWrap.innerHTML = "";
+    poTableWrap.appendChild(table);
+  }
+
+  function makeTd(text) {
+    const td = document.createElement("td");
+    td.textContent = text;
+    return td;
+  }
+
+  function makeExfIdCell(po) {
+    const td = document.createElement("td");
+    if (po["EXF Request ID"]) {
+      const chip = document.createElement("span");
+      chip.className = "exf-id-chip";
+      chip.textContent = po["EXF Request ID"];
+      td.appendChild(chip);
+    } else {
+      td.textContent = "—";
+    }
+    return td;
+  }
+
+  function makeQtyCell(po) {
+    const td = document.createElement("td");
+    if (!po.sizeLabels || po.sizeLabels.length === 0) {
+      td.textContent = po["PO Qty"] || "—";
+      return td;
+    }
+    const group = document.createElement("div");
+    group.className = "size-qty-group";
+    po.sizeLabels.forEach((label, i) => {
+      const chip = document.createElement("div");
+      chip.className = "size-qty-chip";
+
+      const lbl = document.createElement("div");
+      lbl.className = "size-qty-chip__label";
+      lbl.textContent = label;
+
+      const poQ = document.createElement("div");
+      poQ.className = "size-qty-chip__po";
+      poQ.textContent = (po.poUnits && po.poUnits[i]) ? po.poUnits[i] : (po["PO Qty"] || "—");
+
+      const actQ = document.createElement("div");
+      actQ.className = "size-qty-chip__act";
+      actQ.textContent = (po.actUnits && po.actUnits[i] > 0) ? po.actUnits[i] : "";
+
+      chip.appendChild(lbl);
+      chip.appendChild(poQ);
+      chip.appendChild(actQ);
+      group.appendChild(chip);
+    });
+    td.appendChild(group);
+    return td;
+  }
+
+  // ── Packing pane ──────────────────────────────────────────
+  function openPackingPane(po) {
+    selectedPo = po;
+    sizeLabels = (po.sizeLabels && po.sizeLabels.length) ? po.sizeLabels : ["Units"];
+
+    hidePanelMsg();
+    confirmationOverlay.classList.remove("show");
+    packingNotes.value = po.packingNotes || "";
+    packingPane.hidden = false;
+
+    // Load existing cartons or start fresh
+    if (po.existingCartons && po.existingCartons.length > 0) {
+      cartons = po.existingCartons.map(c => {
+        const out = {};
+        sizeLabels.forEach((_, i) => {
+          out["u" + i] = qty(c["Unit " + (i + 1)]);
+        });
+        out.weight = qty(c["Carton Weight"]);
+        return out;
+      });
+      const initialCount = Math.max(cartons.length, po.cartonCount || 1);
+      while (cartons.length < initialCount) cartons.push(makeEmptyCarton());
+    } else {
+      cartons = [makeEmptyCarton()];
+    }
+
+    cartonCountInput.value = String(cartons.length);
+    buildSummaryCard(po);
+    buildCartonGrid();
+    if (cartonGridScroll) cartonGridScroll.scrollTop = 0;
+    highlightSelectedRow();
+  }
+
+  function closePackingPane() {
+    selectedPo = null;
+    packingPane.hidden = true;
+    highlightSelectedRow();
+  }
+
+  packingPaneClose.addEventListener("click", closePackingPane);
+
+  function highlightSelectedRow() {
+    const rows = poTableWrap.querySelectorAll("tbody tr");
+    rows.forEach(tr => {
+      const poNum = tr.querySelector(".po-num");
+      if (poNum) {
+        tr.classList.toggle("is-selected", selectedPo && poNum.textContent === selectedPo["PO #"]);
+      }
+    });
+  }
+
+  // ── PO Summary ────────────────────────────────────────────
+  function buildSummaryCard(po) {
+    poSummaryCard.innerHTML = "";
+
+    function addRow(label, value) {
+      if (!value) return;
+      const row = document.createElement("div");
+      row.className = "po-summary-row";
+      const lbl = document.createElement("span");
+      lbl.className = "po-summary-label";
+      lbl.textContent = label;
+      const val = document.createElement("span");
+      val.className = "po-summary-value";
+      val.textContent = value;
+      row.appendChild(lbl);
+      row.appendChild(val);
+      poSummaryCard.appendChild(row);
+    }
+
+    addRow("PO #", po["PO #"]);
+    addRow("Buyer PO #", po["Buyer PO #"]);
+    addRow("Buyer", po["Buyer"]);
+    addRow("Style #", po["Style #"]);
+    addRow("Color", po["Color"]);
+    if (po["EXF Request ID"]) addRow("EXF Req ID", po["EXF Request ID"]);
+    if (po["EXF Request Date"] || po["EXF Req Date"]) {
+      addRow("EXF Date", fmtDate(po["EXF Request Date"] || po["EXF Req Date"]));
+    }
+    if (po["EXF Memo"]) addRow("EXF Memo", po["EXF Memo"]);
+
+    // Totals
+    const totalsRow = document.createElement("div");
+    totalsRow.className = "po-summary-totals";
+
+    function addTotal(num, label) {
+      const item = document.createElement("div");
+      item.className = "po-summary-total-item";
+      const n = document.createElement("div");
+      n.className = "po-summary-total-item__num";
+      n.id = "summaryTotal_" + label.replace(/\s+/g, "");
+      n.textContent = String(num);
+      const l = document.createElement("div");
+      l.className = "po-summary-total-item__label";
+      l.textContent = label;
+      item.appendChild(n);
+      item.appendChild(l);
+      totalsRow.appendChild(item);
+    }
+    addTotal(cartons.length || po["Ctn Qty"] || 0, "Cartons");
+    const initialUnits = cartons.reduce((sum, c) => sum + cartonTotal(c), 0);
+    addTotal(initialUnits || po["Actual Qty"] || 0, "Total Units");
+    const initialWeight = cartons.reduce((sum, c) => sum + qty(c.weight), 0);
+    addTotal(fmtWeightKg(initialWeight), "Total Weight");
+    poSummaryCard.appendChild(totalsRow);
+
+    const sizeTotalsRow = document.createElement("div");
+    sizeTotalsRow.className = "po-summary-size-totals";
+    sizeTotalsRow.id = "summarySizeTotals";
+    sizeLabels.forEach((label, i) => {
+      const item = document.createElement("div");
+      item.className = "po-summary-size-total-item";
+      const lbl = document.createElement("div");
+      lbl.className = "po-summary-size-total-item__label";
+      lbl.textContent = label;
+      const num = document.createElement("div");
+      num.className = "po-summary-size-total-item__num";
+      num.id = "summarySizeTotal_" + i;
+      num.textContent = String(cartons.reduce((sum, c) => sum + qty(c["u" + i]), 0));
+      item.appendChild(lbl);
+      item.appendChild(num);
+      sizeTotalsRow.appendChild(item);
+    });
+    poSummaryCard.appendChild(sizeTotalsRow);
+  }
+
+  function refreshSummaryTotals() {
+    const ctnEl = document.getElementById("summaryTotal_Cartons");
+    const unitEl = document.getElementById("summaryTotal_TotalUnits");
+    const weightEl = document.getElementById("summaryTotal_TotalWeight");
+    if (ctnEl) ctnEl.textContent = String(cartons.length);
+    const totalUnits = cartons.reduce((sum, c) => sum + cartonTotal(c), 0);
+    if (unitEl) unitEl.textContent = String(totalUnits);
+    const totalWeight = cartons.reduce((sum, c) => sum + qty(c.weight), 0);
+    if (weightEl) weightEl.textContent = fmtWeightKg(totalWeight);
+    sizeLabels.forEach((_, i) => {
+      const el = document.getElementById("summarySizeTotal_" + i);
+      if (el) {
+        const t = cartons.reduce((sum, c) => sum + qty(c["u" + i]), 0);
+        el.textContent = String(t);
+      }
+    });
+  }
+
+  const CARTON_COL = {
+    num: 28,
+    gap: 10,
+    total: 42,
+    weight: 72,
+    panePad: 34,
+    paneMax: 560,
+    paneMin: 420,
+    sizeMin: 40,
+    sizeDefault: 46,
+  };
+
+  function getCartonGridLayout() {
+    const count = Math.max(1, sizeLabels.length);
+    const fixed = CARTON_COL.num + CARTON_COL.gap * 2 + CARTON_COL.total + CARTON_COL.weight;
+    const sizeW = Math.max(
+      CARTON_COL.sizeMin,
+      Math.min(
+        CARTON_COL.sizeDefault,
+        Math.floor((CARTON_COL.paneMax - CARTON_COL.panePad - fixed) / count)
+      )
+    );
+    const colWidths = [
+      CARTON_COL.num,
+      CARTON_COL.gap,
+      ...Array(count).fill(sizeW),
+      CARTON_COL.gap,
+      CARTON_COL.total,
+      CARTON_COL.weight,
+    ];
+    const tableW = colWidths.reduce((sum, w) => sum + w, 0);
+    const paneW = Math.min(CARTON_COL.paneMax, Math.max(CARTON_COL.paneMin, tableW + CARTON_COL.panePad));
+    return { sizeW, tableW, paneW, colWidths };
+  }
+
+  function syncCartonGridLayout() {
+    const { sizeW, tableW, paneW } = getCartonGridLayout();
+    const count = Math.max(1, sizeLabels.length);
+    const cols = [
+      CARTON_COL.num + "px",
+      CARTON_COL.gap + "px",
+      ...Array(count).fill(sizeW + "px"),
+      CARTON_COL.gap + "px",
+      CARTON_COL.total + "px",
+      CARTON_COL.weight + "px",
+    ].join(" ");
+    packingPane.style.setProperty("--packing-pane-width", paneW + "px");
+    if (cartonGridWrap) {
+      cartonGridWrap.style.setProperty("--carton-grid-width", tableW + "px");
+      cartonGridWrap.style.setProperty("--carton-grid-cols", cols);
+    }
+  }
+
+  function syncCartonGridScrollbarPad() {
+    if (!cartonGridScroll || !cartonGridHeadWrap) return;
+    const sb = cartonGridScroll.offsetWidth - cartonGridScroll.clientWidth;
+    cartonGridHeadWrap.style.paddingRight = sb > 0 ? sb + "px" : "0";
+  }
+
+  function addGridGap(parent) {
+    const gap = document.createElement("div");
+    gap.className = "carton-grid-gap";
+    gap.setAttribute("aria-hidden", "true");
+    parent.appendChild(gap);
+    return gap;
+  }
+
+  function addGridHeadCell(text) {
+    const cell = document.createElement("div");
+    cell.textContent = text;
+    cartonGridHead.appendChild(cell);
+    return cell;
+  }
+
+  function createQtyInput(value, onInput) {
+    const input = document.createElement("input");
+    input.type = "number";
+    input.min = "0";
+    input.step = "1";
+    input.inputMode = "numeric";
+    input.className = "carton-grid-input";
+    input.value = value > 0 ? value : "";
+    input.placeholder = "—";
+    bindNumberInput(input);
+    input.addEventListener("input", onInput);
+    return input;
+  }
+
+  function createWeightField(value, onInput) {
+    const field = document.createElement("div");
+    field.className = "carton-weight-field";
+    const input = document.createElement("input");
+    input.type = "number";
+    input.min = "0";
+    input.step = "0.01";
+    input.inputMode = "decimal";
+    input.className = "carton-weight-input";
+    input.value = value > 0 ? value : "";
+    input.placeholder = "—";
+    bindNumberInput(input);
+    input.addEventListener("input", onInput);
+    const suffix = document.createElement("span");
+    suffix.className = "carton-weight-suffix";
+    suffix.textContent = "kg";
+    field.appendChild(input);
+    field.appendChild(suffix);
+    return { field, input };
+  }
+
+  // ── Carton Grid ───────────────────────────────────────────
+  function buildCartonGrid() {
+    syncCartonGridLayout();
+
+    cartonGridHead.innerHTML = "";
+    const numHead = addGridHeadCell("#");
+    numHead.className = "carton-grid-num";
+    addGridGap(cartonGridHead);
+    sizeLabels.forEach(l => addGridHeadCell(l));
+    addGridGap(cartonGridHead);
+    addGridHeadCell("Total");
+    addGridHeadCell("Weight");
+
+    renderCartonRows();
+  }
+
+  function renderCartonRows() {
+    cartonGridBody.innerHTML = "";
+
+    cartons.forEach((c, idx) => {
+      const row = document.createElement("div");
+      row.className = "carton-grid-row";
+
+      const numCell = document.createElement("div");
+      numCell.className = "carton-grid-num";
+      numCell.textContent = String(idx + 1);
+      row.appendChild(numCell);
+      addGridGap(row);
+
+      sizeLabels.forEach((_, i) => {
+        const cell = document.createElement("div");
+        const input = createQtyInput(c["u" + i], () => {
+          c["u" + i] = qty(input.value);
+          totalCell.textContent = cartonTotal(c) > 0 ? String(cartonTotal(c)) : "";
+          refreshSummaryTotals();
+        });
+        cell.appendChild(input);
+        row.appendChild(cell);
+      });
+
+      addGridGap(row);
+
+      const totalCell = document.createElement("div");
+      totalCell.className = "carton-grid-total";
+      totalCell.textContent = cartonTotal(c) > 0 ? String(cartonTotal(c)) : "";
+      row.appendChild(totalCell);
+
+      const weightCell = document.createElement("div");
+      const weightField = createWeightField(c.weight, () => {
+        c.weight = qty(weightField.input.value);
+        refreshSummaryTotals();
+      });
+      weightCell.appendChild(weightField.field);
+      row.appendChild(weightCell);
+
+      cartonGridBody.appendChild(row);
+    });
+
+    refreshSummaryTotals();
+    requestAnimationFrame(syncCartonGridScrollbarPad);
+  }
+
+  // ── Carton count stepper ──────────────────────────────────
+  cartonDecrBtn.addEventListener("click", () => adjustCartonCount(-1));
+  cartonIncrBtn.addEventListener("click", () => adjustCartonCount(1));
+  cartonCountInput.addEventListener("change", () => syncCartonCountToInput());
+  bindNumberInput(cartonCountInput);
+
+  function adjustCartonCount(delta) {
+    const next = Math.max(1, Math.floor(Number(cartonCountInput.value) || 1) + delta);
+    cartonCountInput.value = String(next);
+    syncCartonCount(next);
+  }
+
+  function syncCartonCountToInput() {
+    const next = Math.max(1, Math.floor(Number(cartonCountInput.value) || 1));
+    cartonCountInput.value = String(next);
+    syncCartonCount(next);
+  }
+
+  function syncCartonCount(count) {
+    while (cartons.length < count) cartons.push(makeEmptyCarton());
+    if (cartons.length > count) cartons.length = count;
+    renderCartonRows();
+  }
+
+  // ── Menu ──────────────────────────────────────────────────
+  packingMenuBtn.addEventListener("click", e => {
+    e.stopPropagation();
+    packingMenuDropdown.hidden = !packingMenuDropdown.hidden;
+  });
+  document.addEventListener("click", () => { packingMenuDropdown.hidden = true; });
+
+  menuClearPacking.addEventListener("click", () => {
+    packingMenuDropdown.hidden = true;
+    if (!confirm("Clear all carton data? This clears your current draft but does not delete any saved packing list until you submit.")) return;
+    cartons = [makeEmptyCarton()];
+    cartonCountInput.value = "1";
+    renderCartonRows();
+    hidePanelMsg();
+  });
+
+  menuMultiCarton.addEventListener("click", () => {
+    packingMenuDropdown.hidden = true;
+    openMultiCartonModal();
+  });
+
+  // ── Multi Carton Modal ────────────────────────────────────
+  function openMultiCartonModal() {
+    // Build size inputs
+    multiCartonSizeFields.innerHTML = "";
+    sizeLabels.forEach((label, i) => {
+      const div = document.createElement("div");
+      div.className = "modal-field modal-size-item";
+      const lbl = document.createElement("label");
+      lbl.textContent = label;
+      lbl.htmlFor = "mcSize_" + i;
+      const inp = document.createElement("input");
+      inp.type = "number";
+      inp.min = "0";
+      inp.step = "1";
+      inp.id = "mcSize_" + i;
+      inp.value = "";
+      inp.placeholder = "0";
+      bindNumberInput(inp);
+      div.appendChild(lbl);
+      div.appendChild(inp);
+      multiCartonSizeFields.appendChild(div);
+    });
+    multiCartonCount.value = "1";
+    multiCartonWeight.value = "";
+    multiCartonModal.hidden = false;
+    // Focus first size input
+    const first = multiCartonSizeFields.querySelector("input");
+    if (first) first.focus();
+  }
+
+  multiCartonCancel.addEventListener("click", () => { multiCartonModal.hidden = true; });
+  multiCartonModal.addEventListener("click", e => {
+    if (e.target === multiCartonModal) multiCartonModal.hidden = true;
+  });
+
+  multiCartonApply.addEventListener("click", () => {
+    const sizeQtys = sizeLabels.map((_, i) => {
+      const inp = document.getElementById("mcSize_" + i);
+      return inp ? qty(inp.value) : 0;
+    });
+    const numCartons = Math.max(1, Math.floor(Number(multiCartonCount.value) || 1));
+    const weight = qty(multiCartonWeight.value);
+
+    // Find first empty carton index (all-zero units)
+    let startIdx = cartons.findIndex(c => sizeLabels.every((_, i) => qty(c["u" + i]) === 0));
+    if (startIdx === -1) startIdx = cartons.length;
+
+    // Ensure enough cartons
+    const neededCount = startIdx + numCartons;
+    while (cartons.length < neededCount) cartons.push(makeEmptyCarton());
+
+    // Fill cartons
+    for (let n = 0; n < numCartons; n++) {
+      const c = cartons[startIdx + n];
+      sizeLabels.forEach((_, i) => { c["u" + i] = sizeQtys[i]; });
+      c.weight = weight;
+    }
+
+    cartonCountInput.value = String(cartons.length);
+    renderCartonRows();
+    multiCartonModal.hidden = true;
+  });
+
   // ── Submit ────────────────────────────────────────────────
   submitBtn.addEventListener("click", () => {
-    hideMsg();
-    const po = poSelect.value;
-    if (!po) { showMsg("Please select a PO.", "error"); return; }
+    hidePanelMsg();
+    if (!selectedPo) return;
 
+    const po = selectedPo["PO #"];
     const cartonsPayload = cartons.map((c, idx) => {
       const obj = { "Carton #": idx + 1 };
       sizeLabels.forEach((_, i) => { obj["Unit " + (i + 1)] = c["u" + i] || ""; });
@@ -553,7 +1733,10 @@
     const hasSomeQty = cartonsPayload.some(c =>
       sizeLabels.some((_, i) => qty(c["Unit " + (i + 1)]) > 0)
     );
-    if (!hasSomeQty) { showMsg("Please enter at least one unit quantity.", "error"); return; }
+    if (!hasSomeQty) {
+      showPanelMsg("Please enter at least one unit quantity.", "error");
+      return;
+    }
 
     submitBtn.disabled = true;
     submitSpinner.style.display = "";
@@ -561,70 +1744,88 @@
     google.script.run
       .withSuccessHandler(onSubmitSuccess)
       .withFailureHandler(onSubmitFailure)
-      .vendorPortalSubmit(SESSION_ID, TOKEN, po, cartonsPayload, notesInput.value.trim());
+      .vendorPortalSubmit(SESSION_ID, TOKEN, po, cartonsPayload, packingNotes.value.trim());
   });
 
   function onSubmitSuccess(result) {
     submitBtn.disabled = false;
     submitSpinner.style.display = "none";
-    if (!result.success) {
-      showMsg(result.error || "Submission failed.", "error");
+    if (!result || !result.success) {
+      showPanelMsg(result ? (result.error || "Submission failed.") : "Submission failed.", "error");
       return;
     }
-    formSection.style.display = "none";
+    // Update local PO state so summary totals reflect submission
+    if (selectedPo) {
+      if (result.mode === "review") {
+        selectedPo.hasPendingSubmission = true;
+        selectedPo.hasPackingList = false;
+      } else {
+        selectedPo.hasPackingList = true;
+        selectedPo.hasPendingSubmission = false;
+      }
+      selectedPo.submittedAt = new Date().toISOString();
+      selectedPo["Ctn Qty"] = cartons.length;
+      selectedPo["Actual Qty"] = cartons.reduce((sum, c) => sum + cartonTotal(c), 0);
+      selectedPo.actUnits = sizeLabels.map((_, i) =>
+        cartons.reduce((sum, c) => sum + qty(c["u" + i]), 0)
+      );
+      selectedPo.existingCartons = cartons.map((c, idx) => {
+        const out = { "Carton #": idx + 1 };
+        sizeLabels.forEach((_, i) => { out["Unit " + (i + 1)] = c["u" + i] || ""; });
+        out["Carton Weight"] = c.weight || "";
+        return out;
+      });
+      refreshSummaryTotals();
+    }
+    updateCounters();
+    document.getElementById("packingEditorSection").querySelector(".packing-editor-footer").style.display = "none";
     confirmationMsg.textContent = result.message || "Your packing list has been received.";
-    confirmationBox.classList.add("show");
+    confirmationOverlay.classList.add("show");
+    renderPoTable();
   }
 
   function onSubmitFailure(err) {
     submitBtn.disabled = false;
     submitSpinner.style.display = "none";
-    showMsg("An error occurred. Please try again.", "error");
+    showPanelMsg("An error occurred. Please try again.", "error");
     console.error(err);
   }
 
-  // ── Submit another ────────────────────────────────────────
   submitAnotherBtn.addEventListener("click", () => {
-    confirmationBox.classList.remove("show");
-    poSelect.value = "";
-    poMeta.style.display = "none";
-    cartonCard.style.display = "none";
-    notesInput.value = "";
-    hideMsg();
-    formSection.style.display = "";
+    confirmationOverlay.classList.remove("show");
+    const edSec = document.getElementById("packingEditorSection");
+    edSec.querySelector(".packing-editor-footer").style.display = "";
+    closePackingPane();
   });
 
   // ── Load POs ──────────────────────────────────────────────
   google.script.run
     .withSuccessHandler(function (result) {
-      loadingCard.style.display = "none";
-      if (!result.success) {
-        loadingCard.style.display = "";
-        loadingCard.textContent = result.error || "Failed to load POs.";
+      loadingState.style.display = "none";
+      if (!result || !result.success) {
+        loadingState.style.display = "";
+        loadingState.textContent = (result && result.error) || "Failed to load POs.";
         return;
       }
       allPos = result.pos || [];
+      headerVendorName.textContent = result.vendor || "";
       if (allPos.length === 0) {
-        loadingCard.style.display = "";
-        loadingCard.textContent = "No open POs found for your vendor account.";
+        loadingState.style.display = "";
+        loadingState.textContent = "No open POs found for your vendor account.";
         return;
       }
-      allPos.forEach(po => {
-        const opt = document.createElement("option");
-        opt.value = po["PO #"];
-        opt.textContent = po["PO #"] +
-          (po["Style #"] ? "  —  " + po["Style #"] : "") +
-          (po["Color"] ? " / " + po["Color"] : "") +
-          (po.hasPackingList ? " ✓" : "");
-        poSelect.appendChild(opt);
-      });
-      formSection.style.display = "";
+      appRoot.style.display = "flex";
+      updateCounters();
+      renderPoTable();
     })
     .withFailureHandler(function (err) {
-      loadingCard.textContent = "Failed to load POs. Please refresh the page.";
+      loadingState.textContent = "Failed to load POs. Please refresh the page.";
       console.error(err);
     })
     .vendorPortalGetPos(SESSION_ID, TOKEN);
+
+  window.addEventListener("resize", syncCartonGridScrollbarPad);
+
 })();
 </script>
 </body>
