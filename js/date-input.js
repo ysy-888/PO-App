@@ -61,8 +61,7 @@ function readCompactDateInputValue(input) {
 function isCompactDateInputCommitReady(input) {
   const digits = String(input?.value ?? "").replace(/\D/g, "");
   if (!digits) return true;
-  if (digits.length === 6) return Boolean(readCompactDateInputValue(input));
-  return false;
+  return Boolean(readCompactDateInputValue(input));
 }
 
 function createCompactDateInput({

@@ -78,11 +78,11 @@ const COLUMNS = [
   "Old PO #","Style #","Color","Style Category","PO Qty","Actual Qty","Ctn Qty","Received Qty","FOB Cost","PO Total Cost",
   "Vessel","House #","Shipped","ETD",
   "EST EXF","EST IHD","Ship Method","Shipment ID","Packing List",
-  "EXF Requested","EXF Date","EXF Req Date","EXF Request ID","EXF Memo",
+  "EXF Requested","EXF Date","EXF Request ID","EXF Memo",
   "ASN Requested","ASN Date","ASN Req Date","ASN Request ID",
   "Delivery Requested","Delivery Date","Delivery Req Date","Delivery Request ID",
   "Pickup Requested","Pickup Date","Pickup Req Date","Pickup Request ID",
-  "EXF","ETA","IHD","CXL Date","Assign Date","Notes"
+  "ETA","IHD","CXL Date","Assign Date","Notes"
 ];
 
 /** PO table column width tiers (see #poTable col-w-* in po-table.css). */
@@ -108,9 +108,9 @@ const COLUMN_WIDTH_TIER_XS = new Set([
 const COLUMN_WIDTH_TIER_S = new Set([
   "Vendor",
   "PO Date", "Shipped", "ETD", "EST EXF", "EST IHD",
-  "EXF Date", "EXF Req Date", "ASN Date", "ASN Req Date",
+  "EXF Date", "ASN Date", "ASN Req Date",
   "Delivery Date", "Delivery Req Date", "Pickup Date", "Pickup Req Date",
-  "EXF", "ETA", "IHD", "CXL Date", "Assign Date",
+  "ETA", "IHD", "CXL Date", "Assign Date",
   "PO #", "Old PO #", "SO #", "FOB Cost", "PO Total Cost",
   "N41 Status",
   "EXF Requested", "ASN Requested", "Delivery Requested", "Pickup Requested",
@@ -137,7 +137,6 @@ const COLUMN_LABELS = {
   "PO Total Cost": "PO Cost",
   "EXF Requested": "EXF Req",
   "EXF Date": "EXF Date",
-  "EXF Req Date": "EXF Req Date",
   "EXF Request ID": "EXF Req ID",
   "EXF Memo": "EXF Memo",
   "ASN Requested": "ASN Req",
@@ -556,6 +555,9 @@ function normalizeRow(row) {
   if ("Shipment ID" in out && isEmptyValue(out["Shipment ID"])) {
     out["Shipment ID"] = "";
   }
+  if (!String(out["EXF Date"] ?? "").trim() && String(out["EXF Request Date"] ?? "").trim()) {
+    out["EXF Date"] = out["EXF Request Date"];
+  }
   return out;
 }
 
@@ -631,6 +633,7 @@ function loadColumnVisibility() {
   }
   columnOrder = normalizeColumnOrder([...DEFAULT_COLUMN_ORDER]);
   visibleColumns = getDefaultVisibleColumnsSet();
+  migrateVisibleColumnsForNewFields();
 }
 
 /** When new PO columns ship, show them if their sibling request-ID column is already visible. */
@@ -641,11 +644,18 @@ function migrateVisibleColumnsForNewFields() {
     changed = true;
   }
   if (!columnOrder.includes("EXF Request ID")) {
-    const idx = columnOrder.indexOf("EXF Req Date");
+    const idx = columnOrder.indexOf("EXF Date");
     if (idx !== -1) columnOrder.splice(idx + 1, 0, "EXF Request ID");
     else columnOrder = normalizeColumnOrder([...columnOrder, "EXF Request ID"]);
     changed = true;
   }
+  ["EXF", "EXF Req Date", "EXF Request Date"].forEach(legacyCol => {
+    if (columnOrder.includes(legacyCol)) {
+      columnOrder = columnOrder.filter(col => col !== legacyCol);
+      visibleColumns.delete(legacyCol);
+      changed = true;
+    }
+  });
   if (changed) saveColumnLayoutPreference();
 }
 
@@ -920,6 +930,13 @@ function applyEditTableFromPopover() {
   saveColumnLayoutPreference();
   if (typeof updateColumnFilterHeaderStates === "function") updateColumnFilterHeaderStates();
   clearEditTableFooterMessage();
+  if (typeof closeSettingsModal === "function") closeSettingsModal();
+}
+
+function cancelEditTableFromPopover() {
+  prepareEditTableDraft();
+  clearEditTableFooterMessage();
+  if (typeof closeSettingsModal === "function") closeSettingsModal();
 }
 
 function initEditTable() {
@@ -930,5 +947,5 @@ function initEditTable() {
   document.getElementById("editTableSaveDefault")?.addEventListener("click", saveDefaultColumnVisibility);
   document.getElementById("editTableResetDefault")?.addEventListener("click", resetEditTableToDefault);
   document.getElementById("editTableOk")?.addEventListener("click", applyEditTableFromPopover);
-  document.getElementById("editTableCancel")?.addEventListener("click", prepareEditTableDraft);
+  document.getElementById("editTableCancel")?.addEventListener("click", cancelEditTableFromPopover);
 }

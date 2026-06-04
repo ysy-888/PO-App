@@ -2891,7 +2891,7 @@ function markExfRequestPosRequested_(poSheet, poNumbers, requestId, exfDate, mem
     updates[EXF_REQUEST_ID_FIELD] = requestId;
     updates[EXF_REQUESTED_FIELD] = true;
     updates["Status"] = "Requested";
-    updates[EXF_REQUEST_DATE_FIELD] = exfDate;
+    updates[EXF_DATE_FIELD] = exfDate;
     if (shipMethods[poNumber] !== undefined) updates["Ship Method"] = shipMethods[poNumber];
     const memo = String(memos[poNumber] ?? "").trim();
     if (memo) updates[EXF_MEMO_FIELD] = memo;
@@ -3803,8 +3803,7 @@ function vendorPortalGetPos(sessionId, token) {
         "Ctn Qty": toPackingQty_(row["Ctn Qty"]) || 0,
         "EST EXF": row["EST EXF"] ? String(row["EST EXF"]) : "",
         "EXF Request ID": String(row[EXF_REQUEST_ID_FIELD] ?? "").trim(),
-        "EXF Request Date": row[EXF_REQUEST_DATE_FIELD] ? String(row[EXF_REQUEST_DATE_FIELD]) : "",
-        "EXF Req Date": row[EXF_REQ_DATE_FIELD] ? String(row[EXF_REQ_DATE_FIELD]) : "",
+        "EXF Date": row[EXF_DATE_FIELD] ? String(row[EXF_DATE_FIELD]) : (row[EXF_REQUEST_DATE_FIELD] ? String(row[EXF_REQUEST_DATE_FIELD]) : ""),
         "EXF Memo": String(row[EXF_MEMO_FIELD] ?? "").trim(),
         "sizeLabels": sizeLabels,
         "poUnits": poUnits,

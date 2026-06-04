@@ -172,11 +172,11 @@
       <col class="col-shipped" /><col class="col-etd" />
       <col class="col-est-exf" /><col class="col-est-ihd" />
       <col class="col-ship-method" /><col class="col-shipment-id" /><col class="col-packing-list" />
-      <col class="col-exf-req" /><col class="col-date" /><col class="col-exf-req-date" /><col class="col-shipment-id" /><col class="col-exf-memo" />
+      <col class="col-exf-req" /><col class="col-date" /><col class="col-shipment-id" /><col class="col-exf-memo" />
       <col class="col-bool" /><col class="col-date" /><col class="col-date" /><col class="col-shipment-id" />
       <col class="col-bool" /><col class="col-date" /><col class="col-date" /><col class="col-shipment-id" />
       <col class="col-bool" /><col class="col-date" /><col class="col-date" /><col class="col-shipment-id" />
-      <col class="col-exf" /><col class="col-eta" /><col class="col-ihd" />
+      <col class="col-eta" /><col class="col-ihd" />
       <col class="col-cxl" /><col class="col-assign" /><col class="col-notes" />
     </colgroup>
     <thead>
@@ -219,7 +219,6 @@
         <th class="th-packing-list-col" data-col="Packing List" aria-label="Packing List"></th>
         <th class="th-filterable" data-col="EXF Requested"><span class="th-label">EXF Req</span></th>
         <th class="th-filterable" data-col="EXF Date"><span class="th-label">EXF Date</span></th>
-        <th class="th-filterable" data-col="EXF Req Date"><span class="th-label">EXF Req Date</span></th>
         <th class="th-filterable" data-col="EXF Request ID"><span class="th-label">EXF Req ID</span></th>
         <th data-col="EXF Memo" onclick="sortBy('EXF Memo')">EXF Memo</th>
         <th class="th-filterable" data-col="ASN Requested"><span class="th-label">ASN Req</span></th>
@@ -234,7 +233,6 @@
         <th class="th-filterable" data-col="Pickup Date"><span class="th-label">Pkp Date</span></th>
         <th class="th-filterable" data-col="Pickup Req Date"><span class="th-label">Pkp Req Date</span></th>
         <th class="th-filterable" data-col="Pickup Request ID"><span class="th-label">Pickup</span></th>
-        <th class="th-filterable" data-col="EXF"><span class="th-label">EXF</span></th>
         <th class="th-filterable" data-col="ETA"><span class="th-label">ETA</span></th>
         <th class="th-filterable" data-col="IHD"><span class="th-label">IHD</span></th>
         <th class="th-filterable" data-col="CXL Date"><span class="th-label">CXL Date</span></th>
@@ -243,7 +241,7 @@
       </tr>
     </thead>
     <tbody id="tableBody">
-      <tr class="state-row"><td colspan="54">Loading POs…</td></tr>
+      <tr class="state-row"><td colspan="52">Loading POs…</td></tr>
     </tbody>
   </table>
   </div>
@@ -889,7 +887,7 @@
         </section>
         <section class="settings-section" id="settingsSectionVendorPortal" data-settings-section="vendor-portal" hidden>
           <h4 class="settings-section-title">Vendor Portal Links</h4>
-          <div class="settings-group">
+          <div class="settings-group" id="settingsVendorSubmissionsGroup">
             <div class="settings-group-label">Vendor submissions</div>
             <div class="settings-option-list" id="settingsVendorSubmitModeList" role="radiogroup" aria-label="Vendor submissions mode">
               <button type="button" class="settings-option-item" data-vendor-submit-mode="review" role="radio" aria-checked="true">

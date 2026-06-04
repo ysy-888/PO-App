@@ -552,7 +552,7 @@ function handleSizeGridKeydown(e) {
 }
 
 function createModalActualDateRow(row) {
-  const actualCols = ["EXF", "IHD"];
+  const actualCols = ["EXF Date", "IHD"];
   if (shouldShowAssignDate(row)) actualCols.push("Assign Date");
   const actualRow = createModalFieldRow(
     actualCols,
@@ -702,7 +702,53 @@ function createModalFreightInfo(row) {
   return wrap;
 }
 
-function createModalFreightSection(row) {
+function createModalFreightPackingTotals() {
+  const wrap = document.createElement("div");
+  wrap.className = "modal-freight-packing-totals";
+
+  [
+    ["unit", "Total Unit Qty"],
+    ["ctn", "Total Ctn Qty"],
+  ].forEach(([kind, label]) => {
+    const line = document.createElement("div");
+    line.className = "packing-list-total-compare";
+    line.dataset.packingTotal = kind;
+    line.textContent = label;
+    wrap.appendChild(line);
+  });
+
+  return wrap;
+}
+
+function formatPackingQtyCompareLine(label, current, target) {
+  const cur = toQtyNumber(current);
+  const tgt = toQtyNumber(target);
+  if (tgt > 0) return `${label}: ${cur} / ${tgt}`;
+  if (cur > 0) return `${label}: ${cur}`;
+  return `${label}: ${EMPTY_DISPLAY}`;
+}
+
+function refreshModalFreightPackingTotals(editor, row, cartons) {
+  const wrap = editor?.querySelector(".modal-freight-packing-totals");
+  if (!wrap) return;
+
+  const unitEl = wrap.querySelector('[data-packing-total="unit"]');
+  const ctnEl = wrap.querySelector('[data-packing-total="ctn"]');
+  if (!unitEl || !ctnEl) return;
+
+  const packingUnits = computePackingTotalsByUnit(cartons).reduce((sum, qty) => sum + toQtyNumber(qty), 0);
+  const packingCtns = cartons.length;
+  const poUnits = toQtyNumber(row["Actual Qty"]) || computePoQtyFromUnits(row);
+  const poCtns = toQtyNumber(row["Ctn Qty"]);
+
+  unitEl.textContent = formatPackingQtyCompareLine("Total Unit Qty", packingUnits, poUnits);
+  ctnEl.textContent = formatPackingQtyCompareLine("Total Ctn Qty", packingCtns, poCtns);
+
+  unitEl.classList.toggle("packing-list-total-compare--match", poUnits > 0 && packingUnits === poUnits);
+  ctnEl.classList.toggle("packing-list-total-compare--match", poCtns > 0 && packingCtns === poCtns);
+}
+
+function createModalFreightSection(row, { includePackingTotals = false } = {}) {
   if (typeof poHasShipment !== "function" || !poHasShipment(row)) return null;
 
   const block = document.createElement("section");
@@ -725,6 +771,9 @@ function createModalFreightSection(row) {
   content.className = "modal-block-content modal-freight-body";
   content.appendChild(createModalFreightInfo(row));
   content.appendChild(createModalFreightRequests(row));
+  if (includePackingTotals) {
+    content.appendChild(createModalFreightPackingTotals());
+  }
 
   block.appendChild(header);
   block.appendChild(content);
@@ -1179,6 +1228,7 @@ function setPackingEditorTotals(container, row, cartons) {
   if (grandTotal) grandTotal.textContent = formatPackingListTotal(totalQty);
   const weightSummary = container.querySelector(".packing-list-weight-summary");
   if (weightSummary) weightSummary.textContent = formatPackingWeightTotal(computePackingWeightTotal(cartons));
+  refreshModalFreightPackingTotals(container, row, cartons);
 }
 
 function createPackingListEditor(row, packingList, sourceCartons) {
@@ -1265,6 +1315,7 @@ function createPackingListEditor(row, packingList, sourceCartons) {
   }
 
   controlsRight.appendChild(countBlock);
+  controlsRight.querySelectorAll(".packing-list-total-compare, .packing-list-header-total").forEach(el => el.remove());
 
   controls.appendChild(headingWrap);
   controls.appendChild(controlsRight);
@@ -1456,7 +1507,7 @@ function createPackingListSidePanel(row) {
   panel.className = "packing-list-side-panel";
 
   const editor = createPackingListEditor(row, packingList, cartons);
-  const freightSection = createModalFreightSection(row);
+  const freightSection = createModalFreightSection(row, { includePackingTotals: true });
   if (freightSection) editor.appendChild(freightSection);
   panel.appendChild(editor);
   return panel;
@@ -1678,6 +1729,8 @@ function renderModalContent(row) {
   const layout = document.createElement("div");
   layout.className = "modal-layout";
   layout.classList.toggle("modal-layout--packing-open", packingListPanelOpen);
+  const modalCard = document.querySelector("#modalOverlay .modal-card");
+  if (modalCard) modalCard.classList.toggle("modal-card--packing-open", packingListPanelOpen);
 
   const main = document.createElement("div");
   main.className = "modal-layout-main";
@@ -1765,6 +1818,7 @@ function dismissModalOverlay() {
   clearModalPendingSubmission();
   clearModalFooterMessageForOverlay("modalOverlay");
   document.getElementById("modalOverlay")?.classList.remove("open");
+  document.querySelector("#modalOverlay .modal-card")?.classList.remove("modal-card--packing-open");
   updateModalSaveState();
 }
 

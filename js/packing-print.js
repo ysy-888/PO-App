@@ -58,7 +58,7 @@ function buildPlPrintPoDetailsHtml(row) {
     ["Ship Method", plPrintVal(row["Ship Method"])],
     ["Status", plPrintVal(row["Status"])],
     ["PO Date", plPrintDate(row["PO Date"])],
-    ["EXF", plPrintDate(row["EXF"])],
+    ["EXF Date", plPrintDate(row["EXF Date"] || row["EXF Request Date"] || row["EXF"])],
     ["IHD", plPrintDate(row["IHD"])],
     ["CXL Date", plPrintDate(row["CXL Date"])],
   ];

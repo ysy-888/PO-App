@@ -11,6 +11,9 @@ function isOpenRow(row) {
 
 function getColumnFilterRawValue(col, row) {
   if (col === "EST IHD") return calculateEstIhd(row["Ship Method"], row["EST EXF"]);
+  if (col === "EXF Date") {
+    return row["EXF Date"] ?? row["EXF Request Date"] ?? "";
+  }
   if (col === "Actual Qty") {
     const qty = getPackingActualQtyForRow(row);
     return qty > 0 ? qty : "";
@@ -735,8 +738,8 @@ const STATUS_BADGE = {
 };
 
 const DATE_FIELDS = new Set([
-  "PO Date","Shipped","ETD","ETA","IHD","EST EXF","EST IHD","EXF","CXL Date","Assign Date",
-  "EXF Request Date","EXF Date","EXF Req Date",
+  "PO Date","Shipped","ETD","ETA","IHD","EST EXF","EST IHD","CXL Date","Assign Date",
+  "EXF Date",
   "ASN Date","ASN Req Date",
   "Delivery Date","Delivery Req Date",
   "Pickup Date","Pickup Req Date",
@@ -744,12 +747,13 @@ const DATE_FIELDS = new Set([
 
 const COUNTDOWN_DATE_COLS = new Set([
   "Assign Date",
-  "EST EXF", "EST IHD", "EXF", "ETA", "IHD", "CXL Date", "Shipped", "ETD",
+  "EST EXF", "EST IHD", "ETA", "IHD", "CXL Date", "Shipped", "ETD",
 ]);
 const CXL_PROXIMITY_COLS = new Set(["IHD", "EST IHD"]);
 
 function getDateFieldValue(col, row) {
   if (col === "EST IHD") return calculateEstIhd(row["Ship Method"], row["EST EXF"]);
+  if (col === "EXF Date") return row["EXF Date"] ?? row["EXF Request Date"] ?? "";
   return row[col] ?? "";
 }
 

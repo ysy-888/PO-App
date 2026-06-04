@@ -1170,7 +1170,7 @@
     const thead = document.createElement("thead");
     const headRow = document.createElement("tr");
     const cols = isExf
-      ? ["EXF Request ID", "EXF Req Date", "EXF Memo", "PO #", "Buyer PO #", "Buyer", "Style #", "Color", "Qty", "Packing List"]
+      ? ["EXF Request ID", "EXF Date", "EXF Memo", "PO #", "Buyer PO #", "Buyer", "Style #", "Color", "Qty", "Packing List"]
       : isSubmitted
         ? ["PO #", "Buyer PO #", "Buyer", "Style #", "Color", "Status", "Qty", "Submitted At", "Packing List"]
         : ["PO #", "Buyer PO #", "Buyer", "Style #", "Color", "Est EXF", "Qty", "Packing List"];
@@ -1191,7 +1191,7 @@
 
       if (isExf) {
         tr.appendChild(makeExfIdCell(po));
-        tr.appendChild(makeTd(fmtDate(po["EXF Req Date"] || po["EXF Request Date"])));
+        tr.appendChild(makeTd(fmtDate(po["EXF Date"] || po["EXF Request Date"])));
         tr.appendChild(makeTd(po["EXF Memo"] || "—"));
       }
 
@@ -1370,8 +1370,8 @@
     addRow("Style #", po["Style #"]);
     addRow("Color", po["Color"]);
     if (po["EXF Request ID"]) addRow("EXF Req ID", po["EXF Request ID"]);
-    if (po["EXF Request Date"] || po["EXF Req Date"]) {
-      addRow("EXF Date", fmtDate(po["EXF Request Date"] || po["EXF Req Date"]));
+    if (po["EXF Date"] || po["EXF Request Date"]) {
+      addRow("EXF Date", fmtDate(po["EXF Date"] || po["EXF Request Date"]));
     }
     if (po["EXF Memo"]) addRow("EXF Memo", po["EXF Memo"]);
 

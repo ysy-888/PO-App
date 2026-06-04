@@ -450,6 +450,7 @@ function closePackingListPanelInModal(row) {
   if (typeof closePoModalMenu === "function") closePoModalMenu();
   packingListPanelOpen = false;
   document.querySelector("#modalOverlay .modal-layout")?.classList.remove("modal-layout--packing-open");
+  document.querySelector("#modalOverlay .modal-card")?.classList.remove("modal-card--packing-open");
   document.querySelector("#modalOverlay .packing-list-side-panel")?.remove();
   updateModalPackingListButton(row);
   if (typeof updatePoModalMenu === "function") updatePoModalMenu(modalRow ?? row);

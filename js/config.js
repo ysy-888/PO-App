@@ -33,6 +33,9 @@ const APPS_SCRIPT_URL_LIVE =
 const APPS_SCRIPT_URL_TEST =
   "https://script.google.com/macros/s/AKfycbxrWo9TBsY2T40kqd-Pay45afo86oocOrDBKdz4UokGRJ5_2hRk8GCXR7uZbEAytAym/exec";
 
+/** When false, hides the Vendor Submissions tab and related settings. */
+const VENDOR_SUBMISSIONS_ENABLED = true;
+
 const APP_MODE_STORAGE_KEY = "poTable.appMode";
 const URL_PLACEHOLDER = "YOUR_APPS_SCRIPT_WEB_APP_URL_HERE";
 const TEST_URL_PLACEHOLDER = "YOUR_TEST_APPS_SCRIPT_WEB_APP_URL_HERE";

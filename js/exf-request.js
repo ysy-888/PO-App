@@ -1043,7 +1043,7 @@ function applyExfRequestCreatedLocally(
     row[EXF_REQUEST_ID_FIELD] = requestId;
     row[EXF_REQUESTED_FIELD] = true;
     row["Status"] = "Requested";
-    row[EXF_REQUEST_DATE_FIELD] = exfDate;
+    row[EXF_DATE_FIELD] = exfDate;
     row["Ship Method"] = shipMethods[poNumber] ?? shipMethods[String(poNumber)] ?? row["Ship Method"];
     row["EST IHD"] = calculateEstIhd(row["Ship Method"], row["EST EXF"]);
     const memo = String(memos[poNumber] ?? memos[String(poNumber)] ?? "").trim();

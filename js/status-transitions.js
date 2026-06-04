@@ -82,6 +82,9 @@ function migrateLegacyRow(row) {
   if (row[EXF_REQUESTED_FIELD] === undefined || row[EXF_REQUESTED_FIELD] === null) {
     row[EXF_REQUESTED_FIELD] = getRowStatus(row) === "Requested";
   }
+  if (!String(row["EXF Date"] ?? "").trim() && String(row["EXF Request Date"] ?? "").trim()) {
+    row["EXF Date"] = row["EXF Request Date"];
+  }
   return row;
 }
 

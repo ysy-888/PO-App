@@ -27,6 +27,7 @@ const PACKING_REVIEW_DATE_COLS = new Set(["Submitted At", "Reviewed At"]);
 let allPendingPackingLists = [];
 let filteredPendingPackingLists = [];
 let vendorSubmitMode = "review";
+let vendorSubmitModeLoaded = false;
 let packingReviewOpInProgress = false;
 let packingReviewSelectedIds = new Set();
 
@@ -50,11 +51,19 @@ function enrichPendingPackingListsFromPos(rows) {
   });
 }
 
+function normalizeVendorSubmitMode(mode) {
+  return String(mode ?? "").trim().toLowerCase() === "direct" ? "direct" : "review";
+}
+
 function onPendingPackingListsDataLoaded(rows, mode) {
   allPendingPackingLists = enrichPendingPackingListsFromPos(rows);
   packingReviewSelectedIds = new Set();
-  if (mode) vendorSubmitMode = mode;
+  if (mode !== undefined && mode !== null) {
+    vendorSubmitMode = normalizeVendorSubmitMode(mode);
+    vendorSubmitModeLoaded = true;
+  }
   applyPackingReviewFilters();
+  updateVendorSubmitModeCheck();
 }
 
 // ── Filtering & sorting ───────────────────────────────────────────────────────
@@ -344,8 +353,18 @@ function updateVendorSubmitModeCheck() {
   updateVendorSubmissionsTabVisibility();
 }
 
+function isVendorSubmissionsFeatureEnabled() {
+  return typeof VENDOR_SUBMISSIONS_ENABLED === "undefined" || VENDOR_SUBMISSIONS_ENABLED !== false;
+}
+
 function isVendorSubmissionsReviewEnabled() {
+  if (!isVendorSubmissionsFeatureEnabled() || !vendorSubmitModeLoaded) return false;
   return vendorSubmitMode !== "direct";
+}
+
+function updateSettingsVendorSubmissionsVisibility() {
+  const group = document.getElementById("settingsVendorSubmissionsGroup");
+  if (group) group.hidden = !isVendorSubmissionsFeatureEnabled();
 }
 
 function updateVendorSubmissionsTabVisibility() {
@@ -353,6 +372,9 @@ function updateVendorSubmissionsTabVisibility() {
   if (!tab) return;
   const show = isVendorSubmissionsReviewEnabled();
   tab.hidden = !show;
+  if (show) tab.style.removeProperty("display");
+  else tab.style.display = "none";
+  updateSettingsVendorSubmissionsVisibility();
   if (!show
     && typeof currentAppView !== "undefined"
     && currentAppView === "packingReviews"
@@ -363,17 +385,20 @@ function updateVendorSubmissionsTabVisibility() {
 
 async function setVendorSubmitModeFromSettings(mode) {
   if (isAppSaving()) return;
-  const newMode = mode === "direct" ? "direct" : "review";
+  const newMode = normalizeVendorSubmitMode(mode);
   if (newMode === vendorSubmitMode) return;
+  const previousMode = vendorSubmitMode;
+  vendorSubmitMode = newMode;
+  vendorSubmitModeLoaded = true;
+  updateVendorSubmitModeCheck();
   try {
     const json = await postAppsScript({ action: "setVendorSubmitMode", mode: newMode });
     if (!json.success) throw new Error(json.error);
-    vendorSubmitMode = newMode;
-    updateVendorSubmitModeCheck();
     showIndicator(`Vendor submissions: ${newMode === "direct" ? "Direct (immediate)" : "Review queue"} ${CHECK_MARK}`, "success");
   } catch (err) {
-    showIndicator("Mode change failed: " + err.message, "error");
+    vendorSubmitMode = previousMode;
     updateVendorSubmitModeCheck();
+    showIndicator("Mode change failed: " + err.message, "error");
   }
 }
 
@@ -387,7 +412,8 @@ function initPackingReviews() {
   document.getElementById("packingReviewApproveAllBtn")?.addEventListener("click", () => {
     approveAllSelectedPendingPackingLists();
   });
+  updateVendorSubmissionsTabVisibility();
 }
 
 initPackingReviews();
-
+

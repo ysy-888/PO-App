@@ -30,6 +30,9 @@ function updateSettingsUi() {
   updateSettingsCountdownUi();
   updateSettingsDateFormatUi();
   if (typeof updateVendorSubmitModeCheck === "function") updateVendorSubmitModeCheck();
+  if (typeof updateSettingsVendorSubmissionsVisibility === "function") {
+    updateSettingsVendorSubmissionsVisibility();
+  }
 }
 
 function initSettingsVendorSubmitMode() {
