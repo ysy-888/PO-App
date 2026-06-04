@@ -1959,7 +1959,8 @@ async function deletePackingListFromPanel(row, packingList) {
       String(carton?.[PACKING_LIST_ID_FIELD] ?? "").trim() !== packingListId
     );
     invalidatePackingIndex();
-    closePackingListPanelInModal(row);
+    if (typeof closePoPackingPane === "function") closePoPackingPane({ clearSelection: false });
+    else closePackingListPanelInModal(row);
     renderTable();
     showIndicator("Packing list deleted", "success");
     return;
@@ -1979,7 +1980,8 @@ async function deletePackingListFromPanel(row, packingList) {
       String(carton?.[PACKING_LIST_ID_FIELD] ?? "").trim() !== packingListId
     );
     invalidatePackingIndex();
-    closePackingListPanelInModal(row);
+    if (typeof closePoPackingPane === "function") closePoPackingPane({ clearSelection: false });
+    else closePackingListPanelInModal(row);
     renderTable();
     showIndicator("Packing list deleted", "success");
   } catch (err) {

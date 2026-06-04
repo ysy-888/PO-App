@@ -243,6 +243,13 @@ function clearMiniSelection() {
   miniSelectedIndices.clear();
   miniSelectClickAnchorIndex = -1;
   applyMiniSelectionClasses();
+  if (typeof syncPoPackingPaneFromMiniSelection === "function") syncPoPackingPaneFromMiniSelection();
+}
+
+function getSingleMiniSelectedRow() {
+  if (miniSelectedIndices.size !== 1) return null;
+  const index = [...miniSelectedIndices][0];
+  return getVisiblePageRow(index);
 }
 
 function getMiniSelectShiftAnchor() {
@@ -260,6 +267,7 @@ function setMiniSelectionByIndexRange(startIdx, endIdx) {
   miniSelectedIndices.clear();
   for (let i = lo; i <= hi; i++) miniSelectedIndices.add(i);
   applyMiniSelectionClasses();
+  if (typeof syncPoPackingPaneFromMiniSelection === "function") syncPoPackingPaneFromMiniSelection();
 }
 
 function getVisiblePageRow(index) {

@@ -3749,6 +3749,21 @@ function vendorPortalGetPos(sessionId, token) {
       cartonsByListId[id].push(carton);
     });
 
+    const exfRequestsSheet = getExfRequestsSheet_();
+    const exfRequests = sheetToObjects_(exfRequestsSheet, EXF_REQUEST_ID_FIELD);
+    const exfRequestIdByPo = {};
+    exfRequests.forEach(request => {
+      const requestId = String(request[EXF_REQUEST_ID_FIELD] ?? "").trim();
+      if (!requestId) return;
+      String(request["PO Numbers"] ?? "")
+        .split(",")
+        .map(s => s.trim())
+        .filter(Boolean)
+        .forEach(poKey => {
+          if (!exfRequestIdByPo[poKey]) exfRequestIdByPo[poKey] = requestId;
+        });
+    });
+
     const pendingSheet = getPendingPackingListsSheet_();
     const pendingLists = sheetToObjects_(pendingSheet, PENDING_PACKING_LIST_ID_FIELD);
     const pendingByPo = {};
@@ -3802,7 +3817,7 @@ function vendorPortalGetPos(sessionId, token) {
         "Actual Qty": toPackingQty_(row["Actual Qty"]) || 0,
         "Ctn Qty": toPackingQty_(row["Ctn Qty"]) || 0,
         "EST EXF": row["EST EXF"] ? String(row["EST EXF"]) : "",
-        "EXF Request ID": String(row[EXF_REQUEST_ID_FIELD] ?? "").trim(),
+        "EXF Request ID": String(row[EXF_REQUEST_ID_FIELD] ?? "").trim() || exfRequestIdByPo[po] || "",
         "EXF Date": row[EXF_DATE_FIELD] ? String(row[EXF_DATE_FIELD]) : (row[EXF_REQUEST_DATE_FIELD] ? String(row[EXF_REQUEST_DATE_FIELD]) : ""),
         "EXF Memo": String(row[EXF_MEMO_FIELD] ?? "").trim(),
         "sizeLabels": sizeLabels,

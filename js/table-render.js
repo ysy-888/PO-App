@@ -141,6 +141,9 @@ function renderTable() {
     tr.className = "clickable-row";
 
     if (isTruthy(row["Flag"])) tr.classList.add("row-flagged");
+    else if (typeof isN41ClosedStatusMismatch === "function" && isN41ClosedStatusMismatch(row)) {
+      tr.classList.add("row-flagged");
+    }
 
     getColumnOrder().forEach(col => {
 
@@ -391,13 +394,6 @@ function renderN41StatusCell(td, row, val) {
   }
 
   mountSearchHighlightedText(td, display, val);
-  if (mismatch) {
-    const mark = document.createElement("span");
-    mark.className = "n41-status-mismatch-mark";
-    mark.setAttribute("aria-hidden", "true");
-    mark.textContent = "!";
-    td.appendChild(mark);
-  }
 }
 
 function applyN41StatusFieldDisplay(fieldEl, row, val) {
@@ -412,13 +408,6 @@ function applyN41StatusFieldDisplay(fieldEl, row, val) {
 
   fieldEl.textContent = String(val).trim();
   fieldEl.classList.remove("empty-display");
-  if (mismatch) {
-    const mark = document.createElement("span");
-    mark.className = "n41-status-mismatch-mark";
-    mark.setAttribute("aria-hidden", "true");
-    mark.textContent = "!";
-    fieldEl.appendChild(mark);
-  }
 }
 
 

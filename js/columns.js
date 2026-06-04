@@ -126,6 +126,7 @@ const COLUMN_WIDTH_TIER_L = new Set(["Notes"]);
 
 const COLUMN_CUSTOM_WIDTHS = {
   Buyer: 160,
+  "Buyer PO #": 120,
   Vendor: 84,
 };
 

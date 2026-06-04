@@ -62,7 +62,7 @@ function toggleCxlCountdown() {
 }
 
 function isPoTableViewActive() {
-  const wrap = document.getElementById("poTableWrap");
+  const wrap = document.getElementById("poViewContent") || document.getElementById("poTableWrap");
   return Boolean(wrap && !wrap.hidden);
 }
 

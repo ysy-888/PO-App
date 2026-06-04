@@ -364,6 +364,7 @@ function switchAppView(view) {
   const chargebackToolbar = document.getElementById("chargebackToolbar");
   const packingReviewToolbar = document.getElementById("packingReviewToolbar");
   const poHeaderMeta = document.getElementById("poHeaderMeta");
+  const poViewContent = document.getElementById("poViewContent");
   const poTableWrap = document.getElementById("poTableWrap");
   const shipmentTableWrap = document.getElementById("shipmentTableWrap");
   const requestsTableWrap = document.getElementById("requestsTableWrap");
@@ -381,7 +382,9 @@ function switchAppView(view) {
   if (chargebackToolbar) chargebackToolbar.hidden = view !== "chargebacks";
   if (packingReviewToolbar) packingReviewToolbar.hidden = view !== "packingReviews";
   if (poHeaderMeta) poHeaderMeta.hidden = view !== "po";
-  if (poTableWrap) poTableWrap.hidden = view !== "po";
+  if (poViewContent) poViewContent.hidden = view !== "po";
+  else if (poTableWrap) poTableWrap.hidden = view !== "po";
+  if (view !== "po" && typeof closePoPackingPane === "function") closePoPackingPane({ clearSelection: false });
   if (shipmentTableWrap) shipmentTableWrap.hidden = view !== "shipments";
   if (requestsTableWrap) requestsTableWrap.hidden = view !== "requests";
   if (chargebackTableWrap) chargebackTableWrap.hidden = view !== "chargebacks";

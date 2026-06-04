@@ -122,7 +122,7 @@ const DIVISION_BUYERS = {
     "Specialty",
   ],
   "Freesia": [
-    "LULU'S",
+    "LULU'S FASHION LOUNGE",
     "12TH TRIBE",
     "SHORT STORY",
   ],
