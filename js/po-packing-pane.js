@@ -9,6 +9,7 @@ let poPackingPaneSaveInProgress = false;
 
 const PO_PACKING_PANE = {
   pane: "poPackingPane",
+  title: "poPackingPaneTitle",
   summary: "poPackingSummaryCard",
   status: "poPackingStatusMsg",
   notes: "poPackingNotes",
@@ -32,7 +33,7 @@ const PO_CARTON_COL = {
   weight: 72,
   panePad: 34,
   paneMax: 560,
-  paneMin: 420,
+  paneMin: 440,
   sizeMin: 40,
   sizeDefault: 46,
 };
@@ -51,6 +52,11 @@ function poPaneFmtWeightKg(val) {
   return n > 0 ? n.toFixed(2) : "0";
 }
 
+function poPaneFmtTotalWeightKg(val) {
+  const n = Math.round(poPaneQty(val));
+  return n + " kg";
+}
+
 function poPaneMakeEmptyCarton() {
   const c = {};
   poPackingPaneSizeLabels.forEach((_, i) => { c["u" + i] = 0; });
@@ -66,6 +72,87 @@ function poPaneGetSizeLabelsFromRow(row) {
     if (label) labels.push(label);
   }
   return labels.length ? labels : ["Units"];
+}
+
+function poPaneUnitQtyFromRow(row, index) {
+  const field = `PO Unit ${index + 1}`;
+  return typeof toQtyNumber === "function" ? toQtyNumber(row[field]) : poPaneQty(row[field]);
+}
+
+function poPanePackingUnitQty(index) {
+  return poPackingPaneCartons.reduce((sum, c) => sum + poPaneQty(c["u" + index]), 0);
+}
+
+function poPaneFormatQtyCell(n) {
+  return n > 0 ? String(n) : "";
+}
+
+function poPaneAppendSizeQtyBlock(card, row) {
+  const count = poPackingPaneSizeLabels.length;
+  if (count === 0) return;
+
+  const block = document.createElement("div");
+  block.className = "po-summary-size-block";
+  block.style.setProperty("--po-size-count", String(count));
+
+  const corner = document.createElement("div");
+  corner.className = "po-summary-size-corner";
+  block.appendChild(corner);
+
+  const totalHeadSpacer = document.createElement("div");
+  totalHeadSpacer.className = "po-summary-size-colhead po-summary-size-colhead--blank";
+  totalHeadSpacer.setAttribute("aria-hidden", "true");
+  block.appendChild(totalHeadSpacer);
+
+  poPackingPaneSizeLabels.forEach(label => {
+    const head = document.createElement("div");
+    head.className = "po-summary-size-colhead";
+    head.textContent = label;
+    block.appendChild(head);
+  });
+
+  const poRowLabel = document.createElement("div");
+  poRowLabel.className = "po-summary-size-row-label";
+  poRowLabel.textContent = "PO Qty";
+  block.appendChild(poRowLabel);
+
+  const poTotal = typeof computePoQtyFromUnits === "function"
+    ? computePoQtyFromUnits(row)
+    : poPackingPaneSizeLabels.reduce((sum, _, i) => sum + poPaneUnitQtyFromRow(row, i), 0);
+  const poTotalCell = document.createElement("div");
+  poTotalCell.className = "po-summary-size-qty po-summary-size-qty--po";
+  poTotalCell.textContent = poPaneFormatQtyCell(poTotal);
+  block.appendChild(poTotalCell);
+
+  poPackingPaneSizeLabels.forEach((_, i) => {
+    const cell = document.createElement("div");
+    cell.className = "po-summary-size-qty po-summary-size-qty--po";
+    cell.id = "poSummaryPoUnit_" + i;
+    cell.textContent = poPaneFormatQtyCell(poPaneUnitQtyFromRow(row, i));
+    block.appendChild(cell);
+  });
+
+  const actRowLabel = document.createElement("div");
+  actRowLabel.className = "po-summary-size-row-label";
+  actRowLabel.textContent = "Actual Qty";
+  block.appendChild(actRowLabel);
+
+  const actTotal = poPackingPaneSizeLabels.reduce((sum, _, i) => sum + poPanePackingUnitQty(i), 0);
+  const actTotalCell = document.createElement("div");
+  actTotalCell.className = "po-summary-size-qty po-summary-size-qty--act";
+  actTotalCell.id = "poSummaryActTotal";
+  actTotalCell.textContent = poPaneFormatQtyCell(actTotal);
+  block.appendChild(actTotalCell);
+
+  poPackingPaneSizeLabels.forEach((_, i) => {
+    const cell = document.createElement("div");
+    cell.className = "po-summary-size-qty po-summary-size-qty--act";
+    cell.id = "poSummarySizeTotal_" + i;
+    cell.textContent = poPaneFormatQtyCell(poPanePackingUnitQty(i));
+    block.appendChild(cell);
+  });
+
+  card.appendChild(block);
 }
 
 function poPaneSheetCartonsToPane(cartons) {
@@ -180,8 +267,13 @@ function openPoPackingPane(row) {
   const readOnly = typeof isPoClosed === "function" && isPoClosed(row);
 
   if (countInput) countInput.value = String(poPackingPaneCartons.length);
-  if (notesInput) notesInput.value = String(packingList?.["Notes"] ?? "").trim();
+  if (notesInput) {
+    notesInput.value = String(row["Notes"] ?? "").trim();
+    notesInput.readOnly = true;
+  }
   if (deleteBtn) deleteBtn.hidden = !packingList;
+  const titleEl = document.getElementById(PO_PACKING_PANE.title);
+  if (titleEl) titleEl.textContent = poKey ? "PO # " + poKey : "";
   if (pane) pane.hidden = false;
 
   poPaneSetReadOnly(readOnly);
@@ -196,8 +288,6 @@ function poPaneSetReadOnly(readOnly) {
     PO_PACKING_PANE.countInput,
     PO_PACKING_PANE.decr,
     PO_PACKING_PANE.incr,
-    PO_PACKING_PANE.notes,
-    "poPackingSaveBtn",
   ];
   ids.forEach(id => {
     const el = document.getElementById(id);
@@ -205,6 +295,8 @@ function poPaneSetReadOnly(readOnly) {
     if (el.tagName === "BUTTON") el.disabled = readOnly;
     else el.readOnly = readOnly;
   });
+  const notesEl = document.getElementById(PO_PACKING_PANE.notes);
+  if (notesEl) notesEl.readOnly = true;
   document.querySelectorAll("#poCartonGridBody input").forEach(inp => {
     inp.readOnly = readOnly;
   });
@@ -215,29 +307,31 @@ function poPaneBuildSummaryCard(row) {
   if (!card) return;
   card.innerHTML = "";
 
+  const fields = document.createElement("div");
+  fields.className = "po-summary-fields";
+
   function addRow(label, value) {
     if (!value) return;
-    const rowEl = document.createElement("div");
-    rowEl.className = "po-summary-row";
     const lbl = document.createElement("span");
     lbl.className = "po-summary-label";
     lbl.textContent = label;
     const val = document.createElement("span");
     val.className = "po-summary-value";
     val.textContent = value;
-    rowEl.appendChild(lbl);
-    rowEl.appendChild(val);
-    card.appendChild(rowEl);
+    fields.appendChild(lbl);
+    fields.appendChild(val);
   }
 
-  addRow("PO #", row["PO #"]);
   addRow("Buyer PO #", row["Buyer PO #"]);
   addRow("Buyer", row["Buyer"]);
   addRow("Style #", row["Style #"]);
   addRow("Color", row["Color"]);
   if (row["EXF Request ID"]) addRow("EXF Req ID", row["EXF Request ID"]);
-  if (row["EXF Date"]) addRow("EXF Date", row["EXF Date"]);
+  const exfDate = row["EXF Date"] || row["EXF Request Date"];
+  if (!isEmptyValue(exfDate)) addRow("EXF Date", formatDateForDisplay(exfDate));
   if (row["EXF Memo"]) addRow("EXF Memo", row["EXF Memo"]);
+
+  card.appendChild(fields);
 
   const totalsRow = document.createElement("div");
   totalsRow.className = "po-summary-totals";
@@ -261,26 +355,10 @@ function poPaneBuildSummaryCard(row) {
   const units = poPackingPaneCartons.reduce((sum, c) => sum + poPaneCartonTotal(c), 0);
   addTotal(units || row["Actual Qty"] || 0, "Total Units", "TotalUnits");
   const weight = poPackingPaneCartons.reduce((sum, c) => sum + poPaneQty(c.weight), 0);
-  addTotal(poPaneFmtWeightKg(weight), "Total Weight", "TotalWeight");
+  addTotal(poPaneFmtTotalWeightKg(weight), "Total Weight", "TotalWeight");
   card.appendChild(totalsRow);
 
-  const sizeTotalsRow = document.createElement("div");
-  sizeTotalsRow.className = "po-summary-size-totals";
-  poPackingPaneSizeLabels.forEach((label, i) => {
-    const item = document.createElement("div");
-    item.className = "po-summary-size-total-item";
-    const lbl = document.createElement("div");
-    lbl.className = "po-summary-size-total-item__label";
-    lbl.textContent = label;
-    const num = document.createElement("div");
-    num.className = "po-summary-size-total-item__num";
-    num.id = "poSummarySizeTotal_" + i;
-    num.textContent = String(poPackingPaneCartons.reduce((sum, c) => sum + poPaneQty(c["u" + i]), 0));
-    item.appendChild(lbl);
-    item.appendChild(num);
-    sizeTotalsRow.appendChild(item);
-  });
-  card.appendChild(sizeTotalsRow);
+  poPaneAppendSizeQtyBlock(card, row);
 }
 
 function poPaneRefreshSummaryTotals() {
@@ -291,12 +369,13 @@ function poPaneRefreshSummaryTotals() {
   const totalUnits = poPackingPaneCartons.reduce((sum, c) => sum + poPaneCartonTotal(c), 0);
   if (unitEl) unitEl.textContent = String(totalUnits);
   const totalWeight = poPackingPaneCartons.reduce((sum, c) => sum + poPaneQty(c.weight), 0);
-  if (weightEl) weightEl.textContent = poPaneFmtWeightKg(totalWeight);
+  if (weightEl) weightEl.textContent = poPaneFmtTotalWeightKg(totalWeight);
+  const actTotal = poPackingPaneSizeLabels.reduce((sum, _, i) => sum + poPanePackingUnitQty(i), 0);
+  const actTotalEl = document.getElementById("poSummaryActTotal");
+  if (actTotalEl) actTotalEl.textContent = poPaneFormatQtyCell(actTotal);
   poPackingPaneSizeLabels.forEach((_, i) => {
     const el = document.getElementById("poSummarySizeTotal_" + i);
-    if (el) {
-      el.textContent = String(poPackingPaneCartons.reduce((sum, c) => sum + poPaneQty(c["u" + i]), 0));
-    }
+    if (el) el.textContent = poPaneFormatQtyCell(poPanePackingUnitQty(i));
   });
 }
 
@@ -341,14 +420,6 @@ function poPaneSyncCartonGridLayout() {
     gridWrap.style.setProperty("--carton-grid-width", tableW + "px");
     gridWrap.style.setProperty("--carton-grid-cols", cols);
   }
-}
-
-function poPaneSyncCartonGridScrollbarPad() {
-  const scroll = document.getElementById(PO_PACKING_PANE.gridScroll);
-  const headWrap = document.getElementById(PO_PACKING_PANE.gridHeadWrap);
-  if (!scroll || !headWrap) return;
-  const sb = scroll.offsetWidth - scroll.clientWidth;
-  headWrap.style.paddingRight = sb > 0 ? sb + "px" : "0";
 }
 
 function poPaneAddGridGap(parent) {
@@ -420,6 +491,7 @@ function poPaneRenderCartonRows() {
 
     poPackingPaneSizeLabels.forEach((_, i) => {
       const cell = document.createElement("div");
+      cell.className = "carton-grid-size-cell";
       const input = poPaneCreateQtyInput(carton["u" + i], () => {
         carton["u" + i] = poPaneQty(input.value);
         totalCell.textContent = poPaneCartonTotal(carton) > 0 ? String(poPaneCartonTotal(carton)) : "";
@@ -437,6 +509,7 @@ function poPaneRenderCartonRows() {
     row.appendChild(totalCell);
 
     const weightCell = document.createElement("div");
+    weightCell.className = "carton-grid-weight-cell";
     const weightField = poPaneCreateWeightField(carton.weight, () => {
       carton.weight = poPaneQty(weightField.input.value);
       poPaneRefreshSummaryTotals();
@@ -448,7 +521,6 @@ function poPaneRenderCartonRows() {
   });
 
   poPaneRefreshSummaryTotals();
-  requestAnimationFrame(poPaneSyncCartonGridScrollbarPad);
 }
 
 function poPaneBuildCartonGrid() {
@@ -459,10 +531,15 @@ function poPaneBuildCartonGrid() {
   const numHead = poPaneAddGridHeadCell(head, "#");
   numHead.className = "carton-grid-num";
   poPaneAddGridGap(head);
-  poPackingPaneSizeLabels.forEach(label => poPaneAddGridHeadCell(head, label));
+  poPackingPaneSizeLabels.forEach(label => {
+    const cell = poPaneAddGridHeadCell(head, label);
+    cell.classList.add("carton-grid-size-head");
+  });
   poPaneAddGridGap(head);
-  poPaneAddGridHeadCell(head, "Total");
-  poPaneAddGridHeadCell(head, "Weight");
+  const totalHead = poPaneAddGridHeadCell(head, "Total");
+  totalHead.classList.add("carton-grid-total-head");
+  const weightHead = poPaneAddGridHeadCell(head, "Weight");
+  weightHead.classList.add("carton-grid-weight-head");
   poPaneRenderCartonRows();
 }
 
@@ -562,7 +639,6 @@ function initPoPackingPane() {
   const decr = document.getElementById(PO_PACKING_PANE.decr);
   const incr = document.getElementById(PO_PACKING_PANE.incr);
   const countInput = document.getElementById(PO_PACKING_PANE.countInput);
-  const saveBtn = document.getElementById("poPackingSaveBtn");
   const menuBtn = document.getElementById(PO_PACKING_PANE.menuBtn);
   const menuDropdown = document.getElementById(PO_PACKING_PANE.menuDropdown);
   const menuClear = document.getElementById("poMenuClearPacking");
@@ -572,6 +648,9 @@ function initPoPackingPane() {
   const mcModal = document.getElementById("poMultiCartonModal");
   const mcCancel = document.getElementById("poMultiCartonCancel");
   const mcApply = document.getElementById("poMultiCartonApply");
+
+  const pane = document.getElementById(PO_PACKING_PANE.pane);
+  pane?.addEventListener("mousedown", e => e.stopPropagation());
 
   paneClose?.addEventListener("click", () => closePoPackingPane({ clearSelection: true }));
 
@@ -588,8 +667,6 @@ function initPoPackingPane() {
     poPaneSyncCartonCount(next);
   });
   if (countInput && typeof bindNumberInput === "function") bindNumberInput(countInput);
-
-  saveBtn?.addEventListener("click", () => poPaneSavePackingList());
 
   menuBtn?.addEventListener("click", e => {
     e.stopPropagation();
@@ -683,9 +760,6 @@ function initPoPackingPane() {
     if (mcModal) mcModal.hidden = true;
   });
 
-  window.addEventListener("resize", () => {
-    if (!document.getElementById(PO_PACKING_PANE.pane)?.hidden) poPaneSyncCartonGridScrollbarPad();
-  });
 }
 
 initPoPackingPane();

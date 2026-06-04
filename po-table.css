@@ -2108,66 +2108,78 @@ tr.row-flagged:hover td.td-flag-cell.col-leading {
     -100vw 0 0 0 var(--row-flagged-hover);
 }
 
-tr.row-flagged:has(.po-select-checkbox:checked) td {
+tr.row-mini-selected.row-flagged td {
   background: var(--row-flagged-selected-bg);
 }
 
-tr.row-flagged:has(.po-select-checkbox:checked):hover td {
+tr.row-mini-selected.row-flagged:hover td {
   background: var(--row-flagged-selected-hover);
 }
 
-tr.row-flagged:has(.po-select-checkbox:checked):hover td.td-flag-cell.col-leading {
+tr.row-mini-selected.row-flagged:hover td.td-flag-cell.col-leading {
   box-shadow:
     inset 3px 0 0 var(--row-flagged-accent),
     -100vw 0 0 0 var(--row-flagged-selected-hover);
 }
 
-tr:has(.po-select-checkbox:checked):not(.row-flagged) td {
+tr.row-mini-selected:not(.row-flagged) td {
   background: var(--row-selected-bg);
 }
 
-tr:has(.po-select-checkbox:checked):not(.row-flagged):hover td {
+tr.row-mini-selected:not(.row-flagged):hover td {
   background: var(--row-selected-hover);
 }
 
-tr:has(.po-select-checkbox:checked):not(.row-flagged):hover td.td-flag-cell.col-leading {
+tr.row-mini-selected:not(.row-flagged):hover td.td-flag-cell.col-leading {
   box-shadow: -100vw 0 0 0 var(--row-selected-hover);
 }
 
-.mini-select-ants {
+.checkbox-select-ants {
   position: absolute;
   pointer-events: none;
   z-index: 44;
   overflow: visible;
 }
 
-.mini-select-ants-svg {
+.checkbox-select-ants-svg {
   display: block;
   overflow: visible;
 }
 
-.mini-select-ants-rect {
+.checkbox-select-ants-rect {
   stroke: #19da90;
   stroke-width: 1.5;
   stroke-dasharray: 6 4;
-  animation: mini-select-ants-march 1.1s linear infinite;
+  animation: checkbox-select-ants-march 1.1s linear infinite;
 }
 
-@keyframes mini-select-ants-march {
+@keyframes checkbox-select-ants-march {
   to {
     stroke-dashoffset: -20;
   }
 }
 
-tr.row-mini-selected td {
+tr.row-flagged:has(.po-select-checkbox:checked) td {
   background: rgba(25, 218, 144, 0.1);
 }
 
-tr.row-mini-selected:hover td {
+tr.row-flagged:has(.po-select-checkbox:checked):hover td {
   background: rgba(25, 218, 144, 0.1) !important;
 }
 
-tr.row-mini-selected:hover td.td-flag-cell.col-leading {
+tr.row-flagged:has(.po-select-checkbox:checked):hover td.td-flag-cell.col-leading {
+  box-shadow: -100vw 0 0 0 rgba(25, 218, 144, 0.1);
+}
+
+tr:has(.po-select-checkbox:checked):not(.row-flagged) td {
+  background: rgba(25, 218, 144, 0.1);
+}
+
+tr:has(.po-select-checkbox:checked):not(.row-flagged):hover td {
+  background: rgba(25, 218, 144, 0.1) !important;
+}
+
+tr:has(.po-select-checkbox:checked):not(.row-flagged):hover td.td-flag-cell.col-leading {
   box-shadow: -100vw 0 0 0 rgba(25, 218, 144, 0.1);
 }
 
@@ -6235,8 +6247,8 @@ th.th-shipment-id-col.th-filterable.sorted-desc {
 #poPackingPane.packing-pane {
   --packing-pane-width: 480px;
   flex: 0 0 auto;
-  width: var(--packing-pane-width);
-  min-width: 0;
+  width: max(var(--packing-pane-width), 440px);
+  min-width: 440px;
   min-height: 0;
   max-width: 560px;
   border-left: 1px solid var(--border);
@@ -6359,66 +6371,109 @@ th.th-shipment-id-col.th-filterable.sorted-desc {
   flex-shrink: 0;
 }
 
-#poPackingPane .po-summary-row {
-  display: flex;
-  gap: 6px;
+#poPackingPane .po-summary-fields {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: 10px;
+  row-gap: 5px;
   align-items: baseline;
-  margin-bottom: 4px;
-  flex-wrap: wrap;
 }
 
 #poPackingPane .po-summary-label {
   font-size: 11px;
-  color: var(--text-muted);
-  font-weight: 600;
+  color: var(--text);
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  min-width: 64px;
-  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 #poPackingPane .po-summary-value {
   font-size: 13px;
   color: var(--text);
   font-weight: 500;
+  min-width: 0;
 }
 
 #poPackingPane .po-summary-totals {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
-  margin-top: 8px;
-  padding-top: 8px;
+  justify-content: center;
+  gap: 20px 24px;
+  margin-top: 12px;
+  padding-top: 12px;
   border-top: 1px solid var(--border);
 }
 
-#poPackingPane .po-summary-size-totals {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-  margin-top: 4px;
-}
-
-#poPackingPane .po-summary-size-total-item {
+#poPackingPane .po-summary-total-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  min-width: 36px;
+  gap: 3px;
 }
 
-#poPackingPane .po-summary-size-total-item__label {
+#poPackingPane .po-summary-size-block {
+  --po-size-row-label-width: 58px;
+  --po-size-total-width: 40px;
+  --po-size-unit-width: 40px;
+  display: grid;
+  grid-template-columns:
+    var(--po-size-row-label-width)
+    var(--po-size-total-width)
+    repeat(var(--po-size-count), minmax(0, var(--po-size-unit-width)));
+  gap: 5px 8px;
+  align-items: center;
+  justify-content: center;
+  width: max-content;
+  max-width: 100%;
+  margin: 20px auto 0;
+}
+
+#poPackingPane .po-summary-size-corner {
+  min-height: 0;
+}
+
+#poPackingPane .po-summary-size-colhead {
+  text-align: center;
   font-size: 10px;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-}
-
-#poPackingPane .po-summary-size-total-item__num {
-  font-size: 14px;
   font-weight: 700;
   color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#poPackingPane .po-summary-size-colhead--blank {
+  visibility: hidden;
+}
+
+#poPackingPane .po-summary-size-row-label {
+  text-align: right;
+  padding-right: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+#poPackingPane .po-summary-size-qty {
+  text-align: center;
   font-variant-numeric: tabular-nums;
+  min-width: 0;
+}
+
+#poPackingPane .po-summary-size-qty--po {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+#poPackingPane .po-summary-size-qty--act {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
 }
 
 #poPackingPane .po-summary-total-item__num {
@@ -6430,7 +6485,10 @@ th.th-shipment-id-col.th-filterable.sorted-desc {
 
 #poPackingPane .po-summary-total-item__label {
   font-size: 11px;
-  color: var(--text-muted);
+  font-weight: 700;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 #poPackingPane .packing-editor-section {
@@ -6516,11 +6574,27 @@ th.th-shipment-id-col.th-filterable.sorted-desc {
   --carton-grid-cols: 28px 10px 46px 10px 42px 72px;
 }
 
+#poPackingPane .carton-grid-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overflow-x: hidden;
+}
+
 #poPackingPane .carton-grid-head-wrap {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   flex-shrink: 0;
   overflow: hidden;
   background: #f7f7f8;
   border-bottom: 2px solid var(--border);
+  width: var(--carton-grid-width);
+}
+
+#poPackingPane .carton-grid-body {
+  width: var(--carton-grid-width);
+  flex-shrink: 0;
 }
 
 #poPackingPane .carton-grid-head,
@@ -6528,7 +6602,19 @@ th.th-shipment-id-col.th-filterable.sorted-desc {
   display: grid;
   grid-template-columns: var(--carton-grid-cols);
   align-items: center;
-  width: var(--carton-grid-width, 100%);
+  width: var(--carton-grid-width);
+  min-width: var(--carton-grid-width);
+  max-width: var(--carton-grid-width);
+  box-sizing: border-box;
+}
+
+#poPackingPane .carton-grid-head > *,
+#poPackingPane .carton-grid-row > * {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
 }
 
 #poPackingPane .carton-grid-head > * {
@@ -6536,38 +6622,84 @@ th.th-shipment-id-col.th-filterable.sorted-desc {
   font-weight: 600;
   font-size: 11px;
   color: var(--text-muted);
-  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 #poPackingPane .carton-grid-row {
   border-bottom: 1px solid var(--border);
 }
 
+#poPackingPane .carton-grid-row > * {
+  padding: 3px 2px;
+}
+
+#poPackingPane .carton-grid-gap {
+  padding: 0;
+}
+
+#poPackingPane .carton-grid-num {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-align: center;
+}
+
+#poPackingPane .carton-grid-size-cell .carton-grid-input {
+  width: 100%;
+  max-width: 100%;
+}
+
 #poPackingPane .carton-grid-row:last-child {
   border-bottom: none;
 }
 
-#poPackingPane .carton-grid-body-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
-
-#poPackingPane .carton-grid-input,
-#poPackingPane .carton-weight-input {
+#poPackingPane .carton-grid-input {
   width: 100%;
+  max-width: 100%;
   box-sizing: border-box;
   padding: 4px 2px;
   text-align: center;
   font-size: 12px;
   font-family: var(--font);
+  font-variant-numeric: tabular-nums;
   border: 1px solid transparent;
   border-radius: 4px;
   background: transparent;
   outline: none;
 }
 
-#poPackingPane .carton-grid-input:focus,
+#poPackingPane .carton-grid-input:focus {
+  border-color: #6b7280;
+  background: #fff;
+}
+
+#poPackingPane .carton-weight-input {
+  width: 3.25em;
+  min-width: 0;
+  flex: 0 1 auto;
+  box-sizing: border-box;
+  padding: 4px 1px 4px 2px;
+  text-align: right;
+  font-size: 12px;
+  font-family: var(--font);
+  font-variant-numeric: tabular-nums;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  outline: none;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+#poPackingPane .carton-weight-input::-webkit-outer-spin-button,
+#poPackingPane .carton-weight-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+
 #poPackingPane .carton-weight-input:focus {
   border-color: #6b7280;
   background: #fff;
@@ -6583,12 +6715,25 @@ th.th-shipment-id-col.th-filterable.sorted-desc {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 1px;
+  max-width: 100%;
 }
 
 #poPackingPane .carton-weight-suffix {
   font-size: 11px;
+  font-weight: 500;
   color: var(--text-muted);
+  white-space: nowrap;
+  line-height: 1;
+  margin-left: -1px;
+}
+
+#poPackingPane .notes-field label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 #poPackingPane .notes-field textarea {
@@ -6601,6 +6746,8 @@ th.th-shipment-id-col.th-filterable.sorted-desc {
   resize: none;
   min-height: 56px;
   outline: none;
+  background: #fafafa;
+  color: var(--text);
 }
 
 #poPackingPane .submit-bar {

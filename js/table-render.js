@@ -352,6 +352,8 @@ function renderTable() {
 
   applyMiniSelectionClasses();
 
+  requestAnimationFrame(updateCheckboxSelectAntsOverlay);
+
 }
 
 let poTableRefreshQueued = false;

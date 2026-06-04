@@ -473,6 +473,9 @@ function setDateFormat(value) {
 function refreshDateDisplays() {
   renderTable();
   updateModalIfOpen();
+  if (typeof poPackingPaneRow !== "undefined" && poPackingPaneRow && typeof poPaneBuildSummaryCard === "function") {
+    poPaneBuildSummaryCard(poPackingPaneRow);
+  }
   if (typeof currentAppView !== "undefined" && typeof switchAppView === "function") {
     switchAppView(currentAppView);
   }

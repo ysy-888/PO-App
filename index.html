@@ -250,7 +250,7 @@
 
 <aside class="packing-pane" id="poPackingPane" hidden>
   <div class="packing-pane-header">
-    <span class="packing-pane-title">Packing List</span>
+    <span class="packing-pane-title" id="poPackingPaneTitle"></span>
     <div class="packing-pane-menu-wrap">
       <button type="button" class="btn-icon-sm" id="poPackingMenuBtn" title="More options">&#8943;</button>
       <div class="packing-pane-menu-dropdown" id="poPackingMenuDropdown" hidden>
@@ -266,19 +266,11 @@
   <div class="packing-editor-section" id="poPackingEditorSection">
     <div class="packing-editor-main">
       <div id="poPackingStatusMsg" class="status-msg"></div>
-      <div class="carton-count-row">
-        <label for="poCartonCountInput">Cartons</label>
-        <div class="count-stepper">
-          <button type="button" class="count-step-btn" id="poCartonDecrBtn">&#8722;</button>
-          <input class="count-stepper-input" type="number" id="poCartonCountInput" min="1" step="1" value="1" />
-          <button type="button" class="count-step-btn" id="poCartonIncrBtn">&#43;</button>
-        </div>
-      </div>
       <div class="carton-grid-wrap" id="poCartonGridWrap">
-        <div class="carton-grid-head-wrap" id="poCartonGridHeadWrap">
-          <div class="carton-grid-head" id="poCartonGridHead"></div>
-        </div>
-        <div class="carton-grid-body-scroll" id="poCartonGridScroll">
+        <div class="carton-grid-scroll" id="poCartonGridScroll">
+          <div class="carton-grid-head-wrap" id="poCartonGridHeadWrap">
+            <div class="carton-grid-head" id="poCartonGridHead"></div>
+          </div>
           <div class="carton-grid-body" id="poCartonGridBody"></div>
         </div>
       </div>
@@ -286,11 +278,7 @@
     <div class="packing-editor-footer">
       <div class="notes-field">
         <label for="poPackingNotes">Notes</label>
-        <textarea id="poPackingNotes" rows="2" placeholder="Any notes…"></textarea>
-      </div>
-      <div class="submit-bar">
-        <button type="button" class="btn btn-primary" id="poPackingSaveBtn">Save</button>
-        <span id="poPackingSaveSpinner" hidden>Saving&hellip;</span>
+        <textarea id="poPackingNotes" rows="2" readonly placeholder=""></textarea>
       </div>
     </div>
   </div>

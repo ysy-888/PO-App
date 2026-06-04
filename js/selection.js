@@ -15,6 +15,7 @@ function toggleRowSelected(row, selected) {
   row["Selected"] = next;
   updateSelectAllHeader();
   if (typeof onPoSelectionChanged === "function") onPoSelectionChanged();
+  requestAnimationFrame(updateCheckboxSelectAntsOverlay);
   return true;
 }
 
@@ -33,6 +34,7 @@ function clearMainTableSelection() {
     cb.checked = false;
   });
   updateSelectAllHeader();
+  requestAnimationFrame(updateCheckboxSelectAntsOverlay);
 }
 
 function clearExfFormSelection() {
@@ -167,39 +169,42 @@ function getOffsetWithin(el, container) {
   return { top, left };
 }
 
-let miniSelectAntsEl = null;
+let checkboxSelectAntsEl = null;
 
-function ensureMiniSelectAntsOverlay() {
-  if (miniSelectAntsEl) return miniSelectAntsEl;
+function getCheckboxSelectedTrList() {
+  return getVisibleRowTrList().filter(tr => tr.querySelector(".po-select-checkbox:checked"));
+}
+
+function ensureCheckboxSelectAntsOverlay() {
+  if (checkboxSelectAntsEl) return checkboxSelectAntsEl;
   const container = document.querySelector(".table-scroll-x");
   if (!container) return null;
 
-  miniSelectAntsEl = document.createElement("div");
-  miniSelectAntsEl.id = "miniSelectAnts";
-  miniSelectAntsEl.className = "mini-select-ants";
-  miniSelectAntsEl.hidden = true;
-  miniSelectAntsEl.innerHTML =
-    `<svg class="mini-select-ants-svg" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
-    `<rect class="mini-select-ants-rect" fill="none"/></svg>`;
-  container.appendChild(miniSelectAntsEl);
-  return miniSelectAntsEl;
+  checkboxSelectAntsEl = document.createElement("div");
+  checkboxSelectAntsEl.id = "checkboxSelectAnts";
+  checkboxSelectAntsEl.className = "checkbox-select-ants";
+  checkboxSelectAntsEl.hidden = true;
+  checkboxSelectAntsEl.innerHTML =
+    `<svg class="checkbox-select-ants-svg" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
+    `<rect class="checkbox-select-ants-rect" fill="none"/></svg>`;
+  container.appendChild(checkboxSelectAntsEl);
+  return checkboxSelectAntsEl;
 }
 
-function updateMiniSelectAntsOverlay() {
-  const overlay = ensureMiniSelectAntsOverlay();
+function updateCheckboxSelectAntsOverlay() {
+  const overlay = ensureCheckboxSelectAntsOverlay();
   if (!overlay) return;
 
-  if (miniSelectedIndices.size === 0) {
+  const selectedTrs = getCheckboxSelectedTrList();
+  if (selectedTrs.length === 0) {
     overlay.hidden = true;
     return;
   }
 
   const container = document.querySelector(".table-scroll-x");
   const table = document.getElementById("poTable");
-  const trs = getVisibleRowTrList();
-  const sorted = [...miniSelectedIndices].sort((a, b) => a - b);
-  const firstTr = trs[sorted[0]];
-  const lastTr = trs[sorted[sorted.length - 1]];
+  const firstTr = selectedTrs[0];
+  const lastTr = selectedTrs[selectedTrs.length - 1];
   if (!container || !table || !firstTr || !lastTr) {
     overlay.hidden = true;
     return;
@@ -218,8 +223,8 @@ function updateMiniSelectAntsOverlay() {
   overlay.style.height = `${height}px`;
   overlay.hidden = false;
 
-  const svg = overlay.querySelector(".mini-select-ants-svg");
-  const rect = overlay.querySelector(".mini-select-ants-rect");
+  const svg = overlay.querySelector(".checkbox-select-ants-svg");
+  const rect = overlay.querySelector(".checkbox-select-ants-rect");
   if (!svg || !rect) return;
 
   svg.setAttribute("width", String(width));
@@ -235,7 +240,6 @@ function applyMiniSelectionClasses() {
   getVisibleRowTrList().forEach((tr, i) => {
     tr.classList.toggle("row-mini-selected", miniSelectedIndices.has(i));
   });
-  requestAnimationFrame(updateMiniSelectAntsOverlay);
 }
 
 function clearMiniSelection() {
@@ -268,6 +272,22 @@ function setMiniSelectionByIndexRange(startIdx, endIdx) {
   for (let i = lo; i <= hi; i++) miniSelectedIndices.add(i);
   applyMiniSelectionClasses();
   if (typeof syncPoPackingPaneFromMiniSelection === "function") syncPoPackingPaneFromMiniSelection();
+}
+
+function moveSingleMiniSelection(delta) {
+  if (miniSelectedIndices.size !== 1) return false;
+
+  const trs = getVisibleRowTrList();
+  if (trs.length === 0) return false;
+
+  const currentIdx = [...miniSelectedIndices][0];
+  const nextIdx = currentIdx + delta;
+  if (nextIdx < 0 || nextIdx >= trs.length) return false;
+
+  setMiniSelectionByIndexRange(nextIdx, nextIdx);
+  miniSelectClickAnchorIndex = nextIdx;
+  trs[nextIdx]?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  return true;
 }
 
 function getVisiblePageRow(index) {
@@ -423,24 +443,35 @@ function initRowMiniSelection() {
   document.addEventListener("mousedown", e => {
     if (rowSelectPointerId !== null) return;
     if (e.target.closest("#tableBody")) return;
+    if (e.target.closest("#poPackingPane, #poMultiCartonModal")) return;
     if (e.target.closest(".column-filter-popover, .cell-select-dropdown, .cell-date-popover, .header-menu-dropdown")) return;
     clearMiniSelection();
   });
 
   document.addEventListener("keydown", e => {
+    if (isTypingInField(e.target)) return;
+
+    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+      if (miniSelectedIndices.size !== 1) return;
+      if (document.querySelector(".modal-backdrop.open")) return;
+      if (typeof isPoTableViewActive === "function" && !isPoTableViewActive()) return;
+      const delta = e.key === "ArrowUp" ? -1 : 1;
+      if (moveSingleMiniSelection(delta)) e.preventDefault();
+      return;
+    }
+
     if (e.key !== " " && e.code !== "Space") return;
     if (miniSelectedIndices.size === 0) return;
-    if (isTypingInField(e.target)) return;
     e.preventDefault();
     toggleMiniSelectedCheckboxState();
   });
 
   document.querySelector(".table-scroll-y")?.addEventListener(
     "scroll",
-    updateMiniSelectAntsOverlay,
+    updateCheckboxSelectAntsOverlay,
     { passive: true }
   );
-  window.addEventListener("resize", updateMiniSelectAntsOverlay, { passive: true });
+  window.addEventListener("resize", updateCheckboxSelectAntsOverlay, { passive: true });
 }
 
 function updateModalIfOpen() {

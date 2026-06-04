@@ -95,7 +95,7 @@ const EDITABLE_FIELDS = [
   "Flag",
   "PO Qty", "Status", "N41 Status", "Ship Method",
   "Vessel", "House #", "Shipped", "ETD", "ETA", "IHD",
-  "EST EXF", "EST IHD", "EXF", "CXL Date", "Assign Date", "Notes",
+  "EST EXF", "EST IHD", "EXF", "CXL Date", "Assign Date", "Notes", "Old PO #",
   EXF_REQUESTED_FIELD, EXF_REQUEST_DATE_FIELD, EXF_MEMO_FIELD,
   EXF_DATE_FIELD, EXF_REQ_DATE_FIELD, EXF_REQUEST_ID_FIELD,
   ASN_REQUEST_ID_FIELD, ASN_REQUESTED_FIELD, ASN_DATE_FIELD, ASN_REQ_DATE_FIELD,

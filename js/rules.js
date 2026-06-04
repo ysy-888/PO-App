@@ -30,7 +30,7 @@ function normalizeStylePhotoUrl(url) {
 const EDITABLE = new Set([
   "Flag",
   "Status","N41 Status","Ship Method",
-  "IHD","EST EXF","CXL Date","Assign Date","Notes",
+  "IHD","EST EXF","CXL Date","Assign Date","Notes","Old PO #",
   "FOB Cost","Price","PO Total Cost","OG","PROTO","FIT/PP","BULK","TOP","TRIM",
   "Received Qty",
 ]);
@@ -60,7 +60,7 @@ function isPoFieldEditable(col, row) {
 const READONLY_NO_SELECT_COLS = new Set(["Division", "PO Date", "Vendor"]);
 
 const COPY_ON_CLICK_COLS = new Set([
-  "Buyer", "Buyer PO #", "SO #", "PO #", "Old PO #", "Style #", "Color",
+  "Buyer", "Buyer PO #", "SO #", "PO #", "Style #", "Color",
 ]);
 
 const MODAL_FIELD_SIZE = {
@@ -172,7 +172,7 @@ const APPS_SCRIPT_EDITABLE_PO_FIELDS = new Set([
   "Flag",
   "PO Qty", "Status", "N41 Status", "Ship Method",
   "Vessel", "House #", "Shipped", "ETD", "ETA", "IHD",
-  "EST EXF", "EST IHD", "CXL Date", "Assign Date", "Notes",
+  "EST EXF", "EST IHD", "CXL Date", "Assign Date", "Notes", "Old PO #",
   "EXF Requested", "EXF Date", "EXF Request ID", "EXF Memo",
   "ASN Requested", "ASN Date", "ASN Req Date", "ASN Request ID",
   "Delivery Requested", "Delivery Date", "Delivery Req Date", "Delivery Request ID",
