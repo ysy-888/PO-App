@@ -292,6 +292,14 @@ function selectCellSelectOption(value) {
     return;
   }
 
+  if (typeof isPackingPaneStatusEl === "function" && isPackingPaneStatusEl(anchor)) {
+    poPaneRenderStatusHeader(row);
+    saveUpdate(row["PO #"], { [col]: value });
+    renderTable();
+    updateModalIfOpen();
+    return;
+  }
+
   const updates = { [col]: value };
   if (col === "Ship Method") {
     updates["EST IHD"] = row["EST IHD"];

@@ -475,8 +475,10 @@ function initRowMiniSelection() {
 }
 
 function updateModalIfOpen() {
-  if (!modalRow || !document.getElementById("modalOverlay")?.classList.contains("open")) return;
-  renderModalContent(modalRow);
+  if (modalRow && document.getElementById("modalOverlay")?.classList.contains("open")) {
+    renderModalContent(modalRow);
+  }
+  if (typeof updatePackingPaneIfOpen === "function") updatePackingPaneIfOpen();
 }
 
 function refreshModalPackingQtyDisplay(row) {

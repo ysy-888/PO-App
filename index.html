@@ -250,35 +250,55 @@
 
 <aside class="packing-pane" id="poPackingPane" hidden>
   <div class="packing-pane-header">
-    <span class="packing-pane-title" id="poPackingPaneTitle"></span>
-    <div class="packing-pane-menu-wrap">
-      <button type="button" class="btn-icon-sm" id="poPackingMenuBtn" title="More options">&#8943;</button>
-      <div class="packing-pane-menu-dropdown" id="poPackingMenuDropdown" hidden>
-        <button type="button" class="packing-menu-item" id="poMenuMultiCarton">&#10064; Multi Carton</button>
-        <button type="button" class="packing-menu-item" id="poMenuPrintPacking">Print Packing List</button>
-        <button type="button" class="packing-menu-item packing-menu-item--danger" id="poMenuClearPacking">&#9003; Clear packing list</button>
-        <button type="button" class="packing-menu-item packing-menu-item--danger" id="poMenuDeletePacking" hidden>&#9003; Delete packing list</button>
-      </div>
+    <div class="packing-pane-title-group">
+      <span class="packing-pane-title" id="poPackingPaneTitle"></span>
+      <span class="packing-pane-vendor" id="poPackingPaneVendor" hidden></span>
     </div>
-    <button type="button" class="packing-pane-close" id="poPackingPaneClose" title="Close">&#10005;</button>
-  </div>
-  <div class="po-summary-card" id="poPackingSummaryCard"></div>
-  <div class="packing-editor-section" id="poPackingEditorSection">
-    <div class="packing-editor-main">
-      <div id="poPackingStatusMsg" class="status-msg"></div>
-      <div class="carton-grid-wrap" id="poCartonGridWrap">
-        <div class="carton-grid-scroll" id="poCartonGridScroll">
-          <div class="carton-grid-head-wrap" id="poCartonGridHeadWrap">
-            <div class="carton-grid-head" id="poCartonGridHead"></div>
-          </div>
-          <div class="carton-grid-body" id="poCartonGridBody"></div>
+    <div class="packing-pane-header-actions">
+      <span id="poPackingPaneStatus" class="packing-pane-status"></span>
+      <div class="packing-pane-menu-wrap">
+        <button type="button" class="btn-icon-sm" id="poPackingMenuBtn" title="More options">&#8943;</button>
+        <div class="packing-pane-menu-dropdown" id="poPackingMenuDropdown" hidden>
+          <button type="button" class="packing-menu-item" id="poMenuMultiCarton">&#10064; Multi Carton</button>
+          <button type="button" class="packing-menu-item" id="poMenuPrintPacking">Print Packing List</button>
+          <button type="button" class="packing-menu-item packing-menu-item--danger" id="poMenuClearPacking">&#9003; Clear packing list</button>
+          <button type="button" class="packing-menu-item packing-menu-item--danger" id="poMenuDeletePacking" hidden>&#9003; Delete packing list</button>
         </div>
       </div>
+      <button type="button" class="packing-pane-close" id="poPackingPaneClose" title="Close">&#10005;</button>
     </div>
-    <div class="packing-editor-footer">
-      <div class="notes-field">
-        <label for="poPackingNotes">Notes</label>
-        <textarea id="poPackingNotes" rows="2" readonly placeholder=""></textarea>
+  </div>
+  <div class="po-summary-card" id="poPackingSummaryCard"></div>
+  <div class="packing-pane-notes" id="poPackingNotesSection">
+    <div class="notes-field">
+      <label for="poPackingNotes">Notes</label>
+      <textarea id="poPackingNotes" rows="2" readonly placeholder=""></textarea>
+    </div>
+  </div>
+  <div class="packing-list-section" id="poPackingListSection">
+    <button type="button" class="packing-list-section-header" id="poPackingListToggle" aria-expanded="false" aria-controls="poPackingListTablePanel">
+      <span class="packing-list-section-title">Packing List</span>
+      <span class="packing-list-section-chevron" aria-hidden="true"></span>
+    </button>
+    <div class="po-summary-fields packing-list-summary-fields" id="poPackingListSummaryFields">
+      <span class="po-summary-label">Cartons</span>
+      <span class="po-summary-value" id="poSummaryTotal_Cartons">0</span>
+      <span class="po-summary-label">Total Units</span>
+      <span class="po-summary-value" id="poSummaryTotal_TotalUnits">0</span>
+      <span class="po-summary-label">Total Weight</span>
+      <span class="po-summary-value" id="poSummaryTotal_TotalWeight">0 kg</span>
+    </div>
+    <div class="packing-list-table-panel" id="poPackingListTablePanel" hidden>
+      <div class="packing-editor-main">
+        <div id="poPackingStatusMsg" class="status-msg"></div>
+        <div class="carton-grid-wrap" id="poCartonGridWrap">
+          <div class="carton-grid-scroll" id="poCartonGridScroll">
+            <div class="carton-grid-head-wrap" id="poCartonGridHeadWrap">
+              <div class="carton-grid-head" id="poCartonGridHead"></div>
+            </div>
+            <div class="carton-grid-body" id="poCartonGridBody"></div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -898,7 +918,6 @@
     <div class="settings-modal-body">
       <nav class="settings-nav" id="settingsNav" aria-label="Settings sections">
         <button type="button" class="settings-nav-item is-active" data-settings-section="general">General</button>
-        <button type="button" class="settings-nav-item" data-settings-section="date-format">Date format</button>
         <button type="button" class="settings-nav-item" data-settings-section="edit-table">Edit table</button>
         <button type="button" class="settings-nav-item" data-settings-section="vendor-portal">Vendor Portal Links</button>
       </nav>
@@ -914,11 +933,11 @@
             </div>
             <p class="settings-hint">Shows days-until labels on CXL and related date columns in the PO table.</p>
           </div>
-        </section>
-        <section class="settings-section" id="settingsSectionDateFormat" data-settings-section="date-format" hidden>
-          <h4 class="settings-section-title">Date format</h4>
           <div class="settings-group">
-            <div class="settings-option-list" id="settingsDateFormatList" role="radiogroup" aria-label="Date format"></div>
+            <div class="settings-date-format-row">
+              <label class="settings-switch-label" for="settingsDateFormatSelect">Date format</label>
+              <select id="settingsDateFormatSelect" class="filter-select settings-date-format-select" aria-label="Date format"></select>
+            </div>
           </div>
         </section>
         <section class="settings-section settings-section--edit-table" id="settingsSectionEditTable" data-settings-section="edit-table" hidden>

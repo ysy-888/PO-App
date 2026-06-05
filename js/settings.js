@@ -17,13 +17,10 @@ function updateSettingsCountdownUi() {
 }
 
 function updateSettingsDateFormatUi() {
+  const select = document.getElementById("settingsDateFormatSelect");
+  if (!select) return;
   const currentId = typeof getDateFormatId === "function" ? getDateFormatId() : DEFAULT_DATE_FORMAT_ID;
-  document.querySelectorAll("#settingsDateFormatList [data-date-format-id]").forEach(item => {
-    const selected = item.dataset.dateFormatId === currentId;
-    const check = item.querySelector(".settings-option-check");
-    if (check) check.hidden = !selected;
-    item.setAttribute("aria-checked", selected ? "true" : "false");
-  });
+  select.value = currentId;
 }
 
 function updateSettingsUi() {
@@ -45,22 +42,17 @@ function initSettingsVendorSubmitMode() {
   });
 }
 
-function buildSettingsDateFormatList() {
-  const list = document.getElementById("settingsDateFormatList");
-  if (!list || typeof DATE_FORMAT_OPTIONS === "undefined") return;
+function buildSettingsDateFormatSelect() {
+  const select = document.getElementById("settingsDateFormatSelect");
+  if (!select || typeof DATE_FORMAT_OPTIONS === "undefined") return;
 
-  list.innerHTML = DATE_FORMAT_OPTIONS.map(opt => (
-    `<button type="button" class="settings-option-item" data-date-format-id="${escapeHtml(opt.id)}" role="radio" aria-checked="false">` +
-    `<span>${escapeHtml(opt.label)}</span>` +
-    `<span class="settings-option-check" hidden aria-hidden="true">✓</span>` +
-    `</button>`
+  select.innerHTML = DATE_FORMAT_OPTIONS.map(opt => (
+    `<option value="${escapeHtml(opt.id)}">${escapeHtml(opt.label)}</option>`
   )).join("");
 
-  list.querySelectorAll("[data-date-format-id]").forEach(item => {
-    item.addEventListener("click", () => {
-      if (typeof setDateFormat === "function") setDateFormat(item.dataset.dateFormatId);
-      updateSettingsDateFormatUi();
-    });
+  select.addEventListener("change", () => {
+    if (typeof setDateFormat === "function") setDateFormat(select.value);
+    updateSettingsDateFormatUi();
   });
 
   updateSettingsDateFormatUi();
@@ -206,7 +198,7 @@ function closeSettingsModal() {
 }
 
 function initSettings() {
-  buildSettingsDateFormatList();
+  buildSettingsDateFormatSelect();
   initSettingsVendorSubmitMode();
 
   document.getElementById("settingsCloseBtn")?.addEventListener("click", closeSettingsModal);

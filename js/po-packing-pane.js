@@ -6,13 +6,20 @@ let poPackingPaneCartons = [];
 let poPackingPaneSizeLabels = [];
 let poPackingPaneSnapshot = null;
 let poPackingPaneSaveInProgress = false;
+let poPackingListTableOpen = false;
 
 const PO_PACKING_PANE = {
   pane: "poPackingPane",
   title: "poPackingPaneTitle",
+  vendor: "poPackingPaneVendor",
+  statusBadge: "poPackingPaneStatus",
   summary: "poPackingSummaryCard",
+  packingListSection: "poPackingListSection",
+  packingListToggle: "poPackingListToggle",
+  packingListTablePanel: "poPackingListTablePanel",
   status: "poPackingStatusMsg",
   notes: "poPackingNotes",
+  notesSection: "poPackingNotesSection",
   countInput: "poCartonCountInput",
   decr: "poCartonDecrBtn",
   incr: "poCartonIncrBtn",
@@ -32,8 +39,8 @@ const PO_CARTON_COL = {
   total: 42,
   weight: 72,
   panePad: 34,
-  paneMax: 560,
-  paneMin: 440,
+  paneMax: 720,
+  paneMin: 540,
   sizeMin: 40,
   sizeDefault: 46,
 };
@@ -87,7 +94,11 @@ function poPaneFormatQtyCell(n) {
   return n > 0 ? String(n) : "";
 }
 
-function poPaneAppendSizeQtyBlock(card, row) {
+function poPanePoHasPackingList(poKey) {
+  return typeof hasPackingList === "function" && hasPackingList(poKey);
+}
+
+function poPaneAppendSizeQtyBlock(card, row, showActualQty = false) {
   const count = poPackingPaneSizeLabels.length;
   if (count === 0) return;
 
@@ -100,7 +111,7 @@ function poPaneAppendSizeQtyBlock(card, row) {
   block.appendChild(corner);
 
   const totalHeadSpacer = document.createElement("div");
-  totalHeadSpacer.className = "po-summary-size-colhead po-summary-size-colhead--blank";
+  totalHeadSpacer.className = "po-summary-size-colhead po-summary-size-colhead--blank po-summary-size-total-col";
   totalHeadSpacer.setAttribute("aria-hidden", "true");
   block.appendChild(totalHeadSpacer);
 
@@ -112,7 +123,7 @@ function poPaneAppendSizeQtyBlock(card, row) {
   });
 
   const poRowLabel = document.createElement("div");
-  poRowLabel.className = "po-summary-size-row-label";
+  poRowLabel.className = "po-summary-label";
   poRowLabel.textContent = "PO Qty";
   block.appendChild(poRowLabel);
 
@@ -120,7 +131,7 @@ function poPaneAppendSizeQtyBlock(card, row) {
     ? computePoQtyFromUnits(row)
     : poPackingPaneSizeLabels.reduce((sum, _, i) => sum + poPaneUnitQtyFromRow(row, i), 0);
   const poTotalCell = document.createElement("div");
-  poTotalCell.className = "po-summary-size-qty po-summary-size-qty--po";
+  poTotalCell.className = "po-summary-size-qty po-summary-size-qty--po po-summary-size-total-col";
   poTotalCell.textContent = poPaneFormatQtyCell(poTotal);
   block.appendChild(poTotalCell);
 
@@ -132,25 +143,27 @@ function poPaneAppendSizeQtyBlock(card, row) {
     block.appendChild(cell);
   });
 
-  const actRowLabel = document.createElement("div");
-  actRowLabel.className = "po-summary-size-row-label";
-  actRowLabel.textContent = "Actual Qty";
-  block.appendChild(actRowLabel);
+  if (showActualQty) {
+    const actRowLabel = document.createElement("div");
+    actRowLabel.className = "po-summary-label";
+    actRowLabel.textContent = "Actual Qty";
+    block.appendChild(actRowLabel);
 
-  const actTotal = poPackingPaneSizeLabels.reduce((sum, _, i) => sum + poPanePackingUnitQty(i), 0);
-  const actTotalCell = document.createElement("div");
-  actTotalCell.className = "po-summary-size-qty po-summary-size-qty--act";
-  actTotalCell.id = "poSummaryActTotal";
-  actTotalCell.textContent = poPaneFormatQtyCell(actTotal);
-  block.appendChild(actTotalCell);
+    const actTotal = poPackingPaneSizeLabels.reduce((sum, _, i) => sum + poPanePackingUnitQty(i), 0);
+    const actTotalCell = document.createElement("div");
+    actTotalCell.className = "po-summary-size-qty po-summary-size-qty--act po-summary-size-total-col";
+    actTotalCell.id = "poSummaryActTotal";
+    actTotalCell.textContent = poPaneFormatQtyCell(actTotal);
+    block.appendChild(actTotalCell);
 
-  poPackingPaneSizeLabels.forEach((_, i) => {
-    const cell = document.createElement("div");
-    cell.className = "po-summary-size-qty po-summary-size-qty--act";
-    cell.id = "poSummarySizeTotal_" + i;
-    cell.textContent = poPaneFormatQtyCell(poPanePackingUnitQty(i));
-    block.appendChild(cell);
-  });
+    poPackingPaneSizeLabels.forEach((_, i) => {
+      const cell = document.createElement("div");
+      cell.className = "po-summary-size-qty po-summary-size-qty--act";
+      cell.id = "poSummarySizeTotal_" + i;
+      cell.textContent = poPaneFormatQtyCell(poPanePackingUnitQty(i));
+      block.appendChild(cell);
+    });
+  }
 
   card.appendChild(block);
 }
@@ -210,6 +223,86 @@ function poPaneHideStatus() {
   el.className = "status-msg";
 }
 
+function isPackingPaneStatusEl(el) {
+  return el?.id === PO_PACKING_PANE.statusBadge;
+}
+
+function poPaneRenderStatusHeader(row) {
+  const el = document.getElementById(PO_PACKING_PANE.statusBadge);
+  if (!el || !row) return;
+
+  const clone = el.cloneNode(false);
+  el.replaceWith(clone);
+
+  const statusVal = typeof getRowWorkflowStatus === "function"
+    ? getRowWorkflowStatus(row)
+    : (row["Status"] ?? "");
+  clone.innerHTML = typeof renderStatus === "function" ? renderStatus(statusVal) : String(statusVal ?? "");
+  clone.className = "packing-pane-status";
+  clone.id = PO_PACKING_PANE.statusBadge;
+  clone.title = "";
+
+  if (typeof isPoFieldEditable === "function" && isPoFieldEditable("Status", row) && typeof bindSelectCellInteractions === "function") {
+    clone.classList.add("editable", "select-cell");
+    clone.title = "Click to choose";
+    bindSelectCellInteractions(clone, "Status", row);
+    return;
+  }
+
+  clone.classList.add("readonly", "readonly-no-select");
+}
+
+function poPaneRenderPaneHeader(row) {
+  const poKey = String(row?.["PO #"] ?? "").trim();
+  const titleEl = document.getElementById(PO_PACKING_PANE.title);
+  const vendorEl = document.getElementById(PO_PACKING_PANE.vendor);
+  if (titleEl) titleEl.textContent = poKey ? "PO # " + poKey : "";
+  if (vendorEl) {
+    const vendor = String(row?.["Vendor"] ?? "").trim();
+    vendorEl.textContent = vendor;
+    vendorEl.hidden = !vendor;
+  }
+}
+
+function updatePackingPaneIfOpen() {
+  if (!poPackingPaneRow || document.getElementById(PO_PACKING_PANE.pane)?.hidden) return;
+  const poKey = String(poPackingPaneRow["PO #"] ?? "").trim();
+  poPaneRenderPaneHeader(poPackingPaneRow);
+  poPaneRenderStatusHeader(poPackingPaneRow);
+  poPaneSyncNotesVisibility(poPackingPaneRow);
+  poPaneSyncPackingListSectionVisibility(poKey);
+  poPaneBuildSummaryCard(poPackingPaneRow);
+}
+
+function poPaneSyncNotesVisibility(row) {
+  const section = document.getElementById(PO_PACKING_PANE.notesSection);
+  const notesInput = document.getElementById(PO_PACKING_PANE.notes);
+  if (!section) return;
+  const raw = row?.["Notes"] ?? notesInput?.value ?? "";
+  const notesText = typeof isEmptyValue === "function" && isEmptyValue(raw)
+    ? ""
+    : String(raw).trim();
+  section.hidden = !notesText;
+}
+
+function poPaneSyncPackingListSectionVisibility(poKey) {
+  const section = document.getElementById(PO_PACKING_PANE.packingListSection);
+  if (!section) return;
+  const visible = poPanePoHasPackingList(poKey);
+  section.hidden = !visible;
+  if (!visible) poPaneSetPackingListTableOpen(false);
+}
+
+function poPaneSetPackingListTableOpen(isOpen) {
+  poPackingListTableOpen = isOpen;
+  const panel = document.getElementById(PO_PACKING_PANE.packingListTablePanel);
+  const toggle = document.getElementById(PO_PACKING_PANE.packingListToggle);
+  const section = document.getElementById(PO_PACKING_PANE.packingListSection);
+  if (panel) panel.hidden = !isOpen;
+  if (toggle) toggle.setAttribute("aria-expanded", String(isOpen));
+  if (section) section.classList.toggle("packing-list-section--open", isOpen);
+}
+
 function closePoPackingPane({ clearSelection = true } = {}) {
   const pane = document.getElementById(PO_PACKING_PANE.pane);
   if (pane) pane.hidden = true;
@@ -235,10 +328,15 @@ function syncPoPackingPaneFromMiniSelection() {
   if (fullRow) openPoPackingPane(fullRow);
 }
 
-function openPoPackingPane(row) {
+function openPoPackingPane(row, { force = false } = {}) {
   if (!row) return;
   const poKey = String(row["PO #"] ?? "").trim();
-  if (poPackingPaneRow && String(poPackingPaneRow["PO #"] ?? "").trim() === poKey && !document.getElementById(PO_PACKING_PANE.pane)?.hidden) {
+  if (
+    !force
+    && poPackingPaneRow
+    && String(poPackingPaneRow["PO #"] ?? "").trim() === poKey
+    && !document.getElementById(PO_PACKING_PANE.pane)?.hidden
+  ) {
     return;
   }
 
@@ -271,14 +369,18 @@ function openPoPackingPane(row) {
     notesInput.value = String(row["Notes"] ?? "").trim();
     notesInput.readOnly = true;
   }
+  poPaneSyncNotesVisibility(row);
+  poPaneSyncPackingListSectionVisibility(poKey);
   if (deleteBtn) deleteBtn.hidden = !packingList;
-  const titleEl = document.getElementById(PO_PACKING_PANE.title);
-  if (titleEl) titleEl.textContent = poKey ? "PO # " + poKey : "";
+  poPaneRenderPaneHeader(row);
+  poPaneRenderStatusHeader(row);
+  poPaneSetPackingListTableOpen(false);
   if (pane) pane.hidden = false;
 
   poPaneSetReadOnly(readOnly);
   poPaneBuildSummaryCard(row);
   poPaneBuildCartonGrid();
+  poPaneRefreshSummaryTotals();
   poPaneCaptureSnapshot();
   poPaneHideStatus();
 }
@@ -302,63 +404,180 @@ function poPaneSetReadOnly(readOnly) {
   });
 }
 
+const PO_PANE_SUMMARY_DATE_COLS = new Set([
+  "PO Date", "CXL Date", "EST EXF", "EST IHD", "EXF Date", "EXF Request Date",
+]);
+
+const PO_PANE_MAIN_SUMMARY_ROWS = [
+  [{ label: "Buyer", col: "Buyer" }, { label: "Buyer PO #", col: "Buyer PO #" }],
+  [{ label: "Style #", col: "Style #" }, { label: "Color", col: "Color" }],
+  [{ label: "PO Date", col: "PO Date" }, { label: "CXL Date", col: "CXL Date" }],
+  [{ label: "EST EXF", col: "EST EXF" }, { label: "EST IHD", col: "EST IHD" }],
+  [{ label: "Old PO #", col: "Old PO #" }, { label: "SO #", col: "SO #" }],
+  [{ label: "Ship Method", col: "Ship Method" }, null],
+];
+
+function poPaneFormatSummaryFieldValue(col, value) {
+  if (isEmptyValue(value)) return "";
+  if (PO_PANE_SUMMARY_DATE_COLS.has(col) || (typeof DATE_FIELDS !== "undefined" && DATE_FIELDS.has(col))) {
+    return formatDateForDisplay(value);
+  }
+  return String(value).trim();
+}
+
+function poPaneAppendSummaryField(parent, label, value) {
+  if (!value) return;
+  const lbl = document.createElement("span");
+  lbl.className = "po-summary-label";
+  lbl.textContent = label;
+  const val = document.createElement("span");
+  val.className = "po-summary-value";
+  val.textContent = value;
+  parent.appendChild(lbl);
+  parent.appendChild(val);
+}
+
+function poPaneCreateSummaryFieldsColumn() {
+  const col = document.createElement("div");
+  col.className = "po-summary-fields";
+  return col;
+}
+
+function poPaneIsPhotoUrl(url) {
+  return /^https?:\/\/.+/i.test(String(url ?? "").trim());
+}
+
+function poPaneGetPhotoMaxDimensions(contextEl) {
+  const style = getComputedStyle(contextEl || document.getElementById("poPackingPane") || document.documentElement);
+  return {
+    maxW: parseFloat(style.getPropertyValue("--po-pane-photo-max-width")) || 220,
+    maxH: parseFloat(style.getPropertyValue("--po-pane-photo-max-height")) || 367,
+  };
+}
+
+function poPaneApplyPhotoImageSize(img) {
+  const { maxW, maxH } = poPaneGetPhotoMaxDimensions(img.closest("#poPackingPane, .packing-pane"));
+  const naturalW = img.naturalWidth;
+  const naturalH = img.naturalHeight;
+  if (!naturalW || !naturalH) return;
+  const scale = Math.min(1, maxW / naturalW, maxH / naturalH);
+  img.style.width = `${Math.round(naturalW * scale)}px`;
+  img.style.height = `${Math.round(naturalH * scale)}px`;
+}
+
+function poPaneBindPhotoSizing(img) {
+  const apply = () => poPaneApplyPhotoImageSize(img);
+  if (img.complete && img.naturalWidth) apply();
+  else img.addEventListener("load", apply, { once: true });
+}
+
+function poPaneRenderPhoto(photoEl, url, photoIndex) {
+  photoEl.innerHTML = "";
+  photoEl.classList.remove("po-summary-photo--has-image", "po-summary-photo--error");
+  const normalizedUrl = typeof normalizeStylePhotoUrl === "function"
+    ? normalizeStylePhotoUrl(url)
+    : String(url ?? "").trim();
+  const openUrl = String(url ?? "").trim() || normalizedUrl;
+
+  if (!poPaneIsPhotoUrl(normalizedUrl)) return;
+
+  photoEl.classList.add("po-summary-photo--has-image");
+  const img = document.createElement("img");
+  img.className = "po-summary-photo-img";
+  img.src = normalizedUrl;
+  img.alt = `Photo ${photoIndex}`;
+  img.loading = "lazy";
+  img.title = "Open in new tab";
+  img.addEventListener("click", e => {
+    e.stopPropagation();
+    window.open(openUrl, "_blank", "noopener,noreferrer");
+  });
+  poPaneBindPhotoSizing(img);
+  img.addEventListener("error", () => {
+    photoEl.classList.remove("po-summary-photo--has-image");
+    photoEl.classList.add("po-summary-photo--error");
+    img.remove();
+  });
+  photoEl.appendChild(img);
+}
+
+function poPaneAppendStylePhotos(card, row) {
+  const stylePhotos = typeof getStylePhotosForRow === "function" ? getStylePhotosForRow(row) : null;
+  const wrap = document.createElement("div");
+  wrap.className = "po-summary-photos";
+
+  STYLE_PHOTO_FIELDS.forEach((field, index) => {
+    const slot = document.createElement("div");
+    slot.className = "po-summary-photo-slot";
+    const photo = document.createElement("div");
+    photo.className = "po-summary-photo";
+    photo.setAttribute("aria-label", field);
+    poPaneRenderPhoto(photo, stylePhotos?.[field] ?? "", index + 1);
+    slot.appendChild(photo);
+    wrap.appendChild(slot);
+  });
+
+  card.appendChild(wrap);
+}
+
 function poPaneBuildSummaryCard(row) {
   const card = document.getElementById(PO_PACKING_PANE.summary);
   if (!card) return;
   card.innerHTML = "";
 
-  const fields = document.createElement("div");
-  fields.className = "po-summary-fields";
+  const mainSection = document.createElement("div");
+  mainSection.className = "po-summary-columns";
+  const leftCol = poPaneCreateSummaryFieldsColumn();
+  const rightCol = poPaneCreateSummaryFieldsColumn();
 
-  function addRow(label, value) {
-    if (!value) return;
-    const lbl = document.createElement("span");
-    lbl.className = "po-summary-label";
-    lbl.textContent = label;
-    const val = document.createElement("span");
-    val.className = "po-summary-value";
-    val.textContent = value;
-    fields.appendChild(lbl);
-    fields.appendChild(val);
+  PO_PANE_MAIN_SUMMARY_ROWS.forEach(([left, right]) => {
+    if (left) {
+      poPaneAppendSummaryField(leftCol, left.label, poPaneFormatSummaryFieldValue(left.col, row[left.col]));
+    }
+    if (right) {
+      poPaneAppendSummaryField(rightCol, right.label, poPaneFormatSummaryFieldValue(right.col, row[right.col]));
+    }
+  });
+
+  mainSection.appendChild(leftCol);
+  mainSection.appendChild(rightCol);
+  card.appendChild(mainSection);
+
+  const exfReqId = poPaneFormatSummaryFieldValue("EXF Request ID", row["EXF Request ID"]);
+  const exfDateRaw = row["EXF Date"] || row["EXF Request Date"];
+  const exfDate = poPaneFormatSummaryFieldValue("EXF Date", exfDateRaw);
+  if (exfReqId || exfDate) {
+    const exfSection = document.createElement("div");
+    exfSection.className = "po-summary-exf-section";
+    const exfColumns = document.createElement("div");
+    exfColumns.className = "po-summary-columns";
+    const exfLeft = poPaneCreateSummaryFieldsColumn();
+    const exfRight = poPaneCreateSummaryFieldsColumn();
+    poPaneAppendSummaryField(exfLeft, "EXF Req ID", exfReqId);
+    poPaneAppendSummaryField(exfRight, "EXF Date", exfDate);
+    exfColumns.appendChild(exfLeft);
+    exfColumns.appendChild(exfRight);
+    exfSection.appendChild(exfColumns);
+    card.appendChild(exfSection);
   }
 
-  addRow("Buyer PO #", row["Buyer PO #"]);
-  addRow("Buyer", row["Buyer"]);
-  addRow("Style #", row["Style #"]);
-  addRow("Color", row["Color"]);
-  if (row["EXF Request ID"]) addRow("EXF Req ID", row["EXF Request ID"]);
-  const exfDate = row["EXF Date"] || row["EXF Request Date"];
-  if (!isEmptyValue(exfDate)) addRow("EXF Date", formatDateForDisplay(exfDate));
-  if (row["EXF Memo"]) addRow("EXF Memo", row["EXF Memo"]);
+  poPaneAppendSizeQtyBlock(card, row, poPanePoHasPackingList(String(row["PO #"] ?? "").trim()));
+  poPaneAppendStylePhotos(card, row);
+  poPaneSyncSummaryLabelColumn(card);
+}
 
-  card.appendChild(fields);
-
-  const totalsRow = document.createElement("div");
-  totalsRow.className = "po-summary-totals";
-
-  function addTotal(num, label, idSuffix) {
-    const item = document.createElement("div");
-    item.className = "po-summary-total-item";
-    const n = document.createElement("div");
-    n.className = "po-summary-total-item__num";
-    n.id = "poSummaryTotal_" + idSuffix;
-    n.textContent = String(num);
-    const l = document.createElement("div");
-    l.className = "po-summary-total-item__label";
-    l.textContent = label;
-    item.appendChild(n);
-    item.appendChild(l);
-    totalsRow.appendChild(item);
-  }
-
-  addTotal(poPackingPaneCartons.length || row["Ctn Qty"] || 0, "Cartons", "Cartons");
-  const units = poPackingPaneCartons.reduce((sum, c) => sum + poPaneCartonTotal(c), 0);
-  addTotal(units || row["Actual Qty"] || 0, "Total Units", "TotalUnits");
-  const weight = poPackingPaneCartons.reduce((sum, c) => sum + poPaneQty(c.weight), 0);
-  addTotal(poPaneFmtTotalWeightKg(weight), "Total Weight", "TotalWeight");
-  card.appendChild(totalsRow);
-
-  poPaneAppendSizeQtyBlock(card, row);
+function poPaneSyncSummaryLabelColumn(card) {
+  if (!card) return;
+  requestAnimationFrame(() => {
+    const labels = card.querySelectorAll(".po-summary-label");
+    let maxW = 0;
+    labels.forEach(el => {
+      maxW = Math.max(maxW, el.scrollWidth);
+    });
+    if (maxW > 0) {
+      card.style.setProperty("--po-summary-label-width", `${maxW}px`);
+    }
+  });
 }
 
 function poPaneRefreshSummaryTotals() {
@@ -652,6 +871,10 @@ function initPoPackingPane() {
   const pane = document.getElementById(PO_PACKING_PANE.pane);
   pane?.addEventListener("mousedown", e => e.stopPropagation());
 
+  document.getElementById(PO_PACKING_PANE.packingListToggle)?.addEventListener("click", () => {
+    poPaneSetPackingListTableOpen(!poPackingListTableOpen);
+  });
+
   paneClose?.addEventListener("click", () => closePoPackingPane({ clearSelection: true }));
 
   decr?.addEventListener("click", () => {
@@ -697,7 +920,7 @@ function initPoPackingPane() {
     if (!packingList || typeof deletePackingListFromPanel !== "function") return;
     await deletePackingListFromPanel(poPackingPaneRow, packingList);
     if (typeof getSingleMiniSelectedRow === "function" && getSingleMiniSelectedRow()) {
-      openPoPackingPane(poPackingPaneRow);
+      openPoPackingPane(poPackingPaneRow, { force: true });
     } else {
       closePoPackingPane({ clearSelection: false });
     }

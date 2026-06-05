@@ -171,9 +171,11 @@
 
   .packing-pane {
     --packing-pane-width: 480px;
+    --po-pane-photo-max-width: 220px;
+    --po-pane-photo-max-height: 367px;
     flex: 0 0 auto;
-    width: var(--packing-pane-width);
-    min-width: 0;
+    width: max(var(--packing-pane-width), 480px);
+    min-width: 480px;
     min-height: 0;
     max-width: 560px;
     border-left: 1px solid var(--border);
@@ -184,6 +186,8 @@
     flex-shrink: 0;
   }
   .packing-pane[hidden] { display: none !important; }
+  .packing-editor-main[hidden],
+  .packing-pane-menu-wrap[hidden] { display: none !important; }
 
   /* ── PO Table ── */
   .po-table-wrap {
@@ -193,7 +197,7 @@
   .po-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 13px;
+    font-size: 14px;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
@@ -203,10 +207,10 @@
   .po-table th {
     background: #f7f7f8;
     border-bottom: 2px solid var(--border);
-    padding: 8px 10px;
+    padding: 9px 11px;
     text-align: left;
     font-weight: 600;
-    font-size: 11px;
+    font-size: 12px;
     color: var(--text-muted);
     white-space: nowrap;
     text-transform: uppercase;
@@ -214,8 +218,8 @@
   }
   .po-table td {
     border-bottom: 1px solid var(--border);
-    padding: 8px 10px;
-    vertical-align: top;
+    padding: 9px 11px;
+    vertical-align: middle;
   }
   .po-table tbody tr:last-child td { border-bottom: none; }
   .po-table tbody tr {
@@ -226,8 +230,17 @@
   .po-table tbody tr.is-selected { background: #f0f4ff; }
   .po-table tbody tr.is-selected:hover { background: #e8eefb; }
 
-  .po-num { font-weight: 600; color: var(--text); }
-  .po-secondary { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .po-table th.col-po-num,
+  .po-table td.col-po-num {
+    text-align: center;
+  }
+  .po-num {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.2;
+  }
+  .po-secondary { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
 
   /* Per-size qty cells */
   .size-qty-group {
@@ -239,27 +252,27 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    min-width: 36px;
+    min-width: 38px;
     background: #f7f7f8;
     border-radius: 4px;
-    padding: 3px 5px;
+    padding: 4px 6px;
     border: 1px solid var(--border);
   }
   .size-qty-chip__label {
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 600;
     color: var(--text-muted);
     line-height: 1.2;
     white-space: nowrap;
   }
   .size-qty-chip__po {
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
     color: var(--text);
     line-height: 1.4;
   }
   .size-qty-chip__act {
-    font-size: 11px;
+    font-size: 12px;
     color: var(--success);
     font-weight: 500;
     line-height: 1.3;
@@ -268,9 +281,9 @@
 
   .pl-badge {
     display: inline-block;
-    padding: 1px 7px;
+    padding: 2px 8px;
     border-radius: 10px;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 600;
     white-space: nowrap;
   }
@@ -279,7 +292,7 @@
 
   .exf-id-chip {
     display: inline-block;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 600;
     font-family: monospace;
     background: #fff7ed;
@@ -411,43 +424,170 @@
     color: var(--text);
     font-weight: 500;
   }
-  .po-summary-totals {
+  .packing-pane .po-summary-photos {
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: row;
+    justify-content: center;
+    align-items: flex-start;
+    flex-wrap: nowrap;
+    gap: 10px;
+    width: 100%;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+    --photo-slot-w: min(var(--po-pane-photo-max-width, 220px), calc((100% - 10px) / 2));
+  }
+  .packing-pane .po-summary-photo-slot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    flex: 0 0 var(--photo-slot-w);
+    min-width: 0;
+  }
+  .packing-pane .po-summary-photo {
+    width: var(--photo-slot-w);
+    aspect-ratio: 3 / 4;
+    flex: none;
+    border: 1px dashed var(--border-strong);
+    border-radius: 8px;
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  .packing-pane .po-summary-photo--has-image {
+    width: fit-content;
+    max-width: var(--photo-slot-w);
+    height: auto;
+    aspect-ratio: auto;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    padding: 0;
+    background: var(--bg);
+    overflow: visible;
+    display: block;
+    line-height: 0;
+    box-shadow:
+      0 0 0 1px rgba(15, 23, 42, 0.08),
+      0 1px 3px rgba(15, 23, 42, 0.06),
+      0 4px 12px rgba(15, 23, 42, 0.04);
+  }
+  .packing-pane .po-summary-photo--error {
+    width: var(--photo-slot-w);
+    aspect-ratio: 3 / 4;
+    border-style: dashed;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: normal;
+    box-shadow: none;
+  }
+  .packing-pane .po-summary-photo--has-image .po-summary-photo-img {
+    width: auto;
+    height: auto;
+    max-width: var(--photo-slot-w);
+    max-height: var(--po-pane-photo-max-height, 367px);
+    object-fit: unset;
+    border: none;
+    outline: none;
+    border-radius: 7px;
+    box-shadow: none;
+    vertical-align: top;
+  }
+  .packing-pane .po-summary-photo-img {
+    display: block;
+    cursor: pointer;
+  }
+  .packing-pane .po-summary-photo-caption {
+    display: none;
+  }
+  .po-summary-metrics {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
     gap: 16px;
     margin-top: 8px;
     padding-top: 8px;
     border-top: 1px solid var(--border);
   }
-  .po-summary-size-totals {
+  .po-summary-totals {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px 12px;
+    justify-content: center;
+    gap: 20px 24px;
     margin-top: 4px;
   }
-  .po-summary-size-total-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-    min-width: 36px;
+  .packing-pane .po-summary-size-block {
+    --po-size-total-width: 44px;
+    --po-size-unit-width: 40px;
+    display: grid;
+    grid-template-columns:
+      max-content
+      var(--po-size-total-width)
+      repeat(var(--po-size-count, 1), minmax(0, var(--po-size-unit-width)));
+    column-gap: 10px;
+    row-gap: 6px;
+    align-items: baseline;
+    width: 100%;
   }
-  .po-summary-size-total-item__label {
+  .packing-pane .po-summary-size-corner {
+    min-height: 0;
+  }
+  .packing-pane .po-summary-size-colhead {
+    text-align: center;
     font-size: 10px;
-    font-weight: 600;
+    font-weight: 700;
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.03em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
-  .po-summary-size-total-item__num {
-    font-size: 14px;
+  .packing-pane .po-summary-size-colhead--total {
+    text-align: left;
+    color: var(--text-muted);
+  }
+  .packing-pane .po-summary-size-total-col {
+    border-right: 1px solid var(--border-strong);
+    padding-right: 6px;
+    margin-right: 2px;
+    align-self: stretch;
+    display: flex;
+    align-items: baseline;
+    justify-content: flex-start;
+  }
+  .packing-pane .po-summary-size-qty {
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    min-width: 0;
+  }
+  .packing-pane .po-summary-size-qty.po-summary-size-total-col {
+    text-align: left;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .packing-pane .po-summary-size-qty--po:not(.po-summary-size-total-col) {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+  .packing-pane .po-summary-size-qty--prod:not(.po-summary-size-total-col) {
+    font-size: 13px;
     font-weight: 700;
     color: var(--text);
-    font-variant-numeric: tabular-nums;
+  }
+  .packing-pane .po-summary-size-block .po-summary-label {
+    min-width: 0;
+    align-self: center;
   }
   .po-summary-total-item {
     display: flex;
     flex-direction: column;
+    align-items: center;
     gap: 2px;
   }
   .po-summary-total-item__num {
@@ -480,30 +620,39 @@
     gap: 12px;
     overflow: hidden;
   }
-  .packing-editor-footer {
+  .packing-notes-section {
     flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
     padding-top: 12px;
     margin-top: 12px;
     border-top: 1px solid var(--border);
     background: var(--surface);
   }
+  .packing-submit-bar {
+    flex-shrink: 0;
+    padding-top: 12px;
+    background: var(--surface);
+  }
+  .packing-submit-bar[hidden] { display: none !important; }
 
   /* Carton count stepper */
   .carton-count-row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     flex-shrink: 0;
   }
-  .carton-count-row label {
+  .packing-list-table-heading {
     font-size: 13px;
     font-weight: 600;
     color: var(--text);
     flex: 1;
     min-width: 0;
+  }
+  .carton-ctn-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    flex-shrink: 0;
   }
   .count-stepper {
     display: flex;
@@ -851,15 +1000,9 @@
   <div id="appRoot" style="display:none; flex-direction:column; height:100%; overflow:hidden;">
     <!-- Tabs + summary counts -->
     <div class="portal-tabs">
-      <button class="portal-tab is-active" id="tabExf" data-tab="exf">
-        EXF <span class="portal-tab-badge" id="badgeExf">0</span>
-      </button>
-      <button class="portal-tab" id="tabWip" data-tab="wip">
-        WIP <span class="portal-tab-badge" id="badgeWip">0</span>
-      </button>
-      <button class="portal-tab" id="tabSubmitted" data-tab="submitted">
-        Submitted <span class="portal-tab-badge" id="badgeSubmitted">0</span>
-      </button>
+      <button class="portal-tab is-active" id="tabExf" data-tab="exf">EXF</button>
+      <button class="portal-tab" id="tabWip" data-tab="wip">WIP</button>
+      <button class="portal-tab" id="tabSubmitted" data-tab="submitted">Submitted</button>
       <div class="portal-tabs-summary">
         <div class="summary-counter">
           <span class="summary-counter__num" id="countAll">0</span>
@@ -894,9 +1037,9 @@
       <!-- Packing list side panel -->
       <div class="packing-pane" id="packingPane" hidden>
         <div class="packing-pane-header">
-          <span class="packing-pane-title">Packing List</span>
+          <span class="packing-pane-title" id="packingPaneTitle"></span>
           <!-- Menu -->
-          <div class="packing-pane-menu-wrap">
+          <div class="packing-pane-menu-wrap" id="packingPaneMenuWrap">
             <button class="btn-icon-sm" id="packingMenuBtn" title="More options">&#8943;</button>
             <div class="packing-pane-menu-dropdown" id="packingMenuDropdown" hidden>
               <button class="packing-menu-item" id="menuMultiCarton">&#10064; Multi Carton</button>
@@ -911,14 +1054,15 @@
 
         <!-- Editor -->
         <div class="packing-editor-section" id="packingEditorSection">
-          <div class="packing-editor-main">
+          <div class="packing-editor-main" id="packingEditorMain">
             <div id="packingStatusMsg" class="status-msg"></div>
 
             <div class="carton-count-row">
-              <label for="cartonCountInput">Cartons</label>
+              <span class="packing-list-table-heading">Packing List</span>
+              <span class="carton-ctn-label">CTN</span>
               <div class="count-stepper">
                 <button class="count-step-btn" id="cartonDecrBtn" type="button">&#8722;</button>
-                <input class="count-stepper-input" type="number" id="cartonCountInput" min="1" step="1" value="1" />
+                <input class="count-stepper-input" type="number" id="cartonCountInput" min="1" step="1" value="1" aria-label="Carton quantity" />
                 <button class="count-step-btn" id="cartonIncrBtn" type="button">&#43;</button>
               </div>
             </div>
@@ -933,12 +1077,14 @@
             </div>
           </div>
 
-          <div class="packing-editor-footer">
+          <div class="packing-notes-section" id="packingNotesSection">
             <div class="notes-field">
               <label for="packingNotes">Notes</label>
               <textarea id="packingNotes" rows="2" placeholder="Any notes…"></textarea>
             </div>
+          </div>
 
+          <div class="packing-submit-bar" id="packingSubmitBar">
             <div class="submit-bar">
               <button class="btn btn-primary" id="submitBtn" type="button">Submit</button>
               <span id="submitSpinner" style="display:none; font-size:12px; color:#6b7280;">Submitting&hellip;</span>
@@ -1005,14 +1151,17 @@
   const countExf           = document.getElementById("countExf");
   const countWip           = document.getElementById("countWip");
   const countSubmitted     = document.getElementById("countSubmitted");
-  const badgeExf           = document.getElementById("badgeExf");
-  const badgeWip           = document.getElementById("badgeWip");
-  const badgeSubmitted     = document.getElementById("badgeSubmitted");
   const tabExf             = document.getElementById("tabExf");
   const tabWip             = document.getElementById("tabWip");
   const tabSubmitted       = document.getElementById("tabSubmitted");
   const poTableWrap        = document.getElementById("poTableWrap");
   const packingPane        = document.getElementById("packingPane");
+  const packingPaneTitle   = document.getElementById("packingPaneTitle");
+  const packingPaneMenuWrap= document.getElementById("packingPaneMenuWrap");
+  const packingEditorMain  = document.getElementById("packingEditorMain");
+  const packingNotesSection= document.getElementById("packingNotesSection");
+  const packingSubmitBar   = document.getElementById("packingSubmitBar");
+  const packingEditorSection = document.getElementById("packingEditorSection");
   const packingPaneClose   = document.getElementById("packingPaneClose");
   const poSummaryCard      = document.getElementById("poSummaryCard");
   const packingStatusMsg   = document.getElementById("packingStatusMsg");
@@ -1105,9 +1254,6 @@
     countExf.textContent = exfPos.length;
     countWip.textContent = wipPos.length;
     countSubmitted.textContent = submittedPos.length;
-    badgeExf.textContent = exfPos.length;
-    badgeWip.textContent = wipPos.length;
-    badgeSubmitted.textContent = submittedPos.length;
   }
 
   // ── Tab switching ─────────────────────────────────────────
@@ -1169,14 +1315,16 @@
     // Head
     const thead = document.createElement("thead");
     const headRow = document.createElement("tr");
+    const baseCols = ["PO #", "Buyer", "Buyer PO #", "Style #", "Color"];
     const cols = isExf
-      ? ["EXF Request ID", "EXF Date", "EXF Memo", "PO #", "Buyer PO #", "Buyer", "Style #", "Color", "Qty", "Packing List"]
+      ? [...baseCols, "Qty", "EXF Request ID", "EXF Date", "EXF Memo", "Packing List"]
       : isSubmitted
-        ? ["PO #", "Buyer PO #", "Buyer", "Style #", "Color", "Status", "Qty", "Submitted At", "Packing List"]
-        : ["PO #", "Buyer PO #", "Buyer", "Style #", "Color", "Est EXF", "Qty", "Packing List"];
+        ? [...baseCols, "Qty", "Status", "Submitted At", "Packing List"]
+        : [...baseCols, "Est EXF", "Qty", "Packing List"];
     cols.forEach(c => {
       const th = document.createElement("th");
       th.textContent = c;
+      if (c === "PO #") th.classList.add("col-po-num");
       headRow.appendChild(th);
     });
     thead.appendChild(headRow);
@@ -1189,22 +1337,17 @@
       if (selectedPo && selectedPo["PO #"] === po["PO #"]) tr.classList.add("is-selected");
       tr.addEventListener("click", () => openPackingPane(po));
 
-      if (isExf) {
-        tr.appendChild(makeExfIdCell(po));
-        tr.appendChild(makeTd(fmtDate(po["EXF Date"] || po["EXF Request Date"])));
-        tr.appendChild(makeTd(po["EXF Memo"] || "—"));
-      }
-
       // PO #
       const poNumTd = document.createElement("td");
+      poNumTd.className = "col-po-num";
       const poNumDiv = document.createElement("div");
       poNumDiv.className = "po-num";
       poNumDiv.textContent = po["PO #"];
       poNumTd.appendChild(poNumDiv);
       tr.appendChild(poNumTd);
 
-      tr.appendChild(makeTd(po["Buyer PO #"] || "—"));
       tr.appendChild(makeTd(po["Buyer"] || "—"));
+      tr.appendChild(makeTd(po["Buyer PO #"] || "—"));
       tr.appendChild(makeTd(po["Style #"] || "—"));
       tr.appendChild(makeTd(po["Color"] || "—"));
 
@@ -1212,14 +1355,16 @@
         tr.appendChild(makeTd(po["EST EXF"] ? fmtDate(po["EST EXF"]) : "—"));
       }
 
-      if (isSubmitted) {
-        tr.appendChild(makeTd(po["Status"] || "—"));
-      }
-
-      // Qty chips
       tr.appendChild(makeQtyCell(po));
 
+      if (isExf) {
+        tr.appendChild(makeExfIdCell(po));
+        tr.appendChild(makeTd(fmtDate(po["EXF Date"] || po["EXF Request Date"])));
+        tr.appendChild(makeTd(po["EXF Memo"] || "—"));
+      }
+
       if (isSubmitted) {
+        tr.appendChild(makeTd(po["Status"] || "—"));
         tr.appendChild(makeTd(po.submittedAt ? fmtDate(po.submittedAt) : "—"));
       }
 
@@ -1294,36 +1439,237 @@
     return td;
   }
 
+  function isExfRequestedPo(po) {
+    return po && po["Status"] === "Requested";
+  }
+
+  function parseQty(val) {
+    const n = Number(String(val ?? "").replace(/,/g, ""));
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  function formatQtyCell(n) {
+    return n > 0 ? String(n) : (n === 0 ? "0" : "—");
+  }
+
+  function poUnitQtyFromPo(po, i) {
+    if (po.poUnits && i < po.poUnits.length && po.poUnits[i] != null && po.poUnits[i] !== "") {
+      return parseQty(po.poUnits[i]);
+    }
+    const field = "PO Unit " + (i + 1);
+    if (po[field] != null && po[field] !== "") return parseQty(po[field]);
+    if (sizeLabels.length === 1 && i === 0) return parseQty(po["PO Qty"]);
+    return 0;
+  }
+
+  function poTotalQtyFromPo(po) {
+    const unitSum = sizeLabels.reduce((sum, _, i) => sum + poUnitQtyFromPo(po, i), 0);
+    if (unitSum > 0) return unitSum;
+    return parseQty(po["PO Qty"]);
+  }
+
+  function prodUnitQty(i) {
+    return cartons.reduce((sum, c) => sum + qty(c["u" + i]), 0);
+  }
+
+  function prodTotalQty() {
+    return cartons.reduce((sum, c) => sum + cartonTotal(c), 0);
+  }
+
+  function appendSizeQtyGrid(container, po, showProdQty) {
+    const count = sizeLabels.length;
+    if (count === 0) return;
+
+    const block = document.createElement("div");
+    block.className = "po-summary-size-block";
+    block.style.setProperty("--po-size-count", String(count));
+
+    const corner = document.createElement("div");
+    corner.className = "po-summary-size-corner";
+    block.appendChild(corner);
+
+    const totalHead = document.createElement("div");
+    totalHead.className = "po-summary-size-colhead po-summary-size-colhead--total";
+    totalHead.textContent = "Total";
+    block.appendChild(totalHead);
+
+    sizeLabels.forEach(label => {
+      const head = document.createElement("div");
+      head.className = "po-summary-size-colhead";
+      head.textContent = label;
+      block.appendChild(head);
+    });
+
+    const poRowLabel = document.createElement("div");
+    poRowLabel.className = "po-summary-label";
+    poRowLabel.textContent = "PO Qty";
+    block.appendChild(poRowLabel);
+
+    const poTotalCell = document.createElement("div");
+    poTotalCell.className = "po-summary-size-qty po-summary-size-qty--po po-summary-size-total-col";
+    poTotalCell.textContent = formatQtyCell(poTotalQtyFromPo(po));
+    block.appendChild(poTotalCell);
+
+    sizeLabels.forEach((_, i) => {
+      const cell = document.createElement("div");
+      cell.className = "po-summary-size-qty po-summary-size-qty--po";
+      cell.textContent = formatQtyCell(poUnitQtyFromPo(po, i));
+      block.appendChild(cell);
+    });
+
+    if (showProdQty) {
+      const prodRowLabel = document.createElement("div");
+      prodRowLabel.className = "po-summary-label";
+      prodRowLabel.textContent = "Prod Qty";
+      block.appendChild(prodRowLabel);
+
+      const prodTotalCell = document.createElement("div");
+      prodTotalCell.className = "po-summary-size-qty po-summary-size-qty--prod po-summary-size-total-col";
+      prodTotalCell.id = "summaryProdTotal";
+      prodTotalCell.textContent = formatQtyCell(prodTotalQty());
+      block.appendChild(prodTotalCell);
+
+      sizeLabels.forEach((_, i) => {
+        const cell = document.createElement("div");
+        cell.className = "po-summary-size-qty po-summary-size-qty--prod";
+        cell.id = "summaryProdUnit_" + i;
+        cell.textContent = formatQtyCell(prodUnitQty(i));
+        block.appendChild(cell);
+      });
+    }
+
+    container.appendChild(block);
+  }
+
+  function isPhotoUrl(url) {
+    return /^https?:\/\/.+/i.test(String(url ?? "").trim());
+  }
+
+  function getPhotoMaxDimensions(contextEl) {
+    const photosRow = contextEl?.closest?.(".po-summary-photos");
+    const style = getComputedStyle(photosRow || contextEl || document.getElementById("packingPane") || document.documentElement);
+    const slotW = parseFloat(style.getPropertyValue("--photo-slot-w"))
+      || parseFloat(style.getPropertyValue("--po-pane-photo-max-width"))
+      || 220;
+    return {
+      maxW: slotW,
+      maxH: parseFloat(style.getPropertyValue("--po-pane-photo-max-height")) || 367,
+    };
+  }
+
+  function applyPhotoImageSize(img) {
+    const { maxW, maxH } = getPhotoMaxDimensions(img.closest(".packing-pane"));
+    const naturalW = img.naturalWidth;
+    const naturalH = img.naturalHeight;
+    if (!naturalW || !naturalH) return;
+    const scale = Math.min(1, maxW / naturalW, maxH / naturalH);
+    img.style.width = String(Math.round(naturalW * scale)) + "px";
+    img.style.height = String(Math.round(naturalH * scale)) + "px";
+  }
+
+  function bindPhotoSizing(img) {
+    const apply = () => applyPhotoImageSize(img);
+    if (img.complete && img.naturalWidth) apply();
+    else img.addEventListener("load", apply, { once: true });
+  }
+
+  function renderSummaryPhoto(photoEl, url, photoIndex) {
+    photoEl.innerHTML = "";
+    photoEl.classList.remove("po-summary-photo--has-image", "po-summary-photo--error");
+    const normalizedUrl = String(url ?? "").trim();
+    if (!isPhotoUrl(normalizedUrl)) return;
+
+    photoEl.classList.add("po-summary-photo--has-image");
+    const img = document.createElement("img");
+    img.className = "po-summary-photo-img";
+    img.src = normalizedUrl;
+    img.alt = "Photo " + photoIndex;
+    img.loading = "lazy";
+    img.title = "Open in new tab";
+    img.addEventListener("click", e => {
+      e.stopPropagation();
+      window.open(normalizedUrl, "_blank", "noopener,noreferrer");
+    });
+    bindPhotoSizing(img);
+    img.addEventListener("error", () => {
+      photoEl.classList.remove("po-summary-photo--has-image");
+      photoEl.classList.add("po-summary-photo--error");
+      img.remove();
+    });
+    photoEl.appendChild(img);
+  }
+
+  function appendStylePhotos(container, po) {
+    const wrap = document.createElement("div");
+    wrap.className = "po-summary-photos";
+    ["Style Photo 1", "Style Photo 2"].forEach((field, index) => {
+      const slot = document.createElement("div");
+      slot.className = "po-summary-photo-slot";
+      const photo = document.createElement("div");
+      photo.className = "po-summary-photo";
+      photo.setAttribute("aria-label", field);
+      renderSummaryPhoto(photo, po[field] || "", index + 1);
+      slot.appendChild(photo);
+      wrap.appendChild(slot);
+    });
+    container.appendChild(wrap);
+  }
+
+  function focusNextGridField(current) {
+    if (!cartonGridWrap) return;
+    const focusable = [...cartonGridWrap.querySelectorAll(".carton-grid-input, .carton-weight-input")];
+    const idx = focusable.indexOf(current);
+    if (idx >= 0 && idx < focusable.length - 1) {
+      focusable[idx + 1].focus();
+    }
+  }
+
   // ── Packing pane ──────────────────────────────────────────
   function openPackingPane(po) {
     selectedPo = po;
     sizeLabels = (po.sizeLabels && po.sizeLabels.length) ? po.sizeLabels : ["Units"];
+    const canEditPacking = isExfRequestedPo(po);
 
     hidePanelMsg();
     confirmationOverlay.classList.remove("show");
     packingNotes.value = po.packingNotes || "";
     packingPane.hidden = false;
-
-    // Load existing cartons or start fresh
-    if (po.existingCartons && po.existingCartons.length > 0) {
-      cartons = po.existingCartons.map(c => {
-        const out = {};
-        sizeLabels.forEach((_, i) => {
-          out["u" + i] = qty(c["Unit " + (i + 1)]);
-        });
-        out.weight = qty(c["Carton Weight"]);
-        return out;
-      });
-      const initialCount = Math.max(cartons.length, po.cartonCount || 1);
-      while (cartons.length < initialCount) cartons.push(makeEmptyCarton());
+    packingPaneTitle.textContent = "PO # " + (po["PO #"] || "");
+    packingPaneMenuWrap.hidden = !canEditPacking;
+    packingEditorMain.hidden = !canEditPacking;
+    packingSubmitBar.hidden = !canEditPacking;
+    packingNotesSection.hidden = false;
+    if (canEditPacking) {
+      packingPane.style.removeProperty("--packing-pane-width");
     } else {
-      cartons = [makeEmptyCarton()];
+      packingPane.style.setProperty("--packing-pane-width", "480px");
     }
 
-    cartonCountInput.value = String(cartons.length);
-    buildSummaryCard(po);
-    buildCartonGrid();
-    if (cartonGridScroll) cartonGridScroll.scrollTop = 0;
+    if (canEditPacking) {
+      // Load existing cartons or start fresh
+      if (po.existingCartons && po.existingCartons.length > 0) {
+        cartons = po.existingCartons.map(c => {
+          const out = {};
+          sizeLabels.forEach((_, i) => {
+            out["u" + i] = qty(c["Unit " + (i + 1)]);
+          });
+          out.weight = qty(c["Carton Weight"]);
+          return out;
+        });
+        const initialCount = Math.max(cartons.length, po.cartonCount || 1);
+        while (cartons.length < initialCount) cartons.push(makeEmptyCarton());
+      } else {
+        cartons = [makeEmptyCarton()];
+      }
+
+      cartonCountInput.value = String(cartons.length);
+      buildCartonGrid();
+      if (cartonGridScroll) cartonGridScroll.scrollTop = 0;
+    } else {
+      cartons = [];
+    }
+
+    buildSummaryCard(po, canEditPacking);
     highlightSelectedRow();
   }
 
@@ -1346,7 +1692,7 @@
   }
 
   // ── PO Summary ────────────────────────────────────────────
-  function buildSummaryCard(po) {
+  function buildSummaryCard(po, showPackingTotals) {
     poSummaryCard.innerHTML = "";
 
     function addRow(label, value) {
@@ -1364,77 +1710,65 @@
       poSummaryCard.appendChild(row);
     }
 
-    addRow("PO #", po["PO #"]);
     addRow("Buyer PO #", po["Buyer PO #"]);
     addRow("Buyer", po["Buyer"]);
     addRow("Style #", po["Style #"]);
     addRow("Color", po["Color"]);
+    if (po["EST EXF"]) addRow("EST EXF Date", fmtDate(po["EST EXF"]));
     if (po["EXF Request ID"]) addRow("EXF Req ID", po["EXF Request ID"]);
     if (po["EXF Date"] || po["EXF Request Date"]) {
       addRow("EXF Date", fmtDate(po["EXF Date"] || po["EXF Request Date"]));
     }
     if (po["EXF Memo"]) addRow("EXF Memo", po["EXF Memo"]);
 
-    // Totals
-    const totalsRow = document.createElement("div");
-    totalsRow.className = "po-summary-totals";
+    const metricsSection = document.createElement("div");
+    metricsSection.className = "po-summary-metrics";
+    appendSizeQtyGrid(metricsSection, po, showPackingTotals);
 
-    function addTotal(num, label) {
-      const item = document.createElement("div");
-      item.className = "po-summary-total-item";
-      const n = document.createElement("div");
-      n.className = "po-summary-total-item__num";
-      n.id = "summaryTotal_" + label.replace(/\s+/g, "");
-      n.textContent = String(num);
-      const l = document.createElement("div");
-      l.className = "po-summary-total-item__label";
-      l.textContent = label;
-      item.appendChild(n);
-      item.appendChild(l);
-      totalsRow.appendChild(item);
+    if (showPackingTotals) {
+      const totalsRow = document.createElement("div");
+      totalsRow.className = "po-summary-totals";
+
+      function addTotal(num, label) {
+        const item = document.createElement("div");
+        item.className = "po-summary-total-item";
+        const n = document.createElement("div");
+        n.className = "po-summary-total-item__num";
+        n.id = "summaryTotal_" + label.replace(/\s+/g, "");
+        n.textContent = String(num);
+        const l = document.createElement("div");
+        l.className = "po-summary-total-item__label";
+        l.textContent = label;
+        item.appendChild(n);
+        item.appendChild(l);
+        totalsRow.appendChild(item);
+      }
+      addTotal(cartons.length || po["Ctn Qty"] || 0, "CTN Qty");
+      addTotal(prodTotalQty() || po["Actual Qty"] || 0, "Total Qty");
+      const initialWeight = cartons.reduce((sum, c) => sum + qty(c.weight), 0);
+      addTotal(fmtWeightKg(initialWeight), "Total Weight");
+
+      metricsSection.appendChild(totalsRow);
     }
-    addTotal(cartons.length || po["Ctn Qty"] || 0, "Cartons");
-    const initialUnits = cartons.reduce((sum, c) => sum + cartonTotal(c), 0);
-    addTotal(initialUnits || po["Actual Qty"] || 0, "Total Units");
-    const initialWeight = cartons.reduce((sum, c) => sum + qty(c.weight), 0);
-    addTotal(fmtWeightKg(initialWeight), "Total Weight");
-    poSummaryCard.appendChild(totalsRow);
 
-    const sizeTotalsRow = document.createElement("div");
-    sizeTotalsRow.className = "po-summary-size-totals";
-    sizeTotalsRow.id = "summarySizeTotals";
-    sizeLabels.forEach((label, i) => {
-      const item = document.createElement("div");
-      item.className = "po-summary-size-total-item";
-      const lbl = document.createElement("div");
-      lbl.className = "po-summary-size-total-item__label";
-      lbl.textContent = label;
-      const num = document.createElement("div");
-      num.className = "po-summary-size-total-item__num";
-      num.id = "summarySizeTotal_" + i;
-      num.textContent = String(cartons.reduce((sum, c) => sum + qty(c["u" + i]), 0));
-      item.appendChild(lbl);
-      item.appendChild(num);
-      sizeTotalsRow.appendChild(item);
-    });
-    poSummaryCard.appendChild(sizeTotalsRow);
+    poSummaryCard.appendChild(metricsSection);
+    appendStylePhotos(poSummaryCard, po);
   }
 
   function refreshSummaryTotals() {
-    const ctnEl = document.getElementById("summaryTotal_Cartons");
-    const unitEl = document.getElementById("summaryTotal_TotalUnits");
+    const ctnEl = document.getElementById("summaryTotal_CTNQty");
+    const unitEl = document.getElementById("summaryTotal_TotalQty");
     const weightEl = document.getElementById("summaryTotal_TotalWeight");
+    const prodTotalEl = document.getElementById("summaryProdTotal");
     if (ctnEl) ctnEl.textContent = String(cartons.length);
-    const totalUnits = cartons.reduce((sum, c) => sum + cartonTotal(c), 0);
+    const totalUnits = prodTotalQty();
     if (unitEl) unitEl.textContent = String(totalUnits);
+    if (prodTotalEl) prodTotalEl.textContent = formatQtyCell(totalUnits);
     const totalWeight = cartons.reduce((sum, c) => sum + qty(c.weight), 0);
     if (weightEl) weightEl.textContent = fmtWeightKg(totalWeight);
     sizeLabels.forEach((_, i) => {
-      const el = document.getElementById("summarySizeTotal_" + i);
-      if (el) {
-        const t = cartons.reduce((sum, c) => sum + qty(c["u" + i]), 0);
-        el.textContent = String(t);
-      }
+      const el = document.getElementById("summaryProdUnit_" + i);
+      if (el) el.textContent = formatQtyCell(prodUnitQty(i));
     });
   }
 
@@ -1445,7 +1779,7 @@
     weight: 72,
     panePad: 34,
     paneMax: 560,
-    paneMin: 420,
+    paneMin: 480,
     sizeMin: 40,
     sizeDefault: 46,
   };
@@ -1484,7 +1818,7 @@
       CARTON_COL.total + "px",
       CARTON_COL.weight + "px",
     ].join(" ");
-    packingPane.style.setProperty("--packing-pane-width", paneW + "px");
+    packingPane.style.setProperty("--packing-pane-width", Math.max(CARTON_COL.paneMin, paneW) + "px");
     if (cartonGridWrap) {
       cartonGridWrap.style.setProperty("--carton-grid-width", tableW + "px");
       cartonGridWrap.style.setProperty("--carton-grid-cols", cols);
@@ -1523,6 +1857,12 @@
     input.placeholder = "—";
     bindNumberInput(input);
     input.addEventListener("input", onInput);
+    input.addEventListener("keydown", e => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        focusNextGridField(input);
+      }
+    });
     return input;
   }
 
@@ -1778,7 +2118,7 @@
       refreshSummaryTotals();
     }
     updateCounters();
-    document.getElementById("packingEditorSection").querySelector(".packing-editor-footer").style.display = "none";
+    packingSubmitBar.hidden = true;
     confirmationMsg.textContent = result.message || "Your packing list has been received.";
     confirmationOverlay.classList.add("show");
     renderPoTable();
@@ -1793,8 +2133,7 @@
 
   submitAnotherBtn.addEventListener("click", () => {
     confirmationOverlay.classList.remove("show");
-    const edSec = document.getElementById("packingEditorSection");
-    edSec.querySelector(".packing-editor-footer").style.display = "";
+    packingSubmitBar.hidden = false;
     closePackingPane();
   });
 

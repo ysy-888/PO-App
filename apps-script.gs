@@ -424,6 +424,32 @@ function stylePhotosSheetToObjects_(sheet) {
   return result;
 }
 
+function stylePhotoLookupKey_(styleNum, color) {
+  var style = String(styleNum ?? "").trim().toLowerCase();
+  var shade = String(color ?? "").trim().toLowerCase();
+  if (!style || !shade) return "";
+  return style + "|" + shade;
+}
+
+function buildStylePhotoLookup_(sheet) {
+  var map = {};
+  stylePhotosSheetToObjects_(sheet).forEach(function(entry) {
+    var key = stylePhotoLookupKey_(entry["Style #"], entry["Color"]);
+    if (!key) return;
+    map[key] = {
+      "Style Photo 1": normalizeStylePhotoUrl_(entry["Style Photo 1"]),
+      "Style Photo 2": normalizeStylePhotoUrl_(entry["Style Photo 2"]),
+    };
+  });
+  return map;
+}
+
+function lookupStylePhotos_(map, row) {
+  var key = stylePhotoLookupKey_(row["Style #"], row["Color"]);
+  if (key && map[key]) return map[key];
+  return { "Style Photo 1": "", "Style Photo 2": "" };
+}
+
 function corsResponse(data) {
   return ContentService
     .createTextOutput(JSON.stringify(data))
@@ -3766,6 +3792,7 @@ function vendorPortalGetPos(sessionId, token) {
 
     const pendingSheet = getPendingPackingListsSheet_();
     const pendingLists = sheetToObjects_(pendingSheet, PENDING_PACKING_LIST_ID_FIELD);
+    const stylePhotoLookup = buildStylePhotoLookup_(getStylePhotosSheet_());
     const pendingByPo = {};
     pendingLists.forEach(entry => {
       if (String(entry["Status"] ?? "").trim().toLowerCase() !== "pending") return;
@@ -3805,11 +3832,14 @@ function vendorPortalGetPos(sessionId, token) {
 
       // Actual units per size from PO row (written by savePackingListCore_)
       const actUnits = sizeLabels.map((_, i) => toPackingQty_(row["Act Unit " + (i + 1)]) || 0);
+      const stylePhotos = lookupStylePhotos_(stylePhotoLookup, row);
 
       return {
         "PO #": po,
         "Style #": String(row["Style #"] ?? "").trim(),
         "Color": String(row["Color"] ?? "").trim(),
+        "Style Photo 1": stylePhotos["Style Photo 1"] || "",
+        "Style Photo 2": stylePhotos["Style Photo 2"] || "",
         "Status": String(row["Status"] ?? "").trim(),
         "Buyer": String(row["Buyer"] ?? "").trim(),
         "Buyer PO #": String(row["Buyer PO #"] ?? "").trim(),
