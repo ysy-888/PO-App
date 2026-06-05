@@ -29,7 +29,7 @@ function normalizeStylePhotoUrl(url) {
 
 const EDITABLE = new Set([
   "Flag",
-  "Status","N41 Status","Ship Method",
+  "Status","Ship Method",
   "IHD","EST EXF","CXL Date","Assign Date","Notes","Old PO #",
   "FOB Cost","Price","PO Total Cost","OG","PROTO","FIT/PP","BULK","TOP","TRIM",
   "Received Qty",
@@ -57,7 +57,7 @@ function isPoFieldEditable(col, row) {
   return true;
 }
 
-const READONLY_NO_SELECT_COLS = new Set(["Division", "PO Date", "Vendor"]);
+const READONLY_NO_SELECT_COLS = new Set(["Division", "PO Date", "Vendor", "N41 Status"]);
 
 const COPY_ON_CLICK_COLS = new Set([
   "Buyer", "Buyer PO #", "SO #", "PO #", "Style #", "Color",

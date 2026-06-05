@@ -502,15 +502,22 @@ function toggleRowFlag(row) {
   if (isAppSaving()) return;
   if (typeof isPoClosed === "function" && isPoClosed(row)) return;
   const next = !isTruthy(row["Flag"]);
+  const poNumber = row["PO #"];
   row["Flag"] = next;
-  if (isPoModalOpenForRow(row)) {
-    updateModalIfOpen();
+
+  const actualRow = findRowByPo(poNumber);
+  if (actualRow && actualRow !== row) actualRow["Flag"] = next;
+
+  if (modalRow && String(modalRow["PO #"]) === String(poNumber)) {
+    modalRow["Flag"] = next;
+    if (modalSnapshot) modalSnapshot["Flag"] = next;
+    if (typeof updateModalFlagButton === "function") updateModalFlagButton(modalRow);
+    if (typeof updatePoModalMenu === "function") updatePoModalMenu(modalRow);
     updateModalSaveState();
-    return;
   }
-  saveUpdate(row["PO #"], { Flag: next });
+
+  saveUpdate(poNumber, { Flag: next }, { silent: true });
   renderTable();
-  updateModalIfOpen();
 }
 
 function setAllFilteredSelected(selected) {

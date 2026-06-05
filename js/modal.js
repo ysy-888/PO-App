@@ -45,7 +45,7 @@ function isModalSaveInProgress() {
 function bindFieldInteractions(fieldEl, col, row) {
   fieldEl.dataset.col = col;
 
-  if (col === "Flag") {
+  if (col === "Flag" || col === "N41 Status") {
     fieldEl.classList.add("readonly", "readonly-no-select");
     return;
   }
@@ -182,7 +182,7 @@ function createModalStyleMetaText(col, row) {
   return wrap;
 }
 
-function createModalStyleMetaGroup(row, cols = ["Vendor", "PO Total Cost"]) {
+function createModalStyleMetaGroup(row, cols = ["PO Total Cost"]) {
   const group = document.createElement("div");
   group.className = "modal-style-meta-group";
   cols.forEach(col => {
@@ -1097,11 +1097,8 @@ function rebuildPoModalMenuItems(row) {
   const packingList = getPackingListForPo(poNumber);
   const closed = typeof isPoClosed === "function" && isPoClosed(row);
 
-  if (!closed) {
-    menu.appendChild(createPoModalMenuItem(
-      isTruthy(row["Flag"]) ? "Unflag PO" : "Flag PO",
-      () => toggleRowFlag(row)
-    ));
+  if (!closed && !isTruthy(row["Flag"])) {
+    menu.appendChild(createPoModalMenuItem("Flag PO", () => toggleRowFlag(row)));
   }
   menu.appendChild(createPoModalMenuItem("New Chargeback", () => beginNewChargeback(row)));
   if (!closed) {
@@ -1138,6 +1135,24 @@ function openPoModalMenu(row) {
 
 function updatePoModalMenu(row) {
   if (poModalMenuOpen && row) rebuildPoModalMenuItems(row);
+}
+
+function updateModalFlagButton(row) {
+  const btn = document.getElementById("modalFlagBtn");
+  if (!btn) return;
+  const flagged = row && isTruthy(row["Flag"]);
+  const closed = row && typeof isPoClosed === "function" && isPoClosed(row);
+  btn.hidden = !flagged || closed;
+}
+
+function initPoModalFlagButton() {
+  const btn = document.getElementById("modalFlagBtn");
+  if (!btn) return;
+  btn.addEventListener("click", e => {
+    e.stopPropagation();
+    if (!modalRow || !isTruthy(modalRow["Flag"])) return;
+    toggleRowFlag(modalRow);
+  });
 }
 
 function initPoModalHeaderMenu() {
@@ -1688,16 +1703,30 @@ function syncPackingListPanelOpenForRow(row) {
   }
 }
 
+function updateModalVendor(row) {
+  const vendorEl = document.getElementById("modalPoVendor");
+  if (!vendorEl) return;
+  const vendorVal = String(getColumnFilterRawValue("Vendor", row) ?? "").trim();
+  if (vendorVal) {
+    vendorEl.textContent = vendorVal;
+    vendorEl.hidden = false;
+  } else {
+    vendorEl.textContent = "";
+    vendorEl.hidden = true;
+  }
+}
+
 function renderModalHeadingMeta(container, row) {
   if (!container) return;
   container.replaceChildren();
+
   const styleVal = String(getColumnFilterRawValue("Style #", row) ?? "").trim();
   const colorVal = String(getColumnFilterRawValue("Color", row) ?? "").trim();
   if (!styleVal && !colorVal) return;
 
   const item = document.createElement("span");
   item.className = "modal-po-heading-meta-item";
-  if (styleVal && colorVal) item.textContent = `${styleVal}/${colorVal}`;
+  if (styleVal && colorVal) item.textContent = `${styleVal} / ${colorVal}`;
   else item.textContent = styleVal || colorVal;
   container.appendChild(item);
 }
@@ -1720,8 +1749,10 @@ function renderModalContent(row) {
   }
 
   renderModalHeadingMeta(poMetaEl, row);
+  updateModalVendor(row);
 
   updateModalPackingListButton(row);
+  updateModalFlagButton(row);
   updatePoModalMenu(row);
 
   bodyEl.innerHTML = "";
@@ -2299,6 +2330,7 @@ async function saveModalChanges() {
 
 function initPoModalActions() {
   bindDirectBackdropDismiss(document.getElementById("modalOverlay"), cancelModalChanges);
+  initPoModalFlagButton();
   initPoModalHeaderMenu();
   document.getElementById("modalSaveBtn")?.addEventListener("click", () => {
     saveModalChanges();

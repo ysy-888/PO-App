@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>PO Table</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-<link rel="stylesheet" href="po-table.css?v=20260603-1" />
+<link rel="stylesheet" href="po-table.css?v=20260604-1" />
 </head>
 <body>
 
@@ -157,6 +157,7 @@
   </div>
 </div>
 
+<div id="appMain" class="app-main">
 <div id="poViewContent" class="po-view-content">
 <div id="poTableWrap" class="table-scroll-y po-list-pane">
   <div class="table-scroll-x">
@@ -305,26 +306,7 @@
 </aside>
 </div>
 
-<div class="modal-overlay" id="poMultiCartonModal" hidden>
-  <div class="modal-box" onclick="event.stopPropagation()">
-    <div class="modal-title">Multi Carton</div>
-    <div id="poMultiCartonSizeFields" class="modal-size-fields"></div>
-    <div class="modal-field" style="margin-top:10px;">
-      <label for="poMultiCartonCount">Number of Cartons</label>
-      <input type="number" id="poMultiCartonCount" min="1" step="1" value="1" />
-    </div>
-    <div class="modal-field">
-      <label for="poMultiCartonWeight">Weight per Carton (kg)</label>
-      <input type="number" id="poMultiCartonWeight" min="0" step="0.01" value="" placeholder="0.00" />
-    </div>
-    <div class="modal-footer">
-      <button type="button" class="btn btn-sm" id="poMultiCartonCancel">Cancel</button>
-      <button type="button" class="btn btn-primary btn-sm" id="poMultiCartonApply">Apply</button>
-    </div>
-  </div>
-</div>
-
-<div id="shipmentTableWrap" class="table-scroll-y" hidden>
+<div id="shipmentTableWrap" class="table-scroll-y app-secondary-table" hidden>
   <div class="table-scroll-x">
   <table id="shipmentTable">
     <colgroup>
@@ -366,7 +348,7 @@
   </div>
 </div>
 
-<div id="requestsTableWrap" class="table-scroll-y" hidden>
+<div id="requestsTableWrap" class="table-scroll-y app-secondary-table" hidden>
 
   <!-- EXF Requests sub-table -->
   <div id="exfRequestTableWrap" class="table-scroll-x">
@@ -483,6 +465,7 @@
         <th>PO Count</th>
         <th>Email Status</th>
         <th>Email Sent</th>
+        <th>Last Attempt</th>
         <th>Email Error</th>
         <th>Action</th>
       </tr>
@@ -524,6 +507,7 @@
         <th>PO Count</th>
         <th>Email Status</th>
         <th>Email Sent</th>
+        <th>Last Attempt</th>
         <th>Email Error</th>
         <th>Action</th>
       </tr>
@@ -536,7 +520,7 @@
 
 </div>
 
-<div id="chargebackTableWrap" class="table-scroll-y" hidden>
+<div id="chargebackTableWrap" class="table-scroll-y app-secondary-table" hidden>
   <div class="table-scroll-x">
   <table id="chargebackTable">
     <colgroup>
@@ -635,6 +619,26 @@
       <tr class="state-row"><td colspan="13">Loading submissions…</td></tr>
     </tbody>
   </table>
+  </div>
+</div>
+</div>
+
+<div class="modal-overlay" id="poMultiCartonModal" hidden>
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-title">Multi Carton</div>
+    <div id="poMultiCartonSizeFields" class="modal-size-fields"></div>
+    <div class="modal-field" style="margin-top:10px;">
+      <label for="poMultiCartonCount">Number of Cartons</label>
+      <input type="number" id="poMultiCartonCount" min="1" step="1" value="1" />
+    </div>
+    <div class="modal-field">
+      <label for="poMultiCartonWeight">Weight per Carton (kg)</label>
+      <input type="number" id="poMultiCartonWeight" min="0" step="0.01" value="" placeholder="0.00" />
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-sm" id="poMultiCartonCancel">Cancel</button>
+      <button type="button" class="btn btn-primary btn-sm" id="poMultiCartonApply">Apply</button>
+    </div>
   </div>
 </div>
 
@@ -934,6 +938,15 @@
             <p class="settings-hint">Shows days-until labels on CXL and related date columns in the PO table.</p>
           </div>
           <div class="settings-group">
+            <div class="settings-switch-row">
+              <span class="settings-switch-label" id="settingsSplitViewLabel">Split view</span>
+              <button type="button" class="settings-round-switch" id="settingsSplitViewToggle" role="switch" aria-labelledby="settingsSplitViewLabel" aria-checked="true">
+                <span class="settings-round-switch-thumb" aria-hidden="true"></span>
+              </button>
+            </div>
+            <p class="settings-hint">When on, Shipments, Requests, and Chargebacks show their table above the PO table. Turn off to use separate full-page views.</p>
+          </div>
+          <div class="settings-group">
             <div class="settings-date-format-row">
               <label class="settings-switch-label" for="settingsDateFormatSelect">Date format</label>
               <select id="settingsDateFormatSelect" class="filter-select settings-date-format-select" aria-label="Date format"></select>
@@ -998,6 +1011,10 @@
       </div>
       <div class="modal-header-actions">
         <button type="button" class="btn btn-secondary packing-list-header-btn" id="modalPackingListBtn" hidden>Add Packing List</button>
+        <button type="button" class="po-flag-btn is-flagged" id="modalFlagBtn" hidden aria-label="Unflag PO" title="Unflag">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+        </button>
+        <span id="modalPoVendor" class="modal-po-heading-vendor" hidden></span>
         <div class="header-menu-wrap modal-header-menu-wrap">
           <button type="button" class="btn btn-icon" id="modalHeaderMenuBtn" aria-label="PO menu" aria-haspopup="menu" aria-expanded="false">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.75"/><circle cx="12" cy="12" r="1.75"/><circle cx="12" cy="19" r="1.75"/></svg>

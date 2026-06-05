@@ -1155,3 +1155,182 @@
 {"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780638299366,"hypothesisId":"A"}
 {"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780638299366,"hypothesisId":"B,D"}
 {"sessionId":"c417e3","location":"data-pipeline.js:loadData:afterFetch","message":"fetch+json done","data":{"httpStatus":200,"httpOk":true,"jsonSuccess":true,"dataLen":464},"timestamp":1780638307032,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780638563699,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780638563704,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780638563704,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780638569537,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780638569543,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780638569543,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:afterFetch","message":"fetch+json done","data":{"httpStatus":200,"httpOk":true,"jsonSuccess":true,"dataLen":464},"timestamp":1780638579671,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780638603146,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780638603151,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780638603151,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780638604688,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780638604693,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780638604693,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780638607366,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780638607371,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780638607371,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780638609161,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780638609165,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780638609165,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780638610145,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780638610151,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780638610151,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780638610354,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780638610359,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780638610359,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780638611173,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780638611178,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780638611178,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780638611661,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780638611667,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780638611667,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780638612247,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780638612251,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780638612251,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780638617745,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780638617750,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780638617750,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:afterFetch","message":"fetch+json done","data":{"httpStatus":200,"httpOk":true,"jsonSuccess":true,"dataLen":464},"timestamp":1780638624818,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780638639758,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780638639761,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780638639762,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:afterFetch","message":"fetch+json done","data":{"httpStatus":200,"httpOk":true,"jsonSuccess":true,"dataLen":464},"timestamp":1780638648968,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780638763920,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780638763926,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780638763927,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:afterFetch","message":"fetch+json done","data":{"httpStatus":200,"httpOk":true,"jsonSuccess":true,"dataLen":464},"timestamp":1780638773410,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780639064018,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780639064023,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780639064023,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:afterFetch","message":"fetch+json done","data":{"httpStatus":200,"httpOk":true,"jsonSuccess":true,"dataLen":464},"timestamp":1780639071918,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780639076783,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780639076787,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780639076788,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:afterFetch","message":"fetch+json done","data":{"httpStatus":200,"httpOk":true,"jsonSuccess":true,"dataLen":464},"timestamp":1780639083898,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780639136896,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780639136900,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780639136900,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:afterFetch","message":"fetch+json done","data":{"httpStatus":200,"httpOk":true,"jsonSuccess":true,"dataLen":464},"timestamp":1780639145936,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780639349336,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780639349342,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780639349342,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:afterFetch","message":"fetch+json done","data":{"httpStatus":200,"httpOk":true,"jsonSuccess":true,"dataLen":464},"timestamp":1780639360734,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780639495006,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780639495010,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780639495010,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780639495237,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780639495242,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780639495242,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780639499209,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780639499213,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780639499214,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780639505875,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780639505879,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780639505879,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:afterFetch","message":"fetch+json done","data":{"httpStatus":200,"httpOk":true,"jsonSuccess":true,"dataLen":464},"timestamp":1780639515290,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780639616472,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780639616476,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780639616476,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780639616696,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780639616701,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780639616702,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780639617017,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780639617021,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780639617021,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:afterFetch","message":"fetch+json done","data":{"httpStatus":200,"httpOk":true,"jsonSuccess":true,"dataLen":464},"timestamp":1780639627383,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780639709438,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780639709443,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780639709443,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:afterFetch","message":"fetch+json done","data":{"httpStatus":200,"httpOk":true,"jsonSuccess":true,"dataLen":464},"timestamp":1780639719159,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780640012627,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780640012633,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780640012633,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780640016852,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780640016857,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780640016857,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780640017056,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780640017063,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780640017063,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:afterFetch","message":"fetch+json done","data":{"httpStatus":200,"httpOk":true,"jsonSuccess":true,"dataLen":464},"timestamp":1780640027751,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780640364617,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780640364623,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780640364623,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:afterFetch","message":"fetch+json done","data":{"httpStatus":200,"httpOk":true,"jsonSuccess":true,"dataLen":464},"timestamp":1780640374346,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780640382077,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780640382082,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780640382082,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780640382541,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780640382545,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780640382545,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:afterFetch","message":"fetch+json done","data":{"httpStatus":200,"httpOk":true,"jsonSuccess":true,"dataLen":464},"timestamp":1780640392757,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780640398545,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780640398548,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780640398548,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:afterFetch","message":"fetch+json done","data":{"httpStatus":200,"httpOk":true,"jsonSuccess":true,"dataLen":464},"timestamp":1780640410808,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780640839696,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780640839704,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780640839704,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780640842311,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780640842314,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780640842315,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780640842556,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780640842560,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780640842560,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780640843025,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780640843030,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780640843030,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780640843724,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780640843727,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780640843728,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:afterFetch","message":"fetch+json done","data":{"httpStatus":200,"httpOk":true,"jsonSuccess":true,"dataLen":464},"timestamp":1780640857129,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780640858572,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780640858576,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780640858576,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:afterFetch","message":"fetch+json done","data":{"httpStatus":200,"httpOk":true,"jsonSuccess":true,"dataLen":464},"timestamp":1780640867019,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780640912391,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780640912396,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780640912396,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:afterFetch","message":"fetch+json done","data":{"httpStatus":200,"httpOk":true,"jsonSuccess":true,"dataLen":464},"timestamp":1780640920816,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780641020524,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780641020532,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780641020532,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780641022066,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780641022073,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780641022074,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780641022389,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780641022394,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780641022394,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:afterFetch","message":"fetch+json done","data":{"httpStatus":200,"httpOk":true,"jsonSuccess":true,"dataLen":464},"timestamp":1780641033139,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780641542908,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780641542912,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780641542912,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780641547727,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780641547732,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780641547732,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:afterFetch","message":"fetch+json done","data":{"httpStatus":200,"httpOk":true,"jsonSuccess":true,"dataLen":464},"timestamp":1780641557636,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780641593035,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780641593038,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780641593039,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:afterFetch","message":"fetch+json done","data":{"httpStatus":200,"httpOk":true,"jsonSuccess":true,"dataLen":464},"timestamp":1780641604295,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780641660672,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780641660677,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780641660677,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780641661300,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780641661305,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780641661305,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780641661915,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780641661918,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780641661919,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780641662363,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780641662367,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780641662367,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780641663793,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780641663798,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780641663799,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:afterFetch","message":"fetch+json done","data":{"httpStatus":200,"httpOk":true,"jsonSuccess":true,"dataLen":464},"timestamp":1780641672825,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780641814550,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780641814555,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780641814556,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:afterFetch","message":"fetch+json done","data":{"httpStatus":200,"httpOk":true,"jsonSuccess":true,"dataLen":464},"timestamp":1780641823372,"hypothesisId":"B,D"}

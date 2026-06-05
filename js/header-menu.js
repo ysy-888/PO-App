@@ -1,4 +1,5 @@
 ﻿const CXL_COUNTDOWN_STORAGE_BASE = "cxlCountdown";
+const SPLIT_VIEW_STORAGE_BASE = "splitView";
 const PAGE_SIZE_STORAGE_BASE = "pageSize";
 const DEFAULT_PAGE_SIZE = "60";
 
@@ -32,6 +33,47 @@ const CHARGEBACK_REASONS = [
 ];
 
 let cxlCountdownEnabled = false;
+let splitViewEnabled = true;
+
+function loadSplitViewPreference() {
+  try {
+    const stored = localStorage.getItem(scopedStorageKey(SPLIT_VIEW_STORAGE_BASE));
+    splitViewEnabled = stored === null ? true : stored === "1";
+  } catch {
+    splitViewEnabled = true;
+  }
+  document.body.classList.toggle("split-view-enabled", splitViewEnabled);
+  refreshSplitViewLayoutIfReady();
+}
+
+function refreshSplitViewLayoutIfReady() {
+  if (typeof switchAppView !== "function" || typeof currentAppView === "undefined") return;
+  switchAppView(currentAppView);
+}
+
+function saveSplitViewPreference() {
+  try {
+    localStorage.setItem(scopedStorageKey(SPLIT_VIEW_STORAGE_BASE), splitViewEnabled ? "1" : "0");
+  } catch {
+    /* ignore storage failures */
+  }
+}
+
+function setSplitViewEnabled(enabled) {
+  splitViewEnabled = Boolean(enabled);
+  saveSplitViewPreference();
+  document.body.classList.toggle("split-view-enabled", splitViewEnabled);
+  if (typeof updateSettingsSplitViewUi === "function") updateSettingsSplitViewUi();
+  refreshSplitViewLayoutIfReady();
+}
+
+function toggleSplitView() {
+  setSplitViewEnabled(!splitViewEnabled);
+}
+
+function isSplitViewEnabled() {
+  return splitViewEnabled;
+}
 
 function loadCxlCountdownPreference() {
   try {

@@ -1158,6 +1158,10 @@ th.th-filterable .th-label {
   text-align: center;
 }
 
+.cell-select-dropdown--align-left .cell-select-option {
+  text-align: left;
+}
+
 .cell-select-option:hover { background: var(--row-hover); }
 
 .cell-select-option.selected {
@@ -2709,6 +2713,23 @@ td.n41-status-mismatch,
   min-height: 68px;
 }
 
+#modalOverlay .modal-field[data-col="Notes"] .modal-field-value.editing {
+  min-height: var(--modal-field-height);
+  max-height: var(--modal-field-height);
+  height: var(--modal-field-height);
+  align-items: center;
+}
+
+#modalOverlay .modal-field[data-col="Notes"] .modal-field-value.editing .cell-textarea {
+  min-height: var(--modal-field-height);
+  max-height: var(--modal-field-height);
+  height: var(--modal-field-height);
+  padding: 0 8px;
+  line-height: calc(var(--modal-field-height) - 2px);
+  resize: none;
+  overflow: hidden;
+}
+
 /* Pop scaling animation on open */
 .modal-backdrop.open .modal-card {
   transform: scale(1);
@@ -2813,6 +2834,18 @@ td.n41-status-mismatch,
   font-size: inherit;
   font-weight: inherit;
   color: inherit;
+}
+
+.modal-po-heading-vendor {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.modal-po-heading-vendor[hidden] {
+  display: none;
 }
 
 .modal-po-heading-meta-item {
@@ -3142,7 +3175,7 @@ td.n41-status-mismatch,
   box-sizing: border-box;
   border: 1px solid transparent;
   border-radius: 4px;
-  background: #fff;
+  background: transparent;
   font-family: var(--font);
   font-size: 12px;
   text-align: center;
@@ -3182,7 +3215,7 @@ td.n41-status-mismatch,
 
 .modal-size-input:hover {
   border-color: var(--border-strong);
-  background: #fff;
+  background: transparent;
 }
 
 .modal-size-input:focus {
@@ -3237,19 +3270,18 @@ td.n41-status-mismatch,
 
 .modal-size-variance-chevron {
   flex: 0 0 auto;
-  width: 3px;
-  height: 3px;
-  border-right: 1px solid currentColor;
-  border-bottom: 1px solid currentColor;
+  width: 6px;
+  height: 5px;
+  background-color: currentColor;
   opacity: 0.85;
 }
 
 .modal-size-variance-chevron--up {
-  transform: rotate(-135deg);
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
 }
 
 .modal-size-variance-chevron--down {
-  transform: rotate(45deg);
+  clip-path: polygon(50% 100%, 0% 0%, 100% 0%);
 }
 
 .modal-size-variance-value {
@@ -3992,6 +4024,10 @@ td.n41-status-mismatch,
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+#modalFlagBtn[hidden] {
+  display: none;
 }
 
 .modal-header-menu-wrap {
@@ -6245,6 +6281,51 @@ th.th-shipment-id-col.th-filterable.sorted-desc {
   max-width: 100%;
 }
 
+/* ── Main view area: split or full-page layouts ── */
+.app-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.app-main > .table-scroll-y:not([hidden]),
+.app-main > .po-view-content:not([hidden]) {
+  flex: 1;
+  min-height: 0;
+}
+
+body.split-view-enabled .app-main.is-split-active {
+  gap: 0;
+}
+
+body.split-view-enabled .app-main.is-split-active > .app-secondary-table:not([hidden]) {
+  order: -1;
+  flex: 0 0 42%;
+  min-height: 160px;
+  max-height: 52%;
+  border-bottom: 1px solid var(--border);
+}
+
+body.split-view-enabled .app-main.is-split-active > .po-view-content {
+  order: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+body:not(.split-view-enabled) .app-main > .app-secondary-table:not([hidden]) {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  order: 0;
+  border-bottom: none;
+}
+
+#poViewContent[hidden] {
+  display: none !important;
+}
+
 /* ── PO table + packing list side panel (vendor portal layout) ── */
 .po-view-content {
   flex: 1;
@@ -6260,8 +6341,8 @@ th.th-shipment-id-col.th-filterable.sorted-desc {
 
 #poPackingPane.packing-pane {
   --packing-pane-width: 540px;
-  --po-pane-photo-max-width: 220px;
-  --po-pane-photo-max-height: 367px;
+  --po-pane-photo-max-width: 240px;
+  --po-pane-photo-max-height: 300px;
   flex: 0 0 auto;
   width: max(var(--packing-pane-width), 540px);
   min-width: 540px;
@@ -6476,10 +6557,13 @@ th.th-shipment-id-col.th-filterable.sorted-desc {
   display: flex;
   flex-direction: row;
   justify-content: center;
-  flex-wrap: wrap;
+  align-items: center;
+  flex-wrap: nowrap;
   gap: 10px;
-  margin-top: 14px;
-  padding-top: 14px;
+  width: 100%;
+  height: 320px;
+  margin-top: 10px;
+  padding-top: 10px;
   border-top: 1px solid var(--border);
 }
 
@@ -6487,12 +6571,14 @@ th.th-shipment-id-col.th-filterable.sorted-desc {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 5px;
-  flex: none;
+  flex: 0 0 auto;
+  width: auto;
 }
 
 #poPackingPane .po-summary-photo {
-  width: var(--po-pane-photo-max-width, 220px);
+  width: var(--po-pane-photo-max-width, 240px);
   aspect-ratio: 3 / 4;
   flex: none;
   border: 1px dashed var(--border-strong);
@@ -6506,7 +6592,7 @@ th.th-shipment-id-col.th-filterable.sorted-desc {
 
 #poPackingPane .po-summary-photo--has-image {
   width: fit-content;
-  max-width: var(--po-pane-photo-max-width, 220px);
+  max-width: 100%;
   height: auto;
   aspect-ratio: auto;
   border: 1px solid var(--border-strong);
@@ -6523,7 +6609,7 @@ th.th-shipment-id-col.th-filterable.sorted-desc {
 }
 
 #poPackingPane .po-summary-photo--error {
-  width: var(--po-pane-photo-max-width, 220px);
+  width: var(--po-pane-photo-max-width, 240px);
   aspect-ratio: 3 / 4;
   border-style: dashed;
   display: flex;
@@ -6536,8 +6622,8 @@ th.th-shipment-id-col.th-filterable.sorted-desc {
 #poPackingPane .po-summary-photo--has-image .po-summary-photo-img {
   width: auto;
   height: auto;
-  max-width: var(--po-pane-photo-max-width, 220px);
-  max-height: var(--po-pane-photo-max-height, 367px);
+  max-width: var(--po-pane-photo-max-width, 240px);
+  max-height: var(--po-pane-photo-max-height, 300px);
   object-fit: unset;
   border: none;
   outline: none;
@@ -6662,7 +6748,8 @@ th.th-shipment-id-col.th-filterable.sorted-desc {
 #poPackingPane .packing-list-section {
   display: flex;
   flex-direction: column;
-  flex-shrink: 0;
+  flex: 1;
+  min-height: 0;
   border-top: 1px solid var(--border);
   background: var(--surface);
 }
@@ -6726,7 +6813,9 @@ th.th-shipment-id-col.th-filterable.sorted-desc {
 }
 
 #poPackingPane .packing-list-summary-fields {
+  flex: 0 0 auto;
   padding: 0 16px 12px;
+  align-content: start;
 }
 
 #poPackingPane .packing-list-table-panel {

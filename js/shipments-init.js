@@ -63,6 +63,7 @@ function initShipments() {
 
   initShipmentSelection();
   switchAppView("po");
+  if (typeof refreshSplitViewLayoutIfReady === "function") refreshSplitViewLayoutIfReady();
 }
 
 // Hook called from po-table.js after load

@@ -448,15 +448,15 @@ function poPaneIsPhotoUrl(url) {
 }
 
 function poPaneGetPhotoMaxDimensions(contextEl) {
-  const style = getComputedStyle(contextEl || document.getElementById("poPackingPane") || document.documentElement);
+  const style = getComputedStyle(contextEl?.closest?.("#poPackingPane") || document.getElementById("poPackingPane") || document.documentElement);
   return {
-    maxW: parseFloat(style.getPropertyValue("--po-pane-photo-max-width")) || 220,
-    maxH: parseFloat(style.getPropertyValue("--po-pane-photo-max-height")) || 367,
+    maxW: parseFloat(style.getPropertyValue("--po-pane-photo-max-width")) || 240,
+    maxH: parseFloat(style.getPropertyValue("--po-pane-photo-max-height")) || 300,
   };
 }
 
 function poPaneApplyPhotoImageSize(img) {
-  const { maxW, maxH } = poPaneGetPhotoMaxDimensions(img.closest("#poPackingPane, .packing-pane"));
+  const { maxW, maxH } = poPaneGetPhotoMaxDimensions(img);
   const naturalW = img.naturalWidth;
   const naturalH = img.naturalHeight;
   if (!naturalW || !naturalH) return;
@@ -467,8 +467,11 @@ function poPaneApplyPhotoImageSize(img) {
 
 function poPaneBindPhotoSizing(img) {
   const apply = () => poPaneApplyPhotoImageSize(img);
-  if (img.complete && img.naturalWidth) apply();
-  else img.addEventListener("load", apply, { once: true });
+  if (img.complete && img.naturalWidth) {
+    apply();
+    return;
+  }
+  img.addEventListener("load", apply, { once: true });
 }
 
 function poPaneRenderPhoto(photoEl, url, photoIndex) {

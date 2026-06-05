@@ -356,14 +356,26 @@ function updateRequestsRowCounter() {
   counterEl.textContent = `${count} ${label}`;
 }
 
+function isSplitViewTab(view) {
+  return view === "shipments" || view === "requests" || view === "chargebacks";
+}
+
+function isSplitViewLayoutEnabled() {
+  if (typeof isSplitViewEnabled === "function") return isSplitViewEnabled();
+  return document.body.classList.contains("split-view-enabled");
+}
+
 function switchAppView(view) {
   currentAppView = view;
+  const splitView = isSplitViewLayoutEnabled();
+  const splitActive = splitView && isSplitViewTab(view);
   const poToolbar = document.getElementById("poToolbar");
   const shipmentToolbar = document.getElementById("shipmentToolbar");
   const requestsToolbar = document.getElementById("requestsToolbar");
   const chargebackToolbar = document.getElementById("chargebackToolbar");
   const packingReviewToolbar = document.getElementById("packingReviewToolbar");
   const poHeaderMeta = document.getElementById("poHeaderMeta");
+  const appMain = document.getElementById("appMain");
   const poViewContent = document.getElementById("poViewContent");
   const poTableWrap = document.getElementById("poTableWrap");
   const shipmentTableWrap = document.getElementById("shipmentTableWrap");
@@ -376,21 +388,32 @@ function switchAppView(view) {
   const chargebackTab = document.getElementById("navTabChargebacks");
   const packingReviewTab = document.getElementById("navTabPackingReviews");
 
+  if (appMain) appMain.classList.toggle("is-split-active", splitActive);
+
   if (poToolbar) poToolbar.hidden = view !== "po";
   if (shipmentToolbar) shipmentToolbar.hidden = view !== "shipments";
   if (requestsToolbar) requestsToolbar.hidden = view !== "requests";
   if (chargebackToolbar) chargebackToolbar.hidden = view !== "chargebacks";
   if (packingReviewToolbar) packingReviewToolbar.hidden = view !== "packingReviews";
-  if (poHeaderMeta) poHeaderMeta.hidden = view !== "po";
-  if (poViewContent) poViewContent.hidden = view !== "po";
-  else if (poTableWrap) poTableWrap.hidden = view !== "po";
-  if (view !== "po" && typeof closePoPackingPane === "function") closePoPackingPane({ clearSelection: false });
+  if (poHeaderMeta) poHeaderMeta.hidden = view !== "po" && !splitActive;
+
+  if (splitActive) {
+    if (poViewContent) poViewContent.hidden = false;
+    else if (poTableWrap) poTableWrap.hidden = false;
+  } else {
+    if (poViewContent) poViewContent.hidden = view !== "po";
+    else if (poTableWrap) poTableWrap.hidden = view !== "po";
+    if (view !== "po" && typeof closePoPackingPane === "function") {
+      closePoPackingPane({ clearSelection: false });
+    }
+  }
+
   if (shipmentTableWrap) shipmentTableWrap.hidden = view !== "shipments";
   if (requestsTableWrap) requestsTableWrap.hidden = view !== "requests";
   if (chargebackTableWrap) chargebackTableWrap.hidden = view !== "chargebacks";
   if (packingReviewTableWrap) packingReviewTableWrap.hidden = view !== "packingReviews";
   const poFooterEnd = document.getElementById("poFooterEnd");
-  if (poFooterEnd) poFooterEnd.hidden = view !== "po";
+  if (poFooterEnd) poFooterEnd.hidden = view !== "po" && !splitActive;
   poTab?.classList.toggle("is-active", view === "po");
   poTab?.setAttribute("aria-selected", view === "po" ? "true" : "false");
   requestsTab?.classList.toggle("is-active", view === "requests");

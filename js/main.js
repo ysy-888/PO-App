@@ -5,6 +5,7 @@ fetch('http://127.0.0.1:7896/ingest/1212f48a-df35-4839-b188-b7be9a87de77',{metho
 loadColumnVisibility();
 applyTwoLineTableHeaders();
 loadCxlCountdownPreference();
+loadSplitViewPreference();
 loadDateFormatPreference();
 initDivisionFilters();
 initStatusFilters();

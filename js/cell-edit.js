@@ -225,6 +225,7 @@ function renderCellSelectDropdown(col, row) {
 
   const currentVal = row[col] ?? "";
   pop.dataset.col = col;
+  pop.classList.toggle("cell-select-dropdown--align-left", col === "Ship Method");
   pop.innerHTML = "";
 
   getCellSelectOptions(col, row).forEach(({ value, label }) => {
@@ -572,6 +573,10 @@ function mountFieldEditor(fieldEl, col, row) {
   const val = row[col] ?? "";
   const editorEl = createCellInput(col, val);
   const input = getCellEditorInput(editorEl);
+
+  if (col === "Notes" && isModalFieldEl(fieldEl) && input instanceof HTMLTextAreaElement) {
+    input.rows = 1;
+  }
 
   fieldEl.innerHTML = "";
   fieldEl.appendChild(editorEl);

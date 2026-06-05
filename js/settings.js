@@ -16,6 +16,12 @@ function updateSettingsCountdownUi() {
   if (toggleBtn) toggleBtn.setAttribute("aria-checked", cxlCountdownEnabled ? "true" : "false");
 }
 
+function updateSettingsSplitViewUi() {
+  const toggleBtn = document.getElementById("settingsSplitViewToggle");
+  const enabled = typeof isSplitViewEnabled === "function" ? isSplitViewEnabled() : true;
+  if (toggleBtn) toggleBtn.setAttribute("aria-checked", enabled ? "true" : "false");
+}
+
 function updateSettingsDateFormatUi() {
   const select = document.getElementById("settingsDateFormatSelect");
   if (!select) return;
@@ -25,6 +31,7 @@ function updateSettingsDateFormatUi() {
 
 function updateSettingsUi() {
   updateSettingsCountdownUi();
+  updateSettingsSplitViewUi();
   updateSettingsDateFormatUi();
   if (typeof updateVendorSubmitModeCheck === "function") updateVendorSubmitModeCheck();
   if (typeof updateSettingsVendorSubmissionsVisibility === "function") {
@@ -211,6 +218,10 @@ function initSettings() {
 
   document.getElementById("settingsCountdownToggle")?.addEventListener("click", () => {
     if (typeof toggleCxlCountdown === "function") toggleCxlCountdown();
+  });
+
+  document.getElementById("settingsSplitViewToggle")?.addEventListener("click", () => {
+    if (typeof toggleSplitView === "function") toggleSplitView();
   });
 
   const overlay = document.getElementById("settingsOverlay");
