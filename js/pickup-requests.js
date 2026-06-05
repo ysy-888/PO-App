@@ -288,7 +288,6 @@ function setPickupRequestModalAddPanelClass(body, isOpen) {
 
 function renderPickupRequestModal(poNumbers, request = {}) {
   const body = document.getElementById("pickupRequestBody");
-  const titleEl = document.getElementById("pickupRequestModalTitle");
   const submitBtn = document.getElementById("pickupRequestSubmitBtn");
   if (!body) return;
 
@@ -299,14 +298,16 @@ function renderPickupRequestModal(poNumbers, request = {}) {
   const activeRequest = request[PICKUP_REQUEST_ID_FIELD] ? request : (pickupRequestModalRow ?? request);
   const isExisting = Boolean(activeRequest[PICKUP_REQUEST_ID_FIELD]);
   const isReadOnly = isExisting && isRequestEmailSent(activeRequest);
-  if (titleEl) {
-    titleEl.textContent = isExisting
-      ? `Pickup Request ${activeRequest[PICKUP_REQUEST_ID_FIELD]}`
-      : "Pickup Request";
-  }
+  const submitDate = formatDateToYmd(new Date());
+  setEmailStyleModalHeader(document.querySelector("#pickupRequestOverlay .modal-header"), {
+    typeLabel: "Pickup Request",
+    recordId: isExisting ? activeRequest[PICKUP_REQUEST_ID_FIELD] : "New",
+    requestDate: isExisting
+      ? (activeRequest[PICKUP_REQ_SUBMIT_DATE_FIELD] ?? submitDate)
+      : submitDate,
+  });
   if (submitBtn) submitBtn.hidden = isReadOnly;
 
-  const submitDate = formatDateToYmd(new Date());
   const defaultFrom = isExisting ? (activeRequest["From"] ?? "") : (pickupRequestDraftFrom || DEFAULT_WAREHOUSE_ENTITY);
   const buyer = isExisting ? (activeRequest["To"] ?? "") : (pickupRequestDraftTo || getPickupRequestBuyerForRows(pos));
   const buyerEmailInfo = getBuyerEmailInfo(buyer);
@@ -315,53 +316,42 @@ function renderPickupRequestModal(poNumbers, request = {}) {
   const outer = document.createElement("div");
   outer.className = "shipment-modal-outer";
 
-  const layout = document.createElement("div");
-  layout.className = "shipment-modal-layout";
-
-  const left = document.createElement("div");
-  left.className = "shipment-modal-left";
-  const form = document.createElement("div");
-  form.className = "shipment-form-edit";
-  form.id = "pickupRequestForm";
-
-  form.appendChild(createRequestFormField("Pickup Date", PICKUP_DATE_FIELD,
-    isExisting ? (activeRequest[PICKUP_DATE_FIELD] ?? "") : (pickupRequestDraftPickupDate || ""),
-    { type: "date", readOnly: isReadOnly }));
-  form.appendChild(createRequestFormField("Request Date", PICKUP_REQ_SUBMIT_DATE_FIELD,
-    isExisting ? (activeRequest[PICKUP_REQ_SUBMIT_DATE_FIELD] ?? submitDate) : submitDate,
-    { type: "date", readOnly: true }));
-
   const fromFields = createRequestLocationField("From", "From", "Pickup Address", defaultFrom, { readOnly: isReadOnly });
-  form.appendChild(fromFields.frag);
-
-  // "To" is buyer-driven: show as a select populated from location entities,
-  // defaulting to the buyer name. The Delivery Address auto-fills from the Locations sheet.
   const toFields = createRequestLocationField("To", "To", "Delivery Address", buyer, { readOnly: isReadOnly });
-  form.appendChild(toFields.frag);
   if (isReadOnly) {
     fromFields.addressEl.value = activeRequest["Pickup Address"] ?? fromFields.addressEl.value;
     toFields.addressEl.value = activeRequest["Delivery Address"] ?? toFields.addressEl.value;
   }
 
-  form.appendChild(createRequestFormField("Email", "Email To",
-    isExisting ? (activeRequest["Email To"] ?? "") : (pickupRequestDraftEmail.emailTo ?? buyerEmailInfo.email),
-    { readOnly: isReadOnly }));
-  form.appendChild(createRequestFormField("CC", "Email CC",
-    isExisting ? (activeRequest["Email CC"] ?? "") : (pickupRequestDraftEmail.emailCc ?? buyerEmailInfo.cc),
-    { readOnly: isReadOnly }));
-  form.appendChild(createRequestFormField("Notes", PICKUP_REQ_NOTES_FIELD,
-    isExisting ? (activeRequest[PICKUP_REQ_NOTES_FIELD] ?? activeRequest["Notes"] ?? "") : pickupRequestDraftNotes,
-    { type: "textarea", readOnly: isReadOnly }));
+  const metaRows = [
+    createRequestFormMetaRow("Pickup Date", PICKUP_DATE_FIELD,
+      isExisting ? (activeRequest[PICKUP_DATE_FIELD] ?? "") : (pickupRequestDraftPickupDate || ""),
+      { type: "date", readOnly: isReadOnly }).tr,
+    createRequestFormMetaRow("Request Date", PICKUP_REQ_SUBMIT_DATE_FIELD,
+      isExisting ? (activeRequest[PICKUP_REQ_SUBMIT_DATE_FIELD] ?? submitDate) : submitDate,
+      { type: "date", readOnly: true }).tr,
+    fromFields.row,
+    toFields.row,
+    createRequestFormMetaRow("Email", "Email To",
+      isExisting ? (activeRequest["Email To"] ?? "") : (pickupRequestDraftEmail.emailTo ?? buyerEmailInfo.email),
+      { readOnly: isReadOnly }).tr,
+    createRequestFormMetaRow("CC", "Email CC",
+      isExisting ? (activeRequest["Email CC"] ?? "") : (pickupRequestDraftEmail.emailCc ?? buyerEmailInfo.cc),
+      { readOnly: isReadOnly }).tr,
+  ];
 
-  left.appendChild(form);
-
-  const right = document.createElement("div");
-  right.className = "shipment-modal-right";
-  right.appendChild(renderPickupRequestLinkedPoSection(pos, isReadOnly));
-
-  layout.appendChild(left);
-  layout.appendChild(right);
-  outer.appendChild(layout);
+  outer.appendChild(buildShipmentModalSplitLayout(
+    buildEmailStyleForm({
+      formId: "pickupRequestForm",
+      metaRows,
+      notesField: PICKUP_REQ_NOTES_FIELD,
+      notesValue: isExisting
+        ? (activeRequest[PICKUP_REQ_NOTES_FIELD] ?? "")
+        : pickupRequestDraftNotes,
+      notesReadOnly: isReadOnly,
+    }),
+    renderPickupRequestLinkedPoSection(pos, isReadOnly)
+  ));
 
   if (!isReadOnly && pickupRequestAddPoPanelOpen) {
     outer.classList.add("shipment-modal-outer--add-panel-open");
@@ -461,10 +451,10 @@ function renderPickupRequestLinkedPoSection(pos, isReadOnly = false) {
   section.classList.toggle("shipment-linked-pos--selection-disabled", pickupRequestAddPoPanelOpen || isReadOnly);
 
   const wrap = document.createElement("div");
-  wrap.className = "shipment-linked-po-table-wrap shipment-linked-po-table-wrap--with-footer";
+  wrap.className = "email-po-table-wrap";
 
   const table = document.createElement("table");
-  table.className = "shipment-linked-po-table request-linked-po-table";
+  table.className = "email-po-table shipment-linked-po-table request-linked-po-table";
   appendDeliveryPickupLinkedPoColgroup(table);
 
   const thead = document.createElement("thead");
@@ -516,6 +506,9 @@ function renderPickupRequestLinkedPoSection(pos, isReadOnly = false) {
   });
 
   table.appendChild(tbody);
+  if (pos.length > 0) {
+    appendEmailPoTableFooter(table, pos, DELIVERY_PICKUP_LINKED_PO_COLUMNS, { hasSelectCol: true });
+  }
   wrap.appendChild(table);
   section.appendChild(wrap);
   if (!isReadOnly) section.appendChild(renderPickupRequestLinkedPoFooter(pos));
@@ -544,8 +537,6 @@ function renderPickupRequestLinkedPoFooter(pos) {
   actions.appendChild(addBtn);
   actions.appendChild(removeBtn);
   footer.appendChild(actions);
-
-  footer.appendChild(renderRequestLinkedPoFooterTotals(pos));
   return footer;
 }
 

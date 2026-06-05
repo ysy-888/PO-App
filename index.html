@@ -729,13 +729,22 @@
 
 <div id="createShipmentOverlay" class="modal-backdrop">
   <div class="modal-card shipment-modal-card" onclick="event.stopPropagation()">
-    <div class="modal-header">
-      <div class="modal-header-main">
-        <h3>Create Shipment</h3>
-      </div>
-      <div class="modal-header-actions">
-        <span id="createShipmentPoCount" class="shipment-modal-po-count"></span>
-        <button type="button" class="btn-close" id="createShipmentCancelBtn" aria-label="Close">✕</button>
+    <div class="modal-header email-header email-header-request">
+      <div class="email-header-inner">
+        <div class="email-header-titles">
+          <h1 class="email-heading">ELEVATOR DISCO</h1>
+          <p class="email-subheading" id="createShipmentModalTitle">Create Shipment</p>
+        </div>
+        <div class="email-header-meta">
+          <div class="email-header-id-block">
+            <div class="email-request-id" id="createShipmentModalId">New</div>
+            <div class="email-request-date" id="createShipmentModalDate" hidden></div>
+          </div>
+          <div class="modal-header-actions">
+            <span id="createShipmentPoCount" class="shipment-modal-po-count"></span>
+            <button type="button" class="btn-close" id="createShipmentCancelBtn" aria-label="Close">✕</button>
+          </div>
+        </div>
       </div>
     </div>
     <div class="modal-body" id="createShipmentBody"></div>
@@ -760,13 +769,22 @@
 
 <div id="shipmentModalOverlay" class="modal-backdrop">
   <div class="modal-card shipment-modal-card" onclick="event.stopPropagation()">
-    <div class="modal-header">
-      <div class="modal-header-main">
-        <h3>Shipment <span id="shipmentModalId" class="modal-po-num">—</span></h3>
-      </div>
-      <div class="modal-header-actions">
-        <span id="shipmentModalPoCount" class="shipment-modal-po-count"></span>
-        <button type="button" class="btn-close" id="shipmentModalCloseBtn" aria-label="Close">✕</button>
+    <div class="modal-header email-header email-header-request">
+      <div class="email-header-inner">
+        <div class="email-header-titles">
+          <h1 class="email-heading">ELEVATOR DISCO</h1>
+          <p class="email-subheading" id="shipmentModalTitle">Shipment</p>
+        </div>
+        <div class="email-header-meta">
+          <div class="email-header-id-block">
+            <div class="email-request-id" id="shipmentModalId">—</div>
+            <div class="email-request-date" id="shipmentModalDate" hidden></div>
+          </div>
+          <div class="modal-header-actions">
+            <span id="shipmentModalPoCount" class="shipment-modal-po-count"></span>
+            <button type="button" class="btn-close" id="shipmentModalCloseBtn" aria-label="Close">✕</button>
+          </div>
+        </div>
       </div>
     </div>
     <div class="modal-body" id="shipmentModalBody"></div>
@@ -791,13 +809,22 @@
 
 <div id="exfRequestOverlay" class="modal-backdrop">
   <div class="modal-card shipment-modal-card" onclick="event.stopPropagation()">
-    <div class="modal-header">
-      <div class="modal-header-main">
-        <h3>EXF Request</h3>
-      </div>
-      <div class="modal-header-actions">
-        <span id="exfRequestPoCount" class="shipment-modal-po-count"></span>
-        <button type="button" class="btn-close" id="exfRequestCancelBtn" aria-label="Close">✕</button>
+    <div class="modal-header email-header email-header-request">
+      <div class="email-header-inner">
+        <div class="email-header-titles">
+          <h1 class="email-heading">ELEVATOR DISCO</h1>
+          <p class="email-subheading" id="exfRequestModalTitle">EXF Request</p>
+        </div>
+        <div class="email-header-meta">
+          <div class="email-header-id-block">
+            <div class="email-request-id" id="exfRequestModalId">New</div>
+            <div class="email-request-date" id="exfRequestModalDate"></div>
+          </div>
+          <div class="modal-header-actions">
+            <span id="exfRequestPoCount" class="shipment-modal-po-count"></span>
+            <button type="button" class="btn-close" id="exfRequestCancelBtn" aria-label="Close">✕</button>
+          </div>
+        </div>
       </div>
     </div>
     <div class="modal-body" id="exfRequestBody"></div>
@@ -814,14 +841,23 @@
 
 <div id="asnRequestOverlay" class="modal-backdrop">
   <div class="modal-card shipment-modal-card" onclick="event.stopPropagation()">
-    <div class="modal-header">
-      <div class="modal-header-main">
-        <h3 id="asnRequestModalTitle">ASN Request</h3>
-      </div>
-      <div class="modal-header-actions">
-        <span id="asnRequestPoCount" class="shipment-modal-po-count"></span>
-        <button type="button" class="btn btn-secondary packing-list-print-btn" id="asnRequestPrintBtn" hidden title="Print packing list for linked POs">Print Packing List</button>
-        <button type="button" class="btn-close" id="asnRequestCancelBtn" aria-label="Close">✕</button>
+    <div class="modal-header email-header email-header-request">
+      <div class="email-header-inner">
+        <div class="email-header-titles">
+          <h1 class="email-heading">ELEVATOR DISCO</h1>
+          <p class="email-subheading" id="asnRequestModalTitle">ASN Request</p>
+        </div>
+        <div class="email-header-meta">
+          <div class="email-header-id-block">
+            <div class="email-request-id" id="asnRequestModalId">New</div>
+            <div class="email-request-date" id="asnRequestModalDate"></div>
+          </div>
+          <div class="modal-header-actions">
+            <span id="asnRequestPoCount" class="shipment-modal-po-count"></span>
+            <button type="button" class="btn btn-secondary packing-list-print-btn" id="asnRequestPrintBtn" hidden title="Print packing list for linked POs">Print Packing List</button>
+            <button type="button" class="btn-close" id="asnRequestCancelBtn" aria-label="Close">✕</button>
+          </div>
+        </div>
       </div>
     </div>
     <div class="modal-body" id="asnRequestBody"></div>
@@ -838,14 +874,23 @@
 
 <div id="deliveryRequestOverlay" class="modal-backdrop">
   <div class="modal-card shipment-modal-card" onclick="event.stopPropagation()">
-    <div class="modal-header">
-      <div class="modal-header-main">
-        <h3 id="deliveryRequestModalTitle">Delivery Request</h3>
-      </div>
-      <div class="modal-header-actions">
-        <span id="deliveryRequestPoCount" class="shipment-modal-po-count"></span>
-        <button type="button" class="btn btn-secondary packing-list-print-btn" id="deliveryRequestPrintBtn" hidden title="Print packing list for linked POs">Print Packing List</button>
-        <button type="button" class="btn-close" id="deliveryRequestCancelBtn" aria-label="Close">✕</button>
+    <div class="modal-header email-header email-header-request">
+      <div class="email-header-inner">
+        <div class="email-header-titles">
+          <h1 class="email-heading">ELEVATOR DISCO</h1>
+          <p class="email-subheading" id="deliveryRequestModalTitle">Delivery Request</p>
+        </div>
+        <div class="email-header-meta">
+          <div class="email-header-id-block">
+            <div class="email-request-id" id="deliveryRequestModalId">New</div>
+            <div class="email-request-date" id="deliveryRequestModalDate"></div>
+          </div>
+          <div class="modal-header-actions">
+            <span id="deliveryRequestPoCount" class="shipment-modal-po-count"></span>
+            <button type="button" class="btn btn-secondary packing-list-print-btn" id="deliveryRequestPrintBtn" hidden title="Print packing list for linked POs">Print Packing List</button>
+            <button type="button" class="btn-close" id="deliveryRequestCancelBtn" aria-label="Close">✕</button>
+          </div>
+        </div>
       </div>
     </div>
     <div class="modal-body" id="deliveryRequestBody"></div>
@@ -862,14 +907,23 @@
 
 <div id="pickupRequestOverlay" class="modal-backdrop">
   <div class="modal-card shipment-modal-card" onclick="event.stopPropagation()">
-    <div class="modal-header">
-      <div class="modal-header-main">
-        <h3 id="pickupRequestModalTitle">Pickup Request</h3>
-      </div>
-      <div class="modal-header-actions">
-        <span id="pickupRequestPoCount" class="shipment-modal-po-count"></span>
-        <button type="button" class="btn btn-secondary packing-list-print-btn" id="pickupRequestPrintBtn" hidden title="Print packing list for linked POs">Print Packing List</button>
-        <button type="button" class="btn-close" id="pickupRequestCancelBtn" aria-label="Close">✕</button>
+    <div class="modal-header email-header email-header-request">
+      <div class="email-header-inner">
+        <div class="email-header-titles">
+          <h1 class="email-heading">ELEVATOR DISCO</h1>
+          <p class="email-subheading" id="pickupRequestModalTitle">Pickup Request</p>
+        </div>
+        <div class="email-header-meta">
+          <div class="email-header-id-block">
+            <div class="email-request-id" id="pickupRequestModalId">New</div>
+            <div class="email-request-date" id="pickupRequestModalDate"></div>
+          </div>
+          <div class="modal-header-actions">
+            <span id="pickupRequestPoCount" class="shipment-modal-po-count"></span>
+            <button type="button" class="btn btn-secondary packing-list-print-btn" id="pickupRequestPrintBtn" hidden title="Print packing list for linked POs">Print Packing List</button>
+            <button type="button" class="btn-close" id="pickupRequestCancelBtn" aria-label="Close">✕</button>
+          </div>
+        </div>
       </div>
     </div>
     <div class="modal-body" id="pickupRequestBody"></div>

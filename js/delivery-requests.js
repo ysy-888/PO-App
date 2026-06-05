@@ -256,7 +256,6 @@ function setDeliveryRequestModalAddPanelClass(body, isOpen) {
 
 function renderDeliveryRequestModal(poNumbers, request = {}) {
   const body = document.getElementById("deliveryRequestBody");
-  const titleEl = document.getElementById("deliveryRequestModalTitle");
   const submitBtn = document.getElementById("deliveryRequestSubmitBtn");
   if (!body) return;
 
@@ -267,14 +266,16 @@ function renderDeliveryRequestModal(poNumbers, request = {}) {
   const activeRequest = request[DELIVERY_REQUEST_ID_FIELD] ? request : (deliveryRequestModalRow ?? request);
   const isExisting = Boolean(activeRequest[DELIVERY_REQUEST_ID_FIELD]);
   const isReadOnly = isExisting && isRequestEmailSent(activeRequest);
-  if (titleEl) {
-    titleEl.textContent = isExisting
-      ? `Delivery Request ${activeRequest[DELIVERY_REQUEST_ID_FIELD]}`
-      : "Delivery Request";
-  }
+  const submitDate = formatDateToYmd(new Date());
+  setEmailStyleModalHeader(document.querySelector("#deliveryRequestOverlay .modal-header"), {
+    typeLabel: "Delivery Request",
+    recordId: isExisting ? activeRequest[DELIVERY_REQUEST_ID_FIELD] : "New",
+    requestDate: isExisting
+      ? (activeRequest[DELIVERY_REQ_SUBMIT_DATE_FIELD] ?? submitDate)
+      : submitDate,
+  });
   if (submitBtn) submitBtn.hidden = isReadOnly;
 
-  const submitDate = formatDateToYmd(new Date());
   const defaultFrom = isExisting ? (activeRequest["From"] ?? "") : (deliveryRequestDraftFrom || DEFAULT_WAREHOUSE_ENTITY);
   const defaultTo = isExisting ? (activeRequest["To"] ?? "") : (deliveryRequestDraftTo || DEFAULT_DELIVERY_TO_ENTITY);
 
@@ -282,51 +283,41 @@ function renderDeliveryRequestModal(poNumbers, request = {}) {
   const outer = document.createElement("div");
   outer.className = "shipment-modal-outer";
 
-  const layout = document.createElement("div");
-  layout.className = "shipment-modal-layout";
-
-  const left = document.createElement("div");
-  left.className = "shipment-modal-left";
-  const form = document.createElement("div");
-  form.className = "shipment-form-edit";
-  form.id = "deliveryRequestForm";
-
-  form.appendChild(createRequestFormField("Delivery Date", DELIVERY_DATE_FIELD,
-    isExisting ? (activeRequest[DELIVERY_DATE_FIELD] ?? "") : (deliveryRequestDraftDeliveryDate || ""),
-    { type: "date", readOnly: isReadOnly }));
-  form.appendChild(createRequestFormField("Request Date", DELIVERY_REQ_SUBMIT_DATE_FIELD,
-    isExisting ? (activeRequest[DELIVERY_REQ_SUBMIT_DATE_FIELD] ?? submitDate) : submitDate,
-    { type: "date", readOnly: true }));
-
   const fromFields = createRequestLocationField("From", "From", "Pickup Address", defaultFrom, { readOnly: isReadOnly });
-  form.appendChild(fromFields.frag);
-
   const toFields = createRequestLocationField("To", "To", "Delivery Address", defaultTo, { readOnly: isReadOnly });
-  form.appendChild(toFields.frag);
   if (isReadOnly) {
     fromFields.addressEl.value = activeRequest["Pickup Address"] ?? fromFields.addressEl.value;
     toFields.addressEl.value = activeRequest["Delivery Address"] ?? toFields.addressEl.value;
   }
 
-  form.appendChild(createRequestFormField("Email", "Email To",
-    isExisting ? (activeRequest["Email To"] ?? "") : (deliveryRequestDraftEmail.emailTo ?? ""),
-    { readOnly: isReadOnly }));
-  form.appendChild(createRequestFormField("CC", "Email CC",
-    isExisting ? (activeRequest["Email CC"] ?? "") : (deliveryRequestDraftEmail.emailCc ?? ""),
-    { readOnly: isReadOnly }));
-  form.appendChild(createRequestFormField("Notes", DELIVERY_REQ_NOTES_FIELD,
-    isExisting ? (activeRequest[DELIVERY_REQ_NOTES_FIELD] ?? activeRequest["Notes"] ?? "") : deliveryRequestDraftNotes,
-    { type: "textarea", readOnly: isReadOnly }));
-
-  left.appendChild(form);
-
-  const right = document.createElement("div");
-  right.className = "shipment-modal-right";
-  right.appendChild(renderDeliveryRequestLinkedPoSection(pos, isReadOnly));
-
-  layout.appendChild(left);
-  layout.appendChild(right);
-  outer.appendChild(layout);
+  const metaRows = [
+    createRequestFormMetaRow("Delivery Date", DELIVERY_DATE_FIELD,
+      isExisting ? (activeRequest[DELIVERY_DATE_FIELD] ?? "") : (deliveryRequestDraftDeliveryDate || ""),
+      { type: "date", readOnly: isReadOnly }).tr,
+    createRequestFormMetaRow("Request Date", DELIVERY_REQ_SUBMIT_DATE_FIELD,
+      isExisting ? (activeRequest[DELIVERY_REQ_SUBMIT_DATE_FIELD] ?? submitDate) : submitDate,
+      { type: "date", readOnly: true }).tr,
+    fromFields.row,
+    toFields.row,
+    createRequestFormMetaRow("Email", "Email To",
+      isExisting ? (activeRequest["Email To"] ?? "") : (deliveryRequestDraftEmail.emailTo ?? ""),
+      { readOnly: isReadOnly }).tr,
+    createRequestFormMetaRow("CC", "Email CC",
+      isExisting ? (activeRequest["Email CC"] ?? "") : (deliveryRequestDraftEmail.emailCc ?? ""),
+      { readOnly: isReadOnly }).tr,
+  ];
+  outer.appendChild(buildShipmentModalSplitLayout(
+    buildEmailStyleForm({
+      formId: "deliveryRequestForm",
+      metaRows,
+      notesField: DELIVERY_REQ_NOTES_FIELD,
+      notesValue: isExisting
+        ? (activeRequest[DELIVERY_REQ_NOTES_FIELD] ?? "")
+        : deliveryRequestDraftNotes,
+      notesReadOnly: isReadOnly,
+    }),
+    renderDeliveryRequestLinkedPoSection(pos, isReadOnly)
+  ));
 
   if (!isReadOnly && deliveryRequestAddPoPanelOpen) {
     outer.classList.add("shipment-modal-outer--add-panel-open");
@@ -421,10 +412,10 @@ function renderDeliveryRequestLinkedPoSection(pos, isReadOnly = false) {
   section.classList.toggle("shipment-linked-pos--selection-disabled", deliveryRequestAddPoPanelOpen || isReadOnly);
 
   const wrap = document.createElement("div");
-  wrap.className = "shipment-linked-po-table-wrap shipment-linked-po-table-wrap--with-footer";
+  wrap.className = "email-po-table-wrap";
 
   const table = document.createElement("table");
-  table.className = "shipment-linked-po-table request-linked-po-table";
+  table.className = "email-po-table shipment-linked-po-table request-linked-po-table";
   appendDeliveryPickupLinkedPoColgroup(table);
 
   const thead = document.createElement("thead");
@@ -476,6 +467,9 @@ function renderDeliveryRequestLinkedPoSection(pos, isReadOnly = false) {
   });
 
   table.appendChild(tbody);
+  if (pos.length > 0) {
+    appendEmailPoTableFooter(table, pos, DELIVERY_PICKUP_LINKED_PO_COLUMNS, { hasSelectCol: true });
+  }
   wrap.appendChild(table);
   section.appendChild(wrap);
   if (!isReadOnly) section.appendChild(renderDeliveryRequestLinkedPoFooter(pos));
@@ -504,8 +498,6 @@ function renderDeliveryRequestLinkedPoFooter(pos) {
   actions.appendChild(addBtn);
   actions.appendChild(removeBtn);
   footer.appendChild(actions);
-
-  footer.appendChild(renderRequestLinkedPoFooterTotals(pos));
   return footer;
 }
 

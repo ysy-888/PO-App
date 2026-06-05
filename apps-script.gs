@@ -65,6 +65,11 @@ const SHIPMENT_DATA_FIELDS = [
   "Ship Method", "Vessel", "House #", "EXF", "Shipped", "ETD", "ETA", "IHD", "Notes"
 ];
 
+/** Shipment fields copied to linked PO rows. Notes stay on the shipment record only. */
+const SHIPMENT_PO_SYNC_FIELDS = [
+  "Ship Method", "Vessel", "House #", "EXF", "Shipped", "ETD", "ETA", "IHD"
+];
+
 const EXF_REQUEST_DATA_FIELDS = [
   EXF_DATE_FIELD, EXF_REQ_SUBMIT_DATE_FIELD, "Vendor", "Vendor Email", EXF_REQ_CC_FIELD, EXF_REQ_NOTES_FIELD,
   "PO Numbers", "PO Count", "Total Qty",
@@ -1029,6 +1034,14 @@ function pickShipmentData_(source) {
   return out;
 }
 
+function pickShipmentPoSyncData_(source) {
+  const out = {};
+  SHIPMENT_PO_SYNC_FIELDS.forEach(field => {
+    if (source && source[field] !== undefined) out[field] = source[field];
+  });
+  return out;
+}
+
 function findPoRowIndex_(poSheet, poNumber) {
   const rows = poSheet.getDataRange().getValues();
   const headers = rows[0].map(h => String(h ?? "").trim());
@@ -1096,7 +1109,7 @@ function applyPoUpdatesBatch_(poSheet, items) {
 }
 
 function syncPosFromShipment_(poSheet, shipmentId, shipmentData, poNumbers) {
-  const syncData = pickShipmentData_(shipmentData);
+  const syncData = pickShipmentPoSyncData_(shipmentData);
   syncData[SHIPMENT_ID_FIELD] = shipmentId;
   syncData["Status"] = "OTW";
   const list = Array.isArray(poNumbers) ? poNumbers.map(String) : [];
@@ -1121,7 +1134,7 @@ function findPoRowsByShipmentId_(poSheet, shipmentId) {
 function clearPoShipmentDataAtRow_(poSheet, rowIndex, headers) {
   const updates = {};
   updates[SHIPMENT_ID_FIELD] = "";
-  SHIPMENT_DATA_FIELDS.forEach(field => {
+  SHIPMENT_PO_SYNC_FIELDS.forEach(field => {
     updates[field] = "";
   });
   const exfCol = headers.indexOf(EXF_REQUESTED_FIELD);
@@ -2562,7 +2575,7 @@ function buildDeliveryPickupRequestEmailHtml_(requestType, requestId, rows, requ
     poCount: rows.length,
     fromBlockHtml: buildDeliveryPickupFromBlockHtml_(requestData["From"], requestData["Pickup Address"], !hasTo),
     toBlockHtml: buildDeliveryPickupToBlockHtml_(requestData["To"], requestData["Delivery Address"]),
-    notesBlockHtml: buildEmailNotesBlockHtml_(requestData[notesField] ?? requestData["Notes"]),
+    notesBlockHtml: buildEmailNotesBlockHtml_(requestData[notesField]),
     poTableHtml: buildRequestEmailPoTableHtml_(rows, weightByPo),
   });
 }
@@ -2585,7 +2598,7 @@ function buildDeliveryPickupRequestEmailText_(requestType, requestId, rows, requ
   if (requestData["Pickup Address"]) lines.push("Pickup Address: " + String(requestData["Pickup Address"]));
   if (requestData["To"]) lines.push("To: " + String(requestData["To"]));
   if (requestData["Delivery Address"]) lines.push("Delivery Address: " + String(requestData["Delivery Address"]));
-  const notes = String(requestData[notesField] ?? requestData["Notes"] ?? "").trim();
+  const notes = String(requestData[notesField] ?? "").trim();
   if (notes) lines.push("Notes: " + notes);
   lines.push("");
   lines.push(buildRequestEmailPoTableText_(rows, weightByPo));

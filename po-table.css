@@ -4988,6 +4988,143 @@ td.n41-status-mismatch,
   max-width: 1320px;
   max-height: calc(100vh - 48px);
   overflow: hidden;
+  padding: 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #1a1a18;
+}
+
+/* Email-style dark header (mirrors templates/email-exf.html) */
+.shipment-modal-card .modal-header.email-header-request {
+  background-color: #2d2d29;
+  color: #ffffff;
+  padding: 20px 24px;
+  margin-bottom: 0;
+  border-bottom: none;
+}
+
+.shipment-modal-card .email-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
+}
+
+.shipment-modal-card .email-header-titles {
+  min-width: 0;
+}
+
+.shipment-modal-card .email-header-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.shipment-modal-card .email-header-id-block {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.shipment-modal-card .email-header-request .email-heading {
+  margin: 0 0 6px 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #ffffff;
+  line-height: 1.2;
+}
+
+.shipment-modal-card .email-header-request .email-subheading {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #d4d9df;
+  line-height: 1.3;
+}
+
+.shipment-modal-card .email-header-request .email-request-id {
+  font-size: 14px;
+  font-weight: 500;
+  color: #ffffff;
+  letter-spacing: 0.02em;
+  line-height: 1.4;
+}
+
+.shipment-modal-card .email-header-request .email-request-date {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #d4d9df;
+  line-height: 1.3;
+}
+
+.shipment-modal-card .email-header-request .email-request-id[hidden],
+.shipment-modal-card .email-header-request .email-request-date[hidden] {
+  display: none;
+}
+
+.shipment-modal-card .email-header-request .btn-close {
+  color: #d4d9df;
+}
+
+.shipment-modal-card .email-header-request .btn-close:hover,
+.shipment-modal-card .email-header-request .btn-close:focus-visible {
+  color: #ffffff;
+  outline: none;
+}
+
+.shipment-modal-card .email-header-request .btn-secondary {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+}
+
+.shipment-modal-card .email-header-request .btn-secondary:hover,
+.shipment-modal-card .email-header-request .btn-secondary:focus-visible {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.32);
+  color: #ffffff;
+}
+
+.shipment-modal-card .email-header-request .shipment-modal-po-count-num {
+  color: #ffffff;
+}
+
+.shipment-modal-card .email-header-request .shipment-modal-po-count-unit {
+  color: #d4d9df;
+}
+
+@media (max-width: 640px) {
+  .shipment-modal-card .modal-header.email-header-request {
+    padding: 16px;
+  }
+
+  .shipment-modal-card .email-header-inner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .shipment-modal-card .email-header-meta {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .shipment-modal-card .email-header-id-block {
+    text-align: left;
+  }
+
+  .shipment-modal-card .modal-body {
+    padding: 16px;
+  }
 }
 
 .batch-edit-modal-card {
@@ -5034,6 +5171,7 @@ td.n41-status-mismatch,
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  padding: 24px;
 }
 
 .shipment-modal-outer {
@@ -5197,6 +5335,9 @@ td.n41-status-mismatch,
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+  padding: 12px 24px 16px;
+  border-top: 1px solid #e5e7eb;
+  margin-top: 0;
 }
 
 .shipment-modal-card .modal-footer .btn-primary {
@@ -5212,8 +5353,8 @@ td.n41-status-mismatch,
 }
 
 .shipment-modal-left {
-  flex: 0 0 220px;
-  min-width: 220px;
+  flex: 0 0 280px;
+  min-width: 280px;
 }
 
 .shipment-modal-right {
@@ -5228,6 +5369,200 @@ td.n41-status-mismatch,
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.shipment-form-edit--email-style {
+  gap: 0;
+}
+
+/* ── Email-template form styles (mirrors templates/email-styles.html) ── */
+/* Form area: email colors/typeface; meta + notes stack in the left column */
+.shipment-modal-left .email-info-row {
+  flex-direction: column;
+  gap: 12px;
+}
+
+.shipment-modal-left .email-info-meta,
+.shipment-modal-left .email-info-notes {
+  flex: 1 1 auto;
+  width: 100%;
+}
+
+.shipment-modal-card .email-info-row {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+  width: 100%;
+}
+
+.shipment-modal-card .email-info-meta {
+  flex: 0 0 52%;
+  min-width: 0;
+}
+
+.shipment-modal-card .email-info-meta--full {
+  flex: 1 1 100%;
+}
+
+.shipment-modal-card .email-info-notes {
+  flex: 1 1 48%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.shipment-modal-card .email-meta {
+  width: 100%;
+  min-width: 0;
+  border-collapse: collapse;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  overflow: hidden;
+  table-layout: fixed;
+}
+
+.shipment-modal-card .email-meta td {
+  max-width: none;
+  text-align: left;
+  border-right: none;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  font-family: var(--font);
+  vertical-align: middle;
+}
+
+.shipment-modal-card .email-meta tr:last-child td {
+  border-bottom: none;
+}
+
+.shipment-modal-card .email-meta-label {
+  width: 110px;
+  max-width: 110px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  background-color: #f7f7f8;
+  border-bottom: 1px solid #e5e7eb;
+  white-space: nowrap;
+  vertical-align: top;
+}
+
+.shipment-modal-card .email-meta-value {
+  padding: 0;
+  font-size: 14px;
+  color: #1a1a18;
+  background-color: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.shipment-modal-card .email-meta-value .email-meta-input,
+.shipment-modal-card .email-meta-value .shipment-form-input.email-meta-input {
+  width: 100%;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 8px 12px;
+  font-size: 14px;
+  box-shadow: none;
+}
+
+.shipment-modal-card .email-meta-value .email-meta-input:hover,
+.shipment-modal-card .email-meta-value .shipment-form-input.email-meta-input:hover {
+  background: #f9fafb;
+}
+
+.shipment-modal-card .email-meta-value .email-meta-input:focus,
+.shipment-modal-card .email-meta-value .shipment-form-input.email-meta-input:focus {
+  background: #fff;
+  box-shadow: inset 0 0 0 2px rgba(139, 146, 156, 0.12);
+  outline: none;
+}
+
+.shipment-modal-card .email-meta-value .compact-date-input-wrap {
+  width: 100%;
+}
+
+.shipment-modal-card .email-meta-value .compact-date-input-wrap .compact-date-input {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 8px 12px;
+  font-size: 14px;
+  box-shadow: none;
+}
+
+.shipment-modal-card .email-meta-sub.email-meta-address {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 6px 12px 8px;
+  border: none;
+  border-top: 1px solid #e5e7eb;
+  border-radius: 0;
+  background: #f9fafb;
+  font-family: var(--font);
+  font-size: 13px;
+  line-height: 1.4;
+  color: #6b7280;
+  resize: none;
+  overflow: hidden;
+  box-shadow: none;
+}
+
+.shipment-modal-card .email-notes-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 100px;
+  padding: 14px 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: transparent;
+}
+
+.shipment-modal-card .email-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #374151;
+  margin: 0 0 8px 0;
+  flex-shrink: 0;
+}
+
+.shipment-modal-card .email-notes-input {
+  flex: 1;
+  width: 100%;
+  min-height: 72px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.5;
+  color: #1a1a18;
+  resize: none;
+  outline: none;
+}
+
+.shipment-modal-card .email-notes-panel:focus-within {
+  box-shadow: inset 0 0 0 2px rgba(139, 146, 156, 0.12);
+}
+
+@media (max-width: 900px) {
+  .shipment-modal-card .email-info-row {
+    flex-direction: column;
+  }
+
+  .shipment-modal-card .email-info-meta,
+  .shipment-modal-card .email-info-notes {
+    flex: 1 1 auto;
+    width: 100%;
+  }
 }
 
 .shipment-form-main-grid {
@@ -5258,10 +5593,12 @@ td.n41-status-mismatch,
   resize: vertical;
 }
 
-#exfRequestOverlay .shipment-form-edit textarea.shipment-form-input,
-#asnRequestOverlay .shipment-form-edit textarea.shipment-form-input,
-#deliveryRequestOverlay .shipment-form-edit textarea.shipment-form-input,
-#pickupRequestOverlay .shipment-form-edit textarea.shipment-form-input {
+#exfRequestOverlay .email-notes-input,
+#asnRequestOverlay .email-notes-input,
+#deliveryRequestOverlay .email-notes-input,
+#pickupRequestOverlay .email-notes-input,
+#createShipmentOverlay .email-notes-input,
+#shipmentModalOverlay .email-notes-input {
   resize: none;
   overflow-y: auto;
 }
@@ -5272,32 +5609,108 @@ td.n41-status-mismatch,
   color: var(--text);
 }
 
-.shipment-linked-po-table-wrap {
+.shipment-linked-po-table-wrap,
+.email-po-table-wrap {
   flex: 1;
   min-height: 0;
   overflow: hidden;
   overflow-y: auto;
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  border: none;
+  border-radius: 8px;
   width: 100%;
 }
 
-.shipment-linked-po-table-wrap--with-footer {
-  border-radius: 6px 6px 0 0;
+.shipment-linked-po-table-wrap--with-footer,
+.email-po-table-wrap--with-footer {
+  border-radius: 8px;
 }
 
-/* Override global `table { min-width: 2800px }` and `td { max-width: 0 }`. */
-.shipment-linked-po-table {
+/* Email / vendor-portal PO table styling inside modals */
+.shipment-modal-card .email-po-table,
+.shipment-modal-card .shipment-linked-po-table {
   width: 100%;
-  min-width: 980px;
+  min-width: 0;
   max-width: none;
   border-collapse: collapse;
-  table-layout: fixed;
-  font-size: 12px;
+  table-layout: auto;
+  font-size: 13px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
-.shipment-linked-po-table th.th-select-col,
-.shipment-linked-po-table td.td-select-cell {
+.shipment-modal-card .email-po-table th,
+.shipment-modal-card .shipment-linked-po-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #374151;
+  background: #f7f7f8;
+  border-bottom: 1px solid #e5e7eb;
+  border-right: none;
+  vertical-align: bottom;
+  line-height: 1.2;
+  cursor: default;
+  max-width: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.shipment-modal-card .email-po-table td,
+.shipment-modal-card .shipment-linked-po-table td {
+  padding: 10px 12px;
+  text-align: left;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  border-right: none;
+  vertical-align: top;
+  line-height: 1.35;
+  max-width: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font);
+  font-size: 13px;
+}
+
+.shipment-modal-card .email-po-table tbody tr:last-child td,
+.shipment-modal-card .shipment-linked-po-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.shipment-modal-card .email-po-table tfoot td,
+.shipment-modal-card .email-po-table .email-po-footer-cell {
+  padding: 10px 12px;
+  font-weight: 600;
+  font-size: 13px;
+  background-color: #eef0f3;
+  color: #1a1a18;
+  border-bottom: none;
+  border-right: none;
+  max-width: none;
+  text-align: left;
+}
+
+.shipment-modal-card .email-po-table tfoot .email-po-footer-label {
+  text-align: right;
+}
+
+.shipment-modal-card .email-po-table tfoot .email-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.shipment-modal-card .shipment-linked-po-table th.th-select-col,
+.shipment-modal-card .shipment-linked-po-table td.td-select-cell {
   width: 52px;
   min-width: 52px;
   max-width: none;
@@ -5308,48 +5721,19 @@ td.n41-status-mismatch,
   text-align: center;
 }
 
-.shipment-linked-po-table th:nth-child(2),
-.shipment-linked-po-table td:nth-child(2) {
-  padding-left: 6px;
+.shipment-modal-card .shipment-linked-po-table th:nth-child(2),
+.shipment-modal-card .shipment-linked-po-table td:nth-child(2) {
+  padding-left: 12px;
 }
 
-.shipment-linked-po-table th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  padding: 6px 8px;
-  text-align: left;
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  color: var(--text);
-  background: var(--surface);
-  border-bottom: 1px solid var(--border-strong);
-  border-right: 1px solid var(--border);
-  vertical-align: bottom;
-  line-height: 1.2;
-  cursor: default;
-  max-width: none;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.shipment-modal-card .shipment-linked-po-table .shipment-po-cell-qty,
+.shipment-modal-card .email-po-table .email-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
-.shipment-linked-po-table td {
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--border);
-  border-right: 1px solid var(--border);
-  vertical-align: top;
-  line-height: 1.25;
-  max-width: none;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.shipment-linked-po-table .shipment-po-cell-qty {
-  text-align: center;
-  white-space: nowrap;
+.shipment-modal-card .shipment-linked-po-table th.shipment-po-cell-qty {
+  text-align: right;
 }
 
 .shipment-linked-po-table:not(.shipment-requested-po-table) .shipment-po-cell-id,
@@ -5645,6 +6029,20 @@ td.n41-status-mismatch,
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
+
+.shipment-linked-po-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border: 1px solid #e5e7eb;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  background: #fff;
+  font-size: 13px;
 }
 
 .shipment-modal-po-count {

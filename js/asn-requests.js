@@ -293,17 +293,19 @@ function setAsnRequestModalAddPanelClass(body, isOpen) {
 
 function renderAsnRequestModal(poNumbers, { asnDate = formatDateToYmd(new Date()), request = null } = {}) {
   const body = document.getElementById("asnRequestBody");
-  const titleEl = document.getElementById("asnRequestModalTitle");
   const submitBtn = document.getElementById("asnRequestSubmitBtn");
   if (!body) return;
 
   const isExisting = Boolean(request?.[ASN_REQUEST_ID_FIELD]);
   const isView = isExisting && isRequestEmailSent(request);
-  if (titleEl) {
-    titleEl.textContent = isExisting
-      ? `ASN Request ${request[ASN_REQUEST_ID_FIELD]}`
-      : "ASN Request";
-  }
+  const submitDate = formatDateToYmd(new Date());
+  setEmailStyleModalHeader(document.querySelector("#asnRequestOverlay .modal-header"), {
+    typeLabel: "ASN Request",
+    recordId: isExisting ? request[ASN_REQUEST_ID_FIELD] : "New",
+    requestDate: isExisting
+      ? (request[ASN_REQ_SUBMIT_DATE_FIELD] ?? submitDate)
+      : submitDate,
+  });
   if (submitBtn) submitBtn.hidden = isView;
 
   asnRequestPoNumbers = poNumbers.slice();
@@ -312,61 +314,48 @@ function renderAsnRequestModal(poNumbers, { asnDate = formatDateToYmd(new Date()
     ? (request["Buyer"] ?? "")
     : (asnRequestBuyer || getAsnRequestBuyerForRows(pos));
   const buyerEmailInfo = getAsnRequestBuyerEmailInfo(buyer);
-  const submitDate = formatDateToYmd(new Date());
 
   body.innerHTML = "";
   const outer = document.createElement("div");
   outer.className = "shipment-modal-outer";
 
-  const layout = document.createElement("div");
-  layout.className = "shipment-modal-layout";
-
-  const left = document.createElement("div");
-  left.className = "shipment-modal-left";
-  const form = document.createElement("div");
-  form.className = "shipment-form-edit";
-  form.id = "asnRequestForm";
-
-  form.appendChild(createRequestFormField(
-    "ASN Date",
-    ASN_DATE_FIELD,
-    isExisting ? (request[ASN_DATE_FIELD] ?? "") : (asnRequestDraftAsnDate || asnDate),
-    { type: "date", readOnly: isView }
+  const metaRows = [
+    createRequestFormMetaRow(
+      "ASN Date",
+      ASN_DATE_FIELD,
+      isExisting ? (request[ASN_DATE_FIELD] ?? "") : (asnRequestDraftAsnDate || asnDate),
+      { type: "date", readOnly: isView }
+    ).tr,
+    createRequestFormMetaRow(
+      "Request Date",
+      ASN_REQ_SUBMIT_DATE_FIELD,
+      isExisting ? (request[ASN_REQ_SUBMIT_DATE_FIELD] ?? submitDate) : submitDate,
+      { type: "date", readOnly: true }
+    ).tr,
+    createRequestFormMetaRow("Buyer", "Buyer", buyer, { readOnly: true }).tr,
+    createRequestFormMetaRow(
+      "Buyer Email",
+      "Buyer Email",
+      isExisting ? (request["Buyer Email"] ?? "") : (asnRequestDraftEmail.email ?? buyerEmailInfo.email),
+      { readOnly: isView }
+    ).tr,
+    createRequestFormMetaRow(
+      "CC",
+      "CC",
+      isExisting ? (request["CC"] ?? "") : (asnRequestDraftEmail.cc ?? buyerEmailInfo.cc),
+      { readOnly: isView }
+    ).tr,
+  ];
+  outer.appendChild(buildShipmentModalSplitLayout(
+    buildEmailStyleForm({
+      formId: "asnRequestForm",
+      metaRows,
+      notesField: ASN_REQ_NOTES_FIELD,
+      notesValue: isExisting ? (request[ASN_REQ_NOTES_FIELD] ?? "") : asnRequestDraftNotes,
+      notesReadOnly: isView,
+    }),
+    renderAsnRequestLinkedPoSection(pos, isView)
   ));
-  form.appendChild(createRequestFormField(
-    "Request Date",
-    ASN_REQ_SUBMIT_DATE_FIELD,
-    isExisting ? (request[ASN_REQ_SUBMIT_DATE_FIELD] ?? submitDate) : submitDate,
-    { type: "date", readOnly: true }
-  ));
-  form.appendChild(createRequestFormField("Buyer", "Buyer", buyer, { readOnly: true }));
-  form.appendChild(createRequestFormField(
-    "Buyer Email",
-    "Buyer Email",
-    isExisting ? (request["Buyer Email"] ?? "") : (asnRequestDraftEmail.email ?? buyerEmailInfo.email),
-    { readOnly: isView }
-  ));
-  form.appendChild(createRequestFormField(
-    "CC",
-    "CC",
-    isExisting ? (request["CC"] ?? "") : (asnRequestDraftEmail.cc ?? buyerEmailInfo.cc),
-    { readOnly: isView }
-  ));
-  form.appendChild(createRequestFormField(
-    "Notes",
-    ASN_REQ_NOTES_FIELD,
-    isExisting ? (request[ASN_REQ_NOTES_FIELD] ?? "") : asnRequestDraftNotes,
-    { type: "textarea", readOnly: isView }
-  ));
-  left.appendChild(form);
-
-  const right = document.createElement("div");
-  right.className = "shipment-modal-right";
-  right.appendChild(renderAsnRequestLinkedPoSection(pos, isView));
-
-  layout.appendChild(left);
-  layout.appendChild(right);
-  outer.appendChild(layout);
 
   if (!isView && asnRequestAddPoPanelOpen) {
     outer.classList.add("shipment-modal-outer--add-panel-open");
@@ -454,10 +443,10 @@ function renderAsnRequestLinkedPoSection(pos, isView = false) {
   section.classList.toggle("shipment-linked-pos--selection-disabled", asnRequestAddPoPanelOpen || isView);
 
   const wrap = document.createElement("div");
-  wrap.className = "shipment-linked-po-table-wrap shipment-linked-po-table-wrap--with-footer";
+  wrap.className = "email-po-table-wrap";
 
   const table = document.createElement("table");
-  table.className = "shipment-linked-po-table request-linked-po-table";
+  table.className = "email-po-table shipment-linked-po-table request-linked-po-table";
   appendDeliveryPickupLinkedPoColgroup(table);
 
   const thead = document.createElement("thead");
@@ -512,6 +501,9 @@ function renderAsnRequestLinkedPoSection(pos, isView = false) {
   });
 
   table.appendChild(tbody);
+  if (pos.length > 0) {
+    appendEmailPoTableFooter(table, pos, DELIVERY_PICKUP_LINKED_PO_COLUMNS, { hasSelectCol: true });
+  }
   wrap.appendChild(table);
   section.appendChild(wrap);
   if (!isView) section.appendChild(renderAsnRequestLinkedPoFooter(pos));
@@ -552,8 +544,6 @@ function renderAsnRequestLinkedPoFooter(pos) {
   actions.appendChild(addBtn);
   actions.appendChild(removeBtn);
   footer.appendChild(actions);
-
-  footer.appendChild(renderRequestLinkedPoFooterTotals(pos));
   return footer;
 }
 

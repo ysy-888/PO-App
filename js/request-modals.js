@@ -118,22 +118,151 @@ function getLocationAddress(entity) {
   return String(row?.["Address"] ?? "").trim();
 }
 
+function createFormMetaRow(label) {
+  const tr = document.createElement("tr");
+  const labelTd = document.createElement("td");
+  labelTd.className = "email-meta-label";
+  labelTd.textContent = label;
+  const valueTd = document.createElement("td");
+  valueTd.className = "email-meta-value";
+  tr.appendChild(labelTd);
+  tr.appendChild(valueTd);
+  return { tr, valueTd };
+}
+
+function createFormMetaInputElement(fieldName, value, { type = "text", readOnly = false, selectOptions = null } = {}) {
+  let control;
+  let input;
+
+  if (type === "date") {
+    const dateInput = createCompactDateInput({
+      initialYmd: value,
+      readOnly,
+      inputClassName: "shipment-form-input shipment-form-input--date email-meta-input",
+    });
+    input = dateInput.input;
+    control = dateInput.wrap;
+  } else if (type === "textarea") {
+    input = document.createElement("textarea");
+    input.rows = 3;
+    input.value = isEmptyValue(value) ? "" : String(value);
+    input.className = "shipment-form-input email-meta-input";
+    control = input;
+  } else if (selectOptions) {
+    input = document.createElement("select");
+    selectOptions.forEach(({ value: optVal, label: optLabel, selected = false }) => {
+      const option = document.createElement("option");
+      option.value = optVal;
+      option.textContent = optLabel;
+      if (selected) option.selected = true;
+      input.appendChild(option);
+    });
+    input.className = "shipment-form-input email-meta-input";
+    control = input;
+  } else {
+    input = document.createElement("input");
+    input.type = "text";
+    input.value = isEmptyValue(value) ? "" : String(value);
+    input.className = "shipment-form-input email-meta-input";
+    control = input;
+  }
+
+  input.dataset.field = fieldName;
+  if (readOnly) {
+    if (input instanceof HTMLSelectElement) input.disabled = true;
+    else input.readOnly = true;
+  }
+  return { control, input };
+}
+
+function createRequestFormMetaRow(label, fieldName, value, { type = "text", readOnly = false, selectOptions = null } = {}) {
+  const { tr, valueTd } = createFormMetaRow(label);
+  const { control, input } = createFormMetaInputElement(fieldName, value, { type, readOnly, selectOptions });
+  valueTd.appendChild(control);
+  return { tr, input };
+}
+
+function createFormNotesPanel(fieldName, value, { readOnly = false } = {}) {
+  const panel = document.createElement("div");
+  panel.className = "email-notes-panel";
+
+  const title = document.createElement("div");
+  title.className = "email-section-title";
+  title.textContent = "Notes";
+
+  const textarea = document.createElement("textarea");
+  textarea.className = "email-notes-input";
+  textarea.dataset.field = fieldName;
+  textarea.rows = 5;
+  textarea.value = isEmptyValue(value) ? "" : String(value);
+  if (readOnly) textarea.readOnly = true;
+
+  panel.appendChild(title);
+  panel.appendChild(textarea);
+  return { panel, input: textarea };
+}
+
+function buildEmailStyleForm({ formId, metaRows = [], notesField = null, notesValue = "", notesReadOnly = false } = {}) {
+  const form = document.createElement("div");
+  form.className = "shipment-form-edit shipment-form-edit--email-style";
+  if (formId) form.id = formId;
+
+  const infoRow = document.createElement("div");
+  infoRow.className = "email-info-row";
+
+  const metaWrap = document.createElement("div");
+  metaWrap.className = "email-info-meta";
+  if (!notesField) metaWrap.classList.add("email-info-meta--full");
+
+  const table = document.createElement("table");
+  table.className = "email-meta";
+  const tbody = document.createElement("tbody");
+  metaRows.forEach(row => tbody.appendChild(row));
+  table.appendChild(tbody);
+  metaWrap.appendChild(table);
+  infoRow.appendChild(metaWrap);
+
+  if (notesField) {
+    const notesWrap = document.createElement("div");
+    notesWrap.className = "email-info-notes";
+    const { panel } = createFormNotesPanel(notesField, notesValue, { readOnly: notesReadOnly });
+    notesWrap.appendChild(panel);
+    infoRow.appendChild(notesWrap);
+  }
+
+  form.appendChild(infoRow);
+  return form;
+}
+
+function buildShipmentModalSplitLayout(form, linkedSection) {
+  const layout = document.createElement("div");
+  layout.className = "shipment-modal-layout";
+
+  const left = document.createElement("div");
+  left.className = "shipment-modal-left";
+  left.appendChild(form);
+
+  const right = document.createElement("div");
+  right.className = "shipment-modal-right";
+  if (linkedSection) right.appendChild(linkedSection);
+
+  layout.appendChild(left);
+  layout.appendChild(right);
+  return layout;
+}
+
 /**
- * Creates a pair of form fields: an entity <select> and a read-only address <textarea>.
- * Returns { wrap (contains both), selectEl, addressEl }.
+ * Entity select + read-only address sub-line in a single meta row (matches email From/To blocks).
+ * Returns { row, selectEl, addressEl }.
  */
 function createRequestLocationField(label, entityFieldName, addressFieldName, defaultEntity = "", { readOnly = false } = {}) {
-  const frag = document.createDocumentFragment();
+  const { tr, valueTd } = createFormMetaRow(label);
 
-  // Entity select
-  const entityWrap = document.createElement("div");
-  entityWrap.className = "shipment-form-field";
-  const entityLbl = document.createElement("label");
-  entityLbl.className = "shipment-form-label";
-  entityLbl.textContent = label;
+  const selectWrap = document.createElement("div");
+  selectWrap.className = "email-meta-control-wrap";
 
   const select = document.createElement("select");
-  select.className = "shipment-form-input";
+  select.className = "shipment-form-input email-meta-input";
   select.dataset.field = entityFieldName;
 
   const entities = getLocationEntities();
@@ -157,39 +286,26 @@ function createRequestLocationField(label, entityFieldName, addressFieldName, de
     opt.selected = true;
     select.appendChild(opt);
   }
-
   if (readOnly) select.disabled = true;
 
-  entityWrap.appendChild(entityLbl);
-  entityWrap.appendChild(select);
-
-  // Address textarea (read-only)
-  const addrWrap = document.createElement("div");
-  addrWrap.className = "shipment-form-field";
-  const addrLbl = document.createElement("label");
-  addrLbl.className = "shipment-form-label";
-  addrLbl.textContent = label === "From" ? "Pickup Address" : "Delivery Address";
-
-  const textarea = document.createElement("textarea");
-  textarea.className = "shipment-form-input";
-  textarea.dataset.field = addressFieldName;
-  textarea.rows = 3;
-  textarea.readOnly = true;
-  textarea.value = getLocationAddress(select.value);
+  const addressSub = document.createElement("textarea");
+  addressSub.className = "email-meta-sub email-meta-address";
+  addressSub.dataset.field = addressFieldName;
+  addressSub.rows = 2;
+  addressSub.readOnly = true;
+  addressSub.value = getLocationAddress(select.value);
 
   if (!readOnly) {
     select.addEventListener("change", () => {
-      textarea.value = getLocationAddress(select.value);
+      addressSub.value = getLocationAddress(select.value);
     });
   }
 
-  addrWrap.appendChild(addrLbl);
-  addrWrap.appendChild(textarea);
+  selectWrap.appendChild(select);
+  valueTd.appendChild(selectWrap);
+  valueTd.appendChild(addressSub);
 
-  frag.appendChild(entityWrap);
-  frag.appendChild(addrWrap);
-
-  return { frag, selectEl: select, addressEl: textarea };
+  return { row: tr, selectEl: select, addressEl: addressSub };
 }
 
 
@@ -234,13 +350,48 @@ function appendDeliveryPickupLinkedPoColgroup(table) {
 
 function getRequestLinkedPoTotals(pos) {
   return pos.reduce((totals, row) => {
+    totals.orderQty += toQtyNumber(row["PO Qty"]);
     totals.unitQty += toQtyNumber(row["Actual Qty"]);
     totals.ctnQty += toQtyNumber(row["Ctn Qty"]);
     if (typeof getPackingWeightForPo === "function") {
       totals.totalWeight += getPackingWeightForPo(row["PO #"]);
     }
     return totals;
-  }, { unitQty: 0, ctnQty: 0, totalWeight: 0 });
+  }, { orderQty: 0, unitQty: 0, ctnQty: 0, totalWeight: 0 });
+}
+
+function appendEmailPoTableFooter(table, pos, colDefs, { hasSelectCol = false, qtyCol = "Actual Qty" } = {}) {
+  const totals = getRequestLinkedPoTotals(pos);
+  const cols = hasSelectCol ? [{ col: "_select" }, ...colDefs.map(c => ({ col: c.col }))] : colDefs.map(c => ({ col: c.col }));
+  const qtyIndex = cols.findIndex(c => c.col === qtyCol);
+  const labelIndex = qtyIndex > 0 ? qtyIndex - 1 : -1;
+
+  const tfoot = document.createElement("tfoot");
+  const tr = document.createElement("tr");
+  cols.forEach(({ col }, index) => {
+    const td = document.createElement("td");
+    if (col === "_select") {
+      td.className = "email-po-footer-cell";
+    } else if (index === labelIndex) {
+      td.className = "email-po-footer-cell email-po-footer-label";
+      td.textContent = "Total";
+    } else if (col === "PO Qty") {
+      td.className = "email-po-footer-cell email-num";
+      td.textContent = formatShipmentLinkedPoTotal(totals.orderQty);
+    } else if (col === qtyCol) {
+      td.className = "email-po-footer-cell email-num";
+      td.textContent = formatShipmentLinkedPoTotal(totals.unitQty);
+    } else if (col === "Ctn Qty") {
+      td.className = "email-po-footer-cell email-num";
+      td.textContent = formatShipmentLinkedPoTotal(totals.ctnQty);
+    } else {
+      td.className = "email-po-footer-cell";
+    }
+    tr.appendChild(td);
+  });
+  tfoot.appendChild(tr);
+  table.appendChild(tfoot);
+  return tfoot;
 }
 
 function renderRequestLinkedPoFooterTotals(pos) {
@@ -270,43 +421,10 @@ function renderRequestLinkedPoFooterTotals(pos) {
   return wrap;
 }
 
+/** @deprecated Use createRequestFormMetaRow + buildEmailStyleForm instead. */
 function createRequestFormField(label, fieldName, value, { type = "text", readOnly = false } = {}) {
-  const wrap = document.createElement("div");
-  wrap.className = "shipment-form-field";
-
-  const lbl = document.createElement("label");
-  lbl.className = "shipment-form-label";
-  lbl.textContent = label;
-
-  let input;
-  if (type === "date") {
-    const dateInput = createCompactDateInput({
-      initialYmd: value,
-      readOnly,
-      inputClassName: "shipment-form-input shipment-form-input--date",
-    });
-    input = dateInput.input;
-    wrap.appendChild(lbl);
-    wrap.appendChild(dateInput.wrap);
-  } else if (type === "textarea") {
-    input = document.createElement("textarea");
-    input.rows = 3;
-    input.value = isEmptyValue(value) ? "" : String(value);
-    input.classList.add("shipment-form-input");
-    wrap.appendChild(lbl);
-    wrap.appendChild(input);
-  } else {
-    input = document.createElement("input");
-    input.type = "text";
-    input.value = isEmptyValue(value) ? "" : String(value);
-    input.classList.add("shipment-form-input");
-    wrap.appendChild(lbl);
-    wrap.appendChild(input);
-  }
-
-  input.dataset.field = fieldName;
-  if (readOnly) input.readOnly = true;
-  return wrap;
+  const { tr } = createRequestFormMetaRow(label, fieldName, value, { type, readOnly });
+  return tr;
 }
 
 function readRequestForm(container) {
@@ -359,10 +477,10 @@ function renderRequestLinkedPoTable(pos, { columns } = {}) {
   }
 
   const wrap = document.createElement("div");
-  wrap.className = "shipment-linked-po-table-wrap";
+  wrap.className = "email-po-table-wrap";
 
   const table = document.createElement("table");
-  table.className = "shipment-linked-po-table request-linked-po-table";
+  table.className = "email-po-table shipment-linked-po-table request-linked-po-table";
 
   const thead = document.createElement("thead");
   const headRow = document.createElement("tr");
@@ -394,6 +512,9 @@ function renderRequestLinkedPoTable(pos, { columns } = {}) {
     tbody.appendChild(tr);
   });
   table.appendChild(tbody);
+  if (pos.length > 0) {
+    appendEmailPoTableFooter(table, pos, colDefs, { qtyCol: "PO Qty" });
+  }
   wrap.appendChild(table);
   section.appendChild(wrap);
   return section;
@@ -416,26 +537,33 @@ function createRequestModalBodyPoCount(count) {
   return wrap;
 }
 
-function buildRequestModalLayout({ formFields, formId, linkedPos, linkedPoColumns, showBodyPoCount = false }) {
-  const layout = document.createElement("div");
-  layout.className = "shipment-modal-layout";
+function buildRequestModalLayout({
+  metaRows = [],
+  formId,
+  notesField = null,
+  notesValue = "",
+  notesReadOnly = false,
+  linkedPos,
+  linkedPoColumns,
+  showBodyPoCount = false,
+} = {}) {
+  const form = buildEmailStyleForm({
+    formId,
+    metaRows,
+    notesField,
+    notesValue,
+    notesReadOnly,
+  });
 
-  const left = document.createElement("div");
-  left.className = "shipment-modal-left";
-  if (showBodyPoCount) left.appendChild(createRequestModalBodyPoCount(linkedPos.length));
-  const form = document.createElement("div");
-  form.className = "shipment-form-edit";
-  form.id = formId;
-  formFields.forEach(field => form.appendChild(field));
-  left.appendChild(form);
+  if (showBodyPoCount) {
+    const count = createRequestModalBodyPoCount(linkedPos.length);
+    form.insertBefore(count, form.firstChild);
+  }
 
-  const right = document.createElement("div");
-  right.className = "shipment-modal-right";
-  right.appendChild(renderRequestLinkedPoTable(linkedPos, { columns: linkedPoColumns }));
-
-  layout.appendChild(left);
-  layout.appendChild(right);
-  return layout;
+  return buildShipmentModalSplitLayout(
+    form,
+    renderRequestLinkedPoTable(linkedPos, { columns: linkedPoColumns })
+  );
 }
 
 function setRequestModalPoCount(el, count) {
@@ -444,6 +572,39 @@ function setRequestModalPoCount(el, count) {
   el.innerHTML =
     `<span class="shipment-modal-po-count-num">${count}</span>` +
     `<span class="shipment-modal-po-count-unit">${unit}</span>`;
+}
+
+/** Update modal header to match email request header (templates/email-exf.html). */
+function setEmailStyleModalHeader(headerEl, { typeLabel = "", recordId = "", requestDate = "" } = {}) {
+  if (!headerEl) return;
+
+  const subheading = headerEl.querySelector(".email-subheading");
+  const idEl = headerEl.querySelector(".email-request-id");
+  const dateEl = headerEl.querySelector(".email-request-date");
+
+  if (subheading) subheading.textContent = typeLabel;
+
+  if (idEl) {
+    const id = String(recordId ?? "").trim();
+    if (id) {
+      idEl.textContent = id;
+      idEl.hidden = false;
+    } else {
+      idEl.textContent = "";
+      idEl.hidden = true;
+    }
+  }
+
+  if (dateEl) {
+    const date = String(requestDate ?? "").trim();
+    if (date) {
+      dateEl.textContent = formatDateForDisplay(date);
+      dateEl.hidden = false;
+    } else {
+      dateEl.textContent = "";
+      dateEl.hidden = true;
+    }
+  }
 }
 
 const AVAILABLE_PO_PICKER_COLUMNS = [

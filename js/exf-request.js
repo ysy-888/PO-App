@@ -444,13 +444,15 @@ function renderExfRequestModal(poNumbers, { exfDate = formatDateToYmd(new Date()
   const activeRequest = request ?? exfRequestModalRow;
   const isExisting = Boolean(activeRequest?.[EXF_REQUEST_ID_FIELD]);
   const isView = isExisting && isRequestEmailSent(activeRequest);
-  const titleEl = document.querySelector("#exfRequestOverlay .modal-header-main h3");
   const submitBtn = document.getElementById("exfRequestSubmitBtn");
-  if (titleEl) {
-    titleEl.textContent = isExisting
-      ? `EXF Request ${activeRequest[EXF_REQUEST_ID_FIELD]}`
-      : "EXF Request";
-  }
+  const submitDate = formatDateToYmd(new Date());
+  setEmailStyleModalHeader(document.querySelector("#exfRequestOverlay .modal-header"), {
+    typeLabel: "EXF Request",
+    recordId: isExisting ? activeRequest[EXF_REQUEST_ID_FIELD] : "New",
+    requestDate: isExisting
+      ? (activeRequest[EXF_REQ_SUBMIT_DATE_FIELD] ?? submitDate)
+      : submitDate,
+  });
   if (submitBtn) submitBtn.hidden = isView;
 
   exfRequestPoNumbers = poNumbers.slice();
@@ -496,55 +498,45 @@ function buildExfRequestModalLayout({ exfDate, vendor, linkedPos, showAddPanel =
   const outer = document.createElement("div");
   outer.className = "shipment-modal-outer";
 
-  const layout = document.createElement("div");
-  layout.className = "shipment-modal-layout";
-
-  const left = document.createElement("div");
-  left.className = "shipment-modal-left";
-  const form = document.createElement("div");
-  form.className = "shipment-form-edit";
-  form.id = "exfRequestForm";
   const vendorEmailInfo = getExfRequestVendorEmailInfo(vendor);
   const submitDate = formatDateToYmd(new Date());
-  form.appendChild(createRequestFormField(
-    "EXF Date",
-    EXF_DATE_FIELD,
-    isView ? (request?.[EXF_DATE_FIELD] ?? "") : (exfRequestDraftExfDate || exfDate),
-    { type: "date", readOnly: isView }
-  ));
-  form.appendChild(createRequestFormField(
-    "Request Date",
-    EXF_REQ_SUBMIT_DATE_FIELD,
-    isView ? (request?.[EXF_REQ_SUBMIT_DATE_FIELD] ?? submitDate) : submitDate,
-    { type: "date", readOnly: true }
-  ));
-  form.appendChild(createRequestFormField("Vendor", "Vendor", vendor, { readOnly: true }));
-  form.appendChild(createRequestFormField(
-    "Vendor Email",
-    "Vendor Email",
-    isView ? (request?.["Vendor Email"] ?? "") : (exfRequestDraftEmail.email ?? vendorEmailInfo.email),
-    { readOnly: isView }
-  ));
-  form.appendChild(createRequestFormField(
-    "CC",
-    EXF_REQ_CC_FIELD,
-    isView ? (request?.[EXF_REQ_CC_FIELD] ?? "") : (exfRequestDraftEmail.cc ?? vendorEmailInfo.cc),
-    { readOnly: isView }
-  ));
-  form.appendChild(createRequestFormField(
-    "Notes",
-    EXF_REQ_NOTES_FIELD,
-    isView ? (request?.[EXF_REQ_NOTES_FIELD] ?? "") : exfRequestDraftNotes,
-    { type: "textarea", readOnly: isView }
-  ));
-  left.appendChild(form);
-
-  const right = document.createElement("div");
-  right.className = "shipment-modal-right";
-  right.appendChild(renderExfRequestLinkedPoSection(linkedPos, isView));
-
-  layout.appendChild(left);
-  layout.appendChild(right);
+  const metaRows = [
+    createRequestFormMetaRow(
+      "EXF Date",
+      EXF_DATE_FIELD,
+      isView ? (request?.[EXF_DATE_FIELD] ?? "") : (exfRequestDraftExfDate || exfDate),
+      { type: "date", readOnly: isView }
+    ).tr,
+    createRequestFormMetaRow(
+      "Request Date",
+      EXF_REQ_SUBMIT_DATE_FIELD,
+      isView ? (request?.[EXF_REQ_SUBMIT_DATE_FIELD] ?? submitDate) : submitDate,
+      { type: "date", readOnly: true }
+    ).tr,
+    createRequestFormMetaRow("Vendor", "Vendor", vendor, { readOnly: true }).tr,
+    createRequestFormMetaRow(
+      "Vendor Email",
+      "Vendor Email",
+      isView ? (request?.["Vendor Email"] ?? "") : (exfRequestDraftEmail.email ?? vendorEmailInfo.email),
+      { readOnly: isView }
+    ).tr,
+    createRequestFormMetaRow(
+      "CC",
+      EXF_REQ_CC_FIELD,
+      isView ? (request?.[EXF_REQ_CC_FIELD] ?? "") : (exfRequestDraftEmail.cc ?? vendorEmailInfo.cc),
+      { readOnly: isView }
+    ).tr,
+  ];
+  const layout = buildShipmentModalSplitLayout(
+    buildEmailStyleForm({
+      formId: "exfRequestForm",
+      metaRows,
+      notesField: EXF_REQ_NOTES_FIELD,
+      notesValue: isView ? (request?.[EXF_REQ_NOTES_FIELD] ?? "") : exfRequestDraftNotes,
+      notesReadOnly: isView,
+    }),
+    renderExfRequestLinkedPoSection(linkedPos, isView)
+  );
   outer.appendChild(layout);
 
   if (showAddPanel) {
@@ -810,10 +802,10 @@ function renderExfRequestLinkedPoSection(pos, isView = false) {
   section.classList.toggle("shipment-linked-pos--selection-disabled", exfRequestAddPoPanelOpen || isView);
 
   const wrap = document.createElement("div");
-  wrap.className = "shipment-linked-po-table-wrap shipment-linked-po-table-wrap--with-footer";
+  wrap.className = "email-po-table-wrap";
 
   const table = document.createElement("table");
-  table.className = "shipment-linked-po-table request-linked-po-table exf-request-linked-po-table";
+  table.className = "email-po-table shipment-linked-po-table request-linked-po-table exf-request-linked-po-table";
 
   const colgroup = document.createElement("colgroup");
   EXF_REQUEST_LINKED_PO_COL_CLASSES.forEach((className, i) => {
@@ -888,6 +880,9 @@ function renderExfRequestLinkedPoSection(pos, isView = false) {
   });
 
   table.appendChild(tbody);
+  if (pos.length > 0) {
+    appendEmailPoTableFooter(table, pos, EXF_REQUEST_LINKED_PO_COLUMNS, { hasSelectCol: true, qtyCol: "Actual Qty" });
+  }
   wrap.appendChild(table);
   section.appendChild(wrap);
   if (!isView) section.appendChild(renderExfRequestLinkedPoFooter(pos));

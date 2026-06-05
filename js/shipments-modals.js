@@ -46,32 +46,21 @@ function openPoFromShipment(poNumber) {
   bringModalToFront(document.getElementById("modalOverlay"));
 }
 
-function createShipmentFormField(col, value, { readOnly = false } = {}) {
-  const wrap = document.createElement("div");
-  wrap.className = "shipment-form-field";
-
-  const label = document.createElement("label");
-  label.className = "shipment-form-label";
-  label.textContent = col;
-
+function createShipmentFormMetaRow(col, value, { readOnly = false } = {}) {
+  const { tr, valueTd } = createFormMetaRow(col);
   let input;
+
   if (col === "Notes") {
-    input = document.createElement("textarea");
-    input.rows = 3;
-    input.classList.add("shipment-form-input");
-    input.value = isEmptyValue(value) ? "" : String(value);
-    wrap.appendChild(label);
-    wrap.appendChild(input);
+    return null;
   } else if (SHIPMENT_DATE_FIELDS.has(col)) {
     const dateInput = createCompactDateInput({
       initialYmd: value,
       readOnly,
-      inputClassName: "shipment-form-input shipment-form-input--date",
+      inputClassName: "shipment-form-input shipment-form-input--date email-meta-input",
       placeholder: "",
     });
     input = dateInput.input;
-    wrap.appendChild(label);
-    wrap.appendChild(dateInput.wrap);
+    valueTd.appendChild(dateInput.wrap);
   } else if (col === "Ship Method") {
     input = document.createElement("select");
     ["", ...SHIP_OPTIONS].forEach(opt => {
@@ -81,20 +70,32 @@ function createShipmentFormField(col, value, { readOnly = false } = {}) {
       if (String(value ?? "") === opt) o.selected = true;
       input.appendChild(o);
     });
-    input.classList.add("shipment-form-input");
-    wrap.appendChild(label);
-    wrap.appendChild(input);
+    input.className = "shipment-form-input email-meta-input";
+    valueTd.appendChild(input);
   } else {
     input = document.createElement("input");
     input.type = "text";
     input.value = isEmptyValue(value) ? "" : String(value);
-    input.classList.add("shipment-form-input");
-    wrap.appendChild(label);
-    wrap.appendChild(input);
+    input.className = "shipment-form-input email-meta-input";
+    valueTd.appendChild(input);
   }
 
   input.dataset.field = col;
   if (readOnly) input.readOnly = true;
+  return { tr, input };
+}
+
+/** @deprecated Use createShipmentFormMetaRow instead. */
+function createShipmentFormField(col, value, { readOnly = false } = {}) {
+  const result = createShipmentFormMetaRow(col, value, { readOnly });
+  if (!result) {
+    const wrap = document.createElement("div");
+    wrap.className = "shipment-form-field";
+    return wrap;
+  }
+  const wrap = document.createElement("div");
+  wrap.className = "shipment-form-field";
+  wrap.appendChild(result.tr);
   return wrap;
 }
 
@@ -135,29 +136,22 @@ function bindCreateShipmentEnterNavigation(form) {
 }
 
 function buildShipmentFormEdit(shipment, formId) {
-  const form = document.createElement("div");
-  form.className = "shipment-form-edit";
-  form.id = formId;
-
-  const mainGrid = document.createElement("div");
-  mainGrid.className = "shipment-form-main-grid";
+  const metaRows = [];
   SHIPMENT_MODAL_INFO_FIELDS.forEach(col => {
-    mainGrid.appendChild(createShipmentFormField(col, shipment[col] ?? ""));
+    const row = createShipmentFormMetaRow(col, shipment[col] ?? "");
+    if (row) metaRows.push(row.tr);
   });
-  form.appendChild(mainGrid);
-
-  const dateStack = document.createElement("div");
-  dateStack.className = "shipment-form-date-stack";
   SHIPMENT_MODAL_DATE_FIELDS.forEach(col => {
-    const field = createShipmentFormField(col, shipment[col] ?? "");
-    field.classList.add("shipment-form-field--date");
-    dateStack.appendChild(field);
+    const row = createShipmentFormMetaRow(col, shipment[col] ?? "");
+    if (row) metaRows.push(row.tr);
   });
-  form.appendChild(dateStack);
 
-  const notesField = createShipmentFormField("Notes", shipment["Notes"] ?? "");
-  notesField.classList.add("shipment-form-field--notes");
-  form.appendChild(notesField);
+  const form = buildEmailStyleForm({
+    formId,
+    metaRows,
+    notesField: "Notes",
+    notesValue: shipment["Notes"] ?? "",
+  });
 
   if (formId === "createShipmentForm") {
     bindCreateShipmentEnterNavigation(form);
@@ -171,20 +165,10 @@ function buildShipmentModalLayout({ shipment = {}, formId, linkedSource, showAdd
   outer.className = "shipment-modal-outer";
   outer.id = "shipmentModalOuter";
 
-  const layout = document.createElement("div");
-  layout.className = "shipment-modal-layout";
-
-  const left = document.createElement("div");
-  left.className = "shipment-modal-left";
-  left.appendChild(buildShipmentFormEdit(shipment, formId));
-
-  const right = document.createElement("div");
-  right.className = "shipment-modal-right";
-  right.appendChild(renderShipmentLinkedPoSection(linkedSource));
-
-  layout.appendChild(left);
-  layout.appendChild(right);
-  outer.appendChild(layout);
+  outer.appendChild(buildShipmentModalSplitLayout(
+    buildShipmentFormEdit(shipment, formId),
+    renderShipmentLinkedPoSection(linkedSource)
+  ));
 
   if (showAddPanel) {
     const available = getRequestedPoPanelRows(linkedSource);
@@ -484,6 +468,10 @@ function renderCreateShipmentModal(poNumbers) {
     linkedSource: pos,
     showAddPanel: false,
   }));
+  setEmailStyleModalHeader(document.querySelector("#createShipmentOverlay .modal-header"), {
+    typeLabel: "Create Shipment",
+    recordId: "New",
+  });
   setShipmentModalAddPanelClass(body, false);
   setShipmentModalPoCount(document.getElementById("createShipmentPoCount"), pos);
 
@@ -727,7 +715,6 @@ function getShipmentLinkedPoTotals(pos) {
 }
 
 function renderShipmentLinkedPoFooter(pos) {
-  const totals = getShipmentLinkedPoTotals(pos);
   const footer = document.createElement("footer");
   footer.className = "shipment-linked-po-footer";
 
@@ -750,33 +737,6 @@ function renderShipmentLinkedPoFooter(pos) {
   actions.appendChild(addBtn);
   actions.appendChild(removeBtn);
   footer.appendChild(actions);
-
-  const totalsWrap = document.createElement("div");
-  totalsWrap.className = "shipment-linked-po-footer-totals";
-
-  [
-    ["Order Qty", totals.orderQty],
-    ["Actual Qty", totals.actualQty],
-    ["CTN Qty", totals.ctnQty],
-    ["PO Count", pos.length],
-  ].forEach(([label, value]) => {
-    const item = document.createElement("div");
-    item.className = "shipment-linked-po-footer-item";
-
-    const labelEl = document.createElement("span");
-    labelEl.className = "shipment-linked-po-footer-label";
-    labelEl.textContent = label;
-
-    const valueEl = document.createElement("span");
-    valueEl.className = "shipment-linked-po-footer-value";
-    valueEl.textContent = formatShipmentLinkedPoTotal(value);
-
-    item.appendChild(labelEl);
-    item.appendChild(valueEl);
-    totalsWrap.appendChild(item);
-  });
-
-  footer.appendChild(totalsWrap);
 
   return footer;
 }
@@ -849,10 +809,10 @@ function renderShipmentLinkedPoSection(source) {
   }
 
   const wrap = document.createElement("div");
-  wrap.className = "shipment-linked-po-table-wrap shipment-linked-po-table-wrap--with-footer";
+  wrap.className = "email-po-table-wrap";
 
   const table = document.createElement("table");
-  table.className = "shipment-linked-po-table";
+  table.className = "email-po-table shipment-linked-po-table";
 
   const colgroup = document.createElement("colgroup");
   SHIPMENT_LINKED_PO_COL_CLASSES.forEach((className, i) => {
@@ -922,6 +882,9 @@ function renderShipmentLinkedPoSection(source) {
     tbody.appendChild(tr);
   });
   table.appendChild(tbody);
+  if (count > 0) {
+    appendEmailPoTableFooter(table, pos, SHIPMENT_LINKED_PO_COLUMNS, { hasSelectCol: true, qtyCol: "Actual Qty" });
+  }
   wrap.appendChild(table);
   section.appendChild(wrap);
   section.appendChild(renderShipmentLinkedPoFooter(pos));
@@ -930,13 +893,15 @@ function renderShipmentLinkedPoSection(source) {
 }
 
 function renderShipmentModalContent(shipment) {
-  const idEl = document.getElementById("shipmentModalId");
   const body = document.getElementById("shipmentModalBody");
-  if (!idEl || !body) return;
+  if (!body) return;
 
   shipmentAddPoPanelOpen = false;
   clearShipmentFooterMessage("shipmentModalFooterMessage");
-  idEl.textContent = shipment[SHIPMENT_ID_FIELD] ?? EMPTY_DISPLAY;
+  setEmailStyleModalHeader(document.querySelector("#shipmentModalOverlay .modal-header"), {
+    typeLabel: "Shipment",
+    recordId: shipment[SHIPMENT_ID_FIELD] ?? "—",
+  });
   setShipmentModalPoCount(document.getElementById("shipmentModalPoCount"), shipment);
   pruneShipmentFormSelection(getLinkedPoRows(shipment));
   body.innerHTML = "";
