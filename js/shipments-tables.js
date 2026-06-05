@@ -2,18 +2,20 @@
 
 const SHIPMENT_ID_FIELD = "Shipment ID";
 
+const SHIPMENT_EXF_REQUEST_ID_FIELD = "EXF Request ID";
+
 const SHIPMENT_TABLE_COLUMNS = [
-  "Shipment ID", "Ship Method", "PO Count", "Vessel", "House #", "EXF",
+  "Shipment ID", SHIPMENT_EXF_REQUEST_ID_FIELD, "Ship Method", "PO Count", "Vessel", "House #", "EXF",
   "Shipped", "ETD", "ETA", "IHD", "Notes"
 ];
 
 const SHIPMENT_FORM_FIELDS = [
-  "Ship Method", "Vessel", "House #", "EXF", "Shipped", "ETD", "ETA", "IHD", "Notes"
+  SHIPMENT_EXF_REQUEST_ID_FIELD, "Ship Method", "Vessel", "House #", "EXF", "Shipped", "ETD", "ETA", "IHD", "Notes"
 ];
 
 const SHIPMENT_DATE_FIELDS = new Set(["EXF", "Shipped", "ETD", "ETA", "IHD"]);
 
-const SHIPMENT_MODAL_INFO_FIELDS = ["Ship Method", "Vessel", "House #"];
+const SHIPMENT_MODAL_INFO_FIELDS = [SHIPMENT_EXF_REQUEST_ID_FIELD, "Ship Method", "Vessel", "House #"];
 const SHIPMENT_MODAL_DATE_FIELDS = ["EXF", "Shipped", "ETD", "ETA", "IHD"];
 
 const SHIPMENT_LINKED_PO_COLUMNS = [
@@ -73,6 +75,8 @@ let filteredShipments = [];
 let filteredChargebacks = [];
 let shipmentModalRow = null;
 let createShipmentPoNumbers = [];
+/** @type {{ exfRequestId: string, lockExfDate: boolean } | null} */
+let createShipmentContext = null;
 let currentAppView = "po";
 let shipmentAddPoPanelOpen = false;
 

@@ -10,6 +10,7 @@ const EXF_REQ_CC_FIELD = "CC";
 
 const EXF_REQUEST_TABLE_COLUMN_LABELS = {
   [EXF_REQ_SUBMIT_DATE_FIELD]: "Request Date",
+  [SHIPMENT_ID_FIELD]: "Shipment",
 };
 
 function getExfRequestTableColumnLabel(col) {
@@ -26,6 +27,7 @@ const EXF_REQUEST_TABLE_COLUMNS = [
   EXF_REQ_NOTES_FIELD,
   "PO Count",
   "Total Qty",
+  SHIPMENT_ID_FIELD,
   "Email Status",
   "Email Sent At",
   "Last Email Attempt At",
@@ -103,6 +105,58 @@ function syncExfRequestIdsFromRequests(rows, requests) {
   });
 }
 
+function getShipmentIdsForExfRequest(request) {
+  const exfRequestId = getExfRequestRecordId(request);
+  if (!exfRequestId) return [];
+  const ids = new Set();
+  if (typeof allShipments !== "undefined") {
+    allShipments.forEach(shipment => {
+      const linkedExf = String(shipment[SHIPMENT_EXF_REQUEST_ID_FIELD] ?? "").trim();
+      const shipmentId = String(shipment[SHIPMENT_ID_FIELD] ?? "").trim();
+      if (linkedExf === exfRequestId && shipmentId) ids.add(shipmentId);
+    });
+  }
+  getRequestPoNumbers(request, EXF_REQUEST_ID_FIELD).forEach(po => {
+    const row = allRows.find(r => String(r["PO #"]) === String(po));
+    const shipmentId = String(row?.[SHIPMENT_ID_FIELD] ?? "").trim();
+    if (shipmentId) ids.add(shipmentId);
+  });
+  return [...ids].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+}
+
+function getExfRequestSearchText(request) {
+  return EXF_REQUEST_TABLE_COLUMNS
+    .filter(col => col !== "Action")
+    .map(col => {
+      if (col === SHIPMENT_ID_FIELD) return getShipmentIdsForExfRequest(request).join(" ");
+      return String(request[col] ?? "");
+    })
+    .join(" ")
+    .toLowerCase();
+}
+
+function renderExfRequestShipmentCell(td, request) {
+  td.className = "readonly readonly-no-select td-shipment-id-cell";
+  const ids = getShipmentIdsForExfRequest(request);
+  if (ids.length === 0) {
+    setDisplayText(td, EMPTY_DISPLAY);
+    return;
+  }
+  ids.forEach((id, index) => {
+    if (index > 0) td.appendChild(document.createTextNode(", "));
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "shipment-id-link";
+    btn.textContent = id;
+    btn.title = `Open shipment ${id}`;
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      openShipmentDetail(id);
+    });
+    td.appendChild(btn);
+  });
+}
+
 function renderExfRequestIdCell(td, row) {
   td.className = "readonly readonly-no-select td-shipment-id-cell";
   const id = String(row[EXF_REQUEST_ID_FIELD] ?? "").trim();
@@ -161,12 +215,7 @@ function applyExfRequestFilters() {
   const q = (document.getElementById("exfRequestSearchInput")?.value ?? "").toLowerCase();
   filteredExfRequests = allExfRequests.filter(request => {
     if (!q) return true;
-    return EXF_REQUEST_TABLE_COLUMNS
-      .filter(col => col !== "Action")
-      .map(col => String(request[col] ?? ""))
-      .join(" ")
-      .toLowerCase()
-      .includes(q);
+    return getExfRequestSearchText(request).includes(q);
   });
   filteredExfRequests.sort((a, b) => {
     const dateCompare = normalizeToYmd(b[EXF_REQ_SUBMIT_DATE_FIELD] || b["Created At"])
@@ -183,6 +232,10 @@ function updateExfRequestRowCounter() {
 }
 
 function formatExfRequestTableCell(col, request) {
+  if (col === SHIPMENT_ID_FIELD) {
+    const ids = getShipmentIdsForExfRequest(request);
+    return ids.length > 0 ? ids.join(", ") : EMPTY_DISPLAY;
+  }
   const val = request[col] ?? "";
   if ([EXF_DATE_FIELD, EXF_REQ_SUBMIT_DATE_FIELD, "Email Sent At", "Last Email Attempt At", "Created At", "Updated At"].includes(col)) {
     return formatDateForDisplay(val);
@@ -234,6 +287,8 @@ function renderExfRequestTable() {
       td.dataset.col = col;
       if (col === "Action") {
         renderExfRequestActionCell(td, request);
+      } else if (col === SHIPMENT_ID_FIELD) {
+        renderExfRequestShipmentCell(td, request);
       } else if (col === "Email Status") {
         renderExfRequestEmailStatusCell(td, request);
       } else {
@@ -454,6 +509,8 @@ function renderExfRequestModal(poNumbers, { exfDate = formatDateToYmd(new Date()
       : submitDate,
   });
   if (submitBtn) submitBtn.hidden = isView;
+  const createShipmentBtn = document.getElementById("exfRequestCreateShipmentBtn");
+  if (createShipmentBtn) createShipmentBtn.hidden = !isExisting;
 
   exfRequestPoNumbers = poNumbers.slice();
   const originalPos = getExfRequestRows();
@@ -1065,9 +1122,37 @@ function demoExfRequest(poNumbers, exfDate, memos, shipMethods, vendorEmail = "d
   );
 }
 
+function openCreateShipmentFromExfRequest() {
+  if (isAppSaving()) return;
+  setExfRequestFooterMessage("");
+  const request = exfRequestModalRow;
+  const exfRequestId = getExfRequestRecordId(request);
+  if (!exfRequestId) return;
+
+  const rows = exfRequestPoNumbers
+    .map(po => allRows.find(r => String(r["PO #"]) === String(po)))
+    .filter(Boolean);
+  const eligible = rows.filter(isPoEligibleForShipment);
+  if (eligible.length === 0) {
+    setExfRequestFooterMessage("No POs are eligible for shipment (already on a shipment or not in Requested status)");
+    return;
+  }
+
+  const skipped = rows.length - eligible.length;
+  const exfDate = request?.[EXF_DATE_FIELD] || getExfRequestExfDateValue() || "";
+  renderCreateShipmentModal(
+    eligible.map(row => row["PO #"]),
+    { exfRequestId, exfDate, lockExfDate: true }
+  );
+  if (skipped > 0) {
+    showIndicator(`${skipped} PO(s) skipped — already on a shipment or ineligible`, "");
+  }
+}
+
 function initExfRequest() {
   document.getElementById("exfRequestBtn")?.addEventListener("click", openExfRequestFromSelection);
   document.getElementById("exfRequestSubmitBtn")?.addEventListener("click", submitExfRequest);
+  document.getElementById("exfRequestCreateShipmentBtn")?.addEventListener("click", openCreateShipmentFromExfRequest);
   document.getElementById("exfRequestCancelBtn")?.addEventListener("click", closeExfRequestModal);
   document.querySelector('[data-dismiss="exf-request"]')?.addEventListener("click", closeExfRequestModal);
   bindDirectBackdropDismiss(document.getElementById("exfRequestOverlay"), closeExfRequestModal);

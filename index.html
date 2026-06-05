@@ -363,6 +363,7 @@
       <col class="col-notes" />
       <col class="col-po-count" />
       <col class="col-po-qty" />
+      <col class="col-shipment-id" />
       <col class="col-status" />
       <col class="col-date" />
       <col class="col-date" />
@@ -380,6 +381,7 @@
         <th>Notes</th>
         <th>PO Count</th>
         <th>Total Qty</th>
+        <th>Shipment</th>
         <th>Email Status</th>
         <th>Email Sent</th>
         <th>Last Attempt</th>
@@ -388,7 +390,7 @@
       </tr>
     </thead>
     <tbody id="exfRequestTableBody">
-      <tr class="state-row"><td colspan="14">Loading EXF requests…</td></tr>
+      <tr class="state-row"><td colspan="15">Loading EXF requests…</td></tr>
     </tbody>
   </table>
   </div>
@@ -830,6 +832,10 @@
     <div class="modal-body" id="exfRequestBody"></div>
     <div class="modal-footer">
       <div id="exfRequestFooterMessage" class="modal-footer-message shipment-footer-message" role="status" aria-live="polite" hidden></div>
+      <button type="button" class="btn btn-secondary" id="exfRequestCreateShipmentBtn" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v10H3z"/><path d="M14 10h4l3 3v4h-7z"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>
+        Create Shipment
+      </button>
       <button type="button" class="btn btn-primary" id="exfRequestSubmitBtn">
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 2 11 13"/><path d="m22 2-7 20-4-9-9-4z"/></svg>
         Submit

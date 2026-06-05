@@ -746,6 +746,10 @@ table {
   width: 190px;
 }
 
+#exfRequestTable .col-shipment-id {
+  width: 88px;
+}
+
 #exfRequestTable .col-po-count,
 #exfRequestTable .col-po-qty {
   width: 78px;
@@ -5353,8 +5357,8 @@ td.n41-status-mismatch,
 }
 
 .shipment-modal-left {
-  flex: 0 0 280px;
-  min-width: 280px;
+  flex: 0 0 240px;
+  min-width: 240px;
 }
 
 .shipment-modal-right {
@@ -5931,11 +5935,11 @@ td.n41-status-mismatch,
   gap: 14px;
   flex-wrap: wrap;
   padding: 8px 10px;
-  border: 1px solid var(--border);
+  border: 1px solid #e5e7eb;
   border-top: none;
-  border-radius: 0 0 6px 6px;
+  border-radius: 0 0 8px 8px;
   background: #fff;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .shipment-linked-po-footer-actions,
@@ -6029,20 +6033,6 @@ td.n41-status-mismatch,
   min-height: 0;
   display: flex;
   flex-direction: column;
-}
-
-.shipment-linked-po-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 14px;
-  flex-wrap: wrap;
-  padding: 8px 10px;
-  border: 1px solid #e5e7eb;
-  border-top: none;
-  border-radius: 0 0 8px 8px;
-  background: #fff;
-  font-size: 13px;
 }
 
 .shipment-modal-po-count {
@@ -6589,7 +6579,8 @@ th.th-shipment-id-col.th-filterable.sorted-desc {
   #packingPrintRoot {
     display: block;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    font-size: 11px;
+    font-size: 14px;
+    line-height: 1.5;
     color: #1a1a18;
     background: #ffffff;
     margin: 0;

@@ -62,7 +62,7 @@ const PICKUP_REQ_NOTES_FIELD = "Pickup Req Notes";
 */
 
 const SHIPMENT_DATA_FIELDS = [
-  "Ship Method", "Vessel", "House #", "EXF", "Shipped", "ETD", "ETA", "IHD", "Notes"
+  EXF_REQUEST_ID_FIELD, "Ship Method", "Vessel", "House #", "EXF", "Shipped", "ETD", "ETA", "IHD", "Notes"
 ];
 
 /** Shipment fields copied to linked PO rows. Notes stay on the shipment record only. */
@@ -157,6 +157,7 @@ function getShipmentsSheet_() {
       SHIPMENT_ID_FIELD, ...SHIPMENT_DATA_FIELDS
     ]]);
   }
+  ensureSheetHeaders_(sheet, [SHIPMENT_ID_FIELD, ...SHIPMENT_DATA_FIELDS]);
   return sheet;
 }
 
@@ -1974,6 +1975,15 @@ const EMAIL_PO_TD_STYLE_ = "padding:10px 12px;border-bottom:1px solid #e5e7eb;co
 const EMAIL_PO_TD_NUM_STYLE_ = EMAIL_PO_TD_STYLE_ + "text-align:right;";
 const EMAIL_PO_TD_ROW_NUM_STYLE_ = EMAIL_PO_TD_STYLE_ + "text-align:center;color:#6b7280;";
 const EMAIL_PO_FOOTER_TD_STYLE_ = "padding:10px 12px;font-weight:600;background-color:#eef0f3;color:#1a1a18;border-bottom:none;font-size:13px;";
+const PDF_SECTION_TITLE_STYLE_ = "margin:0 0 8px 0;font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:#374151;";
+const PDF_META_TABLE_STYLE_ = "border-collapse:collapse;width:100%;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;";
+const PDF_META_LABEL_LAST_STYLE_ = EMAIL_META_LABEL_STYLE_.replace("border-bottom:1px solid #e5e7eb;", "");
+const PDF_META_VALUE_LAST_STYLE_ = EMAIL_META_VALUE_STYLE_.replace("border-bottom:1px solid #e5e7eb;", "");
+const PDF_TABLE_STYLE_ = "width:100%;border-collapse:collapse;border:1px solid #e5e7eb;font-size:13px;table-layout:auto;";
+const PDF_TH_CENTER_STYLE_ = EMAIL_PO_TH_STYLE_ + "text-align:center;";
+const PDF_TD_CENTER_STYLE_ = EMAIL_PO_TD_ROW_NUM_STYLE_;
+const PDF_TD_TOTAL_CENTER_STYLE_ = EMAIL_PO_FOOTER_TD_STYLE_ + "text-align:center;";
+const PDF_FONT_ = "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;";
 
 function renderEmailTemplate_(filename, vars) {
   const template = HtmlService.createTemplateFromFile(filename);
@@ -2154,58 +2164,58 @@ function pdfMoney_(val) {
   return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function pdfMetaTableHtml_(pairs) {
+  return pairs.map(([label, val], index) => {
+    const isLast = index === pairs.length - 1;
+    const labelStyle = isLast ? PDF_META_LABEL_LAST_STYLE_ : EMAIL_META_LABEL_STYLE_;
+    const valueStyle = isLast ? PDF_META_VALUE_LAST_STYLE_ : EMAIL_META_VALUE_STYLE_;
+    return "<tr><td style=\"" + labelStyle + "\">" + pdfEsc_(label) + "</td><td style=\"" + valueStyle + "\">" + val + "</td></tr>";
+  }).join("");
+}
+
+function pdfMetaTableWrap_(pairs) {
+  return "<table cellpadding=\"0\" cellspacing=\"0\" style=\"" + PDF_META_TABLE_STYLE_ + "\">" +
+    pdfMetaTableHtml_(pairs) + "</table>";
+}
+
+function pdfNotesPanelHtml_(notes) {
+  return "<div style=\"margin:8px 0 0;padding:14px 16px;background:transparent;border:1px solid #e5e7eb;border-radius:6px;\">" +
+    "<div style=\"font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:#374151;margin:0 0 8px 0;\">Notes</div>" +
+    "<div style=\"font-size:14px;color:#1a1a18;white-space:pre-wrap;word-break:break-word;\">" + pdfEsc_(notes) + "</div></div>";
+}
+
 /** Build HTML for a single PO section (PO Details + Style Details + Packing List). */
 function buildPdfPoSectionHtml_(poRow, packingList, cartons, isLast) {
-  const TH = "padding:5px 8px;text-align:left;font-size:10px;font-weight:bold;letter-spacing:0.04em;text-transform:uppercase;color:#374151;background-color:#f0f1f3;border:1px solid #d1d5db;white-space:nowrap;";
-  const TH_R = TH + "text-align:right;";
-  const TD = "padding:5px 8px;border:1px solid #d1d5db;font-size:11px;color:#1a1a18;vertical-align:middle;";
-  const TD_R = TD + "text-align:right;font-variant-numeric:tabular-nums;";
-  const TD_C = TD + "text-align:center;color:#6b7280;font-variant-numeric:tabular-nums;";
-  const TD_TOT = "padding:5px 8px;border:1px solid #d1d5db;font-size:11px;font-weight:bold;color:#1a1a18;background-color:#eef0f3;text-align:right;font-variant-numeric:tabular-nums;";
-  const ML = "padding:5px 8px;font-size:10px;font-weight:bold;color:#374151;background-color:#f0f1f3;border:1px solid #d1d5db;white-space:nowrap;";
-  const MV = "padding:5px 8px;font-size:11px;color:#1a1a18;border:1px solid #d1d5db;";
-  const SEC = "margin:0 0 6px 0;font-size:10px;font-weight:bold;letter-spacing:0.06em;text-transform:uppercase;color:#374151;";
-
   const po = String(poRow["PO #"] ?? "");
   const styleNum = String(poRow["Style #"] ?? "").trim();
   const color = String(poRow["Color"] ?? "").trim();
 
-  // ── PO Details ──────────────────────────────────────────────────────────────
-  const poMetaLeft = [
+  const poMetaRows = [
     ["PO #", pdfVal_(poRow["PO #"])],
     ["Buyer PO #", pdfVal_(poRow["Buyer PO #"])],
     ["SO #", pdfVal_(poRow["SO #"])],
     ["Vendor", pdfVal_(poRow["Vendor"])],
     ["Buyer", pdfVal_(poRow["Buyer"])],
     ["Division", pdfVal_(poRow["Division"])],
-  ];
-  const poMetaRight = [
     ["Ship Method", pdfVal_(poRow["Ship Method"])],
     ["Status", pdfVal_(poRow["Status"])],
     ["PO Date", pdfDate_(poRow["PO Date"])],
-    ["EXF", pdfDate_(poRow["EXF"])],
+    ["EXF Date", pdfDate_(poRow["EXF Date"] || poRow["EXF Request Date"] || poRow["EXF"])],
     ["IHD", pdfDate_(poRow["IHD"])],
     ["CXL Date", pdfDate_(poRow["CXL Date"])],
   ];
+  const poMetaHalf = Math.ceil(poMetaRows.length / 2);
+  const poMetaLeft = poMetaRows.slice(0, poMetaHalf);
+  const poMetaRight = poMetaRows.slice(poMetaHalf);
 
-  function metaTableRows_(pairs) {
-    return pairs.map(([label, val]) =>
-      "<tr><td style=\"" + ML + "\">" + pdfEsc_(label) + "</td><td style=\"" + MV + "\">" + val + "</td></tr>"
-    ).join("");
-  }
-
-  const poDetailsHtml = "<p style=\"" + SEC + "\">PO Details</p>" +
-    "<table cellpadding=\"0\" cellspacing=\"0\" style=\"width:100%;border-collapse:collapse;margin-bottom:12px;\">" +
+  const poDetailsHtml = "<div style=\"margin-bottom:20px;\">" +
+    "<p style=\"" + PDF_SECTION_TITLE_STYLE_ + "\">PO Details</p>" +
+    "<table cellpadding=\"0\" cellspacing=\"0\" style=\"width:100%;border-collapse:collapse;\">" +
     "<tr>" +
-    "<td style=\"width:50%;vertical-align:top;padding-right:6px;\">" +
-    "<table cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;width:100%;\">" + metaTableRows_(poMetaLeft) + "</table>" +
-    "</td>" +
-    "<td style=\"width:50%;vertical-align:top;\">" +
-    "<table cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;width:100%;\">" + metaTableRows_(poMetaRight) + "</table>" +
-    "</td>" +
-    "</tr></table>";
+    "<td style=\"width:50%;vertical-align:top;padding-right:8px;\">" + pdfMetaTableWrap_(poMetaLeft) + "</td>" +
+    "<td style=\"width:50%;vertical-align:top;\">" + pdfMetaTableWrap_(poMetaRight) + "</td>" +
+    "</tr></table></div>";
 
-  // ── Style Details ────────────────────────────────────────────────────────────
   const sizeFields = Array.from({ length: 15 }, (_, i) => "Size " + (i + 1));
   const sizeLabels = sizeFields.map(f => String(poRow[f] ?? "").trim()).filter(s => s !== "");
   const colCount = sizeLabels.length;
@@ -2228,35 +2238,36 @@ function buildPdfPoSectionHtml_(poRow, packingList, cartons, isLast) {
   let sizeBreakdownHtml = "";
   if (colCount > 0) {
     const colW = Math.floor(60 / colCount);
-    const sizeHeads = sizeLabels.map(l => "<th style=\"" + TH_R + "width:" + colW + "%;\">" + pdfEsc_(l) + "</th>").join("");
-    const poUnitCells = poUnits.map(n => "<td style=\"" + TD_R + "\">" + n + "</td>").join("");
-    const actUnitCells = actUnits.map(n => "<td style=\"" + TD_R + "\">" + n + "</td>").join("");
+    const sizeHeads = sizeLabels.map(l =>
+      "<th style=\"" + EMAIL_PO_TH_STYLE_ + "text-align:right;width:" + colW + "%;\">" + pdfEsc_(l) + "</th>"
+    ).join("");
+    const poUnitCells = poUnits.map(n => "<td style=\"" + EMAIL_PO_TD_NUM_STYLE_ + "\">" + n + "</td>").join("");
+    const actUnitCells = actUnits.map(n => "<td style=\"" + EMAIL_PO_TD_NUM_STYLE_ + "\">" + n + "</td>").join("");
     sizeBreakdownHtml =
-      "<table cellpadding=\"0\" cellspacing=\"0\" style=\"width:100%;border-collapse:collapse;margin-top:8px;\">" +
-      "<thead><tr><th style=\"" + TH + "width:20%;\">Row</th>" + sizeHeads +
-      "<th style=\"" + TH_R + "width:60px;\">Total</th></tr></thead>" +
+      "<table cellpadding=\"0\" cellspacing=\"0\" style=\"" + PDF_TABLE_STYLE_ + "margin-top:8px;\">" +
+      "<thead><tr><th style=\"" + EMAIL_PO_TH_STYLE_ + "width:20%;\">Row</th>" + sizeHeads +
+      "<th style=\"" + EMAIL_PO_TH_STYLE_ + "text-align:right;width:60px;\">Total</th></tr></thead>" +
       "<tbody>" +
-      "<tr><td style=\"" + TD + "font-weight:bold;\">PO Qty</td>" + poUnitCells +
-      "<td style=\"" + TD_R + "font-weight:bold;\">" + poTotal + "</td></tr>" +
+      "<tr><td style=\"" + EMAIL_PO_TD_STYLE_ + "font-weight:600;\">PO Qty</td>" + poUnitCells +
+      "<td style=\"" + EMAIL_PO_TD_NUM_STYLE_ + "font-weight:600;\">" + poTotal + "</td></tr>" +
       (hasActual ?
-        "<tr><td style=\"" + TD + "font-weight:bold;\">Packed Qty</td>" + actUnitCells +
-        "<td style=\"" + TD_R + "font-weight:bold;\">" + actTotal + "</td></tr>"
+        "<tr><td style=\"" + EMAIL_PO_TD_STYLE_ + "font-weight:600;\">Packed Qty</td>" + actUnitCells +
+        "<td style=\"" + EMAIL_PO_TD_NUM_STYLE_ + "font-weight:600;\">" + actTotal + "</td></tr>"
         : "") +
       "</tbody></table>";
   }
 
-  const styleDetailsHtml = "<p style=\"" + SEC + "\">Style Details</p>" +
-    "<table cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;margin-bottom:4px;\">" +
-    styleInfoRows.map(([l, v]) => "<tr><td style=\"" + ML + "\">" + pdfEsc_(l) + "</td><td style=\"" + MV + "\">" + v + "</td></tr>").join("") +
-    "</table>" +
+  const styleDetailsHtml = "<div style=\"margin-bottom:20px;\">" +
+    "<p style=\"" + PDF_SECTION_TITLE_STYLE_ + "\">Style Details</p>" +
+    pdfMetaTableWrap_(styleInfoRows) +
     sizeBreakdownHtml +
-    "<div style=\"margin-bottom:12px;\"></div>";
+    "</div>";
 
-  // ── Packing List ─────────────────────────────────────────────────────────────
   let packingHtml;
   if (!packingList || !cartons || cartons.length === 0) {
-    packingHtml = "<p style=\"" + SEC + "\">Packing List</p>" +
-      "<p style=\"font-size:11px;color:#6b7280;font-style:italic;\">No packing list on file.</p>";
+    packingHtml = "<div style=\"margin-bottom:0;\">" +
+      "<p style=\"" + PDF_SECTION_TITLE_STYLE_ + "\">Packing List</p>" +
+      "<p style=\"font-size:14px;color:#6b7280;font-style:italic;margin:0;\">No packing list on file.</p></div>";
   } else {
     const unitTotals = sizeLabels.map((_, i) =>
       cartons.reduce((sum, c) => sum + toQtyNumber_(c["Unit " + (i + 1)]), 0)
@@ -2265,66 +2276,74 @@ function buildPdfPoSectionHtml_(poRow, packingList, cartons, isLast) {
     const totalWeight = cartons.reduce((s, c) => s + toQtyNumber_(c["Carton Weight"]), 0);
     const colW2 = colCount > 0 ? Math.floor(50 / colCount) : 0;
 
-    const sizeHeads2 = sizeLabels.map(l => "<th style=\"" + TH_R + "width:" + colW2 + "%;\">" + pdfEsc_(l) + "</th>").join("");
+    const sizeHeads2 = sizeLabels.map(l =>
+      "<th style=\"" + EMAIL_PO_TH_STYLE_ + "text-align:right;width:" + colW2 + "%;\">" + pdfEsc_(l) + "</th>"
+    ).join("");
     const cartonRows = cartons.map(carton => {
       const rowTotal = sizeLabels.reduce((s, _, i) => s + toQtyNumber_(carton["Unit " + (i + 1)]), 0);
       const unitCells = sizeLabels.map((_, i) => {
         const n = toQtyNumber_(carton["Unit " + (i + 1)]);
-        return "<td style=\"" + TD_R + "\">" + (n > 0 ? n : "") + "</td>";
+        return "<td style=\"" + EMAIL_PO_TD_NUM_STYLE_ + "\">" + (n > 0 ? n : "") + "</td>";
       }).join("");
       const w = toQtyNumber_(carton["Carton Weight"]);
       return "<tr>" +
-        "<td style=\"" + TD_C + "\">" + pdfEsc_(String(carton["Carton #"] ?? "")) + "</td>" +
+        "<td style=\"" + PDF_TD_CENTER_STYLE_ + "\">" + pdfEsc_(String(carton["Carton #"] ?? "")) + "</td>" +
         unitCells +
-        "<td style=\"" + TD_R + "font-weight:bold;\">" + rowTotal + "</td>" +
-        "<td style=\"" + TD_R + "\">" + (w > 0 ? w : "") + "</td>" +
+        "<td style=\"" + EMAIL_PO_TD_NUM_STYLE_ + "font-weight:600;\">" + rowTotal + "</td>" +
+        "<td style=\"" + EMAIL_PO_TD_NUM_STYLE_ + "\">" + (w > 0 ? w : "") + "</td>" +
         "</tr>";
     }).join("");
 
-    const unitTotalCells = unitTotals.map(n => "<td style=\"" + TD_TOT + "\">" + n + "</td>").join("");
+    const unitTotalCells = unitTotals.map(n => "<td style=\"" + EMAIL_PO_FOOTER_TD_STYLE_ + "\">" + n + "</td>").join("");
     const plNotes = String(packingList["Notes"] ?? "").trim();
-    const plNotesHtml = plNotes
-      ? "<p style=\"font-size:11px;color:#4b5563;margin:6px 0 0 0;\"><strong>Notes:</strong> " + pdfEsc_(plNotes) + "</p>"
-      : "";
+    const plNotesHtml = plNotes ? pdfNotesPanelHtml_(plNotes) : "";
 
-    packingHtml = "<p style=\"" + SEC + "\">Packing List <span style=\"font-weight:normal;text-transform:none;letter-spacing:0;\">(" + cartons.length + " carton" + (cartons.length !== 1 ? "s" : "") + ")</span></p>" +
-      "<table cellpadding=\"0\" cellspacing=\"0\" style=\"width:100%;border-collapse:collapse;\">" +
+    packingHtml = "<div style=\"margin-bottom:0;\">" +
+      "<p style=\"" + PDF_SECTION_TITLE_STYLE_ + "\">Packing List <span style=\"font-weight:400;text-transform:none;letter-spacing:0;\">(" +
+      cartons.length + " carton" + (cartons.length !== 1 ? "s" : "") + ")</span></p>" +
+      "<table cellpadding=\"0\" cellspacing=\"0\" style=\"" + PDF_TABLE_STYLE_ + "\">" +
       "<thead><tr>" +
-      "<th style=\"" + TH + "width:40px;text-align:center;\">Ctn #</th>" +
+      "<th style=\"" + PDF_TH_CENTER_STYLE_ + "width:40px;\">Ctn #</th>" +
       sizeHeads2 +
-      "<th style=\"" + TH_R + "width:50px;\">Total</th>" +
-      "<th style=\"" + TH_R + "width:60px;\">Weight</th>" +
+      "<th style=\"" + EMAIL_PO_TH_STYLE_ + "text-align:right;width:50px;\">Total</th>" +
+      "<th style=\"" + EMAIL_PO_TH_STYLE_ + "text-align:right;width:60px;\">Weight</th>" +
       "</tr></thead>" +
       "<tbody>" + cartonRows + "</tbody>" +
       "<tfoot><tr>" +
-      "<td style=\"" + TD_TOT + "text-align:center;\">Totals</td>" +
+      "<td style=\"" + PDF_TD_TOTAL_CENTER_STYLE_ + "\">Totals</td>" +
       unitTotalCells +
-      "<td style=\"" + TD_TOT + "\">" + grandTotal + "</td>" +
-      "<td style=\"" + TD_TOT + "\">" + (totalWeight > 0 ? totalWeight : "&mdash;") + "</td>" +
+      "<td style=\"" + EMAIL_PO_FOOTER_TD_STYLE_ + "\">" + grandTotal + "</td>" +
+      "<td style=\"" + EMAIL_PO_FOOTER_TD_STYLE_ + "\">" + (totalWeight > 0 ? totalWeight : "&mdash;") + "</td>" +
       "</tr></tfoot>" +
       "</table>" +
-      plNotesHtml;
+      plNotesHtml +
+      "</div>";
   }
 
-  // ── Section wrapper ──────────────────────────────────────────────────────────
   const pageBreak = isLast ? "" : "page-break-after:always;";
-  return "<div style=\"font-family:Arial,Helvetica,sans-serif;" + pageBreak + "padding:0 0 24px 0;\">" +
-    // Header banner
-    "<table cellpadding=\"0\" cellspacing=\"0\" style=\"width:100%;border-collapse:collapse;margin-bottom:14px;background-color:#2d2d29;\">" +
+  const styleSubtitle = styleNum
+    ? "<div style=\"margin-top:4px;font-size:12px;font-weight:500;color:#d4d9df;line-height:1.3;\">" +
+      pdfEsc_(styleNum) + " / " + pdfEsc_(color) + "</div>"
+    : "";
+
+  return "<div style=\"" + PDF_FONT_ + pageBreak + "margin:0 0 24px 0;\">" +
+    "<div style=\"border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;background:#ffffff;\">" +
+    "<table cellpadding=\"0\" cellspacing=\"0\" style=\"width:100%;border-collapse:collapse;background-color:#2d2d29;\">" +
     "<tr>" +
-    "<td style=\"padding:10px 14px;\">" +
-    "<span style=\"font-size:13px;font-weight:bold;letter-spacing:0.14em;text-transform:uppercase;color:#ffffff;\">ELEVATOR DISCO</span>" +
-    "<span style=\"font-size:11px;color:#d4d9df;margin-left:16px;letter-spacing:0.06em;text-transform:uppercase;\">Packing List</span>" +
+    "<td style=\"padding:20px 24px;vertical-align:middle;\">" +
+    "<div style=\"margin:0 0 6px 0;font-size:20px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:#ffffff;line-height:1.2;\">ELEVATOR DISCO</div>" +
+    "<div style=\"margin:0;font-size:16px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#d4d9df;line-height:1.3;\">Packing List</div>" +
     "</td>" +
-    "<td style=\"padding:10px 14px;text-align:right;white-space:nowrap;\">" +
-    "<span style=\"font-size:12px;font-weight:bold;color:#ffffff;\">PO " + pdfEsc_(po) + "</span>" +
-    (styleNum ? "<span style=\"font-size:11px;color:#d4d9df;margin-left:10px;\">" + pdfEsc_(styleNum) + " / " + pdfEsc_(color) + "</span>" : "") +
+    "<td style=\"padding:20px 24px;text-align:right;vertical-align:middle;white-space:nowrap;\">" +
+    "<div style=\"font-size:14px;font-weight:500;color:#ffffff;letter-spacing:0.02em;line-height:1.4;\">PO " + pdfEsc_(po) + "</div>" +
+    styleSubtitle +
     "</td>" +
     "</tr></table>" +
+    "<div style=\"padding:24px;\">" +
     poDetailsHtml +
     styleDetailsHtml +
     packingHtml +
-    "</div>";
+    "</div></div></div>";
 }
 
 /**
@@ -2350,8 +2369,8 @@ function buildGroupPackingListPdfBlob_(poRows, opts) {
   const bodyHtml = sections.join("\n");
   const html = "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\">" +
     "<title>Packing List</title></head>" +
-    "<body style=\"margin:0;padding:20px 24px;font-family:Arial,Helvetica,sans-serif;" +
-    "font-size:11px;color:#1a1a18;background:#ffffff;\">" +
+    "<body style=\"margin:0;padding:20px 24px;" + PDF_FONT_ +
+    "font-size:14px;line-height:1.5;color:#1a1a18;background:#ffffff;\">" +
     bodyHtml +
     "</body></html>";
 

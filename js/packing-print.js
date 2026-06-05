@@ -1,17 +1,39 @@
 /** Packing list print functionality – individual (single PO) and group (multi-PO) layouts. */
 
-// ── Shared style constants ──────────────────────────────────────────────────
+// ── Shared style constants (mirrors templates/email-styles.html) ────────────
 
 const PL_PRINT_FONT = "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;";
-const PL_PRINT_TH_STYLE = "padding:6px 8px;text-align:left;font-size:10px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:#374151;background-color:#f0f1f3;border:1px solid #d1d5db;white-space:nowrap;";
+const PL_PRINT_SECTION_TITLE_STYLE =
+  "margin:0 0 8px 0;font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:#374151;";
+const PL_PRINT_META_TABLE_STYLE =
+  "border-collapse:collapse;width:100%;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;";
+const PL_PRINT_META_LABEL_STYLE =
+  "width:110px;max-width:110px;padding:8px 12px;font-size:12px;font-weight:600;color:#374151;background-color:#f7f7f8;border-bottom:1px solid #e5e7eb;white-space:nowrap;vertical-align:top;";
+const PL_PRINT_META_LABEL_LAST_STYLE =
+  "width:110px;max-width:110px;padding:8px 12px;font-size:12px;font-weight:600;color:#374151;background-color:#f7f7f8;white-space:nowrap;vertical-align:top;";
+const PL_PRINT_META_VALUE_STYLE =
+  "padding:8px 12px;font-size:14px;color:#1a1a18;background-color:#ffffff;border-bottom:1px solid #e5e7eb;vertical-align:top;";
+const PL_PRINT_META_VALUE_LAST_STYLE =
+  "padding:8px 12px;font-size:14px;color:#1a1a18;background-color:#ffffff;vertical-align:top;";
+const PL_PRINT_TABLE_STYLE =
+  "width:100%;border-collapse:collapse;border:1px solid #e5e7eb;font-size:13px;table-layout:auto;";
+const PL_PRINT_TH_STYLE =
+  "padding:10px 12px;text-align:left;font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:#374151;background-color:#f7f7f8;border-bottom:1px solid #e5e7eb;white-space:nowrap;";
 const PL_PRINT_TH_NUM_STYLE = PL_PRINT_TH_STYLE + "text-align:right;";
-const PL_PRINT_TD_STYLE = "padding:5px 8px;border:1px solid #d1d5db;font-size:11px;color:#1a1a18;vertical-align:middle;";
+const PL_PRINT_TH_CENTER_STYLE = PL_PRINT_TH_STYLE + "text-align:center;";
+const PL_PRINT_TD_STYLE =
+  "padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#1a1a18;vertical-align:top;font-size:13px;";
 const PL_PRINT_TD_NUM_STYLE = PL_PRINT_TD_STYLE + "text-align:right;font-variant-numeric:tabular-nums;";
 const PL_PRINT_TD_CENTER_STYLE = PL_PRINT_TD_STYLE + "text-align:center;color:#6b7280;font-variant-numeric:tabular-nums;";
-const PL_PRINT_TD_TOTAL_STYLE = "padding:5px 8px;border:1px solid #d1d5db;font-size:11px;color:#1a1a18;font-weight:600;background-color:#eef0f3;vertical-align:middle;text-align:right;font-variant-numeric:tabular-nums;";
-const PL_PRINT_SECTION_TITLE_STYLE = "margin:0 0 6px 0;font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#374151;";
-const PL_PRINT_META_LABEL_STYLE = "padding:5px 8px;font-size:10px;font-weight:600;color:#374151;background-color:#f0f1f3;border:1px solid #d1d5db;white-space:nowrap;";
-const PL_PRINT_META_VALUE_STYLE = "padding:5px 8px;font-size:11px;color:#1a1a18;border:1px solid #d1d5db;";
+const PL_PRINT_TD_TOTAL_STYLE =
+  "padding:10px 12px;font-weight:600;background-color:#eef0f3;color:#1a1a18;border-bottom:none;font-size:13px;text-align:right;font-variant-numeric:tabular-nums;vertical-align:top;";
+const PL_PRINT_TD_TOTAL_CENTER_STYLE = PL_PRINT_TD_TOTAL_STYLE + "text-align:center;";
+const PL_PRINT_NOTES_PANEL_STYLE =
+  "margin:8px 0 0;padding:14px 16px;background:transparent;border:1px solid #e5e7eb;border-radius:6px;";
+const PL_PRINT_NOTES_TITLE_STYLE =
+  "font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:#374151;margin:0 0 8px 0;";
+const PL_PRINT_NOTES_BODY_STYLE =
+  "font-size:14px;color:#1a1a18;white-space:pre-wrap;word-break:break-word;";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -45,6 +67,26 @@ function plPrintMoney(val) {
   return "$" + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function plPrintMetaTable(pairs) {
+  const rows = pairs.map(([label, val], index) => {
+    const isLast = index === pairs.length - 1;
+    const labelStyle = isLast ? PL_PRINT_META_LABEL_LAST_STYLE : PL_PRINT_META_LABEL_STYLE;
+    const valueStyle = isLast ? PL_PRINT_META_VALUE_LAST_STYLE : PL_PRINT_META_VALUE_STYLE;
+    return `<tr>
+      <td style="${labelStyle}">${plPrintEsc(label)}</td>
+      <td style="${valueStyle}">${val}</td>
+    </tr>`;
+  }).join("");
+  return `<table cellpadding="0" cellspacing="0" style="${PL_PRINT_META_TABLE_STYLE}">${rows}</table>`;
+}
+
+function plPrintNotesPanel(notes) {
+  return `<div style="${PL_PRINT_NOTES_PANEL_STYLE}">
+    <div style="${PL_PRINT_NOTES_TITLE_STYLE}">Notes</div>
+    <div style="${PL_PRINT_NOTES_BODY_STYLE}">${plPrintEsc(notes)}</div>
+  </div>`;
+}
+
 // ── PO Details section ───────────────────────────────────────────────────────
 
 function buildPlPrintPoDetailsHtml(row) {
@@ -67,23 +109,13 @@ function buildPlPrintPoDetailsHtml(row) {
   const left = metaRows.slice(0, half);
   const right = metaRows.slice(half);
 
-  function metaTable(pairs) {
-    const rows = pairs.map(([label, val]) =>
-      `<tr>
-        <td style="${PL_PRINT_META_LABEL_STYLE}">${plPrintEsc(label)}</td>
-        <td style="${PL_PRINT_META_VALUE_STYLE}">${val}</td>
-      </tr>`
-    ).join("");
-    return `<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;">${rows}</table>`;
-  }
-
   return `
-<div style="margin-bottom:14px;">
+<div style="margin-bottom:20px;">
   <p style="${PL_PRINT_SECTION_TITLE_STYLE}">PO Details</p>
   <table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;">
     <tr>
-      <td style="width:50%;vertical-align:top;padding-right:6px;">${metaTable(left)}</td>
-      <td style="width:50%;vertical-align:top;">${metaTable(right)}</td>
+      <td style="width:50%;vertical-align:top;padding-right:8px;">${plPrintMetaTable(left)}</td>
+      <td style="width:50%;vertical-align:top;">${plPrintMetaTable(right)}</td>
     </tr>
   </table>
 </div>`;
@@ -114,7 +146,7 @@ function buildPlPrintStyleDetailsHtml(row) {
     ).join("");
 
     sizeBreakdownHtml = `
-<table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin-top:8px;">
+<table cellpadding="0" cellspacing="0" style="${PL_PRINT_TABLE_STYLE}margin-top:8px;">
   <thead>
     <tr>
       <th style="${PL_PRINT_TH_STYLE}width:20%;">Row</th>
@@ -145,19 +177,11 @@ function buildPlPrintStyleDetailsHtml(row) {
     ["PO Qty", plPrintNum(row["PO Qty"])],
     ["Carton Qty", plPrintNum(row["Ctn Qty"])],
   ];
-  const infoHtml = infoRows.map(([label, val]) =>
-    `<tr>
-      <td style="${PL_PRINT_META_LABEL_STYLE}">${plPrintEsc(label)}</td>
-      <td style="${PL_PRINT_META_VALUE_STYLE}">${val}</td>
-    </tr>`
-  ).join("");
 
   return `
-<div style="margin-bottom:14px;">
+<div style="margin-bottom:20px;">
   <p style="${PL_PRINT_SECTION_TITLE_STYLE}">Style Details</p>
-  <table cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:8px;">
-    ${infoHtml}
-  </table>
+  ${plPrintMetaTable(infoRows)}
   ${sizeBreakdownHtml}
 </div>`;
 }
@@ -172,16 +196,15 @@ function buildPlPrintPackingListHtml(row) {
 
   if (!packingList && cartons.length === 0) {
     return `
-<div style="margin-bottom:14px;">
+<div style="margin-bottom:20px;">
   <p style="${PL_PRINT_SECTION_TITLE_STYLE}">Packing List</p>
-  <p style="font-size:11px;color:#6b7280;font-style:italic;margin:4px 0;">No packing list on file.</p>
+  <p style="font-size:14px;color:#6b7280;font-style:italic;margin:0;">No packing list on file.</p>
 </div>`;
   }
 
   const colCount = labels.length;
   const colWidthPct = colCount > 0 ? Math.floor(50 / colCount) : 0;
 
-  // Per-unit column totals
   const unitTotals = Array.from({ length: colCount }, (_, i) =>
     cartons.reduce((sum, carton) => sum + toQtyNumber(carton[`Unit ${i + 1}`]), 0)
   );
@@ -212,17 +235,15 @@ function buildPlPrintPackingListHtml(row) {
   ).join("");
 
   const notes = packingList ? String(packingList["Notes"] ?? "").trim() : "";
-  const notesHtml = notes
-    ? `<p style="font-size:11px;color:#4b5563;margin:6px 0 0 0;"><strong>Notes:</strong> ${plPrintEsc(notes)}</p>`
-    : "";
+  const notesHtml = notes ? plPrintNotesPanel(notes) : "";
 
   return `
-<div style="margin-bottom:14px;">
+<div style="margin-bottom:0;">
   <p style="${PL_PRINT_SECTION_TITLE_STYLE}">Packing List <span style="font-weight:400;text-transform:none;letter-spacing:0;">(${cartons.length} carton${cartons.length !== 1 ? "s" : ""})</span></p>
-  <table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;">
+  <table cellpadding="0" cellspacing="0" style="${PL_PRINT_TABLE_STYLE}">
     <thead>
       <tr>
-        <th style="${PL_PRINT_TH_STYLE}width:40px;text-align:center;">Ctn #</th>
+        <th style="${PL_PRINT_TH_CENTER_STYLE}width:40px;">Ctn #</th>
         ${sizeHeaderCols}
         <th style="${PL_PRINT_TH_NUM_STYLE}width:50px;">Total</th>
         <th style="${PL_PRINT_TH_NUM_STYLE}width:60px;">Weight</th>
@@ -233,7 +254,7 @@ function buildPlPrintPackingListHtml(row) {
     </tbody>
     <tfoot>
       <tr>
-        <td style="${PL_PRINT_TD_TOTAL_STYLE}text-align:center;">Totals</td>
+        <td style="${PL_PRINT_TD_TOTAL_CENTER_STYLE}">Totals</td>
         ${unitTotalCols}
         <td style="${PL_PRINT_TD_TOTAL_STYLE}">${grandTotal}</td>
         <td style="${PL_PRINT_TD_TOTAL_STYLE}">${totalWeight > 0 ? totalWeight : "—"}</td>
@@ -251,24 +272,31 @@ function buildPlPrintPoSectionHtml(row, { pageBreakAfter = false } = {}) {
   const style = plPrintVal(row["Style #"]);
   const color = plPrintVal(row["Color"]);
   const breakStyle = pageBreakAfter ? "page-break-after:always;" : "";
+  const styleSubtitle = style !== "—"
+    ? `<div style="margin-top:4px;font-size:12px;font-weight:500;color:#d4d9df;line-height:1.3;">${style} / ${color}</div>`
+    : "";
 
   return `
-<div class="pl-print-po-section" style="${PL_PRINT_FONT}${breakStyle}margin:0;padding:24px 0;">
-  <table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin-bottom:14px;background-color:#2d2d29;">
-    <tr>
-      <td style="padding:10px 14px;">
-        <span style="font-size:13px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:#ffffff;">ELEVATOR DISCO</span>
-        <span style="font-size:11px;color:#d4d9df;margin-left:16px;letter-spacing:0.06em;text-transform:uppercase;">Packing List</span>
-      </td>
-      <td style="padding:10px 14px;text-align:right;white-space:nowrap;">
-        <span style="font-size:12px;font-weight:600;color:#ffffff;">PO ${poNum}</span>
-        ${style !== "—" ? `<span style="font-size:11px;color:#d4d9df;margin-left:10px;">${style} / ${color}</span>` : ""}
-      </td>
-    </tr>
-  </table>
-  ${buildPlPrintPoDetailsHtml(row)}
-  ${buildPlPrintStyleDetailsHtml(row)}
-  ${buildPlPrintPackingListHtml(row)}
+<div class="pl-print-po-section" style="${PL_PRINT_FONT}${breakStyle}margin:0 0 24px 0;">
+  <div style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;background:#ffffff;">
+    <table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;background-color:#2d2d29;">
+      <tr>
+        <td style="padding:20px 24px;vertical-align:middle;">
+          <div style="margin:0 0 6px 0;font-size:20px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:#ffffff;line-height:1.2;">ELEVATOR DISCO</div>
+          <div style="margin:0;font-size:16px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#d4d9df;line-height:1.3;">Packing List</div>
+        </td>
+        <td style="padding:20px 24px;text-align:right;vertical-align:middle;white-space:nowrap;">
+          <div style="font-size:14px;font-weight:500;color:#ffffff;letter-spacing:0.02em;line-height:1.4;">PO ${poNum}</div>
+          ${styleSubtitle}
+        </td>
+      </tr>
+    </table>
+    <div style="padding:24px;">
+      ${buildPlPrintPoDetailsHtml(row)}
+      ${buildPlPrintStyleDetailsHtml(row)}
+      ${buildPlPrintPackingListHtml(row)}
+    </div>
+  </div>
 </div>`;
 }
 
