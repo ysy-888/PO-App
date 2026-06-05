@@ -151,6 +151,7 @@ body.test-mode-active .app-header {
 
 .header-po-meta .counter {
   text-align: left;
+  font-weight: 600;
 }
 
 .header-menu-wrap {
@@ -408,6 +409,70 @@ select.filter-select:focus { border-color: var(--accent); }
   min-width: 0;
 }
 
+.status-filter-counts {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.status-filter-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.status-filter-count-label {
+  font-weight: 500;
+}
+
+.status-filter-count-value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.status-filter-count[data-status="__open__"] {
+  background: #eef0f3;
+  color: #4b5563;
+  border-color: #d8dce2;
+}
+
+.status-filter-count[data-status="WIP"] {
+  background: #faeeda;
+  color: #633806;
+  border-color: #e8d4b8;
+}
+
+.status-filter-count[data-status="__exf_req__"] {
+  background: #fbeaf0;
+  color: #993556;
+  border-color: #f0d0dc;
+}
+
+.status-filter-count[data-status="OTW"] {
+  background: #e1f5ee;
+  color: #0f6e56;
+  border-color: #c5e8dc;
+}
+
+.status-filter-count[data-status="In Warehouse"] {
+  background: #eaf3de;
+  color: #3b6d11;
+  border-color: #d4e8c0;
+}
+
+.status-filter-count[data-status="Assigned"] {
+  background: #eeedfe;
+  color: #534ab7;
+  border-color: #d8d6f5;
+}
+
 .toolbar-filter-divider {
   align-self: stretch;
   width: 1px;
@@ -489,6 +554,7 @@ select.filter-select:focus { border-color: var(--accent); }
 }
 
 #createShipmentBtn[hidden],
+#clearAllColumnFiltersBtn[hidden],
 #batchEditBtn[hidden],
 #deleteShipmentBtn[hidden],
 #deleteChargebackBtn[hidden] {
@@ -570,25 +636,6 @@ select.filter-select:focus { border-color: var(--accent); }
   color: var(--text);
   white-space: nowrap;
   text-align: right;
-}
-
-.clear-all-filters-btn {
-  background: none;
-  border: none;
-  padding: 0;
-  font-family: var(--font);
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--accent);
-  cursor: pointer;
-  text-decoration: underline;
-  white-space: nowrap;
-}
-
-.clear-all-filters-btn:hover { color: #1e4a75; }
-
-.clear-all-filters-btn[hidden] {
-  display: none;
 }
 
 .page-size-control {
@@ -4956,6 +5003,7 @@ td.n41-status-mismatch,
 }
 
 .col-shipment-id { width: 100px; }
+#shipmentTable .col-exf-request-id { width: 110px; }
 .col-po-count    { width: 80px; }
 
 .modal-footer {

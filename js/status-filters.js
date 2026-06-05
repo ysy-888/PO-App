@@ -143,8 +143,17 @@ const STATUS_FILTER_PRIMARY_GROUPS = [
 const STATUS_FILTER_SECONDARY_GROUPS = [
   { label: "WIP", value: "WIP" },
   { label: "EXF REQ", value: STATUS_FILTER_EXF_REQ },
-  { label: "Shipped", value: STATUS_FILTER_SHIPPED },
+  { label: "OTW", value: "OTW" },
   { label: "In WH", value: "In Warehouse" },
+  { label: "Assigned", value: "Assigned" },
+];
+
+const STATUS_FILTER_COUNT_DISPLAY = [
+  { label: "Open", value: STATUS_FILTER_OPEN },
+  { label: "WIP", value: "WIP" },
+  { label: "EXF REQ", value: STATUS_FILTER_EXF_REQ },
+  { label: "OTW", value: "OTW" },
+  { label: "IN WH", value: "In Warehouse" },
   { label: "Assigned", value: "Assigned" },
 ];
 
@@ -193,9 +202,69 @@ function rowMatchesSingleStatusFilter(row, filter) {
   return status === filter;
 }
 
+function rowPassesNonStatusFilters(row) {
+  const div = activeDivision;
+  if (div && row["Division"] !== div) return false;
+  if (typeof flagFilterActive !== "undefined" && flagFilterActive && !isTruthy(row["Flag"])) return false;
+  if (typeof rowPassesColumnFilters === "function" && !rowPassesColumnFilters(row)) return false;
+  const q = typeof activeSearchQuery !== "undefined" ? activeSearchQuery : "";
+  if (q) {
+    const haystack = COLUMNS.map(c => String(getColumnFilterRawValue(c, row) ?? "")).join(" ").toLowerCase();
+    if (!haystack.includes(q)) return false;
+  }
+  return true;
+}
+
+function initStatusFilterCounts() {
+  const container = document.getElementById("statusFilterCounts");
+  if (!container) return;
+
+  container.innerHTML = "";
+  STATUS_FILTER_COUNT_DISPLAY.forEach(item => {
+    const chip = document.createElement("div");
+    chip.className = "status-filter-count";
+    chip.dataset.status = item.value;
+
+    const label = document.createElement("span");
+    label.className = "status-filter-count-label";
+    label.textContent = item.label;
+
+    const value = document.createElement("span");
+    value.className = "status-filter-count-value";
+    value.textContent = "—";
+
+    chip.append(label, value);
+    container.appendChild(chip);
+  });
+}
+
+function updateStatusFilterCounts() {
+  const container = document.getElementById("statusFilterCounts");
+  if (!container || typeof allRows === "undefined") return;
+
+  const counts = Object.fromEntries(
+    STATUS_FILTER_COUNT_DISPLAY.map(item => [item.value, 0])
+  );
+
+  for (const row of allRows) {
+    if (!rowPassesNonStatusFilters(row)) continue;
+    for (const item of STATUS_FILTER_COUNT_DISPLAY) {
+      if (rowMatchesSingleStatusFilter(row, item.value)) counts[item.value]++;
+    }
+  }
+
+  container.querySelectorAll(".status-filter-count").forEach(chip => {
+    const value = chip.dataset.status;
+    const countEl = chip.querySelector(".status-filter-count-value");
+    if (countEl) countEl.textContent = String(counts[value] ?? 0);
+  });
+}
+
 function initStatusFilters() {
   const group = document.getElementById("statusFilters");
   if (!group) return;
+
+  initStatusFilterCounts();
 
   const makeBtn = (label, value) => {
     const btn = document.createElement("button");

@@ -194,6 +194,7 @@ function applyFilters() {
   currentPage = 1;
   renderTable();
   updateClearAllFiltersButton();
+  if (typeof updateStatusFilterCounts === "function") updateStatusFilterCounts();
 }
 
 function isPageSizeAll() {
