@@ -328,46 +328,117 @@ function renderSizeGridBody(body, row) {
   const chart = document.createElement("div");
   chart.className = "modal-size-chart";
   chart.style.setProperty("--size-col-count", String(colCount));
+  applyModalSizeChartDensity(chart, colCount);
 
+  const headRow = createSizeChartRow("modal-size-chart-row--head");
   const rowHead = document.createElement("div");
   rowHead.className = "modal-size-rowhead modal-size-rowhead--blank";
-  chart.appendChild(rowHead);
+  headRow.appendChild(rowHead);
 
+  const headValues = createSizeChartValuesWrap(headRow);
   const totalHead = document.createElement("div");
   totalHead.className = "modal-size-totalhead";
   totalHead.textContent = "Total";
-  chart.appendChild(totalHead);
+  headValues.appendChild(totalHead);
 
   labels.forEach(label => {
     const head = document.createElement("div");
     head.className = "modal-size-colhead";
     head.textContent = label;
-    chart.appendChild(head);
+    headValues.appendChild(head);
   });
+  chart.appendChild(headRow);
 
   const packingActualUnits = getPackingUnitsForStyleChart(row);
   const hasPackingActualUnits = packingActualUnits.some(qty => toQtyNumber(qty) > 0);
   const showPackingVariance = hasPackingActualUnits || hasPackingList(row["PO #"]);
-  const actTotalCell = showPackingVariance
-    ? buildSizeGridRow(chart, row, "Actual Qty", packingActualUnits, colCount, "act")
-    : null;
-  const poTotalCell = buildSizeGridRow(chart, row, "PO Qty", PO_UNIT_FIELDS, colCount, "po");
-  if (showPackingVariance) buildSizeVarianceRow(chart, colCount);
+  let actTotalCell = null;
+  if (showPackingVariance) {
+    const actRow = createSizeChartRow("modal-size-chart-row--qty");
+    actTotalCell = buildSizeGridRow(actRow, row, "Actual Qty", packingActualUnits, colCount, "act");
+    chart.appendChild(actRow);
+  }
+  const poRow = createSizeChartRow("modal-size-chart-row--qty");
+  const poTotalCell = buildSizeGridRow(poRow, row, "PO Qty", PO_UNIT_FIELDS, colCount, "po");
+  chart.appendChild(poRow);
+
+  if (showPackingVariance) {
+    const varianceRow = createSizeChartRow("modal-size-chart-row--variance");
+    buildSizeVarianceRow(varianceRow, colCount);
+    chart.appendChild(varianceRow);
+  }
   body.appendChild(chart);
 
   refreshSizeGridTotals(row, poTotalCell, actTotalCell, packingActualUnits);
   if (showPackingVariance) refreshSizeGridVariance(row, chart, packingActualUnits);
 }
 
-function buildSizeGridRow(chart, row, label, unitFields, colCount, rowType) {
+function applyModalSizeChartDensity(chart, colCount) {
+  let unitWidth = 40;
+  let gap = 4;
+  let totalWidth = 44;
+  if (colCount > 4) {
+    unitWidth = 34;
+    gap = 3;
+    totalWidth = 40;
+  }
+  if (colCount > 6) {
+    unitWidth = 28;
+    gap = 2;
+    totalWidth = 36;
+  }
+  if (colCount > 9) {
+    unitWidth = 24;
+    gap = 2;
+    totalWidth = 32;
+  }
+  chart.style.setProperty("--modal-size-unit-width", `${unitWidth}px`);
+  chart.style.setProperty("--modal-size-gap", `${gap}px`);
+  chart.style.setProperty("--modal-size-total-width", `${totalWidth}px`);
+}
+
+function createSizeChartRow(extraClass = "") {
+  const rowEl = document.createElement("div");
+  rowEl.className = extraClass ? `modal-size-chart-row ${extraClass}` : "modal-size-chart-row";
+  return rowEl;
+}
+
+function createSizeChartValuesWrap(rowEl) {
+  const wrap = document.createElement("div");
+  wrap.className = "modal-size-chart-values";
+  if (rowEl.classList.contains("modal-size-chart-row--qty")) {
+    wrap.classList.add("modal-size-chart-values--bar");
+  }
+  rowEl.appendChild(wrap);
+  return wrap;
+}
+
+function setModalSizeRowheadLabel(el, label) {
+  const parts = String(label ?? "").trim().split(/\s+/);
+  if (parts.length !== 2) {
+    el.textContent = label;
+    return;
+  }
+  el.classList.add("modal-size-rowhead--stacked");
+  parts.forEach(part => {
+    const line = document.createElement("span");
+    line.className = "modal-size-rowhead-line";
+    line.textContent = part;
+    el.appendChild(line);
+  });
+}
+
+function buildSizeGridRow(rowEl, row, label, unitFields, colCount, rowType) {
   const head = document.createElement("div");
   head.className = "modal-size-rowhead";
-  head.textContent = label;
-  chart.appendChild(head);
+  setModalSizeRowheadLabel(head, label);
+  rowEl.appendChild(head);
+
+  const valuesWrap = createSizeChartValuesWrap(rowEl);
 
   const totalCell = document.createElement("div");
   totalCell.className = `modal-size-total modal-size-total--${rowType}`;
-  chart.appendChild(totalCell);
+  valuesWrap.appendChild(totalCell);
 
   for (let i = 0; i < colCount; i++) {
     const field = unitFields[i];
@@ -378,7 +449,7 @@ function buildSizeGridRow(chart, row, label, unitFields, colCount, rowType) {
       cell.dataset.rowType = rowType;
       const qty = toQtyNumber(unitFields[i]);
       cell.textContent = qty > 0 ? String(qty) : "";
-      chart.appendChild(cell);
+      valuesWrap.appendChild(cell);
       continue;
     }
 
@@ -396,26 +467,28 @@ function buildSizeGridRow(chart, row, label, unitFields, colCount, rowType) {
       input.tabIndex = -1;
     }
     bindNumberInput(input);
-    chart.appendChild(input);
+    valuesWrap.appendChild(input);
   }
 
   return totalCell;
 }
 
-function buildSizeVarianceRow(chart, colCount) {
+function buildSizeVarianceRow(rowEl, colCount) {
   const head = document.createElement("div");
   head.className = "modal-size-rowhead modal-size-rowhead--variance";
-  chart.appendChild(head);
+  rowEl.appendChild(head);
+
+  const valuesWrap = createSizeChartValuesWrap(rowEl);
 
   const totalCell = document.createElement("div");
   totalCell.className = "modal-size-variance modal-size-variance--total";
-  chart.appendChild(totalCell);
+  valuesWrap.appendChild(totalCell);
 
   for (let i = 0; i < colCount; i++) {
     const cell = document.createElement("div");
     cell.className = "modal-size-variance";
     cell.dataset.index = String(i);
-    chart.appendChild(cell);
+    valuesWrap.appendChild(cell);
   }
 }
 
@@ -921,6 +994,89 @@ function setChargebackEditActive(block, active) {
   block?.classList.toggle("chargebacks--mutating", active);
 }
 
+let openChargebackRowMenuDropdown = null;
+let chargebackRowMenuDismissBound = false;
+
+function closeChargebackRowMenu() {
+  if (!openChargebackRowMenuDropdown) return;
+  openChargebackRowMenuDropdown.hidden = true;
+  const btn = openChargebackRowMenuDropdown.previousElementSibling;
+  btn?.setAttribute("aria-expanded", "false");
+  openChargebackRowMenuDropdown = null;
+}
+
+function bindChargebackRowMenuDismiss() {
+  if (chargebackRowMenuDismissBound) return;
+  chargebackRowMenuDismissBound = true;
+  document.addEventListener("click", closeChargebackRowMenu);
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape") closeChargebackRowMenu();
+  });
+}
+
+function createChargebackRowMenuItem(label, onSelect, { danger = false } = {}) {
+  const item = document.createElement("button");
+  item.type = "button";
+  item.className = "chargeback-row-menu-item" + (danger ? " chargeback-row-menu-item--danger" : "");
+  item.setAttribute("role", "menuitem");
+  item.textContent = label;
+  item.addEventListener("click", e => {
+    e.stopPropagation();
+    closeChargebackRowMenu();
+    onSelect();
+  });
+  return item;
+}
+
+function createChargebackRowMenu(rowEl, poNumber, chargeback) {
+  bindChargebackRowMenuDismiss();
+
+  const wrap = document.createElement("div");
+  wrap.className = "chargeback-row-menu-wrap";
+
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "btn-icon-sm chargeback-row-menu-btn";
+  btn.title = "More options";
+  btn.setAttribute("aria-label", "Chargeback options");
+  btn.setAttribute("aria-haspopup", "menu");
+  btn.setAttribute("aria-expanded", "false");
+  btn.innerHTML = "&#8943;";
+
+  const dropdown = document.createElement("div");
+  dropdown.className = "chargeback-row-menu-dropdown";
+  dropdown.hidden = true;
+  dropdown.setAttribute("role", "menu");
+
+  dropdown.appendChild(createChargebackRowMenuItem("Edit", () => {
+    const block = getChargebacksBlockFromEl(rowEl);
+    if (isChargebackEditActive(block)) return;
+    setChargebackEditActive(block, true);
+    rowEl.replaceWith(createChargebackRow(chargeback, poNumber, { editing: true }));
+  }));
+
+  dropdown.appendChild(createChargebackRowMenuItem("Delete", () => {
+    deleteChargebackRow(rowEl, poNumber);
+  }, { danger: true }));
+
+  btn.addEventListener("click", e => {
+    e.stopPropagation();
+    if (openChargebackRowMenuDropdown === dropdown && !dropdown.hidden) {
+      closeChargebackRowMenu();
+      return;
+    }
+    closeChargebackRowMenu();
+    dropdown.hidden = false;
+    btn.setAttribute("aria-expanded", "true");
+    openChargebackRowMenuDropdown = dropdown;
+  });
+
+  wrap.addEventListener("click", e => e.stopPropagation());
+  wrap.appendChild(btn);
+  wrap.appendChild(dropdown);
+  return wrap;
+}
+
 function createChargebackRow(chargeback, poNumber, { editing = false } = {}) {
   const rowEl = document.createElement("div");
   rowEl.className = "chargeback-row" + (editing ? " chargeback-row--editing" : "");
@@ -959,25 +1115,7 @@ function createChargebackRow(chargeback, poNumber, { editing = false } = {}) {
     actions.appendChild(saveBtn);
     actions.appendChild(cancelBtn);
   } else {
-    const editBtn = document.createElement("button");
-    editBtn.type = "button";
-    editBtn.className = "btn btn-secondary chargeback-action-btn chargeback-edit-btn";
-    editBtn.textContent = "Edit";
-    editBtn.addEventListener("click", () => {
-      const block = getChargebacksBlockFromEl(rowEl);
-      if (isChargebackEditActive(block)) return;
-      setChargebackEditActive(block, true);
-      rowEl.replaceWith(createChargebackRow(chargeback, poNumber, { editing: true }));
-    });
-
-    const deleteBtn = document.createElement("button");
-    deleteBtn.type = "button";
-    deleteBtn.className = "btn btn-secondary chargeback-action-btn chargeback-delete-btn";
-    deleteBtn.textContent = "Delete";
-    deleteBtn.addEventListener("click", () => deleteChargebackRow(rowEl, poNumber));
-
-    actions.appendChild(editBtn);
-    actions.appendChild(deleteBtn);
+    actions.appendChild(createChargebackRowMenu(rowEl, poNumber, chargeback));
   }
   rowEl.appendChild(actions);
   return rowEl;
@@ -1726,8 +1864,18 @@ function renderModalHeadingMeta(container, row) {
 
   const item = document.createElement("span");
   item.className = "modal-po-heading-meta-item";
-  if (styleVal && colorVal) item.textContent = `${styleVal} / ${colorVal}`;
-  else item.textContent = styleVal || colorVal;
+  if (styleVal) {
+    const styleEl = document.createElement("span");
+    styleEl.className = "modal-po-heading-meta-style";
+    styleEl.textContent = styleVal;
+    item.appendChild(styleEl);
+  }
+  if (colorVal) {
+    const colorEl = document.createElement("span");
+    colorEl.className = "modal-po-heading-meta-color";
+    colorEl.textContent = colorVal;
+    item.appendChild(colorEl);
+  }
   container.appendChild(item);
 }
 

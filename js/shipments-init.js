@@ -17,7 +17,9 @@ function initShipmentSelection() {
 
 function initShipments() {
   document.getElementById("navTabPo")?.addEventListener("click", () => switchAppView("po"));
-  document.getElementById("navTabRequests")?.addEventListener("click", () => switchAppView("requests"));
+  document.getElementById("navTabRequests")?.addEventListener("click", e => {
+    e.preventDefault();
+  });
   document.getElementById("navTabShipments")?.addEventListener("click", () => switchAppView("shipments"));
   document.getElementById("navTabChargebacks")?.addEventListener("click", () => switchAppView("chargebacks"));
   document.getElementById("navTabPackingReviews")?.addEventListener("click", () => switchAppView("packingReviews"));
@@ -26,6 +28,7 @@ function initShipments() {
 
   // Unified requests search: routes to active type's filter
   document.getElementById("requestsSearchInput")?.addEventListener("input", e => {
+    if (!currentRequestType) return;
     const q = e.target.value;
     // Mirror to the type-specific hidden input so individual filters pick it up
     const hiddenId = currentRequestType + "RequestSearchInput";
@@ -34,11 +37,18 @@ function initShipments() {
     switchRequestType(currentRequestType);
   });
 
-  // Request type filter buttons
-  document.getElementById("requestTypeFilters")?.addEventListener("click", e => {
-    const btn = e.target.closest("[data-request-type]");
-    if (!btn) return;
-    switchRequestType(btn.dataset.requestType);
+  // Request type dropdown (nav tab hover menu)
+  const requestsTabWrap = document.getElementById("navTabRequestsWrap");
+  document.getElementById("navTabRequestsDropdown")?.addEventListener("click", e => {
+    const item = e.target.closest("[data-request-type]");
+    if (!item) return;
+    if (currentAppView !== "requests") switchAppView("requests");
+    switchRequestType(item.dataset.requestType);
+    item.blur();
+    requestsTabWrap?.classList.add("is-dropdown-closed");
+  });
+  requestsTabWrap?.addEventListener("mouseleave", () => {
+    requestsTabWrap.classList.remove("is-dropdown-closed");
   });
   document.getElementById("createShipmentBtn")?.addEventListener("click", openCreateShipmentFromSelection);
   document.getElementById("createShipmentSaveBtn")?.addEventListener("click", submitCreateShipment);

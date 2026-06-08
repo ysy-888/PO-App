@@ -249,7 +249,7 @@ function openAsnRequestFromSelection() {
   if (isAppSaving() || isToolbarCreateActionBlocked()) return;
   const selected = getCheckedFilteredPos();
   if (!areRowsEligibleForAsnRequest(selected)) {
-    showIndicator("Select OTW or Arrived at Port POs with packing lists, all LULU'S FASHION LOUNGE or all 12TH TRIBE, and no ASN request yet", "error");
+    showIndicator("Select OTW POs with packing lists, all LULU'S FASHION LOUNGE or all 12TH TRIBE, and no ASN request yet", "error");
     return;
   }
   asnRequestPoNumbers = selected.map(row => row["PO #"]);
@@ -351,6 +351,8 @@ function renderAsnRequestModal(poNumbers, { asnDate = formatDateToYmd(new Date()
     buildEmailStyleForm({
       formId: "asnRequestForm",
       metaRows,
+      totalsRows: createRequestFormTotalsMetaRows(pos),
+      separateTotals: true,
       notesField: ASN_REQ_NOTES_FIELD,
       notesValue: isExisting ? (request[ASN_REQ_NOTES_FIELD] ?? "") : asnRequestDraftNotes,
       notesReadOnly: isView,
@@ -368,6 +370,7 @@ function renderAsnRequestModal(poNumbers, { asnDate = formatDateToYmd(new Date()
       selection: asnRequestAvailablePoSelection,
       onSelectionChange: updateAsnRequestActionButtons,
       selectAllId: "asnRequestAvailablePoSelectAll",
+      showTableFooter: false,
     }));
   }
 
@@ -488,10 +491,9 @@ function renderAsnRequestLinkedPoSection(pos, isView = false) {
   }
   headRow.appendChild(selectTh);
 
-  DELIVERY_PICKUP_LINKED_PO_COLUMNS.forEach(({ label, cellClass }) => {
+  DELIVERY_PICKUP_LINKED_PO_COLUMNS.forEach(({ col, label, cellClass }) => {
     const th = document.createElement("th");
-    th.textContent = label;
-    if (cellClass) th.className = cellClass;
+    renderLinkedPoTableHeaderCell(th, { label, col, cellClass });
     headRow.appendChild(th);
   });
   thead.appendChild(headRow);
@@ -521,9 +523,6 @@ function renderAsnRequestLinkedPoSection(pos, isView = false) {
   });
 
   table.appendChild(tbody);
-  if (pos.length > 0) {
-    appendEmailPoTableFooter(table, pos, DELIVERY_PICKUP_LINKED_PO_COLUMNS, { hasSelectCol: true });
-  }
   wrap.appendChild(table);
   section.appendChild(wrap);
   return section;

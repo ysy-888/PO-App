@@ -24,13 +24,13 @@ function normalizeShipMethod(value) {
 // Single source of truth for status filter, cell editor, and filter popover order.
 // Table default sort uses STATUS_TABLE_SORT_ORDER below.
 const STATUS_SORT_ORDER = [
-  "Pending", "WIP", "Requested", "OTW", "Arrived at Port", "Scheduled",
+  "Pending", "WIP", "Requested", "OTW", "Scheduled",
   "In Warehouse", "Assigned", "Closed", "Hold", "CXL",
 ];
 
 /** Default Status column sort priority (top = first). */
 const STATUS_TABLE_SORT_ORDER = [
-  "Assigned", "In Warehouse", "Arrived at Port", "OTW", "Requested",
+  "Assigned", "In Warehouse", "OTW", "Requested",
   "Hold", "WIP", "Pending", "CXL", "Closed",
 ];
 
@@ -136,11 +136,11 @@ let statusFilterSelection = new Set([STATUS_FILTER_OPEN]);
 
 const STATUS_FILTER_PRIMARY_GROUPS = [
   { label: "All", value: "" },
-  { label: "Open", value: STATUS_FILTER_OPEN },
   { label: "Closed", value: "Closed" },
 ];
 
 const STATUS_FILTER_SECONDARY_GROUPS = [
+  { label: "Open", value: STATUS_FILTER_OPEN },
   { label: "WIP", value: "WIP" },
   { label: "EXF REQ", value: STATUS_FILTER_EXF_REQ },
   { label: "OTW", value: "OTW" },
@@ -148,12 +148,12 @@ const STATUS_FILTER_SECONDARY_GROUPS = [
   { label: "Assigned", value: "Assigned" },
 ];
 
-const STATUS_FILTER_COUNT_DISPLAY = [
+const STATUS_FILTER_COUNTED = [
   { label: "Open", value: STATUS_FILTER_OPEN },
   { label: "WIP", value: "WIP" },
   { label: "EXF REQ", value: STATUS_FILTER_EXF_REQ },
   { label: "OTW", value: "OTW" },
-  { label: "IN WH", value: "In Warehouse" },
+  { label: "In WH", value: "In Warehouse" },
   { label: "Assigned", value: "Assigned" },
 ];
 
@@ -215,48 +215,41 @@ function rowPassesNonStatusFilters(row) {
   return true;
 }
 
-function initStatusFilterCounts() {
-  const container = document.getElementById("statusFilterCounts");
-  if (!container) return;
-
-  container.innerHTML = "";
-  STATUS_FILTER_COUNT_DISPLAY.forEach(item => {
-    const chip = document.createElement("div");
-    chip.className = "status-filter-count";
-    chip.dataset.status = item.value;
-
-    const label = document.createElement("span");
-    label.className = "status-filter-count-label";
-    label.textContent = item.label;
-
-    const value = document.createElement("span");
-    value.className = "status-filter-count-value";
-    value.textContent = "—";
-
-    chip.append(label, value);
-    container.appendChild(chip);
-  });
+function setStatusFilterButtonLabel(btn, label, count) {
+  btn.dataset.label = label;
+  if (count === undefined) {
+    btn.textContent = label;
+    return;
+  }
+  btn.textContent = "";
+  btn.append(
+    document.createTextNode(label + " "),
+    Object.assign(document.createElement("span"), {
+      className: "filter-btn-count",
+      textContent: String(count),
+    })
+  );
 }
 
 function updateStatusFilterCounts() {
-  const container = document.getElementById("statusFilterCounts");
-  if (!container || typeof allRows === "undefined") return;
+  const group = document.getElementById("statusFilters");
+  if (!group || typeof allRows === "undefined") return;
 
   const counts = Object.fromEntries(
-    STATUS_FILTER_COUNT_DISPLAY.map(item => [item.value, 0])
+    STATUS_FILTER_COUNTED.map(item => [item.value, 0])
   );
 
   for (const row of allRows) {
     if (!rowPassesNonStatusFilters(row)) continue;
-    for (const item of STATUS_FILTER_COUNT_DISPLAY) {
+    for (const item of STATUS_FILTER_COUNTED) {
       if (rowMatchesSingleStatusFilter(row, item.value)) counts[item.value]++;
     }
   }
 
-  container.querySelectorAll(".status-filter-count").forEach(chip => {
-    const value = chip.dataset.status;
-    const countEl = chip.querySelector(".status-filter-count-value");
-    if (countEl) countEl.textContent = String(counts[value] ?? 0);
+  group.querySelectorAll(".filter-btn[data-show-count]").forEach(btn => {
+    const value = btn.dataset.status;
+    const label = btn.dataset.label ?? "";
+    setStatusFilterButtonLabel(btn, label, counts[value] ?? 0);
   });
 }
 
@@ -264,14 +257,13 @@ function initStatusFilters() {
   const group = document.getElementById("statusFilters");
   if (!group) return;
 
-  initStatusFilterCounts();
-
-  const makeBtn = (label, value) => {
+  const makeBtn = (label, value, showCount = false) => {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "filter-btn";
     btn.dataset.status = value;
-    btn.textContent = label;
+    if (showCount) btn.dataset.showCount = "true";
+    setStatusFilterButtonLabel(btn, label);
     btn.onclick = () => setStatusFilter(value);
     return btn;
   };
@@ -285,9 +277,11 @@ function initStatusFilters() {
       group.appendChild(divider);
       return;
     }
-    group.appendChild(makeBtn(item.label, item.value));
+    const showCount = STATUS_FILTER_COUNTED.some(entry => entry.value === item.value);
+    group.appendChild(makeBtn(item.label, item.value, showCount));
   });
   syncStatusFilterToolbar();
+  updateStatusFilterCounts();
 }
 
 function syncStatusFilterToolbar() {

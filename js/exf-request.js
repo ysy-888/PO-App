@@ -589,6 +589,8 @@ function buildExfRequestModalLayout({ exfDate, vendor, linkedPos, showAddPanel =
     buildEmailStyleForm({
       formId: "exfRequestForm",
       metaRows,
+      totalsRows: createRequestFormTotalsMetaRows(linkedPos),
+      separateTotals: true,
       notesField: EXF_REQ_NOTES_FIELD,
       notesValue: isView ? (request?.[EXF_REQ_NOTES_FIELD] ?? "") : exfRequestDraftNotes,
       notesReadOnly: isView,
@@ -610,6 +612,7 @@ function buildExfRequestModalLayout({ exfDate, vendor, linkedPos, showAddPanel =
       onSelectionChange: updateExfRequestModalActionButtons,
       selectAllId: "exfRequestAvailablePoSelectAll",
       qtyCol: "Actual Qty",
+      showTableFooter: false,
     }));
   }
 
@@ -739,13 +742,6 @@ function updateExfRequestModalActionButtons() {
   if (removeBtn) removeBtn.hidden = linkedSelected === 0;
 }
 
-function getExfRequestLinkedPoTotals(pos) {
-  return pos.reduce((totals, row) => {
-    totals.totalQty += toQtyNumber(row["PO Qty"]);
-    return totals;
-  }, { totalQty: 0 });
-}
-
 function applyExfRequestShipMethodToAll(shipMethod) {
   if (isEmptyValue(shipMethod)) return;
   document
@@ -804,43 +800,15 @@ function renderExfRequestSetAllShipMethodControl() {
 }
 
 function renderExfRequestLinkedPoFooter(pos) {
-  const totals = getExfRequestLinkedPoTotals(pos);
+  if (!pos.length) return null;
+
   const footer = document.createElement("footer");
   footer.className = "shipment-linked-po-footer";
 
   const actions = document.createElement("div");
   actions.className = "shipment-linked-po-footer-actions";
-
-  if (pos.length > 0) {
-    actions.appendChild(renderExfRequestSetAllShipMethodControl());
-  }
-
-  if (actions.childElementCount > 0) {
-    footer.appendChild(actions);
-  }
-
-  const totalsWrap = document.createElement("div");
-  totalsWrap.className = "shipment-linked-po-footer-totals";
-  [
-    ["Total Qty", totals.totalQty],
-    ["PO Count", pos.length],
-  ].forEach(([label, value]) => {
-    const item = document.createElement("div");
-    item.className = "shipment-linked-po-footer-item";
-
-    const labelEl = document.createElement("span");
-    labelEl.className = "shipment-linked-po-footer-label";
-    labelEl.textContent = label;
-
-    const valueEl = document.createElement("span");
-    valueEl.className = "shipment-linked-po-footer-value";
-    valueEl.textContent = formatShipmentLinkedPoTotal(value);
-
-    item.appendChild(labelEl);
-    item.appendChild(valueEl);
-    totalsWrap.appendChild(item);
-  });
-  footer.appendChild(totalsWrap);
+  actions.appendChild(renderExfRequestSetAllShipMethodControl());
+  footer.appendChild(actions);
 
   return footer;
 }
@@ -928,10 +896,9 @@ function renderExfRequestLinkedPoSection(pos, isView = false) {
   }
   headRow.appendChild(selectTh);
 
-  EXF_REQUEST_LINKED_PO_COLUMNS.forEach(({ label, cellClass }) => {
+  EXF_REQUEST_LINKED_PO_COLUMNS.forEach(({ col, label, cellClass }) => {
     const th = document.createElement("th");
-    th.textContent = label;
-    if (cellClass) th.className = cellClass;
+    renderLinkedPoTableHeaderCell(th, { label, col, cellClass });
     headRow.appendChild(th);
   });
   thead.appendChild(headRow);
@@ -974,12 +941,12 @@ function renderExfRequestLinkedPoSection(pos, isView = false) {
   });
 
   table.appendChild(tbody);
-  if (pos.length > 0) {
-    appendEmailPoTableFooter(table, pos, EXF_REQUEST_LINKED_PO_COLUMNS, { hasSelectCol: true, qtyCol: "Actual Qty" });
-  }
   wrap.appendChild(table);
   section.appendChild(wrap);
-  if (!isView) section.appendChild(renderExfRequestLinkedPoFooter(pos));
+  if (!isView) {
+    const footer = renderExfRequestLinkedPoFooter(pos);
+    if (footer) section.appendChild(footer);
+  }
   if (!isView) updateExfRequestLinkedPoSelectAllHeader(pos);
   return section;
 }

@@ -1831,7 +1831,7 @@ function assertRowsHavePackingLists_(rows) {
 
 function isDeliveryPickupStatus_(row) {
   const status = String(row["Status"] ?? "").trim();
-  return status === "OTW" || status === "Arrived at Port";
+  return status === "OTW";
 }
 
 function isFreesiaDivision_(row) {
@@ -1842,7 +1842,7 @@ function assertRowsEligibleForAsnRequest_(rows) {
   assertRowsHavePackingLists_(rows);
   rows.forEach(row => {
     if (!isDeliveryPickupStatus_(row) || !isFreesiaDivision_(row)) {
-      throw new Error("PO " + row["PO #"] + " must be Freesia with Status OTW or Arrived at Port.");
+      throw new Error("PO " + row["PO #"] + " must be Freesia with Status OTW.");
     }
     if (String(row[ASN_REQUEST_ID_FIELD] ?? "").trim()) {
       throw new Error("PO " + row["PO #"] + " already has an ASN request.");
@@ -1857,7 +1857,7 @@ function assertRowsEligibleForDeliveryPickupRequest_(rows) {
   assertRowsHavePackingLists_(rows);
   rows.forEach(row => {
     if (!isDeliveryPickupStatus_(row)) {
-      throw new Error("PO " + row["PO #"] + " must have Status OTW or Arrived at Port.");
+      throw new Error("PO " + row["PO #"] + " must have Status OTW.");
     }
     if (String(row[DELIVERY_REQUEST_ID_FIELD] ?? "").trim() || String(row[PICKUP_REQUEST_ID_FIELD] ?? "").trim()) {
       throw new Error("PO " + row["PO #"] + " already has a delivery or pickup request.");

@@ -6,10 +6,10 @@ const DELIVERY_REQUEST_ID_FIELD = "Delivery Request ID";
 const PICKUP_REQUEST_ID_FIELD = "Pickup Request ID";
 
 const SHIPPED_GROUP_STATUSES = new Set([
-  "OTW", "Arrived at Port", "Scheduled",
+  "OTW", "Scheduled",
 ]);
 
-const DELIVERY_REQUEST_ELIGIBLE_STATUSES = new Set(["OTW", "Arrived at Port"]);
+const DELIVERY_REQUEST_ELIGIBLE_STATUSES = new Set(["OTW"]);
 const ASN_REQUEST_BUYERS = new Set(["LULU'S FASHION LOUNGE", "12TH TRIBE"]);
 
 const SHIPMENT_REQUIRED_FIELDS = ["Ship Method", "Shipped", "ETD", "ETA", "IHD"];
@@ -19,7 +19,6 @@ const STATUS_MANUAL_TRANSITIONS = {
   Hold: ["CXL", "WIP"],
   WIP: ["Hold", "CXL"],
   OTW: ["In Warehouse", "Hold", "CXL", "Closed"],
-  "Arrived at Port": ["In Warehouse", "Hold", "CXL", "Closed"],
   Scheduled: ["In Warehouse", "Hold", "CXL", "Closed"],
   "In Warehouse": ["Hold", "CXL", "Closed"],
   Assigned: ["In Warehouse", "Hold", "CXL", "Closed"],
@@ -66,6 +65,7 @@ function syncAllStatusClosedFromN41(rows) {
 function migrateLegacyStatusValue(status, row) {
   const s = String(status ?? "").trim();
   if (s === "Received") return "In Warehouse";
+  if (s === "Arrived at Port") return "OTW";
   if (s === "Shipped") {
     const hasShipment = typeof poHasShipment === "function" && poHasShipment(row);
     return hasShipment ? "OTW" : "In Warehouse";
@@ -276,15 +276,6 @@ function collectAutomaticStatusUpdates(rows, shipments) {
 
     const status = getRowStatus(row);
     const updates = {};
-
-    if (status === "OTW") {
-      const shipmentId = getPoShipmentId(row);
-      const shipment = shipments?.find(s => String(s[SHIPMENT_ID_FIELD] ?? "").trim() === shipmentId);
-      const eta = shipment?.ETA ?? row["ETA"];
-      if (isDateOnOrBeforeToday(eta)) {
-        updates.Status = "Arrived at Port";
-      }
-    }
 
     if (status === "Assigned") {
       const assignDate = getPickupRequestDateForRow(row);

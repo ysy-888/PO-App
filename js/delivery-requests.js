@@ -212,7 +212,7 @@ function openDeliveryRequestFromSelection() {
   if (isAppSaving() || isToolbarCreateActionBlocked()) return;
   const selected = getCheckedFilteredPos();
   if (!areRowsEligibleForDeliveryRequest(selected)) {
-    showIndicator("Select Elevator Disco OTW or Arrived at Port POs with packing lists", "error");
+    showIndicator("Select Elevator Disco OTW POs with packing lists", "error");
     return;
   }
   deliveryRequestPoNumbers = selected.map(row => row["PO #"]);
@@ -311,6 +311,8 @@ function renderDeliveryRequestModal(poNumbers, request = {}) {
     buildEmailStyleForm({
       formId: "deliveryRequestForm",
       metaRows,
+      totalsRows: createRequestFormTotalsMetaRows(pos),
+      separateTotals: true,
       notesField: DELIVERY_REQ_NOTES_FIELD,
       notesValue: isExisting
         ? (activeRequest[DELIVERY_REQ_NOTES_FIELD] ?? "")
@@ -330,6 +332,7 @@ function renderDeliveryRequestModal(poNumbers, request = {}) {
       selection: deliveryRequestAvailablePoSelection,
       onSelectionChange: updateDeliveryRequestActionButtons,
       selectAllId: "deliveryRequestAvailablePoSelectAll",
+      showTableFooter: false,
     }));
   }
 
@@ -456,10 +459,9 @@ function renderDeliveryRequestLinkedPoSection(pos, isReadOnly = false) {
   }
 
   headRow.appendChild(selectTh);
-  DELIVERY_PICKUP_LINKED_PO_COLUMNS.forEach(({ label, cellClass }) => {
+  DELIVERY_PICKUP_LINKED_PO_COLUMNS.forEach(({ col, label, cellClass }) => {
     const th = document.createElement("th");
-    th.textContent = label;
-    if (cellClass) th.className = cellClass;
+    renderLinkedPoTableHeaderCell(th, { label, col, cellClass });
     headRow.appendChild(th);
   });
   thead.appendChild(headRow);
@@ -487,9 +489,6 @@ function renderDeliveryRequestLinkedPoSection(pos, isReadOnly = false) {
   });
 
   table.appendChild(tbody);
-  if (pos.length > 0) {
-    appendEmailPoTableFooter(table, pos, DELIVERY_PICKUP_LINKED_PO_COLUMNS, { hasSelectCol: true });
-  }
   wrap.appendChild(table);
   section.appendChild(wrap);
   return section;

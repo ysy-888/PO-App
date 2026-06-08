@@ -307,9 +307,19 @@ function renderShipmentIdCell(td, row) {
   td.appendChild(btn);
 }
 
-let currentRequestType = "exf"; // "exf" | "asn" | "delivery" | "pickup"
+/** @type {null | "exf" | "asn" | "delivery" | "pickup"} */
+let currentRequestType = null;
+
+function clearRequestTypeSelection() {
+  currentRequestType = null;
+  ["exf", "asn", "delivery", "pickup"].forEach(t => {
+    const btn = document.querySelector(`[data-request-type="${t}"]`);
+    if (btn) btn.classList.remove("active");
+  });
+}
 
 function switchRequestType(type) {
+  if (!type) return;
   currentRequestType = type;
 
   ["exf", "asn", "delivery", "pickup"].forEach(t => {
@@ -342,6 +352,10 @@ function switchRequestType(type) {
 function updateRequestsRowCounter() {
   const counterEl = document.getElementById("requestsRowCounter");
   if (!counterEl) return;
+  if (!currentRequestType) {
+    counterEl.textContent = "— requests";
+    return;
+  }
   let count = 0;
   let label = "requests";
   if (currentRequestType === "exf") {
@@ -429,8 +443,13 @@ function switchAppView(view) {
   packingReviewTab?.classList.toggle("is-active", view === "packingReviews");
   packingReviewTab?.setAttribute("aria-selected", view === "packingReviews" ? "true" : "false");
 
+  if (view !== "requests") {
+    clearRequestTypeSelection();
+  } else if (currentRequestType) {
+    switchRequestType(currentRequestType);
+  }
+
   if (view === "shipments") applyShipmentFilters();
-  if (view === "requests") switchRequestType(currentRequestType);
   if (view === "chargebacks") applyChargebackFilters();
   if (view === "packingReviews" && typeof applyPackingReviewFilters === "function") applyPackingReviewFilters();
   updateDeleteShipmentButton();

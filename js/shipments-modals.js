@@ -138,7 +138,15 @@ function bindCreateShipmentEnterNavigation(form) {
   });
 }
 
-function buildShipmentFormEdit(shipment, formId, { lockExfDate = false } = {}) {
+function createShipmentFormTotalsMetaRows(pos) {
+  const totals = getShipmentLinkedPoTotals(pos);
+  return createLinkedPoTotalsMetaRows(pos, {
+    totalQty: totals.orderQty,
+    ctnQty: totals.ctnQty,
+  });
+}
+
+function buildShipmentFormEdit(shipment, formId, { lockExfDate = false, linkedPos = [] } = {}) {
   const hasExfLink = Boolean(String(shipment[SHIPMENT_EXF_REQUEST_ID_FIELD] ?? "").trim());
   const exfReadOnly = lockExfDate || hasExfLink;
   const metaRows = [];
@@ -156,6 +164,8 @@ function buildShipmentFormEdit(shipment, formId, { lockExfDate = false } = {}) {
   const form = buildEmailStyleForm({
     formId,
     metaRows,
+    totalsRows: createShipmentFormTotalsMetaRows(linkedPos),
+    separateTotals: true,
     notesField: "Notes",
     notesValue: shipment["Notes"] ?? "",
   });
@@ -171,9 +181,10 @@ function buildShipmentModalLayout({ shipment = {}, formId, linkedSource, showAdd
   const outer = document.createElement("div");
   outer.className = "shipment-modal-outer";
   outer.id = "shipmentModalOuter";
+  const linkedPos = getLinkedPoRows(linkedSource);
 
   outer.appendChild(buildShipmentModalSplitLayout(
-    buildShipmentFormEdit(shipment, formId, { lockExfDate }),
+    buildShipmentFormEdit(shipment, formId, { lockExfDate, linkedPos }),
     renderShipmentLinkedPoSection(linkedSource)
   ));
 
@@ -875,10 +886,9 @@ function renderShipmentLinkedPoSection(source) {
   selectTh.appendChild(selectAllCb);
   headRow.appendChild(selectTh);
 
-  SHIPMENT_LINKED_PO_COLUMNS.forEach(({ label, cellClass }) => {
+  SHIPMENT_LINKED_PO_COLUMNS.forEach(({ col, label, cellClass }) => {
     const th = document.createElement("th");
-    th.textContent = label;
-    if (cellClass) th.className = cellClass;
+    renderLinkedPoTableHeaderCell(th, { label, col, cellClass });
     headRow.appendChild(th);
   });
   thead.appendChild(headRow);
@@ -916,9 +926,6 @@ function renderShipmentLinkedPoSection(source) {
     tbody.appendChild(tr);
   });
   table.appendChild(tbody);
-  if (count > 0) {
-    appendEmailPoTableFooter(table, pos, SHIPMENT_LINKED_PO_COLUMNS, { hasSelectCol: true, qtyCol: "Actual Qty" });
-  }
   wrap.appendChild(table);
   section.appendChild(wrap);
   updateShipmentLinkedPoSelectAllHeader(pos);

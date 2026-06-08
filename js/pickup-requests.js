@@ -244,7 +244,7 @@ function openPickupRequestFromSelection() {
   if (isAppSaving() || isToolbarCreateActionBlocked()) return;
   const selected = getCheckedFilteredPos();
   if (!areRowsEligibleForPickupRequest(selected)) {
-    showIndicator("Select LULU'S FASHION LOUNGE or 12TH TRIBE OTW or Arrived at Port POs with packing lists and ASN requests submitted", "error");
+    showIndicator("Select LULU'S FASHION LOUNGE or 12TH TRIBE OTW POs with packing lists and ASN requests submitted", "error");
     return;
   }
   pickupRequestPoNumbers = selected.map(row => row["PO #"]);
@@ -345,6 +345,8 @@ function renderPickupRequestModal(poNumbers, request = {}) {
     buildEmailStyleForm({
       formId: "pickupRequestForm",
       metaRows,
+      totalsRows: createRequestFormTotalsMetaRows(pos),
+      separateTotals: true,
       notesField: PICKUP_REQ_NOTES_FIELD,
       notesValue: isExisting
         ? (activeRequest[PICKUP_REQ_NOTES_FIELD] ?? "")
@@ -364,6 +366,7 @@ function renderPickupRequestModal(poNumbers, request = {}) {
       selection: pickupRequestAvailablePoSelection,
       onSelectionChange: updatePickupRequestActionButtons,
       selectAllId: "pickupRequestAvailablePoSelectAll",
+      showTableFooter: false,
     }));
   }
 
@@ -495,10 +498,9 @@ function renderPickupRequestLinkedPoSection(pos, isReadOnly = false) {
   }
 
   headRow.appendChild(selectTh);
-  DELIVERY_PICKUP_LINKED_PO_COLUMNS.forEach(({ label, cellClass }) => {
+  DELIVERY_PICKUP_LINKED_PO_COLUMNS.forEach(({ col, label, cellClass }) => {
     const th = document.createElement("th");
-    th.textContent = label;
-    if (cellClass) th.className = cellClass;
+    renderLinkedPoTableHeaderCell(th, { label, col, cellClass });
     headRow.appendChild(th);
   });
   thead.appendChild(headRow);
@@ -526,9 +528,6 @@ function renderPickupRequestLinkedPoSection(pos, isReadOnly = false) {
   });
 
   table.appendChild(tbody);
-  if (pos.length > 0) {
-    appendEmailPoTableFooter(table, pos, DELIVERY_PICKUP_LINKED_PO_COLUMNS, { hasSelectCol: true });
-  }
   wrap.appendChild(table);
   section.appendChild(wrap);
   return section;

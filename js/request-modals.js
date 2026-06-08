@@ -182,6 +182,52 @@ function createRequestFormMetaRow(label, fieldName, value, { type = "text", read
   return { tr, input };
 }
 
+function createRequestFormDisplayMetaRow(label, displayValue) {
+  const { tr, valueTd } = createFormMetaRow(label);
+  const span = document.createElement("span");
+  span.className = "request-form-display-value";
+  span.textContent = displayValue;
+  valueTd.appendChild(span);
+  return tr;
+}
+
+const LINKED_PO_SPLIT_HEADER_COLS = {
+  "PO Qty": ["ORD", "QTY"],
+  "Actual Qty": ["ACT", "QTY"],
+  "Ctn Qty": ["CTN", "QTY"],
+};
+
+function renderLinkedPoTableHeaderCell(th, { label, col, cellClass }) {
+  if (cellClass) th.className = cellClass;
+  const lines = LINKED_PO_SPLIT_HEADER_COLS[col];
+  if (lines) {
+    th.classList.add("linked-po-th--split");
+    const span = document.createElement("span");
+    span.className = "linked-po-th-split-label";
+    span.append(lines[0], document.createElement("br"), lines[1]);
+    th.appendChild(span);
+    return;
+  }
+  th.textContent = label;
+}
+
+function createLinkedPoTotalsMetaRows(pos, { totalQty = 0, ctnQty = 0 } = {}) {
+  if (!pos?.length) return [];
+  return [
+    createRequestFormDisplayMetaRow("PO Count", String(pos.length)),
+    createRequestFormDisplayMetaRow("Total CTN Qty", formatShipmentLinkedPoTotal(ctnQty)),
+    createRequestFormDisplayMetaRow("Total Qty", formatShipmentLinkedPoTotal(totalQty)),
+  ];
+}
+
+function createRequestFormTotalsMetaRows(pos) {
+  const totals = getRequestLinkedPoTotals(pos);
+  return createLinkedPoTotalsMetaRows(pos, {
+    totalQty: totals.orderQty,
+    ctnQty: totals.ctnQty,
+  });
+}
+
 function createFormNotesPanel(fieldName, value, { readOnly = false } = {}) {
   const panel = document.createElement("div");
   panel.className = "email-notes-panel";
@@ -205,9 +251,29 @@ function createFormNotesPanel(fieldName, value, { readOnly = false } = {}) {
 const REQUEST_FORM_META_LABEL_WIDTH = 110;
 const REQUEST_FORM_META_VALUE_WIDTH = 240;
 
+function createRequestFormMetaTable(rows, { requestForm = false, extraClass = "" } = {}) {
+  const table = document.createElement("table");
+  table.className = `email-meta${extraClass ? ` ${extraClass}` : ""}`.trim();
+  if (requestForm) {
+    const colgroup = document.createElement("colgroup");
+    [REQUEST_FORM_META_LABEL_WIDTH, REQUEST_FORM_META_VALUE_WIDTH].forEach(width => {
+      const col = document.createElement("col");
+      col.style.width = `${width}px`;
+      colgroup.appendChild(col);
+    });
+    table.appendChild(colgroup);
+  }
+  const tbody = document.createElement("tbody");
+  rows.forEach(row => tbody.appendChild(row));
+  table.appendChild(tbody);
+  return table;
+}
+
 function buildEmailStyleForm({
   formId,
   metaRows = [],
+  totalsRows = [],
+  separateTotals = false,
   notesField = null,
   notesValue = "",
   notesReadOnly = false,
@@ -225,21 +291,19 @@ function buildEmailStyleForm({
   metaWrap.className = "email-info-meta";
   if (!notesField) metaWrap.classList.add("email-info-meta--full");
 
-  const table = document.createElement("table");
-  table.className = "email-meta";
-  if (requestForm) {
-    const colgroup = document.createElement("colgroup");
-    [REQUEST_FORM_META_LABEL_WIDTH, REQUEST_FORM_META_VALUE_WIDTH].forEach(width => {
-      const col = document.createElement("col");
-      col.style.width = `${width}px`;
-      colgroup.appendChild(col);
-    });
-    table.appendChild(colgroup);
+  const metaTable = createRequestFormMetaTable(metaRows, { requestForm });
+  metaWrap.appendChild(metaTable);
+  if (totalsRows.length > 0) {
+    if (separateTotals) {
+      metaWrap.appendChild(createRequestFormMetaTable(totalsRows, {
+        requestForm,
+        extraClass: "request-form-totals-meta",
+      }));
+    } else {
+      const tbody = metaTable.querySelector("tbody");
+      totalsRows.forEach(row => tbody.appendChild(row));
+    }
   }
-  const tbody = document.createElement("tbody");
-  metaRows.forEach(row => tbody.appendChild(row));
-  table.appendChild(tbody);
-  metaWrap.appendChild(table);
   infoRow.appendChild(metaWrap);
 
   if (notesField) {
@@ -422,32 +486,6 @@ function appendEmailPoTableFooter(table, pos, colDefs, { hasSelectCol = false, q
   return tfoot;
 }
 
-function renderRequestLinkedPoFooterTotals(pos) {
-  const totals = getRequestLinkedPoTotals(pos);
-  const wrap = document.createElement("div");
-  wrap.className = "shipment-linked-po-footer-totals";
-  [
-    ["Unit Qty", totals.unitQty],
-    ["Ctn Qty", totals.ctnQty],
-    ["Total Weight", totals.totalWeight > 0 ? `${totals.totalWeight} lbs` : EMPTY_DISPLAY],
-    ["PO Count", pos.length],
-  ].forEach(([label, value]) => {
-    const item = document.createElement("div");
-    item.className = "shipment-linked-po-footer-item";
-    const labelEl = document.createElement("span");
-    labelEl.className = "shipment-linked-po-footer-label";
-    labelEl.textContent = label;
-    const valueEl = document.createElement("span");
-    valueEl.className = "shipment-linked-po-footer-value";
-    valueEl.textContent = typeof value === "number"
-      ? formatShipmentLinkedPoTotal(value)
-      : String(value);
-    item.appendChild(labelEl);
-    item.appendChild(valueEl);
-    wrap.appendChild(item);
-  });
-  return wrap;
-}
 
 /** @deprecated Use createRequestFormMetaRow + buildEmailStyleForm instead. */
 function createRequestFormField(label, fieldName, value, { type = "text", readOnly = false } = {}) {
@@ -512,10 +550,9 @@ function renderRequestLinkedPoTable(pos, { columns } = {}) {
 
   const thead = document.createElement("thead");
   const headRow = document.createElement("tr");
-  colDefs.forEach(({ label, cellClass }) => {
+  colDefs.forEach(({ col, label, cellClass }) => {
     const th = document.createElement("th");
-    th.textContent = label;
-    if (cellClass) th.className = cellClass;
+    renderLinkedPoTableHeaderCell(th, { label, col, cellClass });
     headRow.appendChild(th);
   });
   thead.appendChild(headRow);
@@ -540,9 +577,6 @@ function renderRequestLinkedPoTable(pos, { columns } = {}) {
     tbody.appendChild(tr);
   });
   table.appendChild(tbody);
-  if (pos.length > 0) {
-    appendEmailPoTableFooter(table, pos, colDefs, { qtyCol: "PO Qty" });
-  }
   wrap.appendChild(table);
   section.appendChild(wrap);
   return section;
@@ -578,6 +612,8 @@ function buildRequestModalLayout({
   const form = buildEmailStyleForm({
     formId,
     metaRows,
+    totalsRows: createRequestFormTotalsMetaRows(linkedPos),
+    separateTotals: true,
     notesField,
     notesValue,
     notesReadOnly,
@@ -649,6 +685,7 @@ function renderAvailablePoLinkedSection(pos, {
   selectAllId = "",
   qtyCol = "Actual Qty",
   sectionLabel = "Available POs",
+  showTableFooter = true,
 } = {}) {
   const section = document.createElement("section");
   section.className = "shipment-linked-pos shipment-add-po-section";
@@ -704,10 +741,9 @@ function renderAvailablePoLinkedSection(pos, {
   selectTh.appendChild(selectAllCb);
   headRow.appendChild(selectTh);
 
-  columns.forEach(({ label, cellClass }) => {
+  columns.forEach(({ col, label, cellClass }) => {
     const th = document.createElement("th");
-    th.textContent = label;
-    if (cellClass) th.className = cellClass;
+    renderLinkedPoTableHeaderCell(th, { label, col, cellClass });
     headRow.appendChild(th);
   });
   thead.appendChild(headRow);
@@ -735,7 +771,7 @@ function renderAvailablePoLinkedSection(pos, {
   });
   table.appendChild(tbody);
 
-  if (pos.length > 0) {
+  if (pos.length > 0 && showTableFooter) {
     appendEmailPoTableFooter(table, pos, columns, { hasSelectCol: true, qtyCol });
   }
 
