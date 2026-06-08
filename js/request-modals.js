@@ -427,7 +427,7 @@ const DELIVERY_PICKUP_LINKED_PO_COLUMNS = [
 
 /** Select col + linked PO cols for ASN / pickup / delivery request modals. */
 const DELIVERY_PICKUP_LINKED_PO_COLUMN_WIDTHS = [
-  52, 52, 100, 96, 80, 72, 108, 72, 72, 58, 58, 58,
+  52, 52, 100, 96, 80, 72, 108, 72, 72, 64, 64, 64,
 ];
 
 function appendDeliveryPickupLinkedPoColgroup(table) {

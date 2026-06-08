@@ -27,7 +27,7 @@
     width: 816px;
     min-height: 1056px;
     margin: 0;
-    padding: 0;
+    padding: 48px;
     page-break-after: always;
     background: #ffffff;
   }
@@ -35,28 +35,19 @@
   .pdf-page-last {
     page-break-after: auto;
   }
-  .pdf-page-inner {
-    width: 100%;
-    min-height: 1056px;
-    display: table;
-    border-collapse: collapse;
-  }
-  .pdf-page-body {
-    display: table-row;
-  }
-  .pdf-page-body > td {
-    vertical-align: top;
-    padding: 0 14px 14px;
+  .pdf-page-content {
+    padding-top: 18px;
   }
   .pdf-header {
     width: 100%;
-    background-color: #2d2d29;
-    color: #ffffff;
+    background-color: #ffffff;
+    color: #1a1a18;
+    border-bottom: 1px solid #e5e7eb;
   }
   .pdf-header td {
-    padding: 10px 14px;
+    padding: 10px 0;
     vertical-align: middle;
-    background-color: #2d2d29;
+    background-color: #ffffff;
   }
   .pdf-header-brand {
     margin: 0 0 3px;
@@ -64,7 +55,7 @@
     font-weight: 700;
     letter-spacing: 0.16em;
     text-transform: uppercase;
-    color: #ffffff;
+    color: #1a1a18;
   }
   .pdf-header-title {
     margin: 0;
@@ -72,43 +63,70 @@
     font-weight: 600;
     letter-spacing: 0.05em;
     text-transform: uppercase;
-    color: #d4d9df;
+    color: #374151;
   }
   .pdf-header-po {
     font-size: 10px;
     font-weight: 500;
-    color: #ffffff;
+    color: #1a1a18;
     text-align: right;
   }
   .pdf-header-sub {
     margin-top: 2px;
     font-size: 9px;
     font-weight: 500;
-    color: #d4d9df;
+    color: #6b7280;
     text-align: right;
   }
+  .pdf-page p {
+    margin: 0;
+  }
   .pdf-section-title {
-    margin: 8px 0 3px;
+    margin: 0 0 10px;
     font-size: 8px;
     font-weight: 600;
     letter-spacing: 0.05em;
     text-transform: uppercase;
     color: #374151;
   }
-  .pdf-summary {
-    width: auto;
-    max-width: 100%;
+  .pdf-section-block {
+    margin-bottom: 20px;
+  }
+  .pdf-section-block:last-child {
+    margin-bottom: 0;
+  }
+  .pdf-details-block {
+    margin-bottom: 20px;
+  }
+  .pdf-packing-block {
+    margin-top: 4px;
+  }
+  .pdf-summary-grid {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 12px 0;
+    table-layout: fixed;
+  }
+  .pdf-summary-grid-cell {
+    width: 33.33%;
+    vertical-align: top;
+  }
+  .pdf-summary-grid--2col .pdf-summary-grid-cell {
+    width: 50%;
+  }
+  .pdf-summary-col {
+    width: 100%;
     border-collapse: collapse;
     border: 1px solid #e5e7eb;
     table-layout: fixed;
     font-size: 9px;
   }
-  .pdf-summary td {
-    padding: 2px 5px;
+  .pdf-summary-col td {
+    padding: 4px 8px;
     border-bottom: 1px solid #e5e7eb;
     vertical-align: middle;
   }
-  .pdf-summary tr:last-child td {
+  .pdf-summary-col tr:last-child td {
     border-bottom: none;
   }
   .pdf-summary-label {
@@ -121,8 +139,6 @@
     white-space: nowrap;
   }
   .pdf-summary-value {
-    width: 68px;
-    max-width: 68px;
     font-size: 9px;
     color: #1a1a18;
     background-color: #ffffff;
@@ -136,10 +152,9 @@
     border: 1px solid #e5e7eb;
     table-layout: fixed;
     font-size: 9px;
-    margin-top: 2px;
   }
   .pdf-carton-table th {
-    padding: 3px 4px;
+    padding: 6px 8px;
     font-size: 8px;
     font-weight: 600;
     letter-spacing: 0.02em;
@@ -152,17 +167,36 @@
     text-overflow: ellipsis;
   }
   .pdf-carton-table td {
-    padding: 3px 4px;
+    padding: 6px 8px;
     border-bottom: 1px solid #e5e7eb;
     color: #1a1a18;
     font-size: 9px;
     vertical-align: middle;
   }
+  .pdf-carton-table th.pdf-size-col,
+  .pdf-carton-table td.pdf-size-col {
+    padding: 6px 8px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .pdf-carton-table th.pdf-wt-col,
+  .pdf-carton-table td.pdf-wt-col {
+    padding: 6px 12px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .pdf-title-table th,
+  .pdf-title-table td {
+    text-align: center;
+  }
+  .pdf-title-table tbody td {
+    color: #1a1a18;
+  }
   .pdf-carton-table tbody tr:last-child td {
     border-bottom: none;
   }
   .pdf-carton-table tfoot td {
-    padding: 3px 4px;
+    padding: 6px 8px;
     font-size: 9px;
     font-weight: 600;
     color: #1a1a18;
@@ -180,9 +214,12 @@
     font-variant-numeric: tabular-nums;
     color: #6b7280;
   }
+  .pdf-carton-table tbody td.pdf-center {
+    color: #1a1a18;
+  }
   .pdf-notes {
-    margin-top: 6px;
-    padding: 6px 8px;
+    margin-top: 16px;
+    padding: 8px 10px;
     border: 1px solid #e5e7eb;
     border-radius: 3px;
     font-size: 9px;
@@ -193,7 +230,7 @@
     letter-spacing: 0.05em;
     text-transform: uppercase;
     color: #374151;
-    margin-bottom: 3px;
+    margin-bottom: 4px;
   }
   .pdf-empty {
     font-size: 9px;

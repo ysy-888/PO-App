@@ -738,7 +738,8 @@ function updateExfRequestModalActionButtons() {
   if (addSelectedBtn) addSelectedBtn.hidden = true;
 
   const linkedSelected = getExfRequestRows().filter(isExfRequestRowSelected).length;
-  if (addBtn) addBtn.hidden = linkedSelected > 0;
+  const hasAvailablePos = getAvailableExfRequestPanelRows().length > 0;
+  if (addBtn) addBtn.hidden = linkedSelected > 0 || !hasAvailablePos;
   if (removeBtn) removeBtn.hidden = linkedSelected === 0;
 }
 

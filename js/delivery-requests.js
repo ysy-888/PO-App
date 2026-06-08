@@ -340,15 +340,18 @@ function renderDeliveryRequestModal(poNumbers, request = {}) {
   setDeliveryRequestModalAddPanelClass(body, deliveryRequestAddPoPanelOpen);
   setRequestModalPoCount(document.getElementById("deliveryRequestPoCount"), pos.length);
 
-  const printBtn = document.getElementById("deliveryRequestPrintBtn");
-  if (printBtn) {
-    const hasPacking = poNumbers.length > 0;
-    printBtn.hidden = !hasPacking;
-    printBtn.onclick = () => {
-      if (typeof printPackingList === "function") {
-        printPackingList({ poNumbers: poNumbers.slice(), mode: "group" });
-      }
-    };
+  const titleLabel = String(document.getElementById("deliveryRequestModalId")?.textContent ?? "").trim() || "Delivery Request";
+  const deliveryForm = document.getElementById("deliveryRequestForm");
+  const deliveryFormData = deliveryForm ? readRequestForm(deliveryForm) : {};
+  if (typeof wirePackingListPrintButton === "function") {
+    wirePackingListPrintButton("deliveryRequestPrintBtn", {
+      poNumbers: poNumbers.slice(),
+      titleLabel,
+      includeTitlePage: true,
+      titlePageType: "Delivery",
+      typeDate: deliveryFormData[DELIVERY_DATE_FIELD] ?? (isExisting ? activeRequest[DELIVERY_DATE_FIELD] : deliveryRequestDraftDeliveryDate),
+      requestDate: deliveryFormData[DELIVERY_REQ_SUBMIT_DATE_FIELD] ?? (isExisting ? activeRequest[DELIVERY_REQ_SUBMIT_DATE_FIELD] : submitDate),
+    });
   }
 
   bringModalToFront(document.getElementById("deliveryRequestOverlay"));
@@ -526,7 +529,8 @@ function updateDeliveryRequestActionButtons() {
   const anySelected = deliveryRequestPoNumbers
     .map(po => allRows.find(r => String(r["PO #"]) === String(po)))
     .some(row => row && isDeliveryFormPoSelected(row));
-  if (addBtn) addBtn.hidden = anySelected;
+  const hasAvailablePos = getAvailableDeliveryRequestPanelRows().length > 0;
+  if (addBtn) addBtn.hidden = anySelected || !hasAvailablePos;
   if (removeBtn) removeBtn.hidden = !anySelected;
 }
 

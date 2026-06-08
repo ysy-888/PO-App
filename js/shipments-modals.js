@@ -245,6 +245,38 @@ function clearShipmentFooterMessage(id) {
   clearModalFooterMessageForOverlay(overlay || id);
 }
 
+function updateShipmentPackingListPrintBtn(scope) {
+  const isCreate = scope === "create";
+  const btnId = isCreate ? "createShipmentPrintBtn" : "shipmentModalPrintBtn";
+  let poNumbers = [];
+  let titleLabel = "Shipment";
+  let typeDate = "";
+
+  if (isCreate) {
+    poNumbers = createShipmentPoNumbers.slice();
+    titleLabel = "New Shipment";
+    const form = document.getElementById("createShipmentForm");
+    typeDate = form ? readShipmentForm(form).EXF : "";
+  } else if (shipmentModalRow) {
+    poNumbers = getLinkedPoRows(shipmentModalRow).map(row => row["PO #"]);
+    const shipmentId = String(shipmentModalRow[SHIPMENT_ID_FIELD] ?? "").trim();
+    titleLabel = shipmentId ? `Shipment ${shipmentId}` : "Shipment";
+    const form = document.getElementById("shipmentEditForm");
+    typeDate = form ? readShipmentForm(form).EXF : (shipmentModalRow.EXF ?? "");
+  }
+
+  if (typeof wirePackingListPrintButton === "function") {
+    wirePackingListPrintButton(btnId, {
+      poNumbers,
+      titleLabel,
+      includeTitlePage: true,
+      titlePageType: "Shipment",
+      typeDate,
+      requestDate: "",
+    });
+  }
+}
+
 function updateShipmentModalActionButtons() {
   const { addBtn, removeBtn, doneBtn, addSelectedBtn } = getActiveShipmentModalButtons();
   if (!addBtn && !removeBtn && !doneBtn && !addSelectedBtn) return;
@@ -327,6 +359,7 @@ function rerenderOpenShipmentModalBody() {
       setShipmentModalAddPanelClass(body, shipmentAddPoPanelOpen);
     }
     setShipmentModalPoCount(document.getElementById("createShipmentPoCount"), pos);
+    updateShipmentPackingListPrintBtn("create");
     return;
   }
 
@@ -342,6 +375,7 @@ function rerenderOpenShipmentModalBody() {
     }));
     setShipmentModalAddPanelClass(detailBody, shipmentAddPoPanelOpen);
     setShipmentModalPoCount(document.getElementById("shipmentModalPoCount"), shipmentModalRow);
+    updateShipmentPackingListPrintBtn("detail");
   }
 }
 
@@ -538,6 +572,7 @@ function renderCreateShipmentModal(poNumbers, { exfRequestId = "", exfDate = "",
   });
   setShipmentModalAddPanelClass(body, false);
   setShipmentModalPoCount(document.getElementById("createShipmentPoCount"), pos);
+  updateShipmentPackingListPrintBtn("create");
 
   bringModalToFront(document.getElementById("createShipmentOverlay"));
   updateShipmentModalActionButtons();
@@ -953,6 +988,7 @@ function renderShipmentModalContent(shipment) {
     lockExfDate: Boolean(String(shipment[SHIPMENT_EXF_REQUEST_ID_FIELD] ?? "").trim()),
   }));
   setShipmentModalAddPanelClass(body, false);
+  updateShipmentPackingListPrintBtn("detail");
   updateShipmentModalActionButtons();
 }
 

@@ -374,15 +374,18 @@ function renderPickupRequestModal(poNumbers, request = {}) {
   setPickupRequestModalAddPanelClass(body, pickupRequestAddPoPanelOpen);
   setRequestModalPoCount(document.getElementById("pickupRequestPoCount"), pos.length);
 
-  const printBtn = document.getElementById("pickupRequestPrintBtn");
-  if (printBtn) {
-    const hasPacking = poNumbers.length > 0;
-    printBtn.hidden = !hasPacking;
-    printBtn.onclick = () => {
-      if (typeof printPackingList === "function") {
-        printPackingList({ poNumbers: poNumbers.slice(), mode: "group" });
-      }
-    };
+  const titleLabel = String(document.getElementById("pickupRequestModalId")?.textContent ?? "").trim() || "Pickup Request";
+  const pickupForm = document.getElementById("pickupRequestForm");
+  const pickupFormData = pickupForm ? readRequestForm(pickupForm) : {};
+  if (typeof wirePackingListPrintButton === "function") {
+    wirePackingListPrintButton("pickupRequestPrintBtn", {
+      poNumbers: poNumbers.slice(),
+      titleLabel,
+      includeTitlePage: true,
+      titlePageType: "Pickup",
+      typeDate: pickupFormData[PICKUP_DATE_FIELD] ?? (isExisting ? activeRequest[PICKUP_DATE_FIELD] : pickupRequestDraftPickupDate),
+      requestDate: pickupFormData[PICKUP_REQ_SUBMIT_DATE_FIELD] ?? (isExisting ? activeRequest[PICKUP_REQ_SUBMIT_DATE_FIELD] : submitDate),
+    });
   }
 
   bringModalToFront(document.getElementById("pickupRequestOverlay"));
@@ -565,7 +568,8 @@ function updatePickupRequestActionButtons() {
   const anySelected = pickupRequestPoNumbers
     .map(po => allRows.find(r => String(r["PO #"]) === String(po)))
     .some(row => row && isPickupFormPoSelected(row));
-  if (addBtn) addBtn.hidden = anySelected;
+  const hasAvailablePos = getAvailablePickupRequestPanelRows().length > 0;
+  if (addBtn) addBtn.hidden = anySelected || !hasAvailablePos;
   if (removeBtn) removeBtn.hidden = !anySelected;
 }
 

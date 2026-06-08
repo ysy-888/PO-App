@@ -5770,14 +5770,26 @@ td.n41-status-mismatch,
   overflow: visible;
   text-transform: none;
   letter-spacing: 0.03em;
-  padding: 6px 8px;
+  padding: 6px 12px 6px 8px;
   vertical-align: middle;
-  text-align: center;
+}
+
+.shipment-modal-card .email-po-table th.shipment-po-cell-qty.linked-po-th--split,
+.shipment-modal-card .shipment-linked-po-table th.shipment-po-cell-qty.linked-po-th--split,
+.request-linked-po-table th.shipment-po-cell-qty.linked-po-th--split {
+  text-align: right;
 }
 
 .linked-po-th-split-label {
   display: inline-block;
   line-height: 1.15;
+  text-align: right;
+}
+
+.request-linked-po-table td.shipment-po-cell-qty,
+.request-linked-po-table th.shipment-po-cell-qty {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .shipment-modal-card .email-meta-value .email-meta-input:hover,
@@ -6048,17 +6060,17 @@ td.n41-status-mismatch,
   text-align: right;
 }
 
-.shipment-linked-po-table:not(.shipment-requested-po-table) .shipment-po-cell-id,
-.shipment-linked-po-table:not(.shipment-requested-po-table) .shipment-po-cell-wrap,
-.shipment-linked-po-table:not(.shipment-requested-po-table) .shipment-po-cell-vendor,
-.shipment-linked-po-table:not(.shipment-requested-po-table) .shipment-po-cell-buyer,
-.shipment-linked-po-table:not(.shipment-requested-po-table) .shipment-po-cell-buyer-po,
-.shipment-linked-po-table:not(.shipment-requested-po-table) .shipment-po-cell-qty,
-.shipment-linked-po-table:not(.shipment-requested-po-table) .shipment-po-cell-date {
+.shipment-linked-po-table:not(.shipment-requested-po-table):not(.request-linked-po-table) .shipment-po-cell-id,
+.shipment-linked-po-table:not(.shipment-requested-po-table):not(.request-linked-po-table) .shipment-po-cell-wrap,
+.shipment-linked-po-table:not(.shipment-requested-po-table):not(.request-linked-po-table) .shipment-po-cell-vendor,
+.shipment-linked-po-table:not(.shipment-requested-po-table):not(.request-linked-po-table) .shipment-po-cell-buyer,
+.shipment-linked-po-table:not(.shipment-requested-po-table):not(.request-linked-po-table) .shipment-po-cell-buyer-po,
+.shipment-linked-po-table:not(.shipment-requested-po-table):not(.request-linked-po-table) .shipment-po-cell-qty,
+.shipment-linked-po-table:not(.shipment-requested-po-table):not(.request-linked-po-table) .shipment-po-cell-date {
   text-align: center;
 }
 
-.shipment-linked-po-table th.shipment-po-cell-qty {
+.shipment-linked-po-table:not(.request-linked-po-table) th.shipment-po-cell-qty {
   text-align: center;
 }
 

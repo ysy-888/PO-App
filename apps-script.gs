@@ -1975,13 +1975,20 @@ const EMAIL_PO_TD_STYLE_ = "padding:10px 12px;border-bottom:1px solid #e5e7eb;co
 const EMAIL_PO_TD_NUM_STYLE_ = EMAIL_PO_TD_STYLE_ + "text-align:right;";
 const EMAIL_PO_TD_ROW_NUM_STYLE_ = EMAIL_PO_TD_STYLE_ + "text-align:center;color:#6b7280;";
 const EMAIL_PO_FOOTER_TD_STYLE_ = "padding:10px 12px;font-weight:600;background-color:#eef0f3;color:#1a1a18;border-bottom:none;font-size:13px;";
-const PDF_HEADER_BG_ = "#2d2d29";
+const PDF_HEADER_BG_ = "#ffffff";
 const PDF_META_LABEL_BG_ = "#f7f7f8";
 const PDF_META_VALUE_BG_ = "#ffffff";
 const PDF_TABLE_HEAD_BG_ = "#f7f7f8";
 const PDF_TABLE_FOOTER_BG_ = "#eef0f3";
 const PDF_PAGE_WIDTH_ = 816;
 const PDF_PAGE_HEIGHT_ = 1056;
+const PDF_PAGE_MARGIN_ = 48;
+const PDF_CONTENT_WIDTH_ = PDF_PAGE_WIDTH_ - (PDF_PAGE_MARGIN_ * 2);
+const PDF_CTN_COL_WIDTH_ = 48;
+const PDF_TOTAL_COL_WIDTH_ = 42;
+const PDF_WT_COL_WIDTH_ = 52;
+const PDF_SIZE_COL_WIDTH_ = 30;
+const PDF_SUMMARY_COL_GAP_ = 12;
 
 /** Wrap a table cell with bgcolor for reliable PDF rendering. */
 function pdfBgCell_(tag, bgHex, className, innerHtml) {
@@ -2189,32 +2196,70 @@ function pdfActiveCartons_(cartons) {
   });
 }
 
-/** Three label/value pairs per row for a compact summary grid. */
-function pdfSummaryGridHtml_(pairs) {
-  const colsPerRow = 3;
-  const rows = [];
-  for (let i = 0; i < pairs.length; i += colsPerRow) {
-    let row = "<tr>";
-    for (let j = 0; j < colsPerRow; j++) {
-      const pair = pairs[i + j];
-      if (pair) {
-        row += pdfBgCell_("td", PDF_META_LABEL_BG_, "pdf-summary-label", pdfEsc_(pair[0])) +
-          pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-summary-value", pair[1]);
-      } else {
-        row += pdfBgCell_("td", PDF_META_LABEL_BG_, "pdf-summary-label", "&nbsp;") +
-          pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-summary-value", "&nbsp;");
-      }
-    }
-    row += "</tr>";
-    rows.push(row);
-  }
-  return "<table class=\"pdf-summary\" cellpadding=\"0\" cellspacing=\"0\">" + rows.join("") + "</table>";
+function pdfSummaryColumnHtml_(pairs) {
+  const rows = (Array.isArray(pairs) ? pairs : []).map(pair =>
+    "<tr>" +
+    pdfBgCell_("td", PDF_META_LABEL_BG_, "pdf-summary-label", pdfEsc_(pair[0])) +
+    pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-summary-value", pair[1]) +
+    "</tr>"
+  ).join("");
+  return "<table class=\"pdf-summary-col\" cellpadding=\"0\" cellspacing=\"0\">" + rows + "</table>";
 }
 
-function buildPdfPackingListHeaderHtml_(po, styleNum, color) {
-  const styleSubtitle = styleNum
-    ? "<div class=\"pdf-header-sub\">" + pdfEsc_(styleNum) + " / " + pdfEsc_(color) + "</div>"
-    : "";
+/** Side-by-side label/value columns with explicit field sets per column. */
+function pdfSummaryGridFromColumns_(columns) {
+  const cols = Array.isArray(columns) ? columns : [];
+  const colCount = cols.length;
+  const gridClass = "pdf-summary-grid" + (colCount === 2 ? " pdf-summary-grid--2col" : "");
+  const columnCells = cols.map(col =>
+    "<td class=\"pdf-summary-grid-cell\" valign=\"top\">" + pdfSummaryColumnHtml_(col) + "</td>"
+  ).join("");
+  return "<table class=\"" + gridClass + "\" cellpadding=\"0\" cellspacing=\"" + PDF_SUMMARY_COL_GAP_ + "\" width=\"100%\">" +
+    "<tr>" + columnCells + "</tr></table>";
+}
+
+function getPdfTitlePageTypeDateLabel_(type) {
+  if (type === "ASN") return "ASN Date";
+  if (type === "Delivery") return "Delivery Date";
+  if (type === "Pickup") return "Pickup Date";
+  if (type === "Shipment") return "EXF Date";
+  return "Date";
+}
+
+function getPdfCtnQtyForPo_(poRow, listsByPo, cartonsByListId) {
+  const po = String(poRow["PO #"] ?? "").trim();
+  const packingList = getPackingListForPoFromMap_(listsByPo, po);
+  if (!packingList) return toQtyNumber_(poRow["Ctn Qty"]);
+  const cartons = cartonsByListId[String(packingList[PACKING_LIST_ID_FIELD] ?? "")] || [];
+  const activeCartons = pdfActiveCartons_(cartons);
+  return activeCartons.length || toQtyNumber_(poRow["Ctn Qty"]);
+}
+
+function getPdfActQtyTotalForPo_(poRow, activeCartons) {
+  if (Array.isArray(activeCartons) && activeCartons.length > 0) {
+    return activeCartons.reduce((sum, carton) => {
+      for (let i = 1; i <= 15; i++) {
+        sum += toQtyNumber_(carton["Unit " + i]);
+      }
+      return sum;
+    }, 0);
+  }
+  return toQtyNumber_(poRow["Actual Qty"]);
+}
+
+function buildPdfPackingListHeaderHtml_(opts) {
+  opts = opts || {};
+  const po = String(opts.po ?? "").trim();
+  const styleNum = String(opts.styleNum ?? "").trim();
+  const color = String(opts.color ?? "").trim();
+  const rightPrimary = opts.rightPrimary != null
+    ? String(opts.rightPrimary)
+    : ("PO " + pdfEsc_(po));
+  const rightSecondary = opts.rightSecondary != null
+    ? String(opts.rightSecondary)
+    : (styleNum
+      ? "<div class=\"pdf-header-sub\">" + pdfEsc_(styleNum) + " / " + pdfEsc_(color) + "</div>"
+      : "");
   return "<table class=\"pdf-header\" role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" bgcolor=\"" + PDF_HEADER_BG_ + "\">" +
     "<tr>" +
     "<td bgcolor=\"" + PDF_HEADER_BG_ + "\" valign=\"middle\">" +
@@ -2222,9 +2267,102 @@ function buildPdfPackingListHeaderHtml_(po, styleNum, color) {
     "<div class=\"pdf-header-title\">Packing List</div>" +
     "</td>" +
     "<td bgcolor=\"" + PDF_HEADER_BG_ + "\" valign=\"middle\" align=\"right\">" +
-    "<div class=\"pdf-header-po\">PO " + pdfEsc_(po) + "</div>" +
-    styleSubtitle +
+    "<div class=\"pdf-header-po\">" + rightPrimary + "</div>" +
+    rightSecondary +
     "</td></tr></table>";
+}
+
+function buildPdfTitlePageHtml_(poRows, opts) {
+  opts = opts || {};
+  const rows = Array.isArray(poRows) ? poRows : [];
+  const label = String(opts.titleLabel ?? "").trim() || "Packing List";
+  const type = String(opts.titlePageType ?? "").trim();
+  const typeDateLabel = getPdfTitlePageTypeDateLabel_(type);
+  const typeDateValue = pdfDate_(opts.typeDate);
+  const requestDateValue = pdfDate_(opts.requestDate);
+  const weightByPo = getPackingWeightByPo_();
+  const { listsByPo, cartonsByListId } = getPackingDataMaps_();
+  const totals = computeRequestEmailTotals_(rows, weightByPo);
+  const poCount = rows.length;
+
+  const summaryHtml = pdfSummaryGridFromColumns_([
+    [
+      [typeDateLabel, typeDateValue],
+      ["Request Date", requestDateValue],
+    ],
+    [
+      ["PO Qty", pdfEsc_(String(totals.orderQty))],
+      ["Act Qty", pdfEsc_(String(totals.unitQty))],
+      ["Ctn Qty", pdfEsc_(String(totals.ctnQty))],
+    ],
+  ]);
+
+  const isAsnTitlePage = type === "ASN";
+  const labelColspan = isAsnTitlePage ? 6 : 5;
+
+  const tableRows = rows.map((row, i) => {
+    const po = String(row["PO #"] ?? "").trim();
+    const ctnQty = getPdfCtnQtyForPo_(row, listsByPo, cartonsByListId);
+    const weight = weightByPo[po] || 0;
+    const buyerPoCell = isAsnTitlePage
+      ? pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-center", pdfVal_(row["Buyer PO #"]))
+      : "";
+    return "<tr>" +
+      pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-center", String(i + 1)) +
+      pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-center", pdfVal_(row["PO #"])) +
+      buyerPoCell +
+      pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-center", pdfVal_(row["Style #"])) +
+      pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-center", pdfVal_(row["Color"])) +
+      pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-center", pdfVal_(row["Buyer"])) +
+      pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-center", pdfEsc_(String(toQtyNumber_(row["Actual Qty"])))) +
+      pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-center", pdfEsc_(String(ctnQty))) +
+      pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-center", weight > 0 ? pdfEsc_(String(weight)) : "&mdash;") +
+      "</tr>";
+  }).join("");
+
+  const buyerPoHead = isAsnTitlePage
+    ? pdfBgCell_("th", PDF_TABLE_HEAD_BG_, "pdf-center", "Buyer PO #")
+    : "";
+
+  const bodyHtml =
+    "<div class=\"pdf-details-block\">" +
+    "<p class=\"pdf-section-title\">Request Details</p>" +
+    summaryHtml +
+    "</div>" +
+    "<div class=\"pdf-section-block\">" +
+    "<p class=\"pdf-section-title\">Included POs</p>" +
+    "<table class=\"pdf-carton-table pdf-title-table\" cellpadding=\"0\" cellspacing=\"0\">" +
+    "<thead><tr>" +
+    pdfBgCell_("th", PDF_TABLE_HEAD_BG_, "pdf-center", "#") +
+    pdfBgCell_("th", PDF_TABLE_HEAD_BG_, "pdf-center", "PO #") +
+    buyerPoHead +
+    pdfBgCell_("th", PDF_TABLE_HEAD_BG_, "pdf-center", "Style #") +
+    pdfBgCell_("th", PDF_TABLE_HEAD_BG_, "pdf-center", "Color") +
+    pdfBgCell_("th", PDF_TABLE_HEAD_BG_, "pdf-center", "Buyer") +
+    pdfBgCell_("th", PDF_TABLE_HEAD_BG_, "pdf-center", "Actual Qty") +
+    pdfBgCell_("th", PDF_TABLE_HEAD_BG_, "pdf-center", "Ctn Qty") +
+    pdfBgCell_("th", PDF_TABLE_HEAD_BG_, "pdf-center", "Weight") +
+    "</tr></thead>" +
+    "<tbody>" + tableRows + "</tbody>" +
+    "<tfoot><tr>" +
+    "<td colspan=\"" + labelColspan + "\" bgcolor=\"" + PDF_TABLE_FOOTER_BG_ + "\" style=\"background-color:" + PDF_TABLE_FOOTER_BG_ + ";padding:6px 8px;font-size:9px;font-weight:600;text-align:center;\">" +
+    "Total (" + pdfEsc_(String(poCount)) + (poCount === 1 ? " PO" : " POs") + ")</td>" +
+    pdfBgCell_("td", PDF_TABLE_FOOTER_BG_, "pdf-center", String(totals.unitQty)) +
+    pdfBgCell_("td", PDF_TABLE_FOOTER_BG_, "pdf-center", String(totals.ctnQty)) +
+    pdfBgCell_("td", PDF_TABLE_FOOTER_BG_, "pdf-center", totals.totalWeight > 0 ? pdfEsc_(String(totals.totalWeight)) : "&mdash;") +
+    "</tr></tfoot>" +
+    "</table></div>";
+
+  const headerSubtitle = typeDateValue && typeDateValue !== "&mdash;"
+    ? pdfEsc_(typeDateLabel) + ": " + typeDateValue
+    : pdfEsc_(typeDateLabel);
+
+  return "<div class=\"pdf-page\">" +
+    buildPdfPackingListHeaderHtml_({
+      rightPrimary: pdfEsc_(label),
+      rightSecondary: "<div class=\"pdf-header-sub\">" + headerSubtitle + "</div>",
+    }) +
+    "<div class=\"pdf-page-content\">" + bodyHtml + "</div></div>";
 }
 
 function pdfNotesPanelHtml_(notes) {
@@ -2234,12 +2372,14 @@ function pdfNotesPanelHtml_(notes) {
 }
 
 function pdfCartonColgroupHtml_(sizeColCount) {
-  const contentWidth = 788;
-  const fixed = 30 + 34 + 36;
-  const sizeWidth = sizeColCount > 0 ? Math.max(22, Math.floor((contentWidth - fixed) / sizeColCount)) : 0;
-  let cols = "<colgroup><col width=\"30\">";
+  const fixed = PDF_CTN_COL_WIDTH_ + PDF_TOTAL_COL_WIDTH_ + PDF_WT_COL_WIDTH_;
+  const remaining = Math.max(0, PDF_CONTENT_WIDTH_ - fixed);
+  const sizeWidth = sizeColCount > 0
+    ? Math.max(PDF_SIZE_COL_WIDTH_, Math.floor(remaining / sizeColCount))
+    : 0;
+  let cols = "<colgroup><col width=\"" + PDF_CTN_COL_WIDTH_ + "\">";
   for (let i = 0; i < sizeColCount; i++) cols += "<col width=\"" + sizeWidth + "\">";
-  cols += "<col width=\"34\"><col width=\"36\"></colgroup>";
+  cols += "<col width=\"" + PDF_TOTAL_COL_WIDTH_ + "\"><col width=\"" + PDF_WT_COL_WIDTH_ + "\"></colgroup>";
   return cols;
 }
 
@@ -2250,27 +2390,39 @@ function buildPdfPoSectionHtml_(poRow, packingList, cartons, isLast) {
   const color = String(poRow["Color"] ?? "").trim();
   const activeCartons = pdfActiveCartons_(cartons);
 
-  const summaryRows = [
-    ["PO #", pdfVal_(poRow["PO #"])],
-    ["Buyer PO #", pdfVal_(poRow["Buyer PO #"])],
-    ["Style #", pdfVal_(poRow["Style #"])],
-    ["Color", pdfVal_(poRow["Color"])],
-    ["Vendor", pdfVal_(poRow["Vendor"])],
-    ["Buyer", pdfVal_(poRow["Buyer"])],
-    ["Ship Method", pdfVal_(poRow["Ship Method"])],
-    ["Shipment ID", pdfVal_(poRow[SHIPMENT_ID_FIELD])],
-    ["PO Date", pdfDate_(poRow["PO Date"])],
-    ["EXF Date", pdfDate_(poRow["EXF Date"] || poRow["EXF Request Date"] || poRow["EXF"])],
-    ["IHD", pdfDate_(poRow["IHD"])],
-    ["Ctn Qty", pdfEsc_(String(activeCartons.length || toQtyNumber_(poRow["Ctn Qty"])))],
-  ];
+  const actQtyTotal = getPdfActQtyTotalForPo_(poRow, activeCartons);
+  const ctnQtyTotal = activeCartons.length || toQtyNumber_(poRow["Ctn Qty"]);
 
-  const poDetailsHtml = "<p class=\"pdf-section-title\">PO Details</p>" + pdfSummaryGridHtml_(summaryRows);
+  const poDetailsHtml =
+    "<div class=\"pdf-details-block\">" +
+    "<p class=\"pdf-section-title\">PO Details</p>" +
+    pdfSummaryGridFromColumns_([
+      [
+        ["PO #", pdfVal_(poRow["PO #"])],
+        ["Buyer PO #", pdfVal_(poRow["Buyer PO #"])],
+        ["Buyer", pdfVal_(poRow["Buyer"])],
+        ["Vendor", pdfVal_(poRow["Vendor"])],
+      ],
+      [
+        ["Style #", pdfVal_(poRow["Style #"])],
+        ["Color", pdfVal_(poRow["Color"])],
+        ["Act Qty", pdfEsc_(String(actQtyTotal))],
+        ["Ctn Qty", pdfEsc_(String(ctnQtyTotal))],
+      ],
+      [
+        ["PO Date", pdfDate_(poRow["PO Date"])],
+        ["EXF Date", pdfDate_(poRow["EXF Date"] || poRow["EXF Request Date"] || poRow["EXF"])],
+        ["Ship Method", pdfVal_(poRow["Ship Method"])],
+        ["Shipment ID", pdfVal_(poRow[SHIPMENT_ID_FIELD])],
+      ],
+    ]) +
+    "</div>";
 
   let packingHtml;
   if (!packingList || activeCartons.length === 0) {
-    packingHtml = "<p class=\"pdf-section-title\">Cartons</p>" +
-      "<p class=\"pdf-empty\">No packing list on file.</p>";
+    packingHtml = "<div class=\"pdf-packing-block\">" +
+      "<p class=\"pdf-section-title\">Cartons</p>" +
+      "<p class=\"pdf-empty\">No packing list on file.</p></div>";
   } else {
     const sizeCols = getPdfActiveSizeColumns_(poRow, activeCartons);
     const unitTotals = sizeCols.map(col =>
@@ -2280,60 +2432,90 @@ function buildPdfPoSectionHtml_(poRow, packingList, cartons, isLast) {
     const totalWeight = activeCartons.reduce((s, c) => s + toQtyNumber_(c["Carton Weight"]), 0);
 
     const sizeHeads = sizeCols.map(col =>
-      pdfBgCell_("th", PDF_TABLE_HEAD_BG_, "pdf-num", pdfEsc_(col.label))
+      pdfBgCell_("th", PDF_TABLE_HEAD_BG_, "pdf-center pdf-size-col", pdfEsc_(col.label))
     ).join("");
 
     const cartonRows = activeCartons.map(carton => {
       const rowTotal = sizeCols.reduce((s, col) => s + toQtyNumber_(carton["Unit " + (col.index + 1)]), 0);
       const unitCells = sizeCols.map(col => {
         const n = toQtyNumber_(carton["Unit " + (col.index + 1)]);
-        return pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-num", n > 0 ? String(n) : "");
+        return pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-center pdf-size-col", n > 0 ? String(n) : "");
       }).join("");
       const w = toQtyNumber_(carton["Carton Weight"]);
       return "<tr>" +
         pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-center", pdfEsc_(String(carton["Carton #"] ?? ""))) +
         unitCells +
         pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-num", String(rowTotal)) +
-        pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-num", w > 0 ? String(w) : "") +
+        pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-center pdf-wt-col", w > 0 ? String(w) : "") +
         "</tr>";
     }).join("");
 
     const unitTotalCells = unitTotals.map(n =>
-      pdfBgCell_("td", PDF_TABLE_FOOTER_BG_, "pdf-num", String(n))
+      pdfBgCell_("td", PDF_TABLE_FOOTER_BG_, "pdf-center pdf-size-col", String(n))
     ).join("");
 
     const plNotes = String(packingList["Notes"] ?? "").trim();
     const plNotesHtml = plNotes ? pdfNotesPanelHtml_(plNotes) : "";
 
-    packingHtml = "<p class=\"pdf-section-title\">Cartons (" + activeCartons.length + ")</p>" +
+    packingHtml = "<div class=\"pdf-packing-block\">" +
+      "<p class=\"pdf-section-title\">Cartons (" + activeCartons.length + ")</p>" +
       "<table class=\"pdf-carton-table\" cellpadding=\"0\" cellspacing=\"0\">" +
       pdfCartonColgroupHtml_(sizeCols.length) +
       "<thead><tr>" +
       pdfBgCell_("th", PDF_TABLE_HEAD_BG_, "pdf-center", "Ctn #") +
       sizeHeads +
       pdfBgCell_("th", PDF_TABLE_HEAD_BG_, "pdf-num", "Total") +
-      pdfBgCell_("th", PDF_TABLE_HEAD_BG_, "pdf-num", "Wt") +
+      pdfBgCell_("th", PDF_TABLE_HEAD_BG_, "pdf-center pdf-wt-col", "Wt") +
       "</tr></thead>" +
       "<tbody>" + cartonRows + "</tbody>" +
       "<tfoot><tr>" +
       pdfBgCell_("td", PDF_TABLE_FOOTER_BG_, "pdf-center", "Total") +
       unitTotalCells +
       pdfBgCell_("td", PDF_TABLE_FOOTER_BG_, "pdf-num", String(grandTotal)) +
-      pdfBgCell_("td", PDF_TABLE_FOOTER_BG_, "pdf-num", totalWeight > 0 ? String(totalWeight) : "&mdash;") +
+      pdfBgCell_("td", PDF_TABLE_FOOTER_BG_, "pdf-center pdf-wt-col", totalWeight > 0 ? String(totalWeight) : "&mdash;") +
       "</tr></tfoot>" +
       "</table>" +
-      plNotesHtml;
+      plNotesHtml +
+      "</div>";
   }
 
   const pageClass = "pdf-page" + (isLast ? " pdf-page-last" : "");
 
   return "<div class=\"" + pageClass + "\">" +
-    "<table class=\"pdf-page-inner\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\">" +
-    "<tr><td colspan=\"1\">" + buildPdfPackingListHeaderHtml_(po, styleNum, color) + "</td></tr>" +
-    "<tr class=\"pdf-page-body\"><td>" +
+    buildPdfPackingListHeaderHtml_({ po: po, styleNum: styleNum, color: color }) +
+    "<div class=\"pdf-page-content\">" +
     poDetailsHtml +
     packingHtml +
-    "</td></tr></table></div>";
+    "</div></div>";
+}
+
+/**
+ * Build the packing list HTML document used for PDF generation and browser print.
+ * poRows: array of PO data objects (from getPoObjectsByNumbers_).
+ * opts: { includeTitlePage: boolean, titleLabel: string } optional.
+ */
+function buildGroupPackingListHtml_(poRows, opts) {
+  opts = opts || {};
+  const rows = Array.isArray(poRows) ? poRows : [];
+  const { listsByPo, cartonsByListId } = getPackingDataMaps_();
+
+  const sections = [];
+  if (opts.includeTitlePage && rows.length > 0) {
+    sections.push(buildPdfTitlePageHtml_(rows, opts));
+  }
+
+  rows.forEach((poRow, i) => {
+    const po = String(poRow["PO #"] ?? "").trim();
+    const packingList = getPackingListForPoFromMap_(listsByPo, po);
+    const cartons = packingList
+      ? (cartonsByListId[String(packingList[PACKING_LIST_ID_FIELD] ?? "")] || [])
+      : [];
+    const isLast = i === rows.length - 1;
+    sections.push(buildPdfPoSectionHtml_(poRow, packingList, cartons, isLast));
+  });
+
+  const bodyHtml = sections.join("\n");
+  return renderEmailTemplate_("templates/packing-list-pdf", { poSectionsHtml: bodyHtml });
 }
 
 /**
@@ -2343,22 +2525,7 @@ function buildPdfPoSectionHtml_(poRow, packingList, cartons, isLast) {
  */
 function buildGroupPackingListPdfBlob_(poRows, opts) {
   opts = opts || {};
-  const rows = Array.isArray(poRows) ? poRows : [];
-  const { listsByPo, cartonsByListId } = getPackingDataMaps_();
-
-  const sections = rows.map((poRow, i) => {
-    const po = String(poRow["PO #"] ?? "").trim();
-    const packingList = getPackingListForPoFromMap_(listsByPo, po);
-    const cartons = packingList
-      ? (cartonsByListId[String(packingList[PACKING_LIST_ID_FIELD] ?? "")] || [])
-      : [];
-    const isLast = i === rows.length - 1;
-    return buildPdfPoSectionHtml_(poRow, packingList, cartons, isLast);
-  });
-
-  const bodyHtml = sections.join("\n");
-  const html = renderEmailTemplate_("templates/packing-list-pdf", { poSectionsHtml: bodyHtml });
-
+  const html = buildGroupPackingListHtml_(poRows, opts);
   const filename = opts.filename || ("PackingList_" + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMdd") + ".pdf");
   // HtmlService is required for HTML -> PDF conversion; Utilities.newBlob().getAs("application/pdf") does not work.
   return HtmlService.createHtmlOutput(html)
@@ -2366,6 +2533,32 @@ function buildGroupPackingListPdfBlob_(poRows, opts) {
     .setHeight(PDF_PAGE_HEIGHT_)
     .getAs("application/pdf")
     .setName(filename);
+}
+
+function handleGetPackingListPrintHtml(payload) {
+  const poNumbers = payload.poNumbers;
+  if (!Array.isArray(poNumbers) || poNumbers.length === 0) {
+    return corsResponse({ success: false, error: "Select at least one PO." });
+  }
+
+  const poSheet = ensurePoWorkflowHeaders_();
+  let poRows;
+  try {
+    poRows = getPoObjectsByNumbers_(poSheet, poNumbers);
+  } catch (err) {
+    return corsResponse({ success: false, error: err.message });
+  }
+
+  return corsResponse({
+    success: true,
+    html: buildGroupPackingListHtml_(poRows, {
+      includeTitlePage: Boolean(payload.includeTitlePage),
+      titleLabel: String(payload.titleLabel ?? "").trim(),
+      titlePageType: String(payload.titlePageType ?? "").trim(),
+      typeDate: payload.typeDate,
+      requestDate: payload.requestDate,
+    }),
+  });
 }
 
 // ── End Packing List PDF Builders ─────────────────────────────────────────────
@@ -2630,7 +2823,15 @@ function sendDeliveryPickupRequestEmail_(requestType, requestId, emailInfo, rows
   if (emailInfo.cc) options.cc = emailInfo.cc;
   try {
     const pdfFilename = requestType + "_" + requestId + "_PackingList.pdf";
-    const pdfBlob = buildGroupPackingListPdfBlob_(rows, { filename: pdfFilename });
+    const dateField = requestType === "Delivery" ? DELIVERY_DATE_FIELD : PICKUP_DATE_FIELD;
+    const pdfBlob = buildGroupPackingListPdfBlob_(rows, {
+      filename: pdfFilename,
+      includeTitlePage: true,
+      titleLabel: requestType + " " + requestId,
+      titlePageType: requestType,
+      typeDate: requestData[dateField],
+      requestDate: requestData["Request Date"],
+    });
     options.attachments = [pdfBlob];
   } catch (pdfErr) {
     // Non-fatal: send without attachment if PDF generation fails
@@ -2697,7 +2898,14 @@ function sendAsnRequestEmail_(requestId, emailInfo, rows, requestData) {
   if (emailInfo.cc) options.cc = emailInfo.cc;
   try {
     const pdfFilename = "ASN_" + requestId + "_PackingList.pdf";
-    const pdfBlob = buildGroupPackingListPdfBlob_(rows, { filename: pdfFilename });
+    const pdfBlob = buildGroupPackingListPdfBlob_(rows, {
+      filename: pdfFilename,
+      includeTitlePage: true,
+      titleLabel: "ASN " + requestId,
+      titlePageType: "ASN",
+      typeDate: requestData[ASN_DATE_FIELD],
+      requestDate: requestData["Request Date"],
+    });
     options.attachments = [pdfBlob];
   } catch (pdfErr) {
     Logger.log("Packing list PDF generation failed (ASN " + requestId + "): " + pdfErr);
@@ -4130,6 +4338,7 @@ function doPost(e) {
     if (action === "setVendorSubmitMode") return handleSetVendorSubmitMode(payload);
     if (action === "approvePendingPackingList") return handleApprovePendingPackingList(payload);
     if (action === "rejectPendingPackingList") return handleRejectPendingPackingList(payload);
+    if (action === "getPackingListPrintHtml") return handleGetPackingListPrintHtml(payload);
 
     return corsResponse({ success: false, error: "Unknown action: " + action });
   } catch (err) {

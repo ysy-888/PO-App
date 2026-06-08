@@ -379,15 +379,18 @@ function renderAsnRequestModal(poNumbers, { asnDate = formatDateToYmd(new Date()
   const headerCount = document.getElementById("asnRequestPoCount");
   setRequestModalPoCount(headerCount, pos.length);
 
-  const printBtn = document.getElementById("asnRequestPrintBtn");
-  if (printBtn) {
-    const hasPacking = poNumbers.length > 0;
-    printBtn.hidden = !hasPacking;
-    printBtn.onclick = () => {
-      if (typeof printPackingList === "function") {
-        printPackingList({ poNumbers: poNumbers.slice(), mode: "group" });
-      }
-    };
+  const titleLabel = String(document.getElementById("asnRequestModalId")?.textContent ?? "").trim() || "ASN Request";
+  const asnForm = document.getElementById("asnRequestForm");
+  const asnFormData = asnForm ? readRequestForm(asnForm) : {};
+  if (typeof wirePackingListPrintButton === "function") {
+    wirePackingListPrintButton("asnRequestPrintBtn", {
+      poNumbers: poNumbers.slice(),
+      titleLabel,
+      includeTitlePage: true,
+      titlePageType: "ASN",
+      typeDate: asnFormData[ASN_DATE_FIELD] ?? (isExisting ? request?.[ASN_DATE_FIELD] : asnRequestDraftAsnDate),
+      requestDate: asnFormData[ASN_REQ_SUBMIT_DATE_FIELD] ?? (isExisting ? request?.[ASN_REQ_SUBMIT_DATE_FIELD] : submitDate),
+    });
   }
 
   bringModalToFront(document.getElementById("asnRequestOverlay"));
@@ -569,7 +572,8 @@ function updateAsnRequestActionButtons() {
   if (addSelectedBtn) addSelectedBtn.hidden = true;
 
   const anySelected = getAsnRequestRows().some(isAsnFormPoSelected);
-  if (addBtn) addBtn.hidden = anySelected;
+  const hasAvailablePos = getAvailableAsnRequestPanelRows().length > 0;
+  if (addBtn) addBtn.hidden = anySelected || !hasAvailablePos;
   if (removeBtn) removeBtn.hidden = !anySelected;
 }
 
