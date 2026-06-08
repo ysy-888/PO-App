@@ -1,3 +1,5 @@
+const shipmentAvailablePoSelection = createAvailablePoPickerSelection();
+
 function bringModalToFront(overlay) {
   document.querySelectorAll(".modal-backdrop.open").forEach(el => {
     el.style.zIndex = "1000";
@@ -177,8 +179,10 @@ function buildShipmentModalLayout({ shipment = {}, formId, linkedSource, showAdd
 
   if (showAddPanel) {
     const available = getRequestedPoPanelRows(linkedSource);
-    outer.appendChild(renderRequestedPoPickerPanel(available));
-    outer.classList.add("shipment-modal-outer--add-panel-open");
+    appendAvailablePoPanelToModalRight(outer, renderRequestedPoPickerPanel(available, {
+      selection: shipmentAvailablePoSelection,
+      onSelectionChange: updateShipmentModalActionButtons,
+    }));
   }
 
   return outer;
@@ -193,15 +197,19 @@ function getActiveShipmentModalButtons() {
     return {
       addBtn: document.getElementById("shipmentAddPosBtn"),
       removeBtn: document.getElementById("shipmentRemovePosBtn"),
+      doneBtn: document.getElementById("createShipmentAddPoDoneBtn"),
+      addSelectedBtn: document.getElementById("createShipmentAddSelectedPosBtn"),
     };
   }
   if (document.getElementById("shipmentModalOverlay")?.classList.contains("open")) {
     return {
       addBtn: document.getElementById("shipmentDetailAddPosBtn"),
       removeBtn: document.getElementById("shipmentDetailRemovePosBtn"),
+      doneBtn: document.getElementById("shipmentDetailAddPoDoneBtn"),
+      addSelectedBtn: document.getElementById("shipmentDetailAddSelectedPosBtn"),
     };
   }
-  return { addBtn: null, removeBtn: null };
+  return { addBtn: null, removeBtn: null, doneBtn: null, addSelectedBtn: null };
 }
 
 function getActiveShipmentModalScope() {
@@ -227,33 +235,49 @@ function clearShipmentFooterMessage(id) {
 }
 
 function updateShipmentModalActionButtons() {
-  const { addBtn, removeBtn } = getActiveShipmentModalButtons();
-  const scope = getActiveShipmentModalScope();
-  const footerAddBtn = scope.querySelector(".shipment-linked-po-footer-add");
-  const footerRemoveBtn = scope.querySelector(".shipment-linked-po-footer-remove");
-  if (!addBtn && !removeBtn && !footerAddBtn && !footerRemoveBtn) return;
+  const { addBtn, removeBtn, doneBtn, addSelectedBtn } = getActiveShipmentModalButtons();
+  if (!addBtn && !removeBtn && !doneBtn && !addSelectedBtn) return;
+
+  if (shipmentAddPoPanelOpen) {
+    if (addBtn) addBtn.hidden = true;
+    if (removeBtn) removeBtn.hidden = true;
+    if (doneBtn) doneBtn.hidden = false;
+    if (addSelectedBtn) addSelectedBtn.hidden = shipmentAvailablePoSelection.size === 0;
+    return;
+  }
+
+  if (doneBtn) doneBtn.hidden = true;
+  if (addSelectedBtn) addSelectedBtn.hidden = true;
 
   const linked = getLinkedPosFromModalTable();
   const linkedSelected = linked.filter(isShipmentFormPoSelected).length;
-  const showAdd = !shipmentAddPoPanelOpen && linkedSelected === 0;
-  const showRemove = !shipmentAddPoPanelOpen && linkedSelected > 0;
+  const showAdd = linkedSelected === 0;
+  const showRemove = linkedSelected > 0;
 
-  if (addBtn) addBtn.hidden = true;
-  if (removeBtn) removeBtn.hidden = true;
-  if (footerAddBtn) footerAddBtn.hidden = !showAdd;
-  if (footerRemoveBtn) footerRemoveBtn.hidden = !showRemove;
+  if (addBtn) addBtn.hidden = !showAdd;
+  if (removeBtn) removeBtn.hidden = !showRemove;
 }
 
 function openShipmentAddPoPanel() {
   clearShipmentFormSelection();
+  shipmentAvailablePoSelection.clear();
   shipmentAddPoPanelOpen = true;
   rerenderOpenShipmentModalBody();
   updateShipmentModalActionButtons();
 }
 
 function closeShipmentAddPoPanel() {
+  shipmentAvailablePoSelection.clear();
   shipmentAddPoPanelOpen = false;
   rerenderOpenShipmentModalBody();
+  updateShipmentModalActionButtons();
+}
+
+async function addSelectedPosToShipment() {
+  const selected = shipmentAvailablePoSelection.getAll();
+  if (selected.length === 0) return;
+  shipmentAvailablePoSelection.clear();
+  await addPosToShipment(selected, { keepPanelOpen: true });
   updateShipmentModalActionButtons();
 }
 
@@ -498,7 +522,7 @@ function renderCreateShipmentModal(poNumbers, { exfRequestId = "", exfDate = "",
     lockExfDate: effectiveLockExfDate || Boolean(effectiveExfRequestId),
   }));
   setEmailStyleModalHeader(document.querySelector("#createShipmentOverlay .modal-header"), {
-    typeLabel: "Create Shipment",
+    typeLabel: "Shipment",
     recordId: "New",
   });
   setShipmentModalAddPanelClass(body, false);
@@ -752,33 +776,6 @@ function getShipmentLinkedPoTotals(pos) {
   });
 }
 
-function renderShipmentLinkedPoFooter(pos) {
-  const footer = document.createElement("footer");
-  footer.className = "shipment-linked-po-footer";
-
-  const actions = document.createElement("div");
-  actions.className = "shipment-linked-po-footer-actions";
-
-  const addBtn = document.createElement("button");
-  addBtn.type = "button";
-  addBtn.className = "btn shipment-linked-po-footer-btn shipment-linked-po-footer-add";
-  addBtn.textContent = "Add POs";
-  addBtn.addEventListener("click", openShipmentAddPoPanel);
-
-  const removeBtn = document.createElement("button");
-  removeBtn.type = "button";
-  removeBtn.className = "btn shipment-linked-po-footer-btn shipment-linked-po-footer-remove";
-  removeBtn.textContent = "Remove POs";
-  removeBtn.hidden = true;
-  removeBtn.addEventListener("click", removePosFromShipment);
-
-  actions.appendChild(addBtn);
-  actions.appendChild(removeBtn);
-  footer.appendChild(actions);
-
-  return footer;
-}
-
 function getLinkedPosFromModalTable() {
   const tbody = getActiveShipmentModalScope()
     .querySelector(".shipment-linked-po-table tbody");
@@ -842,7 +839,6 @@ function renderShipmentLinkedPoSection(source) {
     empty.className = "shipment-linked-empty";
     empty.textContent = "No POs linked to this shipment.";
     section.appendChild(empty);
-    section.appendChild(renderShipmentLinkedPoFooter(pos));
     return section;
   }
 
@@ -925,7 +921,6 @@ function renderShipmentLinkedPoSection(source) {
   }
   wrap.appendChild(table);
   section.appendChild(wrap);
-  section.appendChild(renderShipmentLinkedPoFooter(pos));
   updateShipmentLinkedPoSelectAllHeader(pos);
   return section;
 }

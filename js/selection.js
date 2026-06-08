@@ -112,6 +112,55 @@ function onFormPoSelectionChanged() {
   }
 }
 
+function createAvailablePoPickerSelection() {
+  const selected = new Set();
+  return {
+    clear() { selected.clear(); },
+    has(po) { return selected.has(String(po ?? "")); },
+    toggle(po, checked) {
+      const key = String(po ?? "");
+      if (!key) return;
+      if (checked) selected.add(key);
+      else selected.delete(key);
+    },
+    getAll() { return [...selected]; },
+    get size() { return selected.size; },
+    setAll(pos, checked) {
+      pos.forEach(row => {
+        const key = String(row["PO #"] ?? "");
+        if (!key) return;
+        if (checked) selected.add(key);
+        else selected.delete(key);
+      });
+    },
+  };
+}
+
+function updateAvailablePoPickerSelectAll(pos, selectAllEl, selection) {
+  if (!selectAllEl) return;
+  if (pos.length === 0) {
+    selectAllEl.checked = false;
+    selectAllEl.indeterminate = false;
+    selectAllEl.disabled = true;
+    return;
+  }
+  selectAllEl.disabled = false;
+  const count = pos.filter(row => selection.has(row["PO #"])).length;
+  selectAllEl.checked = count === pos.length;
+  selectAllEl.indeterminate = count > 0 && count < pos.length;
+}
+
+function syncAvailablePoPickerRowCheckboxes(section, pos, selection) {
+  const tbody = section.querySelector("tbody");
+  if (!tbody) return;
+  pos.forEach(row => {
+    const po = String(row["PO #"] ?? "");
+    const tr = [...tbody.querySelectorAll("tr[data-po]")].find(el => String(el.dataset.po) === po);
+    const cb = tr?.querySelector(".po-select-checkbox");
+    if (cb) cb.checked = selection.has(po);
+  });
+}
+
 /** @type {Set<number>} visible row indices on the current page */
 let miniSelectedIndices = new Set();
 let miniSelectClickAnchorIndex = -1;

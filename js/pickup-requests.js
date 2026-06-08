@@ -24,6 +24,7 @@ let allPickupRequests = [];
 let filteredPickupRequests = [];
 let pickupRequestPoNumbers = [];
 let pickupRequestAddPoPanelOpen = false;
+const pickupRequestAvailablePoSelection = createAvailablePoPickerSelection();
 let pickupRequestDraftEmail = {};
 let pickupRequestDraftPickupDate = "";
 let pickupRequestDraftFrom = "";
@@ -243,7 +244,7 @@ function openPickupRequestFromSelection() {
   if (isAppSaving() || isToolbarCreateActionBlocked()) return;
   const selected = getCheckedFilteredPos();
   if (!areRowsEligibleForPickupRequest(selected)) {
-    showIndicator("Select LULU'S or 12TH TRIBE OTW or Arrived at Port POs with packing lists and ASN requests submitted", "error");
+    showIndicator("Select LULU'S FASHION LOUNGE or 12TH TRIBE OTW or Arrived at Port POs with packing lists and ASN requests submitted", "error");
     return;
   }
   pickupRequestPoNumbers = selected.map(row => row["PO #"]);
@@ -349,18 +350,20 @@ function renderPickupRequestModal(poNumbers, request = {}) {
         ? (activeRequest[PICKUP_REQ_NOTES_FIELD] ?? "")
         : pickupRequestDraftNotes,
       notesReadOnly: isReadOnly,
+      requestForm: true,
     }),
     renderPickupRequestLinkedPoSection(pos, isReadOnly)
   ));
 
   if (!isReadOnly && pickupRequestAddPoPanelOpen) {
-    outer.classList.add("shipment-modal-outer--add-panel-open");
-    outer.appendChild(renderAvailablePoPickerPanel(getAvailablePickupRequestPanelRows(), {
-      panelId: "pickupRequestAddPoPanel",
+    appendAvailablePoPanelToModalRight(outer, renderAvailablePoLinkedSection(getAvailablePickupRequestPanelRows(), {
+      sectionId: "pickupRequestAddPoPanel",
+      columns: DELIVERY_PICKUP_LINKED_PO_COLUMNS,
+      appendColgroup: appendDeliveryPickupLinkedPoColgroup,
       emptyMessage: "No eligible POs available.",
-      closeLabel: "Close available POs panel",
-      onClose: closePickupRequestAddPoPanel,
-      onAddPo: addPoToPickupRequest,
+      selection: pickupRequestAvailablePoSelection,
+      onSelectionChange: updatePickupRequestActionButtons,
+      selectAllId: "pickupRequestAvailablePoSelectAll",
     }));
   }
 
@@ -380,6 +383,7 @@ function renderPickupRequestModal(poNumbers, request = {}) {
   }
 
   bringModalToFront(document.getElementById("pickupRequestOverlay"));
+  updatePickupRequestActionButtons();
   updateToolbarRequestButtons();
 }
 
@@ -402,13 +406,29 @@ function getPickupRequestModalContext() {
 
 function openPickupRequestAddPoPanel() {
   capturePickupRequestDraft();
+  clearPickupFormSelection();
+  pickupRequestAvailablePoSelection.clear();
   pickupRequestAddPoPanelOpen = true;
   renderPickupRequestModal(pickupRequestPoNumbers, getPickupRequestModalContext());
 }
 
 function closePickupRequestAddPoPanel() {
   capturePickupRequestDraft();
+  pickupRequestAvailablePoSelection.clear();
   pickupRequestAddPoPanelOpen = false;
+  renderPickupRequestModal(pickupRequestPoNumbers, getPickupRequestModalContext());
+}
+
+function addSelectedPosToPickupRequest() {
+  const selected = pickupRequestAvailablePoSelection.getAll();
+  if (selected.length === 0) return;
+  capturePickupRequestDraft();
+  const existing = new Set(pickupRequestPoNumbers.map(String));
+  const toAdd = selected.filter(po => !existing.has(po));
+  if (toAdd.length === 0) return;
+  pickupRequestAvailablePoSelection.clear();
+  pickupRequestPoNumbers = [...pickupRequestPoNumbers, ...toAdd];
+  pickupRequestAddPoPanelOpen = true;
   renderPickupRequestModal(pickupRequestPoNumbers, getPickupRequestModalContext());
 }
 
@@ -511,46 +531,43 @@ function renderPickupRequestLinkedPoSection(pos, isReadOnly = false) {
   }
   wrap.appendChild(table);
   section.appendChild(wrap);
-  if (!isReadOnly) section.appendChild(renderPickupRequestLinkedPoFooter(pos));
   return section;
-}
-
-function renderPickupRequestLinkedPoFooter(pos) {
-  const footer = document.createElement("footer");
-  footer.className = "shipment-linked-po-footer";
-  const actions = document.createElement("div");
-  actions.className = "shipment-linked-po-footer-actions";
-
-  const addBtn = document.createElement("button");
-  addBtn.type = "button";
-  addBtn.className = "btn shipment-linked-po-footer-btn pickup-request-linked-po-footer-add";
-  addBtn.textContent = "Add POs";
-  addBtn.addEventListener("click", openPickupRequestAddPoPanel);
-
-  const removeBtn = document.createElement("button");
-  removeBtn.type = "button";
-  removeBtn.className = "btn shipment-linked-po-footer-btn pickup-request-linked-po-footer-remove";
-  removeBtn.textContent = "Remove POs";
-  removeBtn.hidden = true;
-  removeBtn.addEventListener("click", removePosFromPickupRequest);
-
-  actions.appendChild(addBtn);
-  actions.appendChild(removeBtn);
-  footer.appendChild(actions);
-  return footer;
 }
 
 function updatePickupRequestActionButtons() {
   const overlay = document.getElementById("pickupRequestOverlay");
   if (!overlay?.classList.contains("open")) return;
-  const addBtn = overlay.querySelector(".pickup-request-linked-po-footer-add");
-  const removeBtn = overlay.querySelector(".pickup-request-linked-po-footer-remove");
-  if (!addBtn && !removeBtn) return;
+  const addBtn = document.getElementById("pickupRequestAddPosBtn");
+  const removeBtn = document.getElementById("pickupRequestRemovePosBtn");
+  const doneBtn = document.getElementById("pickupRequestAddPoDoneBtn");
+  const addSelectedBtn = document.getElementById("pickupRequestAddSelectedPosBtn");
+  const submitBtn = document.getElementById("pickupRequestSubmitBtn");
+
+  const isView = submitBtn?.hidden === true;
+  if (isView) {
+    if (addBtn) addBtn.hidden = true;
+    if (removeBtn) removeBtn.hidden = true;
+    if (doneBtn) doneBtn.hidden = true;
+    if (addSelectedBtn) addSelectedBtn.hidden = true;
+    return;
+  }
+
+  if (pickupRequestAddPoPanelOpen) {
+    if (addBtn) addBtn.hidden = true;
+    if (removeBtn) removeBtn.hidden = true;
+    if (doneBtn) doneBtn.hidden = false;
+    if (addSelectedBtn) addSelectedBtn.hidden = pickupRequestAvailablePoSelection.size === 0;
+    return;
+  }
+
+  if (doneBtn) doneBtn.hidden = true;
+  if (addSelectedBtn) addSelectedBtn.hidden = true;
+
   const anySelected = pickupRequestPoNumbers
     .map(po => allRows.find(r => String(r["PO #"]) === String(po)))
     .some(row => row && isPickupFormPoSelected(row));
-  if (addBtn) addBtn.hidden = pickupRequestAddPoPanelOpen || anySelected;
-  if (removeBtn) removeBtn.hidden = pickupRequestAddPoPanelOpen || !anySelected;
+  if (addBtn) addBtn.hidden = anySelected;
+  if (removeBtn) removeBtn.hidden = !anySelected;
 }
 
 function closePickupRequestModal() {
@@ -744,6 +761,10 @@ function syncAllAssignDatesFromPickupRequests(rows) {
 function initPickupRequests() {
   document.getElementById("pickupRequestBtn")?.addEventListener("click", openPickupRequestFromSelection);
   document.getElementById("pickupRequestSubmitBtn")?.addEventListener("click", submitPickupRequest);
+  document.getElementById("pickupRequestAddPosBtn")?.addEventListener("click", openPickupRequestAddPoPanel);
+  document.getElementById("pickupRequestRemovePosBtn")?.addEventListener("click", removePosFromPickupRequest);
+  document.getElementById("pickupRequestAddPoDoneBtn")?.addEventListener("click", closePickupRequestAddPoPanel);
+  document.getElementById("pickupRequestAddSelectedPosBtn")?.addEventListener("click", addSelectedPosToPickupRequest);
   document.getElementById("pickupRequestCancelBtn")?.addEventListener("click", closePickupRequestModal);
   document.querySelector('[data-dismiss="pickup-request"]')?.addEventListener("click", closePickupRequestModal);
   bindDirectBackdropDismiss(document.getElementById("pickupRequestOverlay"), closePickupRequestModal);

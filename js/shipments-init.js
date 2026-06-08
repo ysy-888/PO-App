@@ -49,6 +49,8 @@ function initShipments() {
   document.querySelector('[data-dismiss="create-shipment"]')?.addEventListener("click", closeCreateShipmentModal);
   document.getElementById("shipmentAddPosBtn")?.addEventListener("click", openShipmentAddPoPanel);
   document.getElementById("shipmentRemovePosBtn")?.addEventListener("click", removePosFromShipment);
+  document.getElementById("createShipmentAddPoDoneBtn")?.addEventListener("click", closeShipmentAddPoPanel);
+  document.getElementById("createShipmentAddSelectedPosBtn")?.addEventListener("click", addSelectedPosToShipment);
   document.getElementById("shipmentModalSaveBtn")?.addEventListener("click", saveShipmentModal);
   document.getElementById("shipmentModalCloseBtn")?.addEventListener("click", closeShipmentModalForce);
   document.getElementById("shipmentModalBody")?.addEventListener("input", () => {
@@ -57,6 +59,8 @@ function initShipments() {
   document.querySelector('[data-dismiss="shipment-modal"]')?.addEventListener("click", closeShipmentModalForce);
   document.getElementById("shipmentDetailAddPosBtn")?.addEventListener("click", openShipmentAddPoPanel);
   document.getElementById("shipmentDetailRemovePosBtn")?.addEventListener("click", removePosFromShipment);
+  document.getElementById("shipmentDetailAddPoDoneBtn")?.addEventListener("click", closeShipmentAddPoPanel);
+  document.getElementById("shipmentDetailAddSelectedPosBtn")?.addEventListener("click", addSelectedPosToShipment);
 
   bindDirectBackdropDismiss(document.getElementById("shipmentModalOverlay"), closeShipmentModalForce);
   bindDirectBackdropDismiss(document.getElementById("createShipmentOverlay"), closeCreateShipmentModal);

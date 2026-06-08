@@ -200,7 +200,7 @@ function getLocationsSheet_() {
     sheet.getRange(2, 1, 5, 2).setValues([
       ["FORERUNNER LOGISTICS", "4577 MAYWOOD AVE.\nVERNON, CA, 90058"],
       ["ELEVATOR DISCO", "810 E PICO BLVD #B21\nLOS ANGELES, CA 90021"],
-      ["LULU'S", ""],
+      ["LULU'S FASHION LOUNGE", ""],
       ["12TH TRIBE", ""],
       ["URBAN OUTFITTERS", ""],
     ]);
@@ -1975,15 +1975,20 @@ const EMAIL_PO_TD_STYLE_ = "padding:10px 12px;border-bottom:1px solid #e5e7eb;co
 const EMAIL_PO_TD_NUM_STYLE_ = EMAIL_PO_TD_STYLE_ + "text-align:right;";
 const EMAIL_PO_TD_ROW_NUM_STYLE_ = EMAIL_PO_TD_STYLE_ + "text-align:center;color:#6b7280;";
 const EMAIL_PO_FOOTER_TD_STYLE_ = "padding:10px 12px;font-weight:600;background-color:#eef0f3;color:#1a1a18;border-bottom:none;font-size:13px;";
-const PDF_SECTION_TITLE_STYLE_ = "margin:0 0 8px 0;font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:#374151;";
-const PDF_META_TABLE_STYLE_ = "border-collapse:collapse;width:100%;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;";
-const PDF_META_LABEL_LAST_STYLE_ = EMAIL_META_LABEL_STYLE_.replace("border-bottom:1px solid #e5e7eb;", "");
-const PDF_META_VALUE_LAST_STYLE_ = EMAIL_META_VALUE_STYLE_.replace("border-bottom:1px solid #e5e7eb;", "");
-const PDF_TABLE_STYLE_ = "width:100%;border-collapse:collapse;border:1px solid #e5e7eb;font-size:13px;table-layout:auto;";
-const PDF_TH_CENTER_STYLE_ = EMAIL_PO_TH_STYLE_ + "text-align:center;";
-const PDF_TD_CENTER_STYLE_ = EMAIL_PO_TD_ROW_NUM_STYLE_;
-const PDF_TD_TOTAL_CENTER_STYLE_ = EMAIL_PO_FOOTER_TD_STYLE_ + "text-align:center;";
-const PDF_FONT_ = "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;";
+const PDF_HEADER_BG_ = "#2d2d29";
+const PDF_META_LABEL_BG_ = "#f7f7f8";
+const PDF_META_VALUE_BG_ = "#ffffff";
+const PDF_TABLE_HEAD_BG_ = "#f7f7f8";
+const PDF_TABLE_FOOTER_BG_ = "#eef0f3";
+const PDF_PAGE_WIDTH_ = 816;
+const PDF_PAGE_HEIGHT_ = 1056;
+
+/** Wrap a table cell with bgcolor for reliable PDF rendering. */
+function pdfBgCell_(tag, bgHex, className, innerHtml) {
+  const cls = className ? " class=\"" + className + "\"" : "";
+  return "<" + tag + cls + " bgcolor=\"" + bgHex + "\" style=\"background-color:" + bgHex + ";\">" +
+    innerHtml + "</" + tag + ">";
+}
 
 function renderEmailTemplate_(filename, vars) {
   const template = HtmlService.createTemplateFromFile(filename);
@@ -2164,186 +2169,171 @@ function pdfMoney_(val) {
   return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function pdfMetaTableHtml_(pairs) {
-  return pairs.map(([label, val], index) => {
-    const isLast = index === pairs.length - 1;
-    const labelStyle = isLast ? PDF_META_LABEL_LAST_STYLE_ : EMAIL_META_LABEL_STYLE_;
-    const valueStyle = isLast ? PDF_META_VALUE_LAST_STYLE_ : EMAIL_META_VALUE_STYLE_;
-    return "<tr><td style=\"" + labelStyle + "\">" + pdfEsc_(label) + "</td><td style=\"" + valueStyle + "\">" + val + "</td></tr>";
-  }).join("");
+function getPdfActiveSizeColumns_(poRow, cartons) {
+  const cols = [];
+  for (let i = 0; i < 15; i++) {
+    const hasQty = cartons.some(c => toQtyNumber_(c["Unit " + (i + 1)]) > 0);
+    if (!hasQty) continue;
+    const label = String(poRow["Size " + (i + 1)] ?? "").trim() || ("Sz " + (i + 1));
+    cols.push({ index: i, label: label });
+  }
+  return cols;
 }
 
-function pdfMetaTableWrap_(pairs) {
-  return "<table cellpadding=\"0\" cellspacing=\"0\" style=\"" + PDF_META_TABLE_STYLE_ + "\">" +
-    pdfMetaTableHtml_(pairs) + "</table>";
+function pdfActiveCartons_(cartons) {
+  return (Array.isArray(cartons) ? cartons : []).filter(carton => {
+    for (let i = 1; i <= 15; i++) {
+      if (toQtyNumber_(carton["Unit " + i]) > 0) return true;
+    }
+    return toQtyNumber_(carton["Carton Weight"]) > 0;
+  });
+}
+
+/** Three label/value pairs per row for a compact summary grid. */
+function pdfSummaryGridHtml_(pairs) {
+  const colsPerRow = 3;
+  const rows = [];
+  for (let i = 0; i < pairs.length; i += colsPerRow) {
+    let row = "<tr>";
+    for (let j = 0; j < colsPerRow; j++) {
+      const pair = pairs[i + j];
+      if (pair) {
+        row += pdfBgCell_("td", PDF_META_LABEL_BG_, "pdf-summary-label", pdfEsc_(pair[0])) +
+          pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-summary-value", pair[1]);
+      } else {
+        row += pdfBgCell_("td", PDF_META_LABEL_BG_, "pdf-summary-label", "&nbsp;") +
+          pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-summary-value", "&nbsp;");
+      }
+    }
+    row += "</tr>";
+    rows.push(row);
+  }
+  return "<table class=\"pdf-summary\" cellpadding=\"0\" cellspacing=\"0\">" + rows.join("") + "</table>";
+}
+
+function buildPdfPackingListHeaderHtml_(po, styleNum, color) {
+  const styleSubtitle = styleNum
+    ? "<div class=\"pdf-header-sub\">" + pdfEsc_(styleNum) + " / " + pdfEsc_(color) + "</div>"
+    : "";
+  return "<table class=\"pdf-header\" role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" bgcolor=\"" + PDF_HEADER_BG_ + "\">" +
+    "<tr>" +
+    "<td bgcolor=\"" + PDF_HEADER_BG_ + "\" valign=\"middle\">" +
+    "<div class=\"pdf-header-brand\">ELEVATOR DISCO</div>" +
+    "<div class=\"pdf-header-title\">Packing List</div>" +
+    "</td>" +
+    "<td bgcolor=\"" + PDF_HEADER_BG_ + "\" valign=\"middle\" align=\"right\">" +
+    "<div class=\"pdf-header-po\">PO " + pdfEsc_(po) + "</div>" +
+    styleSubtitle +
+    "</td></tr></table>";
 }
 
 function pdfNotesPanelHtml_(notes) {
-  return "<div style=\"margin:8px 0 0;padding:14px 16px;background:transparent;border:1px solid #e5e7eb;border-radius:6px;\">" +
-    "<div style=\"font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:#374151;margin:0 0 8px 0;\">Notes</div>" +
-    "<div style=\"font-size:14px;color:#1a1a18;white-space:pre-wrap;word-break:break-word;\">" + pdfEsc_(notes) + "</div></div>";
+  return "<div class=\"pdf-notes\">" +
+    "<div class=\"pdf-notes-title\">Notes</div>" +
+    "<div>" + pdfEsc_(notes) + "</div></div>";
 }
 
-/** Build HTML for a single PO section (PO Details + Style Details + Packing List). */
+function pdfCartonColgroupHtml_(sizeColCount) {
+  const contentWidth = 788;
+  const fixed = 30 + 34 + 36;
+  const sizeWidth = sizeColCount > 0 ? Math.max(22, Math.floor((contentWidth - fixed) / sizeColCount)) : 0;
+  let cols = "<colgroup><col width=\"30\">";
+  for (let i = 0; i < sizeColCount; i++) cols += "<col width=\"" + sizeWidth + "\">";
+  cols += "<col width=\"34\"><col width=\"36\"></colgroup>";
+  return cols;
+}
+
+/** Build HTML for a single PO page (full portrait layout). */
 function buildPdfPoSectionHtml_(poRow, packingList, cartons, isLast) {
   const po = String(poRow["PO #"] ?? "");
   const styleNum = String(poRow["Style #"] ?? "").trim();
   const color = String(poRow["Color"] ?? "").trim();
+  const activeCartons = pdfActiveCartons_(cartons);
 
-  const poMetaRows = [
+  const summaryRows = [
     ["PO #", pdfVal_(poRow["PO #"])],
     ["Buyer PO #", pdfVal_(poRow["Buyer PO #"])],
-    ["SO #", pdfVal_(poRow["SO #"])],
+    ["Style #", pdfVal_(poRow["Style #"])],
+    ["Color", pdfVal_(poRow["Color"])],
     ["Vendor", pdfVal_(poRow["Vendor"])],
     ["Buyer", pdfVal_(poRow["Buyer"])],
-    ["Division", pdfVal_(poRow["Division"])],
     ["Ship Method", pdfVal_(poRow["Ship Method"])],
-    ["Status", pdfVal_(poRow["Status"])],
+    ["Shipment ID", pdfVal_(poRow[SHIPMENT_ID_FIELD])],
     ["PO Date", pdfDate_(poRow["PO Date"])],
     ["EXF Date", pdfDate_(poRow["EXF Date"] || poRow["EXF Request Date"] || poRow["EXF"])],
     ["IHD", pdfDate_(poRow["IHD"])],
-    ["CXL Date", pdfDate_(poRow["CXL Date"])],
-  ];
-  const poMetaHalf = Math.ceil(poMetaRows.length / 2);
-  const poMetaLeft = poMetaRows.slice(0, poMetaHalf);
-  const poMetaRight = poMetaRows.slice(poMetaHalf);
-
-  const poDetailsHtml = "<div style=\"margin-bottom:20px;\">" +
-    "<p style=\"" + PDF_SECTION_TITLE_STYLE_ + "\">PO Details</p>" +
-    "<table cellpadding=\"0\" cellspacing=\"0\" style=\"width:100%;border-collapse:collapse;\">" +
-    "<tr>" +
-    "<td style=\"width:50%;vertical-align:top;padding-right:8px;\">" + pdfMetaTableWrap_(poMetaLeft) + "</td>" +
-    "<td style=\"width:50%;vertical-align:top;\">" + pdfMetaTableWrap_(poMetaRight) + "</td>" +
-    "</tr></table></div>";
-
-  const sizeFields = Array.from({ length: 15 }, (_, i) => "Size " + (i + 1));
-  const sizeLabels = sizeFields.map(f => String(poRow[f] ?? "").trim()).filter(s => s !== "");
-  const colCount = sizeLabels.length;
-
-  const poUnits = sizeLabels.map((_, i) => toQtyNumber_(poRow["PO Unit " + (i + 1)]));
-  const actUnits = sizeLabels.map((_, i) => toQtyNumber_(poRow["Act Unit " + (i + 1)]));
-  const hasActual = actUnits.some(n => n > 0);
-  const poTotal = poUnits.reduce((s, n) => s + n, 0);
-  const actTotal = actUnits.reduce((s, n) => s + n, 0);
-
-  const styleInfoRows = [
-    ["Style #", pdfVal_(poRow["Style #"])],
-    ["Color", pdfVal_(poRow["Color"])],
-    ["FOB Cost", pdfMoney_(poRow["FOB Cost"])],
-    ["PO Total Cost", pdfMoney_(poRow["PO Total Cost"])],
-    ["PO Qty", pdfEsc_(String(toQtyNumber_(poRow["PO Qty"])))],
-    ["Carton Qty", pdfEsc_(String(toQtyNumber_(poRow["Ctn Qty"])))],
+    ["Ctn Qty", pdfEsc_(String(activeCartons.length || toQtyNumber_(poRow["Ctn Qty"])))],
   ];
 
-  let sizeBreakdownHtml = "";
-  if (colCount > 0) {
-    const colW = Math.floor(60 / colCount);
-    const sizeHeads = sizeLabels.map(l =>
-      "<th style=\"" + EMAIL_PO_TH_STYLE_ + "text-align:right;width:" + colW + "%;\">" + pdfEsc_(l) + "</th>"
-    ).join("");
-    const poUnitCells = poUnits.map(n => "<td style=\"" + EMAIL_PO_TD_NUM_STYLE_ + "\">" + n + "</td>").join("");
-    const actUnitCells = actUnits.map(n => "<td style=\"" + EMAIL_PO_TD_NUM_STYLE_ + "\">" + n + "</td>").join("");
-    sizeBreakdownHtml =
-      "<table cellpadding=\"0\" cellspacing=\"0\" style=\"" + PDF_TABLE_STYLE_ + "margin-top:8px;\">" +
-      "<thead><tr><th style=\"" + EMAIL_PO_TH_STYLE_ + "width:20%;\">Row</th>" + sizeHeads +
-      "<th style=\"" + EMAIL_PO_TH_STYLE_ + "text-align:right;width:60px;\">Total</th></tr></thead>" +
-      "<tbody>" +
-      "<tr><td style=\"" + EMAIL_PO_TD_STYLE_ + "font-weight:600;\">PO Qty</td>" + poUnitCells +
-      "<td style=\"" + EMAIL_PO_TD_NUM_STYLE_ + "font-weight:600;\">" + poTotal + "</td></tr>" +
-      (hasActual ?
-        "<tr><td style=\"" + EMAIL_PO_TD_STYLE_ + "font-weight:600;\">Packed Qty</td>" + actUnitCells +
-        "<td style=\"" + EMAIL_PO_TD_NUM_STYLE_ + "font-weight:600;\">" + actTotal + "</td></tr>"
-        : "") +
-      "</tbody></table>";
-  }
-
-  const styleDetailsHtml = "<div style=\"margin-bottom:20px;\">" +
-    "<p style=\"" + PDF_SECTION_TITLE_STYLE_ + "\">Style Details</p>" +
-    pdfMetaTableWrap_(styleInfoRows) +
-    sizeBreakdownHtml +
-    "</div>";
+  const poDetailsHtml = "<p class=\"pdf-section-title\">PO Details</p>" + pdfSummaryGridHtml_(summaryRows);
 
   let packingHtml;
-  if (!packingList || !cartons || cartons.length === 0) {
-    packingHtml = "<div style=\"margin-bottom:0;\">" +
-      "<p style=\"" + PDF_SECTION_TITLE_STYLE_ + "\">Packing List</p>" +
-      "<p style=\"font-size:14px;color:#6b7280;font-style:italic;margin:0;\">No packing list on file.</p></div>";
+  if (!packingList || activeCartons.length === 0) {
+    packingHtml = "<p class=\"pdf-section-title\">Cartons</p>" +
+      "<p class=\"pdf-empty\">No packing list on file.</p>";
   } else {
-    const unitTotals = sizeLabels.map((_, i) =>
-      cartons.reduce((sum, c) => sum + toQtyNumber_(c["Unit " + (i + 1)]), 0)
+    const sizeCols = getPdfActiveSizeColumns_(poRow, activeCartons);
+    const unitTotals = sizeCols.map(col =>
+      activeCartons.reduce((sum, c) => sum + toQtyNumber_(c["Unit " + (col.index + 1)]), 0)
     );
     const grandTotal = unitTotals.reduce((s, n) => s + n, 0);
-    const totalWeight = cartons.reduce((s, c) => s + toQtyNumber_(c["Carton Weight"]), 0);
-    const colW2 = colCount > 0 ? Math.floor(50 / colCount) : 0;
+    const totalWeight = activeCartons.reduce((s, c) => s + toQtyNumber_(c["Carton Weight"]), 0);
 
-    const sizeHeads2 = sizeLabels.map(l =>
-      "<th style=\"" + EMAIL_PO_TH_STYLE_ + "text-align:right;width:" + colW2 + "%;\">" + pdfEsc_(l) + "</th>"
+    const sizeHeads = sizeCols.map(col =>
+      pdfBgCell_("th", PDF_TABLE_HEAD_BG_, "pdf-num", pdfEsc_(col.label))
     ).join("");
-    const cartonRows = cartons.map(carton => {
-      const rowTotal = sizeLabels.reduce((s, _, i) => s + toQtyNumber_(carton["Unit " + (i + 1)]), 0);
-      const unitCells = sizeLabels.map((_, i) => {
-        const n = toQtyNumber_(carton["Unit " + (i + 1)]);
-        return "<td style=\"" + EMAIL_PO_TD_NUM_STYLE_ + "\">" + (n > 0 ? n : "") + "</td>";
+
+    const cartonRows = activeCartons.map(carton => {
+      const rowTotal = sizeCols.reduce((s, col) => s + toQtyNumber_(carton["Unit " + (col.index + 1)]), 0);
+      const unitCells = sizeCols.map(col => {
+        const n = toQtyNumber_(carton["Unit " + (col.index + 1)]);
+        return pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-num", n > 0 ? String(n) : "");
       }).join("");
       const w = toQtyNumber_(carton["Carton Weight"]);
       return "<tr>" +
-        "<td style=\"" + PDF_TD_CENTER_STYLE_ + "\">" + pdfEsc_(String(carton["Carton #"] ?? "")) + "</td>" +
+        pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-center", pdfEsc_(String(carton["Carton #"] ?? ""))) +
         unitCells +
-        "<td style=\"" + EMAIL_PO_TD_NUM_STYLE_ + "font-weight:600;\">" + rowTotal + "</td>" +
-        "<td style=\"" + EMAIL_PO_TD_NUM_STYLE_ + "\">" + (w > 0 ? w : "") + "</td>" +
+        pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-num", String(rowTotal)) +
+        pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-num", w > 0 ? String(w) : "") +
         "</tr>";
     }).join("");
 
-    const unitTotalCells = unitTotals.map(n => "<td style=\"" + EMAIL_PO_FOOTER_TD_STYLE_ + "\">" + n + "</td>").join("");
+    const unitTotalCells = unitTotals.map(n =>
+      pdfBgCell_("td", PDF_TABLE_FOOTER_BG_, "pdf-num", String(n))
+    ).join("");
+
     const plNotes = String(packingList["Notes"] ?? "").trim();
     const plNotesHtml = plNotes ? pdfNotesPanelHtml_(plNotes) : "";
 
-    packingHtml = "<div style=\"margin-bottom:0;\">" +
-      "<p style=\"" + PDF_SECTION_TITLE_STYLE_ + "\">Packing List <span style=\"font-weight:400;text-transform:none;letter-spacing:0;\">(" +
-      cartons.length + " carton" + (cartons.length !== 1 ? "s" : "") + ")</span></p>" +
-      "<table cellpadding=\"0\" cellspacing=\"0\" style=\"" + PDF_TABLE_STYLE_ + "\">" +
+    packingHtml = "<p class=\"pdf-section-title\">Cartons (" + activeCartons.length + ")</p>" +
+      "<table class=\"pdf-carton-table\" cellpadding=\"0\" cellspacing=\"0\">" +
+      pdfCartonColgroupHtml_(sizeCols.length) +
       "<thead><tr>" +
-      "<th style=\"" + PDF_TH_CENTER_STYLE_ + "width:40px;\">Ctn #</th>" +
-      sizeHeads2 +
-      "<th style=\"" + EMAIL_PO_TH_STYLE_ + "text-align:right;width:50px;\">Total</th>" +
-      "<th style=\"" + EMAIL_PO_TH_STYLE_ + "text-align:right;width:60px;\">Weight</th>" +
+      pdfBgCell_("th", PDF_TABLE_HEAD_BG_, "pdf-center", "Ctn #") +
+      sizeHeads +
+      pdfBgCell_("th", PDF_TABLE_HEAD_BG_, "pdf-num", "Total") +
+      pdfBgCell_("th", PDF_TABLE_HEAD_BG_, "pdf-num", "Wt") +
       "</tr></thead>" +
       "<tbody>" + cartonRows + "</tbody>" +
       "<tfoot><tr>" +
-      "<td style=\"" + PDF_TD_TOTAL_CENTER_STYLE_ + "\">Totals</td>" +
+      pdfBgCell_("td", PDF_TABLE_FOOTER_BG_, "pdf-center", "Total") +
       unitTotalCells +
-      "<td style=\"" + EMAIL_PO_FOOTER_TD_STYLE_ + "\">" + grandTotal + "</td>" +
-      "<td style=\"" + EMAIL_PO_FOOTER_TD_STYLE_ + "\">" + (totalWeight > 0 ? totalWeight : "&mdash;") + "</td>" +
+      pdfBgCell_("td", PDF_TABLE_FOOTER_BG_, "pdf-num", String(grandTotal)) +
+      pdfBgCell_("td", PDF_TABLE_FOOTER_BG_, "pdf-num", totalWeight > 0 ? String(totalWeight) : "&mdash;") +
       "</tr></tfoot>" +
       "</table>" +
-      plNotesHtml +
-      "</div>";
+      plNotesHtml;
   }
 
-  const pageBreak = isLast ? "" : "page-break-after:always;";
-  const styleSubtitle = styleNum
-    ? "<div style=\"margin-top:4px;font-size:12px;font-weight:500;color:#d4d9df;line-height:1.3;\">" +
-      pdfEsc_(styleNum) + " / " + pdfEsc_(color) + "</div>"
-    : "";
+  const pageClass = "pdf-page" + (isLast ? " pdf-page-last" : "");
 
-  return "<div style=\"" + PDF_FONT_ + pageBreak + "margin:0 0 24px 0;\">" +
-    "<div style=\"border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;background:#ffffff;\">" +
-    "<table cellpadding=\"0\" cellspacing=\"0\" style=\"width:100%;border-collapse:collapse;background-color:#2d2d29;\">" +
-    "<tr>" +
-    "<td style=\"padding:20px 24px;vertical-align:middle;\">" +
-    "<div style=\"margin:0 0 6px 0;font-size:20px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:#ffffff;line-height:1.2;\">ELEVATOR DISCO</div>" +
-    "<div style=\"margin:0;font-size:16px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#d4d9df;line-height:1.3;\">Packing List</div>" +
-    "</td>" +
-    "<td style=\"padding:20px 24px;text-align:right;vertical-align:middle;white-space:nowrap;\">" +
-    "<div style=\"font-size:14px;font-weight:500;color:#ffffff;letter-spacing:0.02em;line-height:1.4;\">PO " + pdfEsc_(po) + "</div>" +
-    styleSubtitle +
-    "</td>" +
-    "</tr></table>" +
-    "<div style=\"padding:24px;\">" +
+  return "<div class=\"" + pageClass + "\">" +
+    "<table class=\"pdf-page-inner\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\">" +
+    "<tr><td colspan=\"1\">" + buildPdfPackingListHeaderHtml_(po, styleNum, color) + "</td></tr>" +
+    "<tr class=\"pdf-page-body\"><td>" +
     poDetailsHtml +
-    styleDetailsHtml +
     packingHtml +
-    "</div></div></div>";
+    "</td></tr></table></div>";
 }
 
 /**
@@ -2367,18 +2357,13 @@ function buildGroupPackingListPdfBlob_(poRows, opts) {
   });
 
   const bodyHtml = sections.join("\n");
-  const html = "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\">" +
-    "<title>Packing List</title></head>" +
-    "<body style=\"margin:0;padding:20px 24px;" + PDF_FONT_ +
-    "font-size:14px;line-height:1.5;color:#1a1a18;background:#ffffff;\">" +
-    bodyHtml +
-    "</body></html>";
+  const html = renderEmailTemplate_("templates/packing-list-pdf", { poSectionsHtml: bodyHtml });
 
   const filename = opts.filename || ("PackingList_" + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMdd") + ".pdf");
   // HtmlService is required for HTML -> PDF conversion; Utilities.newBlob().getAs("application/pdf") does not work.
   return HtmlService.createHtmlOutput(html)
-    .setWidth(1056)
-    .setHeight(816)
+    .setWidth(PDF_PAGE_WIDTH_)
+    .setHeight(PDF_PAGE_HEIGHT_)
     .getAs("application/pdf")
     .setName(filename);
 }

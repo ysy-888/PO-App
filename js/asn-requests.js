@@ -28,6 +28,7 @@ const ASN_REQUEST_TABLE_COLUMN_LABELS = {
 
 let asnRequestPoNumbers = [];
 let asnRequestAddPoPanelOpen = false;
+const asnRequestAvailablePoSelection = createAvailablePoPickerSelection();
 let asnRequestDraftByPo = {};
 let asnRequestDraftEmail = {};
 let asnRequestDraftAsnDate = "";
@@ -248,7 +249,7 @@ function openAsnRequestFromSelection() {
   if (isAppSaving() || isToolbarCreateActionBlocked()) return;
   const selected = getCheckedFilteredPos();
   if (!areRowsEligibleForAsnRequest(selected)) {
-    showIndicator("Select OTW or Arrived at Port POs with packing lists, all LULU'S or all 12TH TRIBE, and no ASN request yet", "error");
+    showIndicator("Select OTW or Arrived at Port POs with packing lists, all LULU'S FASHION LOUNGE or all 12TH TRIBE, and no ASN request yet", "error");
     return;
   }
   asnRequestPoNumbers = selected.map(row => row["PO #"]);
@@ -353,18 +354,20 @@ function renderAsnRequestModal(poNumbers, { asnDate = formatDateToYmd(new Date()
       notesField: ASN_REQ_NOTES_FIELD,
       notesValue: isExisting ? (request[ASN_REQ_NOTES_FIELD] ?? "") : asnRequestDraftNotes,
       notesReadOnly: isView,
+      requestForm: true,
     }),
     renderAsnRequestLinkedPoSection(pos, isView)
   ));
 
   if (!isView && asnRequestAddPoPanelOpen) {
-    outer.classList.add("shipment-modal-outer--add-panel-open");
-    outer.appendChild(renderAvailablePoPickerPanel(getAvailableAsnRequestPanelRows(), {
-      panelId: "asnRequestAddPoPanel",
+    appendAvailablePoPanelToModalRight(outer, renderAvailablePoLinkedSection(getAvailableAsnRequestPanelRows(), {
+      sectionId: "asnRequestAddPoPanel",
+      columns: DELIVERY_PICKUP_LINKED_PO_COLUMNS,
+      appendColgroup: appendDeliveryPickupLinkedPoColgroup,
       emptyMessage: "No eligible POs available.",
-      closeLabel: "Close available POs panel",
-      onClose: closeAsnRequestAddPoPanel,
-      onAddPo: addPoToAsnRequest,
+      selection: asnRequestAvailablePoSelection,
+      onSelectionChange: updateAsnRequestActionButtons,
+      selectAllId: "asnRequestAvailablePoSelectAll",
     }));
   }
 
@@ -385,6 +388,7 @@ function renderAsnRequestModal(poNumbers, { asnDate = formatDateToYmd(new Date()
   }
 
   bringModalToFront(document.getElementById("asnRequestOverlay"));
+  updateAsnRequestActionButtons();
   updateToolbarRequestButtons();
 }
 
@@ -409,13 +413,29 @@ function getAsnRequestModalRenderOptions(extra = {}) {
 
 function openAsnRequestAddPoPanel() {
   captureAsnRequestDraft();
+  clearAsnFormSelection();
+  asnRequestAvailablePoSelection.clear();
   asnRequestAddPoPanelOpen = true;
   renderAsnRequestModal(asnRequestPoNumbers, getAsnRequestModalRenderOptions());
 }
 
 function closeAsnRequestAddPoPanel() {
   captureAsnRequestDraft();
+  asnRequestAvailablePoSelection.clear();
   asnRequestAddPoPanelOpen = false;
+  renderAsnRequestModal(asnRequestPoNumbers, getAsnRequestModalRenderOptions());
+}
+
+function addSelectedPosToAsnRequest() {
+  const selected = asnRequestAvailablePoSelection.getAll();
+  if (selected.length === 0) return;
+  captureAsnRequestDraft();
+  const existing = new Set(asnRequestPoNumbers.map(String));
+  const toAdd = selected.filter(po => !existing.has(po));
+  if (toAdd.length === 0) return;
+  asnRequestAvailablePoSelection.clear();
+  asnRequestPoNumbers = [...asnRequestPoNumbers, ...toAdd];
+  asnRequestAddPoPanelOpen = true;
   renderAsnRequestModal(asnRequestPoNumbers, getAsnRequestModalRenderOptions());
 }
 
@@ -506,7 +526,6 @@ function renderAsnRequestLinkedPoSection(pos, isView = false) {
   }
   wrap.appendChild(table);
   section.appendChild(wrap);
-  if (!isView) section.appendChild(renderAsnRequestLinkedPoFooter(pos));
   return section;
 }
 
@@ -521,41 +540,38 @@ function syncAsnRequestLinkedPoCheckboxes(pos) {
   });
 }
 
-function renderAsnRequestLinkedPoFooter(pos) {
-  const footer = document.createElement("footer");
-  footer.className = "shipment-linked-po-footer";
-
-  const actions = document.createElement("div");
-  actions.className = "shipment-linked-po-footer-actions";
-
-  const addBtn = document.createElement("button");
-  addBtn.type = "button";
-  addBtn.className = "btn shipment-linked-po-footer-btn asn-request-linked-po-footer-add";
-  addBtn.textContent = "Add POs";
-  addBtn.addEventListener("click", openAsnRequestAddPoPanel);
-
-  const removeBtn = document.createElement("button");
-  removeBtn.type = "button";
-  removeBtn.className = "btn shipment-linked-po-footer-btn asn-request-linked-po-footer-remove";
-  removeBtn.textContent = "Remove POs";
-  removeBtn.hidden = true;
-  removeBtn.addEventListener("click", removePosFromAsnRequest);
-
-  actions.appendChild(addBtn);
-  actions.appendChild(removeBtn);
-  footer.appendChild(actions);
-  return footer;
-}
-
 function updateAsnRequestActionButtons() {
   const overlay = document.getElementById("asnRequestOverlay");
   if (!overlay?.classList.contains("open")) return;
-  const addBtn = overlay.querySelector(".asn-request-linked-po-footer-add");
-  const removeBtn = overlay.querySelector(".asn-request-linked-po-footer-remove");
-  if (!addBtn && !removeBtn) return;
+  const addBtn = document.getElementById("asnRequestAddPosBtn");
+  const removeBtn = document.getElementById("asnRequestRemovePosBtn");
+  const doneBtn = document.getElementById("asnRequestAddPoDoneBtn");
+  const addSelectedBtn = document.getElementById("asnRequestAddSelectedPosBtn");
+  const submitBtn = document.getElementById("asnRequestSubmitBtn");
+
+  const isView = submitBtn?.hidden === true;
+  if (isView) {
+    if (addBtn) addBtn.hidden = true;
+    if (removeBtn) removeBtn.hidden = true;
+    if (doneBtn) doneBtn.hidden = true;
+    if (addSelectedBtn) addSelectedBtn.hidden = true;
+    return;
+  }
+
+  if (asnRequestAddPoPanelOpen) {
+    if (addBtn) addBtn.hidden = true;
+    if (removeBtn) removeBtn.hidden = true;
+    if (doneBtn) doneBtn.hidden = false;
+    if (addSelectedBtn) addSelectedBtn.hidden = asnRequestAvailablePoSelection.size === 0;
+    return;
+  }
+
+  if (doneBtn) doneBtn.hidden = true;
+  if (addSelectedBtn) addSelectedBtn.hidden = true;
+
   const anySelected = getAsnRequestRows().some(isAsnFormPoSelected);
-  if (addBtn) addBtn.hidden = asnRequestAddPoPanelOpen || anySelected;
-  if (removeBtn) removeBtn.hidden = asnRequestAddPoPanelOpen || !anySelected;
+  if (addBtn) addBtn.hidden = anySelected;
+  if (removeBtn) removeBtn.hidden = !anySelected;
 }
 
 // Per-row selection state (reuses the existing form selection helpers pattern)
@@ -686,6 +702,10 @@ function demoCreateAsnRequest(poNumbers, data) {
 function initAsnRequests() {
   document.getElementById("asnRequestBtn")?.addEventListener("click", openAsnRequestFromSelection);
   document.getElementById("asnRequestSubmitBtn")?.addEventListener("click", submitAsnRequest);
+  document.getElementById("asnRequestAddPosBtn")?.addEventListener("click", openAsnRequestAddPoPanel);
+  document.getElementById("asnRequestRemovePosBtn")?.addEventListener("click", removePosFromAsnRequest);
+  document.getElementById("asnRequestAddPoDoneBtn")?.addEventListener("click", closeAsnRequestAddPoPanel);
+  document.getElementById("asnRequestAddSelectedPosBtn")?.addEventListener("click", addSelectedPosToAsnRequest);
   document.getElementById("asnRequestCancelBtn")?.addEventListener("click", closeAsnRequestModal);
   document.querySelector('[data-dismiss="asn-request"]')?.addEventListener("click", closeAsnRequestModal);
   bindDirectBackdropDismiss(document.getElementById("asnRequestOverlay"), closeAsnRequestModal);

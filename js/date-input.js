@@ -19,6 +19,49 @@ function updateCompactDateInputState(input) {
   input.dataset.normalizedValue = ymd;
 }
 
+function commitCompactDateInputValue(input, onCommit) {
+  const trimmed = String(input.value ?? "").trim();
+  if (!trimmed) {
+    input.value = "";
+    input.maxLength = 6;
+    input.classList.remove("is-invalid");
+    input.dataset.normalizedValue = "";
+    onCommit?.(null);
+    return;
+  }
+
+  const ymd = normalizeCompactDateInputValue(trimmed);
+  if (ymd) {
+    input.value = formatDateForDisplay(ymd);
+    input.maxLength = getDateFormatDisplayMaxLength();
+    input.classList.remove("is-invalid");
+    input.dataset.normalizedValue = ymd;
+    onCommit?.(ymd);
+    return;
+  }
+
+  const digits = trimmed.replace(/\D/g, "").slice(0, 6);
+  if (digits.length === 6) {
+    input.value = digits;
+    input.maxLength = 6;
+    input.classList.add("is-invalid");
+    input.dataset.normalizedValue = "";
+    onCommit?.(null);
+    return;
+  }
+
+  if (digits.length > 0) {
+    input.value = "";
+    input.maxLength = 6;
+    input.classList.remove("is-invalid");
+    input.dataset.normalizedValue = "";
+    onCommit?.(null);
+    return;
+  }
+
+  updateCompactDateInputState(input);
+}
+
 function handleCompactDateInput(input, onCommit) {
   const digits = input.value.replace(/\D/g, "").slice(0, 6);
   if (!digits) {
@@ -103,17 +146,7 @@ function createCompactDateInput({
   btn.hidden = readOnly;
 
   input.addEventListener("input", () => handleCompactDateInput(input, onCommit));
-  input.addEventListener("blur", () => {
-    const digits = input.value.replace(/\D/g, "");
-    if (digits.length > 0 && digits.length < 6) {
-      input.value = "";
-      input.classList.remove("is-invalid");
-      input.dataset.normalizedValue = "";
-      onCommit?.(null);
-      return;
-    }
-    updateCompactDateInputState(input);
-  });
+  input.addEventListener("blur", () => commitCompactDateInputValue(input, onCommit));
 
   btn.addEventListener("mousedown", e => e.preventDefault());
 

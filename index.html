@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>PO Table</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-<link rel="stylesheet" href="po-table.css?v=20260605-3" />
+<link rel="stylesheet" href="po-table.css?v=20260605-11" />
 </head>
 <body>
 
@@ -740,8 +740,8 @@
     <div class="modal-header email-header email-header-request">
       <div class="email-header-inner">
         <div class="email-header-titles">
-          <h1 class="email-heading">ELEVATOR DISCO</h1>
-          <p class="email-subheading" id="createShipmentModalTitle">Create Shipment</p>
+          <h1 class="email-heading">Shipment</h1>
+          <p class="email-subheading" id="createShipmentModalTitle">New</p>
         </div>
         <div class="email-header-meta">
           <div class="email-header-id-block">
@@ -750,6 +750,16 @@
           </div>
           <div class="modal-header-actions">
             <span id="createShipmentPoCount" class="shipment-modal-po-count"></span>
+            <button type="button" class="btn btn-secondary" id="shipmentAddPosBtn">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+              Add POs
+            </button>
+            <button type="button" class="btn btn-secondary" id="shipmentRemovePosBtn" hidden>
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>
+              Remove POs
+            </button>
+            <button type="button" class="btn btn-secondary" id="createShipmentAddSelectedPosBtn" hidden>Add</button>
+            <button type="button" class="btn btn-secondary" id="createShipmentAddPoDoneBtn" hidden>Done</button>
             <button type="button" class="btn-close" id="createShipmentCancelBtn" aria-label="Close">✕</button>
           </div>
         </div>
@@ -758,14 +768,6 @@
     <div class="modal-body" id="createShipmentBody"></div>
     <div class="modal-footer">
       <div id="createShipmentFooterMessage" class="modal-footer-message shipment-footer-message" role="status" aria-live="polite" hidden></div>
-      <button type="button" class="btn btn-secondary" id="shipmentAddPosBtn">
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-        Add POs
-      </button>
-      <button type="button" class="btn btn-secondary" id="shipmentRemovePosBtn" hidden>
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>
-        Remove POs
-      </button>
       <button type="button" class="btn btn-primary" id="createShipmentSaveBtn">
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v10H3z"/><path d="M14 10h4l3 3v4h-7z"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>
         Create
@@ -780,8 +782,8 @@
     <div class="modal-header email-header email-header-request">
       <div class="email-header-inner">
         <div class="email-header-titles">
-          <h1 class="email-heading">ELEVATOR DISCO</h1>
-          <p class="email-subheading" id="shipmentModalTitle">Shipment</p>
+          <h1 class="email-heading">Shipment</h1>
+          <p class="email-subheading" id="shipmentModalTitle">—</p>
         </div>
         <div class="email-header-meta">
           <div class="email-header-id-block">
@@ -790,6 +792,16 @@
           </div>
           <div class="modal-header-actions">
             <span id="shipmentModalPoCount" class="shipment-modal-po-count"></span>
+            <button type="button" class="btn btn-secondary" id="shipmentDetailAddPosBtn">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+              Add POs
+            </button>
+            <button type="button" class="btn btn-secondary" id="shipmentDetailRemovePosBtn" hidden>
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>
+              Remove POs
+            </button>
+            <button type="button" class="btn btn-secondary" id="shipmentDetailAddSelectedPosBtn" hidden>Add</button>
+            <button type="button" class="btn btn-secondary" id="shipmentDetailAddPoDoneBtn" hidden>Done</button>
             <button type="button" class="btn-close" id="shipmentModalCloseBtn" aria-label="Close">✕</button>
           </div>
         </div>
@@ -798,14 +810,6 @@
     <div class="modal-body" id="shipmentModalBody"></div>
     <div class="modal-footer">
       <div id="shipmentModalFooterMessage" class="modal-footer-message shipment-footer-message" role="status" aria-live="polite" hidden></div>
-      <button type="button" class="btn btn-secondary" id="shipmentDetailAddPosBtn">
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-        Add POs
-      </button>
-      <button type="button" class="btn btn-secondary" id="shipmentDetailRemovePosBtn" hidden>
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>
-        Remove POs
-      </button>
       <button type="button" class="btn btn-primary" id="shipmentModalSaveBtn">
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
         Save
@@ -820,8 +824,8 @@
     <div class="modal-header email-header email-header-request">
       <div class="email-header-inner">
         <div class="email-header-titles">
-          <h1 class="email-heading">ELEVATOR DISCO</h1>
-          <p class="email-subheading" id="exfRequestModalTitle">EXF Request</p>
+          <h1 class="email-heading">EXF Request</h1>
+          <p class="email-subheading" id="exfRequestModalTitle">New</p>
         </div>
         <div class="email-header-meta">
           <div class="email-header-id-block">
@@ -830,6 +834,16 @@
           </div>
           <div class="modal-header-actions">
             <span id="exfRequestPoCount" class="shipment-modal-po-count"></span>
+            <button type="button" class="btn btn-secondary" id="exfRequestAddPosBtn">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+              Add POs
+            </button>
+            <button type="button" class="btn btn-secondary" id="exfRequestRemovePosBtn" hidden>
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>
+              Remove POs
+            </button>
+            <button type="button" class="btn btn-secondary" id="exfRequestAddSelectedPosBtn" hidden>Add</button>
+            <button type="button" class="btn btn-secondary" id="exfRequestAddPoDoneBtn" hidden>Done</button>
             <button type="button" class="btn-close" id="exfRequestCancelBtn" aria-label="Close">✕</button>
           </div>
         </div>
@@ -856,8 +870,8 @@
     <div class="modal-header email-header email-header-request">
       <div class="email-header-inner">
         <div class="email-header-titles">
-          <h1 class="email-heading">ELEVATOR DISCO</h1>
-          <p class="email-subheading" id="asnRequestModalTitle">ASN Request</p>
+          <h1 class="email-heading">ASN Request</h1>
+          <p class="email-subheading" id="asnRequestModalTitle">New</p>
         </div>
         <div class="email-header-meta">
           <div class="email-header-id-block">
@@ -866,6 +880,16 @@
           </div>
           <div class="modal-header-actions">
             <span id="asnRequestPoCount" class="shipment-modal-po-count"></span>
+            <button type="button" class="btn btn-secondary" id="asnRequestAddPosBtn">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+              Add POs
+            </button>
+            <button type="button" class="btn btn-secondary" id="asnRequestRemovePosBtn" hidden>
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>
+              Remove POs
+            </button>
+            <button type="button" class="btn btn-secondary" id="asnRequestAddSelectedPosBtn" hidden>Add</button>
+            <button type="button" class="btn btn-secondary" id="asnRequestAddPoDoneBtn" hidden>Done</button>
             <button type="button" class="btn btn-secondary packing-list-print-btn" id="asnRequestPrintBtn" hidden title="Print packing list for linked POs">Print Packing List</button>
             <button type="button" class="btn-close" id="asnRequestCancelBtn" aria-label="Close">✕</button>
           </div>
@@ -889,8 +913,8 @@
     <div class="modal-header email-header email-header-request">
       <div class="email-header-inner">
         <div class="email-header-titles">
-          <h1 class="email-heading">ELEVATOR DISCO</h1>
-          <p class="email-subheading" id="deliveryRequestModalTitle">Delivery Request</p>
+          <h1 class="email-heading">Delivery Request</h1>
+          <p class="email-subheading" id="deliveryRequestModalTitle">New</p>
         </div>
         <div class="email-header-meta">
           <div class="email-header-id-block">
@@ -899,6 +923,16 @@
           </div>
           <div class="modal-header-actions">
             <span id="deliveryRequestPoCount" class="shipment-modal-po-count"></span>
+            <button type="button" class="btn btn-secondary" id="deliveryRequestAddPosBtn">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+              Add POs
+            </button>
+            <button type="button" class="btn btn-secondary" id="deliveryRequestRemovePosBtn" hidden>
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>
+              Remove POs
+            </button>
+            <button type="button" class="btn btn-secondary" id="deliveryRequestAddSelectedPosBtn" hidden>Add</button>
+            <button type="button" class="btn btn-secondary" id="deliveryRequestAddPoDoneBtn" hidden>Done</button>
             <button type="button" class="btn btn-secondary packing-list-print-btn" id="deliveryRequestPrintBtn" hidden title="Print packing list for linked POs">Print Packing List</button>
             <button type="button" class="btn-close" id="deliveryRequestCancelBtn" aria-label="Close">✕</button>
           </div>
@@ -922,8 +956,8 @@
     <div class="modal-header email-header email-header-request">
       <div class="email-header-inner">
         <div class="email-header-titles">
-          <h1 class="email-heading">ELEVATOR DISCO</h1>
-          <p class="email-subheading" id="pickupRequestModalTitle">Pickup Request</p>
+          <h1 class="email-heading">Pickup Request</h1>
+          <p class="email-subheading" id="pickupRequestModalTitle">New</p>
         </div>
         <div class="email-header-meta">
           <div class="email-header-id-block">
@@ -932,6 +966,16 @@
           </div>
           <div class="modal-header-actions">
             <span id="pickupRequestPoCount" class="shipment-modal-po-count"></span>
+            <button type="button" class="btn btn-secondary" id="pickupRequestAddPosBtn">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+              Add POs
+            </button>
+            <button type="button" class="btn btn-secondary" id="pickupRequestRemovePosBtn" hidden>
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>
+              Remove POs
+            </button>
+            <button type="button" class="btn btn-secondary" id="pickupRequestAddSelectedPosBtn" hidden>Add</button>
+            <button type="button" class="btn btn-secondary" id="pickupRequestAddPoDoneBtn" hidden>Done</button>
             <button type="button" class="btn btn-secondary packing-list-print-btn" id="pickupRequestPrintBtn" hidden title="Print packing list for linked POs">Print Packing List</button>
             <button type="button" class="btn-close" id="pickupRequestCancelBtn" aria-label="Close">✕</button>
           </div>
@@ -1120,12 +1164,12 @@
 <script src="js/batch-edit.js"></script>
 <script src="js/main.js"></script>
 <script src="js/shipments-tables.js"></script>
-<script src="js/shipments-modals.js"></script>
-<script src="js/request-modals.js"></script>
-<script src="js/exf-request.js"></script>
-<script src="js/asn-requests.js"></script>
-<script src="js/delivery-requests.js"></script>
-<script src="js/pickup-requests.js"></script>
+<script src="js/shipments-modals.js?v=20260605-8"></script>
+<script src="js/request-modals.js?v=20260605-10"></script>
+<script src="js/exf-request.js?v=20260605-8"></script>
+<script src="js/asn-requests.js?v=20260605-8"></script>
+<script src="js/delivery-requests.js?v=20260605-8"></script>
+<script src="js/pickup-requests.js?v=20260605-8"></script>
 <script src="js/packing-reviews.js"></script>
 <script src="js/export-csv.js"></script>
 <script src="js/shipments-init.js"></script>

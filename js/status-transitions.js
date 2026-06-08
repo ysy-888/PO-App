@@ -10,7 +10,7 @@ const SHIPPED_GROUP_STATUSES = new Set([
 ]);
 
 const DELIVERY_REQUEST_ELIGIBLE_STATUSES = new Set(["OTW", "Arrived at Port"]);
-const ASN_REQUEST_BUYERS = new Set(["LULU'S", "12TH TRIBE"]);
+const ASN_REQUEST_BUYERS = new Set(["LULU'S FASHION LOUNGE", "12TH TRIBE"]);
 
 const SHIPMENT_REQUIRED_FIELDS = ["Ship Method", "Shipped", "ETD", "ETA", "IHD"];
 
@@ -66,7 +66,6 @@ function syncAllStatusClosedFromN41(rows) {
 function migrateLegacyStatusValue(status, row) {
   const s = String(status ?? "").trim();
   if (s === "Received") return "In Warehouse";
-  if (s === "Arrived at WH") return "Arrived at Port";
   if (s === "Shipped") {
     const hasShipment = typeof poHasShipment === "function" && poHasShipment(row);
     return hasShipment ? "OTW" : "In Warehouse";

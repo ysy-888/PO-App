@@ -1,39 +1,6 @@
 /** Packing list print functionality – individual (single PO) and group (multi-PO) layouts. */
 
-// ── Shared style constants (mirrors templates/email-styles.html) ────────────
-
 const PL_PRINT_FONT = "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;";
-const PL_PRINT_SECTION_TITLE_STYLE =
-  "margin:0 0 8px 0;font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:#374151;";
-const PL_PRINT_META_TABLE_STYLE =
-  "border-collapse:collapse;width:100%;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;";
-const PL_PRINT_META_LABEL_STYLE =
-  "width:110px;max-width:110px;padding:8px 12px;font-size:12px;font-weight:600;color:#374151;background-color:#f7f7f8;border-bottom:1px solid #e5e7eb;white-space:nowrap;vertical-align:top;";
-const PL_PRINT_META_LABEL_LAST_STYLE =
-  "width:110px;max-width:110px;padding:8px 12px;font-size:12px;font-weight:600;color:#374151;background-color:#f7f7f8;white-space:nowrap;vertical-align:top;";
-const PL_PRINT_META_VALUE_STYLE =
-  "padding:8px 12px;font-size:14px;color:#1a1a18;background-color:#ffffff;border-bottom:1px solid #e5e7eb;vertical-align:top;";
-const PL_PRINT_META_VALUE_LAST_STYLE =
-  "padding:8px 12px;font-size:14px;color:#1a1a18;background-color:#ffffff;vertical-align:top;";
-const PL_PRINT_TABLE_STYLE =
-  "width:100%;border-collapse:collapse;border:1px solid #e5e7eb;font-size:13px;table-layout:auto;";
-const PL_PRINT_TH_STYLE =
-  "padding:10px 12px;text-align:left;font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:#374151;background-color:#f7f7f8;border-bottom:1px solid #e5e7eb;white-space:nowrap;";
-const PL_PRINT_TH_NUM_STYLE = PL_PRINT_TH_STYLE + "text-align:right;";
-const PL_PRINT_TH_CENTER_STYLE = PL_PRINT_TH_STYLE + "text-align:center;";
-const PL_PRINT_TD_STYLE =
-  "padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#1a1a18;vertical-align:top;font-size:13px;";
-const PL_PRINT_TD_NUM_STYLE = PL_PRINT_TD_STYLE + "text-align:right;font-variant-numeric:tabular-nums;";
-const PL_PRINT_TD_CENTER_STYLE = PL_PRINT_TD_STYLE + "text-align:center;color:#6b7280;font-variant-numeric:tabular-nums;";
-const PL_PRINT_TD_TOTAL_STYLE =
-  "padding:10px 12px;font-weight:600;background-color:#eef0f3;color:#1a1a18;border-bottom:none;font-size:13px;text-align:right;font-variant-numeric:tabular-nums;vertical-align:top;";
-const PL_PRINT_TD_TOTAL_CENTER_STYLE = PL_PRINT_TD_TOTAL_STYLE + "text-align:center;";
-const PL_PRINT_NOTES_PANEL_STYLE =
-  "margin:8px 0 0;padding:14px 16px;background:transparent;border:1px solid #e5e7eb;border-radius:6px;";
-const PL_PRINT_NOTES_TITLE_STYLE =
-  "font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:#374151;margin:0 0 8px 0;";
-const PL_PRINT_NOTES_BODY_STYLE =
-  "font-size:14px;color:#1a1a18;white-space:pre-wrap;word-break:break-word;";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -60,130 +27,112 @@ function plPrintNum(val) {
   return n > 0 ? plPrintEsc(String(n)) : "0";
 }
 
-function plPrintMoney(val) {
-  if (!val || String(val).trim() === "") return "—";
-  const n = Number(String(val).replace(/[$,]/g, ""));
-  if (!Number.isFinite(n)) return plPrintEsc(String(val));
-  return "$" + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function plActiveCartons(cartons) {
+  return (Array.isArray(cartons) ? cartons : []).filter(carton => {
+    for (let i = 1; i <= 15; i++) {
+      if (toQtyNumber(carton[`Unit ${i}`]) > 0) return true;
+    }
+    return toQtyNumber(carton["Carton Weight"]) > 0;
+  });
 }
 
-function plPrintMetaTable(pairs) {
-  const rows = pairs.map(([label, val], index) => {
-    const isLast = index === pairs.length - 1;
-    const labelStyle = isLast ? PL_PRINT_META_LABEL_LAST_STYLE : PL_PRINT_META_LABEL_STYLE;
-    const valueStyle = isLast ? PL_PRINT_META_VALUE_LAST_STYLE : PL_PRINT_META_VALUE_STYLE;
-    return `<tr>
-      <td style="${labelStyle}">${plPrintEsc(label)}</td>
-      <td style="${valueStyle}">${val}</td>
-    </tr>`;
-  }).join("");
-  return `<table cellpadding="0" cellspacing="0" style="${PL_PRINT_META_TABLE_STYLE}">${rows}</table>`;
+function plActiveSizeColumns(row, cartons) {
+  const cols = [];
+  for (let i = 0; i < 15; i++) {
+    const hasQty = cartons.some(c => toQtyNumber(c[`Unit ${i + 1}`]) > 0);
+    if (!hasQty) continue;
+    const label = String(row[`Size ${i + 1}`] ?? "").trim() || (`Sz ${i + 1}`);
+    cols.push({ index: i, label });
+  }
+  return cols;
+}
+
+/** Three label/value pairs per row for a compact summary grid. */
+function plPrintSummaryGrid(pairs) {
+  const colsPerRow = 3;
+  const rows = [];
+  for (let i = 0; i < pairs.length; i += colsPerRow) {
+    let row = "<tr>";
+    for (let j = 0; j < colsPerRow; j++) {
+      const pair = pairs[i + j];
+      if (pair) {
+        row += `<td class="pl-summary-label">${plPrintEsc(pair[0])}</td><td class="pl-summary-value">${pair[1]}</td>`;
+      } else {
+        row += `<td class="pl-summary-label">&nbsp;</td><td class="pl-summary-value">&nbsp;</td>`;
+      }
+    }
+    row += "</tr>";
+    rows.push(row);
+  }
+  return `<table class="pl-summary" cellpadding="0" cellspacing="0">${rows.join("")}</table>`;
 }
 
 function plPrintNotesPanel(notes) {
-  return `<div style="${PL_PRINT_NOTES_PANEL_STYLE}">
-    <div style="${PL_PRINT_NOTES_TITLE_STYLE}">Notes</div>
-    <div style="${PL_PRINT_NOTES_BODY_STYLE}">${plPrintEsc(notes)}</div>
+  return `<div class="pl-notes">
+    <div class="pl-notes-title">Notes</div>
+    <div>${plPrintEsc(notes)}</div>
   </div>`;
+}
+
+function plPrintColgroup(sizeColCount) {
+  const contentWidth = 788;
+  const fixed = 30 + 34 + 36;
+  const sizeWidth = sizeColCount > 0 ? Math.max(22, Math.floor((contentWidth - fixed) / sizeColCount)) : 0;
+  let cols = `<colgroup><col width="30">`;
+  for (let i = 0; i < sizeColCount; i++) cols += `<col width="${sizeWidth}">`;
+  cols += `<col width="34"><col width="36"></colgroup>`;
+  return cols;
+}
+
+function plPrintPageStyles() {
+  return `<style>
+    .pl-print-page{width:100%;min-height:100vh;margin:0;padding:0;page-break-after:always;${PL_PRINT_FONT}font-size:9px;line-height:1.3;color:#1a1a18;}
+    .pl-print-page:last-child{page-break-after:auto;}
+    .pl-header{width:100%;border-collapse:collapse;background:#2d2d29;color:#fff;}
+    .pl-header td{padding:10px 14px;vertical-align:middle;background:#2d2d29;}
+    .pl-header-brand{margin:0 0 3px;font-size:13px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;}
+    .pl-header-title{margin:0;font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#d4d9df;}
+    .pl-header-po{font-size:10px;font-weight:500;text-align:right;}
+    .pl-header-sub{margin-top:2px;font-size:9px;color:#d4d9df;text-align:right;}
+    .pl-body{padding:0 14px 14px;}
+    .pl-section-title{margin:8px 0 3px;font-size:8px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#374151;}
+    .pl-summary{width:auto;max-width:100%;border-collapse:collapse;border:1px solid #e5e7eb;table-layout:fixed;font-size:9px;}
+    .pl-summary td{padding:2px 5px;border-bottom:1px solid #e5e7eb;vertical-align:middle;}
+    .pl-summary tr:last-child td{border-bottom:none;}
+    .pl-summary-label{width:58px;max-width:58px;font-size:8px;font-weight:600;color:#374151;background:#f7f7f8;white-space:nowrap;}
+    .pl-summary-value{width:68px;max-width:68px;font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .pl-carton-table{width:100%;border-collapse:collapse;border:1px solid #e5e7eb;table-layout:fixed;font-size:9px;margin-top:2px;}
+    .pl-carton-table th{padding:3px 4px;font-size:8px;font-weight:600;text-transform:uppercase;color:#374151;background:#f7f7f8;border-bottom:1px solid #e5e7eb;}
+    .pl-carton-table td{padding:3px 4px;border-bottom:1px solid #e5e7eb;font-size:9px;vertical-align:middle;}
+    .pl-carton-table tbody tr:last-child td{border-bottom:none;}
+    .pl-carton-table tfoot td{padding:3px 4px;font-size:9px;font-weight:600;background:#eef0f3;border-top:1px solid #e5e7eb;border-bottom:none;}
+    .pl-num{text-align:right;font-variant-numeric:tabular-nums;}
+    .pl-center{text-align:center;font-variant-numeric:tabular-nums;color:#6b7280;}
+    .pl-notes{margin-top:6px;padding:6px 8px;border:1px solid #e5e7eb;border-radius:3px;font-size:9px;}
+    .pl-notes-title{font-size:8px;font-weight:600;text-transform:uppercase;color:#374151;margin-bottom:3px;}
+    .pl-empty{font-size:9px;color:#6b7280;font-style:italic;margin:0;}
+  </style>`;
 }
 
 // ── PO Details section ───────────────────────────────────────────────────────
 
-function buildPlPrintPoDetailsHtml(row) {
+function buildPlPrintPoDetailsHtml(row, activeCartonCount) {
   const metaRows = [
     ["PO #", plPrintVal(row["PO #"])],
     ["Buyer PO #", plPrintVal(row["Buyer PO #"])],
-    ["SO #", plPrintVal(row["SO #"])],
+    ["Style #", plPrintVal(row["Style #"])],
+    ["Color", plPrintVal(row["Color"])],
     ["Vendor", plPrintVal(row["Vendor"])],
     ["Buyer", plPrintVal(row["Buyer"])],
-    ["Division", plPrintVal(row["Division"])],
     ["Ship Method", plPrintVal(row["Ship Method"])],
-    ["Status", plPrintVal(row["Status"])],
+    ["Shipment ID", plPrintVal(row["Shipment ID"])],
     ["PO Date", plPrintDate(row["PO Date"])],
     ["EXF Date", plPrintDate(row["EXF Date"] || row["EXF Request Date"] || row["EXF"])],
     ["IHD", plPrintDate(row["IHD"])],
-    ["CXL Date", plPrintDate(row["CXL Date"])],
+    ["Ctn Qty", plPrintNum(activeCartonCount || row["Ctn Qty"])],
   ];
 
-  const half = Math.ceil(metaRows.length / 2);
-  const left = metaRows.slice(0, half);
-  const right = metaRows.slice(half);
-
-  return `
-<div style="margin-bottom:20px;">
-  <p style="${PL_PRINT_SECTION_TITLE_STYLE}">PO Details</p>
-  <table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;">
-    <tr>
-      <td style="width:50%;vertical-align:top;padding-right:8px;">${plPrintMetaTable(left)}</td>
-      <td style="width:50%;vertical-align:top;">${plPrintMetaTable(right)}</td>
-    </tr>
-  </table>
-</div>`;
-}
-
-// ── Style Details section ────────────────────────────────────────────────────
-
-function buildPlPrintStyleDetailsHtml(row) {
-  const labels = getSizeLabelsFromRow(row);
-  const poUnits = PO_UNIT_FIELDS.slice(0, labels.length).map((f, i) => toQtyNumber(row[f]));
-  const actUnits = labels.map((_, i) => toQtyNumber(row[`Act Unit ${i + 1}`]));
-  const poTotal = poUnits.reduce((s, n) => s + n, 0);
-  const actTotal = actUnits.reduce((s, n) => s + n, 0);
-
-  const hasActual = actUnits.some(n => n > 0);
-
-  let sizeBreakdownHtml = "";
-  if (labels.length > 0) {
-    const colWidthPct = Math.floor(60 / labels.length);
-    const sizeHeaderCols = labels.map(l =>
-      `<th style="${PL_PRINT_TH_NUM_STYLE}width:${colWidthPct}%;">${plPrintEsc(l)}</th>`
-    ).join("");
-    const poUnitCols = poUnits.map(n =>
-      `<td style="${PL_PRINT_TD_NUM_STYLE}">${n > 0 ? n : "0"}</td>`
-    ).join("");
-    const actUnitCols = actUnits.map(n =>
-      `<td style="${PL_PRINT_TD_NUM_STYLE}">${n > 0 ? n : "0"}</td>`
-    ).join("");
-
-    sizeBreakdownHtml = `
-<table cellpadding="0" cellspacing="0" style="${PL_PRINT_TABLE_STYLE}margin-top:8px;">
-  <thead>
-    <tr>
-      <th style="${PL_PRINT_TH_STYLE}width:20%;">Row</th>
-      ${sizeHeaderCols}
-      <th style="${PL_PRINT_TH_NUM_STYLE}width:80px;">Total</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td style="${PL_PRINT_TD_STYLE}font-weight:600;">PO Qty</td>
-      ${poUnitCols}
-      <td style="${PL_PRINT_TD_NUM_STYLE}font-weight:600;">${poTotal}</td>
-    </tr>
-    ${hasActual ? `<tr>
-      <td style="${PL_PRINT_TD_STYLE}font-weight:600;">Packed Qty</td>
-      ${actUnitCols}
-      <td style="${PL_PRINT_TD_NUM_STYLE}font-weight:600;">${actTotal}</td>
-    </tr>` : ""}
-  </tbody>
-</table>`;
-  }
-
-  const infoRows = [
-    ["Style #", plPrintVal(row["Style #"])],
-    ["Color", plPrintVal(row["Color"])],
-    ["FOB Cost", plPrintMoney(row["FOB Cost"])],
-    ["PO Total Cost", plPrintMoney(row["PO Total Cost"])],
-    ["PO Qty", plPrintNum(row["PO Qty"])],
-    ["Carton Qty", plPrintNum(row["Ctn Qty"])],
-  ];
-
-  return `
-<div style="margin-bottom:20px;">
-  <p style="${PL_PRINT_SECTION_TITLE_STYLE}">Style Details</p>
-  ${plPrintMetaTable(infoRows)}
-  ${sizeBreakdownHtml}
-</div>`;
+  return `<p class="pl-section-title">PO Details</p>${plPrintSummaryGrid(metaRows)}`;
 }
 
 // ── Packing List section ─────────────────────────────────────────────────────
@@ -191,78 +140,65 @@ function buildPlPrintStyleDetailsHtml(row) {
 function buildPlPrintPackingListHtml(row) {
   const poNumber = String(row["PO #"] ?? "");
   const packingList = getPackingListForPo(poNumber);
-  const cartons = getPackingCartonsForPo(poNumber);
-  const labels = getSizeLabelsFromRow(row);
+  const cartons = plActiveCartons(getPackingCartonsForPo(poNumber));
 
   if (!packingList && cartons.length === 0) {
-    return `
-<div style="margin-bottom:20px;">
-  <p style="${PL_PRINT_SECTION_TITLE_STYLE}">Packing List</p>
-  <p style="font-size:14px;color:#6b7280;font-style:italic;margin:0;">No packing list on file.</p>
-</div>`;
+    return `<p class="pl-section-title">Cartons</p><p class="pl-empty">No packing list on file.</p>`;
   }
 
-  const colCount = labels.length;
-  const colWidthPct = colCount > 0 ? Math.floor(50 / colCount) : 0;
-
-  const unitTotals = Array.from({ length: colCount }, (_, i) =>
-    cartons.reduce((sum, carton) => sum + toQtyNumber(carton[`Unit ${i + 1}`]), 0)
+  const sizeCols = plActiveSizeColumns(row, cartons);
+  const unitTotals = sizeCols.map(col =>
+    cartons.reduce((sum, carton) => sum + toQtyNumber(carton[`Unit ${col.index + 1}`]), 0)
   );
   const grandTotal = unitTotals.reduce((s, n) => s + n, 0);
   const totalWeight = cartons.reduce((s, c) => s + toQtyNumber(c["Carton Weight"]), 0);
 
-  const sizeHeaderCols = labels.map(l =>
-    `<th style="${PL_PRINT_TH_NUM_STYLE}width:${colWidthPct}%;">${plPrintEsc(l)}</th>`
+  const sizeHeaderCols = sizeCols.map(col =>
+    `<th class="pl-num">${plPrintEsc(col.label)}</th>`
   ).join("");
 
   const cartonRows = cartons.map(carton => {
-    const rowTotal = labels.reduce((s, _, i) => s + toQtyNumber(carton[`Unit ${i + 1}`]), 0);
-    const unitCols = labels.map((_, i) => {
-      const n = toQtyNumber(carton[`Unit ${i + 1}`]);
-      return `<td style="${PL_PRINT_TD_NUM_STYLE}">${n > 0 ? n : ""}</td>`;
+    const rowTotal = sizeCols.reduce((s, col) => s + toQtyNumber(carton[`Unit ${col.index + 1}`]), 0);
+    const unitCols = sizeCols.map(col => {
+      const n = toQtyNumber(carton[`Unit ${col.index + 1}`]);
+      return `<td class="pl-num">${n > 0 ? n : ""}</td>`;
     }).join("");
     const weight = toQtyNumber(carton["Carton Weight"]);
     return `<tr>
-      <td style="${PL_PRINT_TD_CENTER_STYLE}">${plPrintEsc(String(carton["Carton #"] ?? ""))}</td>
+      <td class="pl-center">${plPrintEsc(String(carton["Carton #"] ?? ""))}</td>
       ${unitCols}
-      <td style="${PL_PRINT_TD_NUM_STYLE}font-weight:600;">${rowTotal}</td>
-      <td style="${PL_PRINT_TD_NUM_STYLE}">${weight > 0 ? weight : ""}</td>
+      <td class="pl-num">${rowTotal}</td>
+      <td class="pl-num">${weight > 0 ? weight : ""}</td>
     </tr>`;
   }).join("");
 
-  const unitTotalCols = unitTotals.map(n =>
-    `<td style="${PL_PRINT_TD_TOTAL_STYLE}">${n}</td>`
-  ).join("");
-
+  const unitTotalCols = unitTotals.map(n => `<td class="pl-num">${n}</td>`).join("");
   const notes = packingList ? String(packingList["Notes"] ?? "").trim() : "";
   const notesHtml = notes ? plPrintNotesPanel(notes) : "";
 
   return `
-<div style="margin-bottom:0;">
-  <p style="${PL_PRINT_SECTION_TITLE_STYLE}">Packing List <span style="font-weight:400;text-transform:none;letter-spacing:0;">(${cartons.length} carton${cartons.length !== 1 ? "s" : ""})</span></p>
-  <table cellpadding="0" cellspacing="0" style="${PL_PRINT_TABLE_STYLE}">
-    <thead>
-      <tr>
-        <th style="${PL_PRINT_TH_CENTER_STYLE}width:40px;">Ctn #</th>
-        ${sizeHeaderCols}
-        <th style="${PL_PRINT_TH_NUM_STYLE}width:50px;">Total</th>
-        <th style="${PL_PRINT_TH_NUM_STYLE}width:60px;">Weight</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${cartonRows}
-    </tbody>
-    <tfoot>
-      <tr>
-        <td style="${PL_PRINT_TD_TOTAL_CENTER_STYLE}">Totals</td>
-        ${unitTotalCols}
-        <td style="${PL_PRINT_TD_TOTAL_STYLE}">${grandTotal}</td>
-        <td style="${PL_PRINT_TD_TOTAL_STYLE}">${totalWeight > 0 ? totalWeight : "—"}</td>
-      </tr>
-    </tfoot>
-  </table>
-  ${notesHtml}
-</div>`;
+<p class="pl-section-title">Cartons (${cartons.length})</p>
+<table class="pl-carton-table" cellpadding="0" cellspacing="0">
+  ${plPrintColgroup(sizeCols.length)}
+  <thead>
+    <tr>
+      <th class="pl-center">Ctn #</th>
+      ${sizeHeaderCols}
+      <th class="pl-num">Total</th>
+      <th class="pl-num">Wt</th>
+    </tr>
+  </thead>
+  <tbody>${cartonRows}</tbody>
+  <tfoot>
+    <tr>
+      <td class="pl-center">Total</td>
+      ${unitTotalCols}
+      <td class="pl-num">${grandTotal}</td>
+      <td class="pl-num">${totalWeight > 0 ? totalWeight : "—"}</td>
+    </tr>
+  </tfoot>
+</table>
+${notesHtml}`;
 }
 
 // ── Full PO section ──────────────────────────────────────────────────────────
@@ -271,66 +207,51 @@ function buildPlPrintPoSectionHtml(row, { pageBreakAfter = false } = {}) {
   const poNum = plPrintVal(row["PO #"]);
   const style = plPrintVal(row["Style #"]);
   const color = plPrintVal(row["Color"]);
-  const breakStyle = pageBreakAfter ? "page-break-after:always;" : "";
+  const activeCartons = plActiveCartons(getPackingCartonsForPo(String(row["PO #"] ?? "")));
   const styleSubtitle = style !== "—"
-    ? `<div style="margin-top:4px;font-size:12px;font-weight:500;color:#d4d9df;line-height:1.3;">${style} / ${color}</div>`
+    ? `<div class="pl-header-sub">${style} / ${color}</div>`
     : "";
+  const pageClass = pageBreakAfter ? "pl-print-page" : "pl-print-page";
 
   return `
-<div class="pl-print-po-section" style="${PL_PRINT_FONT}${breakStyle}margin:0 0 24px 0;">
-  <div style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;background:#ffffff;">
-    <table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;background-color:#2d2d29;">
-      <tr>
-        <td style="padding:20px 24px;vertical-align:middle;">
-          <div style="margin:0 0 6px 0;font-size:20px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:#ffffff;line-height:1.2;">ELEVATOR DISCO</div>
-          <div style="margin:0;font-size:16px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#d4d9df;line-height:1.3;">Packing List</div>
-        </td>
-        <td style="padding:20px 24px;text-align:right;vertical-align:middle;white-space:nowrap;">
-          <div style="font-size:14px;font-weight:500;color:#ffffff;letter-spacing:0.02em;line-height:1.4;">PO ${poNum}</div>
-          ${styleSubtitle}
-        </td>
-      </tr>
-    </table>
-    <div style="padding:24px;">
-      ${buildPlPrintPoDetailsHtml(row)}
-      ${buildPlPrintStyleDetailsHtml(row)}
-      ${buildPlPrintPackingListHtml(row)}
-    </div>
+<div class="${pageClass}">
+  <table class="pl-header" cellpadding="0" cellspacing="0" width="100%">
+    <tr>
+      <td>
+        <div class="pl-header-brand">ELEVATOR DISCO</div>
+        <div class="pl-header-title">Packing List</div>
+      </td>
+      <td align="right">
+        <div class="pl-header-po">PO ${poNum}</div>
+        ${styleSubtitle}
+      </td>
+    </tr>
+  </table>
+  <div class="pl-body">
+    ${buildPlPrintPoDetailsHtml(row, activeCartons.length)}
+    ${buildPlPrintPackingListHtml(row)}
   </div>
 </div>`;
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────
 
-/**
- * Build full print HTML document for one PO (individual design).
- */
 function buildIndividualPackingListPrintHtml(poNumber) {
   const row = allRows.find(r => String(r["PO #"]) === String(poNumber));
   if (!row) return "<p>PO not found.</p>";
-  return buildPlPrintPoSectionHtml(row, { pageBreakAfter: false });
+  return plPrintPageStyles() + buildPlPrintPoSectionHtml(row, { pageBreakAfter: false });
 }
 
-/**
- * Build full print HTML document for a list of PO numbers (group design).
- * Each PO gets a section; all but the last have page-break-after.
- */
 function buildGroupPackingListPrintHtml(poNumbers) {
   const rows = poNumbers
     .map(po => allRows.find(r => String(r["PO #"]) === String(po)))
     .filter(Boolean);
   if (rows.length === 0) return "<p>No POs found.</p>";
-  return rows.map((row, i) =>
+  return plPrintPageStyles() + rows.map((row, i) =>
     buildPlPrintPoSectionHtml(row, { pageBreakAfter: i < rows.length - 1 })
   ).join("\n");
 }
 
-/**
- * Render packing list HTML into #packingPrintRoot and trigger browser print.
- * @param {Object} opts
- * @param {string[]} opts.poNumbers
- * @param {"individual"|"group"} opts.mode
- */
 function printPackingList({ poNumbers, mode = "individual" }) {
   const root = document.getElementById("packingPrintRoot");
   if (!root) return;

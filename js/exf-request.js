@@ -64,6 +64,7 @@ const EXF_REQUEST_LINKED_PO_COLUMN_WIDTHS = [52, 64, 110, 102, 160, 112, 54, 54,
 
 let exfRequestPoNumbers = [];
 let exfRequestAddPoPanelOpen = false;
+const exfRequestAvailablePoSelection = createAvailablePoPickerSelection();
 let exfRequestDraftByPo = {};
 let exfRequestDraftEmail = {};
 let exfRequestDraftExfDate = "";
@@ -591,19 +592,24 @@ function buildExfRequestModalLayout({ exfDate, vendor, linkedPos, showAddPanel =
       notesField: EXF_REQ_NOTES_FIELD,
       notesValue: isView ? (request?.[EXF_REQ_NOTES_FIELD] ?? "") : exfRequestDraftNotes,
       notesReadOnly: isView,
+      requestForm: true,
     }),
     renderExfRequestLinkedPoSection(linkedPos, isView)
   );
   outer.appendChild(layout);
 
   if (showAddPanel) {
-    outer.classList.add("shipment-modal-outer--add-panel-open");
-    outer.appendChild(renderAvailablePoPickerPanel(getAvailableExfRequestPanelRows(), {
-      panelId: "exfRequestAddPoPanel",
+    appendAvailablePoPanelToModalRight(outer, renderAvailablePoLinkedSection(getAvailableExfRequestPanelRows(), {
+      sectionId: "exfRequestAddPoPanel",
+      tableClass: "exf-request-linked-po-table",
+      columns: EXF_REQUEST_LINKED_PO_COLUMNS,
+      colClasses: EXF_REQUEST_LINKED_PO_COL_CLASSES,
+      columnWidths: EXF_REQUEST_LINKED_PO_COLUMN_WIDTHS,
       emptyMessage: "No WIP POs available.",
-      closeLabel: "Close WIP POs panel",
-      onClose: closeExfRequestAddPoPanel,
-      onAddPo: addWipPoToExfRequest,
+      selection: exfRequestAvailablePoSelection,
+      onSelectionChange: updateExfRequestModalActionButtons,
+      selectAllId: "exfRequestAvailablePoSelectAll",
+      qtyCol: "Actual Qty",
     }));
   }
 
@@ -634,13 +640,38 @@ function getAvailableExfRequestPanelRows() {
 function openExfRequestAddPoPanel() {
   captureExfRequestDraft();
   clearExfFormSelection();
+  exfRequestAvailablePoSelection.clear();
   exfRequestAddPoPanelOpen = true;
   renderExfRequestModal(exfRequestPoNumbers, getExfRequestModalRenderOptions());
 }
 
 function closeExfRequestAddPoPanel() {
   captureExfRequestDraft();
+  exfRequestAvailablePoSelection.clear();
   exfRequestAddPoPanelOpen = false;
+  renderExfRequestModal(exfRequestPoNumbers, getExfRequestModalRenderOptions());
+}
+
+function addSelectedPosToExfRequest() {
+  const selected = exfRequestAvailablePoSelection.getAll();
+  if (selected.length === 0) return;
+  captureExfRequestDraft();
+  const linkedVendor = exfRequestVendor || getExfRequestVendorForRows(getExfRequestRows());
+  const toAdd = [];
+  for (const po of selected) {
+    const row = allRows.find(r => String(r["PO #"]) === po);
+    if (!row) continue;
+    if (linkedVendor && normalizeExfRequestVendor(row) !== linkedVendor) {
+      showIndicator("Only same-vendor POs can be added", "error");
+      return;
+    }
+    if (!exfRequestVendor) exfRequestVendor = normalizeExfRequestVendor(row);
+    if (!exfRequestPoNumbers.map(String).includes(po)) toAdd.push(po);
+  }
+  if (toAdd.length === 0) return;
+  exfRequestAvailablePoSelection.clear();
+  exfRequestPoNumbers = [...exfRequestPoNumbers, ...toAdd];
+  exfRequestAddPoPanelOpen = true;
   renderExfRequestModal(exfRequestPoNumbers, getExfRequestModalRenderOptions());
 }
 
@@ -677,16 +708,35 @@ function removePosFromExfRequest() {
 }
 
 function updateExfRequestModalActionButtons() {
-  const scope = document.getElementById("exfRequestOverlay")?.classList.contains("open")
-    ? document.getElementById("exfRequestOverlay")
-    : document;
-  const addBtn = scope.querySelector(".exf-request-linked-po-footer-add");
-  const removeBtn = scope.querySelector(".exf-request-linked-po-footer-remove");
-  if (!addBtn && !removeBtn) return;
+  const addBtn = document.getElementById("exfRequestAddPosBtn");
+  const removeBtn = document.getElementById("exfRequestRemovePosBtn");
+  const doneBtn = document.getElementById("exfRequestAddPoDoneBtn");
+  const addSelectedBtn = document.getElementById("exfRequestAddSelectedPosBtn");
+  const submitBtn = document.getElementById("exfRequestSubmitBtn");
+
+  const isView = submitBtn?.hidden === true;
+  if (isView) {
+    if (addBtn) addBtn.hidden = true;
+    if (removeBtn) removeBtn.hidden = true;
+    if (doneBtn) doneBtn.hidden = true;
+    if (addSelectedBtn) addSelectedBtn.hidden = true;
+    return;
+  }
+
+  if (exfRequestAddPoPanelOpen) {
+    if (addBtn) addBtn.hidden = true;
+    if (removeBtn) removeBtn.hidden = true;
+    if (doneBtn) doneBtn.hidden = false;
+    if (addSelectedBtn) addSelectedBtn.hidden = exfRequestAvailablePoSelection.size === 0;
+    return;
+  }
+
+  if (doneBtn) doneBtn.hidden = true;
+  if (addSelectedBtn) addSelectedBtn.hidden = true;
 
   const linkedSelected = getExfRequestRows().filter(isExfRequestRowSelected).length;
-  if (addBtn) addBtn.hidden = exfRequestAddPoPanelOpen || linkedSelected > 0;
-  if (removeBtn) removeBtn.hidden = exfRequestAddPoPanelOpen || linkedSelected === 0;
+  if (addBtn) addBtn.hidden = linkedSelected > 0;
+  if (removeBtn) removeBtn.hidden = linkedSelected === 0;
 }
 
 function getExfRequestLinkedPoTotals(pos) {
@@ -765,22 +815,9 @@ function renderExfRequestLinkedPoFooter(pos) {
     actions.appendChild(renderExfRequestSetAllShipMethodControl());
   }
 
-  const addBtn = document.createElement("button");
-  addBtn.type = "button";
-  addBtn.className = "btn shipment-linked-po-footer-btn exf-request-linked-po-footer-add";
-  addBtn.textContent = "Add POs";
-  addBtn.addEventListener("click", openExfRequestAddPoPanel);
-
-  const removeBtn = document.createElement("button");
-  removeBtn.type = "button";
-  removeBtn.className = "btn shipment-linked-po-footer-btn exf-request-linked-po-footer-remove";
-  removeBtn.textContent = "Remove POs";
-  removeBtn.hidden = true;
-  removeBtn.addEventListener("click", removePosFromExfRequest);
-
-  actions.appendChild(addBtn);
-  actions.appendChild(removeBtn);
-  footer.appendChild(actions);
+  if (actions.childElementCount > 0) {
+    footer.appendChild(actions);
+  }
 
   const totalsWrap = document.createElement("div");
   totalsWrap.className = "shipment-linked-po-footer-totals";
@@ -1153,6 +1190,10 @@ function initExfRequest() {
   document.getElementById("exfRequestBtn")?.addEventListener("click", openExfRequestFromSelection);
   document.getElementById("exfRequestSubmitBtn")?.addEventListener("click", submitExfRequest);
   document.getElementById("exfRequestCreateShipmentBtn")?.addEventListener("click", openCreateShipmentFromExfRequest);
+  document.getElementById("exfRequestAddPosBtn")?.addEventListener("click", openExfRequestAddPoPanel);
+  document.getElementById("exfRequestRemovePosBtn")?.addEventListener("click", removePosFromExfRequest);
+  document.getElementById("exfRequestAddPoDoneBtn")?.addEventListener("click", closeExfRequestAddPoPanel);
+  document.getElementById("exfRequestAddSelectedPosBtn")?.addEventListener("click", addSelectedPosToExfRequest);
   document.getElementById("exfRequestCancelBtn")?.addEventListener("click", closeExfRequestModal);
   document.querySelector('[data-dismiss="exf-request"]')?.addEventListener("click", closeExfRequestModal);
   bindDirectBackdropDismiss(document.getElementById("exfRequestOverlay"), closeExfRequestModal);

@@ -24,6 +24,7 @@ let allDeliveryRequests = [];
 let filteredDeliveryRequests = [];
 let deliveryRequestPoNumbers = [];
 let deliveryRequestAddPoPanelOpen = false;
+const deliveryRequestAvailablePoSelection = createAvailablePoPickerSelection();
 let deliveryRequestDraftEmail = {};
 let deliveryRequestDraftDeliveryDate = "";
 let deliveryRequestDraftFrom = "";
@@ -315,18 +316,20 @@ function renderDeliveryRequestModal(poNumbers, request = {}) {
         ? (activeRequest[DELIVERY_REQ_NOTES_FIELD] ?? "")
         : deliveryRequestDraftNotes,
       notesReadOnly: isReadOnly,
+      requestForm: true,
     }),
     renderDeliveryRequestLinkedPoSection(pos, isReadOnly)
   ));
 
   if (!isReadOnly && deliveryRequestAddPoPanelOpen) {
-    outer.classList.add("shipment-modal-outer--add-panel-open");
-    outer.appendChild(renderAvailablePoPickerPanel(getAvailableDeliveryRequestPanelRows(), {
-      panelId: "deliveryRequestAddPoPanel",
+    appendAvailablePoPanelToModalRight(outer, renderAvailablePoLinkedSection(getAvailableDeliveryRequestPanelRows(), {
+      sectionId: "deliveryRequestAddPoPanel",
+      columns: DELIVERY_PICKUP_LINKED_PO_COLUMNS,
+      appendColgroup: appendDeliveryPickupLinkedPoColgroup,
       emptyMessage: "No eligible POs available.",
-      closeLabel: "Close available POs panel",
-      onClose: closeDeliveryRequestAddPoPanel,
-      onAddPo: addPoToDeliveryRequest,
+      selection: deliveryRequestAvailablePoSelection,
+      onSelectionChange: updateDeliveryRequestActionButtons,
+      selectAllId: "deliveryRequestAvailablePoSelectAll",
     }));
   }
 
@@ -346,6 +349,7 @@ function renderDeliveryRequestModal(poNumbers, request = {}) {
   }
 
   bringModalToFront(document.getElementById("deliveryRequestOverlay"));
+  updateDeliveryRequestActionButtons();
   updateToolbarRequestButtons();
 }
 
@@ -363,13 +367,29 @@ function getDeliveryRequestModalContext() {
 
 function openDeliveryRequestAddPoPanel() {
   captureDeliveryRequestDraft();
+  clearDeliveryFormSelection();
+  deliveryRequestAvailablePoSelection.clear();
   deliveryRequestAddPoPanelOpen = true;
   renderDeliveryRequestModal(deliveryRequestPoNumbers, getDeliveryRequestModalContext());
 }
 
 function closeDeliveryRequestAddPoPanel() {
   captureDeliveryRequestDraft();
+  deliveryRequestAvailablePoSelection.clear();
   deliveryRequestAddPoPanelOpen = false;
+  renderDeliveryRequestModal(deliveryRequestPoNumbers, getDeliveryRequestModalContext());
+}
+
+function addSelectedPosToDeliveryRequest() {
+  const selected = deliveryRequestAvailablePoSelection.getAll();
+  if (selected.length === 0) return;
+  captureDeliveryRequestDraft();
+  const existing = new Set(deliveryRequestPoNumbers.map(String));
+  const toAdd = selected.filter(po => !existing.has(po));
+  if (toAdd.length === 0) return;
+  deliveryRequestAvailablePoSelection.clear();
+  deliveryRequestPoNumbers = [...deliveryRequestPoNumbers, ...toAdd];
+  deliveryRequestAddPoPanelOpen = true;
   renderDeliveryRequestModal(deliveryRequestPoNumbers, getDeliveryRequestModalContext());
 }
 
@@ -472,46 +492,43 @@ function renderDeliveryRequestLinkedPoSection(pos, isReadOnly = false) {
   }
   wrap.appendChild(table);
   section.appendChild(wrap);
-  if (!isReadOnly) section.appendChild(renderDeliveryRequestLinkedPoFooter(pos));
   return section;
-}
-
-function renderDeliveryRequestLinkedPoFooter(pos) {
-  const footer = document.createElement("footer");
-  footer.className = "shipment-linked-po-footer";
-  const actions = document.createElement("div");
-  actions.className = "shipment-linked-po-footer-actions";
-
-  const addBtn = document.createElement("button");
-  addBtn.type = "button";
-  addBtn.className = "btn shipment-linked-po-footer-btn delivery-request-linked-po-footer-add";
-  addBtn.textContent = "Add POs";
-  addBtn.addEventListener("click", openDeliveryRequestAddPoPanel);
-
-  const removeBtn = document.createElement("button");
-  removeBtn.type = "button";
-  removeBtn.className = "btn shipment-linked-po-footer-btn delivery-request-linked-po-footer-remove";
-  removeBtn.textContent = "Remove POs";
-  removeBtn.hidden = true;
-  removeBtn.addEventListener("click", removePosFromDeliveryRequest);
-
-  actions.appendChild(addBtn);
-  actions.appendChild(removeBtn);
-  footer.appendChild(actions);
-  return footer;
 }
 
 function updateDeliveryRequestActionButtons() {
   const overlay = document.getElementById("deliveryRequestOverlay");
   if (!overlay?.classList.contains("open")) return;
-  const addBtn = overlay.querySelector(".delivery-request-linked-po-footer-add");
-  const removeBtn = overlay.querySelector(".delivery-request-linked-po-footer-remove");
-  if (!addBtn && !removeBtn) return;
+  const addBtn = document.getElementById("deliveryRequestAddPosBtn");
+  const removeBtn = document.getElementById("deliveryRequestRemovePosBtn");
+  const doneBtn = document.getElementById("deliveryRequestAddPoDoneBtn");
+  const addSelectedBtn = document.getElementById("deliveryRequestAddSelectedPosBtn");
+  const submitBtn = document.getElementById("deliveryRequestSubmitBtn");
+
+  const isView = submitBtn?.hidden === true;
+  if (isView) {
+    if (addBtn) addBtn.hidden = true;
+    if (removeBtn) removeBtn.hidden = true;
+    if (doneBtn) doneBtn.hidden = true;
+    if (addSelectedBtn) addSelectedBtn.hidden = true;
+    return;
+  }
+
+  if (deliveryRequestAddPoPanelOpen) {
+    if (addBtn) addBtn.hidden = true;
+    if (removeBtn) removeBtn.hidden = true;
+    if (doneBtn) doneBtn.hidden = false;
+    if (addSelectedBtn) addSelectedBtn.hidden = deliveryRequestAvailablePoSelection.size === 0;
+    return;
+  }
+
+  if (doneBtn) doneBtn.hidden = true;
+  if (addSelectedBtn) addSelectedBtn.hidden = true;
+
   const anySelected = deliveryRequestPoNumbers
     .map(po => allRows.find(r => String(r["PO #"]) === String(po)))
     .some(row => row && isDeliveryFormPoSelected(row));
-  if (addBtn) addBtn.hidden = deliveryRequestAddPoPanelOpen || anySelected;
-  if (removeBtn) removeBtn.hidden = deliveryRequestAddPoPanelOpen || !anySelected;
+  if (addBtn) addBtn.hidden = anySelected;
+  if (removeBtn) removeBtn.hidden = !anySelected;
 }
 
 function closeDeliveryRequestModal() {
@@ -653,6 +670,10 @@ function demoCreateOrUpdateDeliveryRequest(poNumbers, data, existing) {
 function initDeliveryRequests() {
   document.getElementById("deliveryRequestBtn")?.addEventListener("click", openDeliveryRequestFromSelection);
   document.getElementById("deliveryRequestSubmitBtn")?.addEventListener("click", submitDeliveryRequest);
+  document.getElementById("deliveryRequestAddPosBtn")?.addEventListener("click", openDeliveryRequestAddPoPanel);
+  document.getElementById("deliveryRequestRemovePosBtn")?.addEventListener("click", removePosFromDeliveryRequest);
+  document.getElementById("deliveryRequestAddPoDoneBtn")?.addEventListener("click", closeDeliveryRequestAddPoPanel);
+  document.getElementById("deliveryRequestAddSelectedPosBtn")?.addEventListener("click", addSelectedPosToDeliveryRequest);
   document.getElementById("deliveryRequestCancelBtn")?.addEventListener("click", closeDeliveryRequestModal);
   document.querySelector('[data-dismiss="delivery-request"]')?.addEventListener("click", closeDeliveryRequestModal);
   bindDirectBackdropDismiss(document.getElementById("deliveryRequestOverlay"), closeDeliveryRequestModal);

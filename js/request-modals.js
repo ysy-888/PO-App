@@ -202,9 +202,20 @@ function createFormNotesPanel(fieldName, value, { readOnly = false } = {}) {
   return { panel, input: textarea };
 }
 
-function buildEmailStyleForm({ formId, metaRows = [], notesField = null, notesValue = "", notesReadOnly = false } = {}) {
+const REQUEST_FORM_META_LABEL_WIDTH = 110;
+const REQUEST_FORM_META_VALUE_WIDTH = 240;
+
+function buildEmailStyleForm({
+  formId,
+  metaRows = [],
+  notesField = null,
+  notesValue = "",
+  notesReadOnly = false,
+  requestForm = false,
+} = {}) {
   const form = document.createElement("div");
   form.className = "shipment-form-edit shipment-form-edit--email-style";
+  if (requestForm) form.classList.add("request-form-edit");
   if (formId) form.id = formId;
 
   const infoRow = document.createElement("div");
@@ -216,6 +227,15 @@ function buildEmailStyleForm({ formId, metaRows = [], notesField = null, notesVa
 
   const table = document.createElement("table");
   table.className = "email-meta";
+  if (requestForm) {
+    const colgroup = document.createElement("colgroup");
+    [REQUEST_FORM_META_LABEL_WIDTH, REQUEST_FORM_META_VALUE_WIDTH].forEach(width => {
+      const col = document.createElement("col");
+      col.style.width = `${width}px`;
+      colgroup.appendChild(col);
+    });
+    table.appendChild(colgroup);
+  }
   const tbody = document.createElement("tbody");
   metaRows.forEach(row => tbody.appendChild(row));
   table.appendChild(tbody);
@@ -249,6 +269,14 @@ function buildShipmentModalSplitLayout(form, linkedSection) {
   layout.appendChild(left);
   layout.appendChild(right);
   return layout;
+}
+
+function appendAvailablePoPanelToModalRight(outer, panel) {
+  if (!outer || !panel) return;
+  const right = outer.querySelector(".shipment-modal-right");
+  if (!right) return;
+  right.appendChild(panel);
+  outer.classList.add("shipment-modal-outer--add-panel-open");
 }
 
 /**
@@ -553,6 +581,7 @@ function buildRequestModalLayout({
     notesField,
     notesValue,
     notesReadOnly,
+    requestForm: true,
   });
 
   if (showBodyPoCount) {
@@ -574,25 +603,25 @@ function setRequestModalPoCount(el, count) {
     `<span class="shipment-modal-po-count-unit">${unit}</span>`;
 }
 
-/** Update modal header to match email request header (templates/email-exf.html). */
+/** Update modal header: main title = form type, subheader = record ID. */
 function setEmailStyleModalHeader(headerEl, { typeLabel = "", recordId = "", requestDate = "" } = {}) {
   if (!headerEl) return;
 
+  const heading = headerEl.querySelector(".email-heading");
   const subheading = headerEl.querySelector(".email-subheading");
   const idEl = headerEl.querySelector(".email-request-id");
   const dateEl = headerEl.querySelector(".email-request-date");
 
-  if (subheading) subheading.textContent = typeLabel;
+  if (heading) heading.textContent = typeLabel;
+
+  if (subheading) {
+    const id = String(recordId ?? "").trim();
+    subheading.textContent = id || "New";
+  }
 
   if (idEl) {
-    const id = String(recordId ?? "").trim();
-    if (id) {
-      idEl.textContent = id;
-      idEl.hidden = false;
-    } else {
-      idEl.textContent = "";
-      idEl.hidden = true;
-    }
+    idEl.textContent = "";
+    idEl.hidden = true;
   }
 
   if (dateEl) {
@@ -607,119 +636,126 @@ function setEmailStyleModalHeader(headerEl, { typeLabel = "", recordId = "", req
   }
 }
 
-const AVAILABLE_PO_PICKER_COLUMNS = [
-  { col: "PO #", label: "PO #" },
-  { col: "Buyer", label: "Buyer" },
-  { col: "Buyer PO #", label: "Buyer PO #" },
-  { col: "Style #", label: "Style #" },
-];
-
-function renderAvailablePoPickerPanel(pos, {
-  panelId = "shipmentAddPoPanel",
+function renderAvailablePoLinkedSection(pos, {
+  sectionId = "",
+  tableClass = "",
+  columns,
+  colClasses,
+  columnWidths,
+  appendColgroup,
   emptyMessage = "No POs available.",
-  closeLabel = "Close available POs panel",
-  onClose,
-  onAddPo,
-  disabled = false,
+  selection,
+  onSelectionChange,
+  selectAllId = "",
+  qtyCol = "Actual Qty",
+  sectionLabel = "Available POs",
 } = {}) {
-  const panel = document.createElement("aside");
-  panel.className = "shipment-add-po-panel";
-  panel.id = panelId;
+  const section = document.createElement("section");
+  section.className = "shipment-linked-pos shipment-add-po-section";
+  if (sectionId) section.id = sectionId;
 
-  const header = document.createElement("div");
-  header.className = "shipment-add-po-panel-header";
-  const closeBtn = document.createElement("button");
-  closeBtn.type = "button";
-  closeBtn.className = "shipment-add-po-panel-close";
-  closeBtn.setAttribute("aria-label", closeLabel);
-  closeBtn.innerHTML = '<span aria-hidden="true"></span>';
-  closeBtn.addEventListener("click", onClose);
-  header.appendChild(closeBtn);
-  panel.appendChild(header);
+  const heading = document.createElement("div");
+  heading.className = "shipment-add-po-section-heading";
+  heading.textContent = sectionLabel;
+  section.appendChild(heading);
 
   if (pos.length === 0) {
     const empty = document.createElement("p");
     empty.className = "shipment-linked-empty";
     empty.textContent = emptyMessage;
-    panel.appendChild(empty);
-    return panel;
+    section.appendChild(empty);
+    return section;
   }
 
-  const colCount = AVAILABLE_PO_PICKER_COLUMNS.length;
-  const gridPanel = document.createElement("div");
-  gridPanel.className = "packing-list-grid-panel available-po-grid-panel";
+  const wrap = document.createElement("div");
+  wrap.className = "email-po-table-wrap shipment-add-po-table-wrap";
 
-  const headGrid = document.createElement("div");
-  headGrid.className = "packing-list-grid packing-list-grid--head available-po-grid";
-  headGrid.style.setProperty("--available-po-col-count", String(colCount));
+  const table = document.createElement("table");
+  table.className = `email-po-table shipment-linked-po-table available-po-linked-table ${tableClass}`.trim();
 
-  const blankHead = document.createElement("div");
-  blankHead.className = "packing-list-rowhead packing-list-rowhead--blank";
-  headGrid.appendChild(blankHead);
+  if (typeof appendColgroup === "function") {
+    appendColgroup(table);
+  } else if (colClasses?.length) {
+    const colgroup = document.createElement("colgroup");
+    colClasses.forEach((className, i) => {
+      const col = document.createElement("col");
+      if (className) col.className = className;
+      const width = columnWidths?.[i];
+      if (width != null) col.style.width = `${width}px`;
+      colgroup.appendChild(col);
+    });
+    table.appendChild(colgroup);
+  }
 
-  AVAILABLE_PO_PICKER_COLUMNS.forEach(({ label }) => {
-    const head = document.createElement("div");
-    head.className = "packing-list-colhead";
-    head.textContent = label;
-    headGrid.appendChild(head);
+  const thead = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  const selectTh = document.createElement("th");
+  selectTh.className = "th-select-col";
+  const selectAllCb = document.createElement("input");
+  selectAllCb.type = "checkbox";
+  if (selectAllId) selectAllCb.id = selectAllId;
+  selectAllCb.setAttribute("aria-label", "Select all available POs");
+  selectAllCb.addEventListener("change", () => {
+    selection.setAll(pos, selectAllCb.checked);
+    syncAvailablePoPickerRowCheckboxes(section, pos, selection);
+    updateAvailablePoPickerSelectAll(pos, selectAllCb, selection);
+    onSelectionChange?.();
   });
+  selectTh.appendChild(selectAllCb);
+  headRow.appendChild(selectTh);
 
-  const bodyScroll = document.createElement("div");
-  bodyScroll.className = "packing-list-grid-scroll";
+  columns.forEach(({ label, cellClass }) => {
+    const th = document.createElement("th");
+    th.textContent = label;
+    if (cellClass) th.className = cellClass;
+    headRow.appendChild(th);
+  });
+  thead.appendChild(headRow);
+  table.appendChild(thead);
 
-  const bodyGrid = document.createElement("div");
-  bodyGrid.className = "packing-list-grid packing-list-grid--body available-po-grid";
-  bodyGrid.style.setProperty("--available-po-col-count", String(colCount));
-
+  const tbody = document.createElement("tbody");
   pos.forEach(row => {
-    const po = String(row["PO #"] ?? "");
+    const tr = document.createElement("tr");
+    tr.dataset.po = row["PO #"];
 
-    const addCell = document.createElement("div");
-    addCell.className = "available-po-add-cell";
-    const addBtn = document.createElement("button");
-    addBtn.type = "button";
-    addBtn.className = "shipment-requested-po-add";
-    addBtn.disabled = disabled;
-    addBtn.setAttribute("aria-label", `Add PO ${po}`);
-    addBtn.title = "Add PO";
-    addBtn.textContent = "+";
-    addBtn.addEventListener("click", e => {
-      e.stopPropagation();
-      onAddPo?.(po);
+    const selectTd = document.createElement("td");
+    renderFormSelectedCell(selectTd, row, selection.has(row["PO #"]), checked => {
+      selection.toggle(row["PO #"], checked);
+      updateAvailablePoPickerSelectAll(pos, selectAllCb, selection);
+      onSelectionChange?.();
     });
-    addCell.appendChild(addBtn);
-    bodyGrid.appendChild(addCell);
+    tr.appendChild(selectTd);
 
-    AVAILABLE_PO_PICKER_COLUMNS.forEach(({ col }) => {
-      const cell = document.createElement("div");
-      cell.className = "packing-list-static available-po-static";
-      const text = formatShipmentLinkedPoCell(col, row);
-      if (text === EMPTY_DISPLAY) {
-        cell.classList.add("empty-display");
-        cell.textContent = EMPTY_DISPLAY;
-      } else {
-        cell.textContent = text;
-        cell.title = text;
-      }
-      bodyGrid.appendChild(cell);
+    columns.forEach(({ col, cellClass }) => {
+      const td = document.createElement("td");
+      renderRequestLinkedPoDataCell(td, col, row, { cellClass });
+      tr.appendChild(td);
     });
+    tbody.appendChild(tr);
   });
+  table.appendChild(tbody);
 
-  bodyScroll.appendChild(bodyGrid);
-  gridPanel.appendChild(headGrid);
-  gridPanel.appendChild(bodyScroll);
-  panel.appendChild(gridPanel);
-  return panel;
+  if (pos.length > 0) {
+    appendEmailPoTableFooter(table, pos, columns, { hasSelectCol: true, qtyCol });
+  }
+
+  wrap.appendChild(table);
+  section.appendChild(wrap);
+  requestAnimationFrame(() => updateAvailablePoPickerSelectAll(pos, selectAllCb, selection));
+  return section;
 }
 
-function renderRequestedPoPickerPanel(pos, { disabled = false } = {}) {
-  return renderAvailablePoPickerPanel(pos, {
-    panelId: "shipmentAddPoPanel",
+function renderRequestedPoPickerPanel(pos, options = {}) {
+  return renderAvailablePoLinkedSection(pos, {
+    sectionId: "shipmentAddPoPanel",
+    columns: SHIPMENT_LINKED_PO_COLUMNS,
+    colClasses: SHIPMENT_LINKED_PO_COL_CLASSES,
+    columnWidths: SHIPMENT_LINKED_PO_COLUMN_WIDTHS,
     emptyMessage: "No requested POs available.",
-    closeLabel: "Close requested POs panel",
-    onClose: closeShipmentAddPoPanel,
-    onAddPo: addRequestedPoToShipment,
-    disabled,
+    selection: options.selection,
+    onSelectionChange: options.onSelectionChange,
+    selectAllId: "shipmentAvailablePoSelectAll",
+    qtyCol: "Actual Qty",
   });
 }
 
