@@ -2157,3 +2157,11 @@
 {"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780985671865,"hypothesisId":"A"}
 {"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780985671866,"hypothesisId":"B,D"}
 {"sessionId":"c417e3","location":"data-pipeline.js:loadData:afterFetch","message":"fetch+json done","data":{"httpStatus":200,"httpOk":true,"jsonSuccess":true,"dataLen":464},"timestamp":1780985681751,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780986341877,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780986341882,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780986341882,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:afterFetch","message":"fetch+json done","data":{"httpStatus":200,"httpOk":true,"jsonSuccess":true,"dataLen":464},"timestamp":1780986357536,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"main.js:initStart","message":"init sequence start","data":{"loadDateFormatPreference":"function","initHeaderMenu":"function","loadData":"function"},"timestamp":1780986504531,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"main.js:beforeLoadData","message":"init sequence completed, calling loadData","data":{},"timestamp":1780986504536,"hypothesisId":"A"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:entry","message":"loadData called","data":{"isDemoMode":false,"isTestMode":true},"timestamp":1780986504536,"hypothesisId":"B,D"}
+{"sessionId":"c417e3","location":"data-pipeline.js:loadData:afterFetch","message":"fetch+json done","data":{"httpStatus":200,"httpOk":true,"jsonSuccess":true,"dataLen":464},"timestamp":1780986515288,"hypothesisId":"B,D"}
