@@ -559,8 +559,17 @@ select.filter-select:focus { border-color: var(--accent); }
 }
 
 #statusFilters .filter-btn .filter-btn-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25em;
+  padding: 1px 5px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 4px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+  line-height: 1.3;
 }
 
 .toolbar-filter-divider {
@@ -7548,6 +7557,21 @@ body:not(.split-view-enabled) .app-main > .app-secondary-table:not([hidden]) {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+#poPackingPane .po-summary-size-colhead:not(.po-summary-size-colhead--blank) {
+  background: var(--accent-heavy);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 6px;
+  align-self: center;
+}
+
+#poPackingPane .po-summary-size-divider {
+  border-top: 1px solid var(--border);
+  margin-top: 2px;
+  min-height: 0;
+  align-self: stretch;
 }
 
 #poPackingPane .po-summary-size-colhead--blank {

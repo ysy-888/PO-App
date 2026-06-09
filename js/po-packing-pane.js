@@ -99,6 +99,11 @@ function poPanePoHasPackingList(poKey) {
   return typeof hasPackingList === "function" && hasPackingList(poKey);
 }
 
+function poPanePlaceSizeGridCell(el, row, col, colSpan = 1) {
+  el.style.gridRow = String(row);
+  el.style.gridColumn = colSpan > 1 ? `${col} / span ${colSpan}` : String(col);
+}
+
 function poPaneAppendSizeQtyBlock(card, row, showActualQty = false) {
   const count = poPackingPaneSizeLabels.length;
   if (count === 0) return;
@@ -109,23 +114,27 @@ function poPaneAppendSizeQtyBlock(card, row, showActualQty = false) {
 
   const corner = document.createElement("div");
   corner.className = "po-summary-size-corner";
+  poPanePlaceSizeGridCell(corner, 1, 1);
   block.appendChild(corner);
 
   const totalHeadSpacer = document.createElement("div");
   totalHeadSpacer.className = "po-summary-size-colhead po-summary-size-colhead--blank po-summary-size-total-col";
   totalHeadSpacer.setAttribute("aria-hidden", "true");
+  poPanePlaceSizeGridCell(totalHeadSpacer, 1, 2);
   block.appendChild(totalHeadSpacer);
 
-  poPackingPaneSizeLabels.forEach(label => {
+  poPackingPaneSizeLabels.forEach((label, i) => {
     const head = document.createElement("div");
     head.className = "po-summary-size-colhead";
     head.textContent = label;
+    poPanePlaceSizeGridCell(head, 1, 3 + i);
     block.appendChild(head);
   });
 
   const poRowLabel = document.createElement("div");
   poRowLabel.className = "po-summary-label";
   poRowLabel.textContent = "PO Qty";
+  poPanePlaceSizeGridCell(poRowLabel, 2, 1);
   block.appendChild(poRowLabel);
 
   const poTotal = typeof computePoQtyFromUnits === "function"
@@ -134,6 +143,7 @@ function poPaneAppendSizeQtyBlock(card, row, showActualQty = false) {
   const poTotalCell = document.createElement("div");
   poTotalCell.className = "po-summary-size-qty po-summary-size-qty--po po-summary-size-total-col";
   poTotalCell.textContent = poPaneFormatQtyCell(poTotal);
+  poPanePlaceSizeGridCell(poTotalCell, 2, 2);
   block.appendChild(poTotalCell);
 
   poPackingPaneSizeLabels.forEach((_, i) => {
@@ -141,13 +151,23 @@ function poPaneAppendSizeQtyBlock(card, row, showActualQty = false) {
     cell.className = "po-summary-size-qty po-summary-size-qty--po";
     cell.id = "poSummaryPoUnit_" + i;
     cell.textContent = poPaneFormatQtyCell(poPaneUnitQtyFromRow(row, i));
+    poPanePlaceSizeGridCell(cell, 2, 3 + i);
     block.appendChild(cell);
   });
 
   if (showActualQty) {
+    const actRow = 4;
+
+    const divider = document.createElement("div");
+    divider.className = "po-summary-size-divider";
+    divider.setAttribute("aria-hidden", "true");
+    poPanePlaceSizeGridCell(divider, 3, 1, 2 + count);
+    block.appendChild(divider);
+
     const actRowLabel = document.createElement("div");
     actRowLabel.className = "po-summary-label";
     actRowLabel.textContent = "Actual Qty";
+    poPanePlaceSizeGridCell(actRowLabel, actRow, 1);
     block.appendChild(actRowLabel);
 
     const actTotal = poPackingPaneSizeLabels.reduce((sum, _, i) => sum + poPanePackingUnitQty(i), 0);
@@ -155,6 +175,7 @@ function poPaneAppendSizeQtyBlock(card, row, showActualQty = false) {
     actTotalCell.className = "po-summary-size-qty po-summary-size-qty--act po-summary-size-total-col";
     actTotalCell.id = "poSummaryActTotal";
     actTotalCell.textContent = poPaneFormatQtyCell(actTotal);
+    poPanePlaceSizeGridCell(actTotalCell, actRow, 2);
     block.appendChild(actTotalCell);
 
     poPackingPaneSizeLabels.forEach((_, i) => {
@@ -162,6 +183,7 @@ function poPaneAppendSizeQtyBlock(card, row, showActualQty = false) {
       cell.className = "po-summary-size-qty po-summary-size-qty--act";
       cell.id = "poSummarySizeTotal_" + i;
       cell.textContent = poPaneFormatQtyCell(poPanePackingUnitQty(i));
+      poPanePlaceSizeGridCell(cell, actRow, 3 + i);
       block.appendChild(cell);
     });
   }
