@@ -7,6 +7,7 @@ let allVendorEmailRows = [];
 let allContactRows = [];
 let allLocationRows = [];
 let allAsnRequests = [];
+let allCustomers = [];
 let packingListPanelOpen = false;
 let flagFilterActive = false;
 let sortCol = "CXL Date";
@@ -21,6 +22,34 @@ const DEMO_CONTACTS = [
   { Name: "LULU'S FASHION LOUNGE", Type: "Buyer", Email: "demo-buyer@example.com", CC: "" },
   { Name: "12TH TRIBE", Type: "Buyer", Email: "demo-buyer@example.com", CC: "" },
   { Name: "FORERUNNER LOGISTICS", Type: "Logistics", Email: "demo-logistics@example.com", CC: "" },
+];
+
+const DEMO_CUSTOMERS = [
+  {
+    Customer: "12TH TRIBE",
+    Address: "11872 LA GRANGE AVE",
+    "Line 2": "",
+    City: "LOS ANGELES",
+    State: "CA",
+    Zip: "90025",
+    Country: "USA",
+    Contact: "KAREN",
+    "Phone #": "",
+    Email: "finance@12thtribe.com",
+    "Email Sent At": "2026-05-28",
+  },
+  {
+    Customer: "LULUS",
+    Address: "195 HUMBOLDT AVE",
+    "Line 2": "",
+    City: "CHICO",
+    State: "CA",
+    Zip: "95928",
+    Country: "USA",
+    Contact: "LULUS",
+    "Phone #": "530-343-3545",
+    Email: "ORDERS@LULUS.COM",
+  },
 ];
 
 const DEMO_LOCATIONS = [

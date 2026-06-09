@@ -650,7 +650,8 @@ select.filter-select:focus { border-color: var(--accent); }
 #clearAllColumnFiltersBtn[hidden],
 #batchEditBtn[hidden],
 #deleteShipmentBtn[hidden],
-#deleteChargebackBtn[hidden] {
+#deleteChargebackBtn[hidden],
+#customersBatchEmailBtn[hidden] {
   display: none !important;
 }
 
@@ -658,7 +659,8 @@ select.filter-select:focus { border-color: var(--accent); }
 #shipmentToolbar[hidden],
 #requestsToolbar[hidden],
 #chargebackToolbar[hidden],
-#packingReviewToolbar[hidden] {
+#packingReviewToolbar[hidden],
+#customersToolbar[hidden] {
   display: none !important;
 }
 
@@ -7843,4 +7845,141 @@ body:not(.split-view-enabled) .app-main > .app-secondary-table:not([hidden]) {
   padding: 20px 22px 18px;
   width: 340px;
   max-width: 95vw;
+}
+
+/* ── Customers view ─────────────────────────────────────────── */
+
+#customersTable {
+  width: 100%;
+  min-width: 1420px;
+  border-collapse: collapse;
+}
+
+#customersTable .col-select { width: 44px; }
+#customersTable .col-customer { width: 140px; }
+#customersTable .col-customer-address { width: 180px; }
+#customersTable .col-customer-line2 { width: 120px; }
+#customersTable .col-customer-city { width: 120px; }
+#customersTable .col-customer-state { width: 64px; }
+#customersTable .col-customer-zip { width: 80px; }
+#customersTable .col-customer-country { width: 72px; }
+#customersTable .col-customer-contact { width: 120px; }
+#customersTable .col-customer-phone { width: 120px; }
+#customersTable .col-customer-email { width: 200px; }
+#customersTable .col-customer-email-sent { width: 108px; }
+#customersTable .col-customer-action { width: 72px; }
+
+#customersTable th[data-col="Customer"],
+#customersTable th[data-col="Address"],
+#customersTable th[data-col="Line 2"],
+#customersTable th[data-col="City"],
+#customersTable th[data-col="Contact"],
+#customersTable td[data-col="Customer"],
+#customersTable td[data-col="Address"],
+#customersTable td[data-col="Line 2"],
+#customersTable td[data-col="City"],
+#customersTable td[data-col="Contact"] {
+  text-align: left;
+}
+
+#customersTable th {
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 8px 12px;
+  background: var(--bg-header, #f7f7f8);
+  border-bottom: 2px solid var(--border, #e5e7eb);
+  color: var(--text-muted, #6b7280);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+#customersTable td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-light, #f0f0f0);
+  font-size: 13px;
+  vertical-align: middle;
+}
+
+.customer-row:hover td {
+  background: #f9fafb;
+}
+
+.customer-row--selected td {
+  background: #eff6ff;
+}
+
+.customer-select-cell {
+  text-align: center;
+  vertical-align: middle;
+}
+
+.customer-select-checkbox {
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+.customer-email-sent-cell {
+  white-space: nowrap;
+}
+
+.customer-email-sent-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #dcfce7;
+  color: #166534;
+}
+
+.customer-action-cell {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.customer-send-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  min-height: 28px;
+}
+
+.customer-email-modal-card {
+  width: calc(100vw - 40px);
+  max-width: 1320px;
+  max-height: calc(100vh - 32px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.customer-email-modal-header h3 {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.customer-email-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 28px;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.customer-email-modal-card .modal-footer {
+  padding: 16px 28px;
+  flex-shrink: 0;
+}
+
+.customer-email-body {
+  min-height: 480px;
+  resize: vertical;
 }

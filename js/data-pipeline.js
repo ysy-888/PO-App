@@ -35,6 +35,11 @@ async function loadData() {
       if (typeof onPendingPackingListsDataLoaded === "function") {
         onPendingPackingListsDataLoaded([], "review");
       }
+      if (typeof onCustomersDataLoaded === "function") {
+        onCustomersDataLoaded(
+          typeof DEMO_CUSTOMERS !== "undefined" ? DEMO_CUSTOMERS.map(r => ({ ...r })) : []
+        );
+      }
       buildStylePhotoIndex(DEMO_STYLE_PHOTOS);
       applyDefaultStatusFilter(STATUS_FILTER_OPEN);
     } else {
@@ -57,6 +62,9 @@ async function loadData() {
       buildStylePhotoIndex(json.stylePhotos ?? []);
       if (typeof onPendingPackingListsDataLoaded === "function") {
         onPendingPackingListsDataLoaded(json.pendingPackingLists ?? [], json.vendorSubmitMode);
+      }
+      if (typeof onCustomersDataLoaded === "function") {
+        onCustomersDataLoaded(json.customers ?? []);
       }
       window.__pendingShipments = json.shipments ?? [];
       window.__pendingExfRequests = json.exfRequests ?? [];

@@ -8,6 +8,7 @@ const ASN_REQUESTS_SHEET_NAME = "ASN Requests";
 const DELIVERY_REQUESTS_SHEET_NAME = "Delivery Requests";
 const PICKUP_REQUESTS_SHEET_NAME = "Pickup Requests";
 const CHARGEBACKS_SHEET_NAME = "Chargebacks";
+const CUSTOMERS_SHEET_NAME = "Customers";
 const PACKING_LISTS_SHEET_NAME = "Packing Lists";
 const PACKING_CARTONS_SHEET_NAME = "Packing List Cartons";
 const STYLE_PHOTOS_SHEET_NAME = "Style Photos";
@@ -206,6 +207,56 @@ function getLocationsSheet_() {
     ]);
   }
   return sheet;
+}
+
+const CUSTOMER_EMAIL_SENT_AT_FIELD = "Email Sent At";
+
+const CUSTOMER_DATA_FIELDS = [
+  "Address",
+  "Line 2",
+  "City",
+  "State",
+  "Zip",
+  "Country",
+  "Contact",
+  "Phone #",
+  "Email",
+  CUSTOMER_EMAIL_SENT_AT_FIELD,
+];
+
+function getCustomersSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(CUSTOMERS_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(CUSTOMERS_SHEET_NAME);
+  }
+  ensureSheetHeaders_(sheet, ["Customer", ...CUSTOMER_DATA_FIELDS]);
+  return sheet;
+}
+
+function findCustomerRowIndex_(customerSheet, customerKey) {
+  const rows = customerSheet.getDataRange().getValues();
+  const headers = rows[0].map(h => String(h ?? "").trim());
+  const customerCol = headers.indexOf("Customer");
+  if (customerCol === -1) throw new Error("Customer column not found in sheet.");
+  const target = String(customerKey ?? "").trim();
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][customerCol] ?? "").trim() === target) {
+      return { rowIndex: i + 1, headers: headers };
+    }
+  }
+  return null;
+}
+
+function recordCustomerEmailSent_(customerKey) {
+  const customerSheet = getCustomersSheet_();
+  const found = findCustomerRowIndex_(customerSheet, customerKey);
+  if (!found) return null;
+  const sentAt = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+  writePoFields_(customerSheet, found.rowIndex, found.headers, {
+    [CUSTOMER_EMAIL_SENT_AT_FIELD]: sentAt,
+  });
+  return sentAt;
 }
 
 function ensurePoWorkflowHeaders_() {
@@ -1718,6 +1769,232 @@ function handleBulkUpsertPos(payload) {
     errors,
     insertedPoNumbers,
     updatedPoNumbers,
+  });
+}
+
+function pickCustomerImportUpdates_(rowData) {
+  const updates = {};
+  Object.entries(rowData || {}).forEach(([field, value]) => {
+    if (field === "Customer") return;
+    updates[field] = value;
+  });
+  return updates;
+}
+
+function ensureCustomerHeaders_(customerSheet, requiredHeaders) {
+  const lastCol = Math.max(customerSheet.getLastColumn(), 1);
+  const headers = customerSheet.getRange(1, 1, 1, lastCol).getValues()[0]
+    .map(h => String(h ?? "").trim());
+  const existing = new Set(headers.filter(Boolean));
+  let changed = false;
+  requiredHeaders.forEach(field => {
+    if (!field || existing.has(field)) return;
+    headers.push(field);
+    existing.add(field);
+    changed = true;
+  });
+  if (changed) {
+    customerSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+  return customerSheet.getRange(1, 1, 1, customerSheet.getLastColumn()).getValues()[0]
+    .map(h => String(h ?? "").trim());
+}
+
+function handleBulkUpsertCustomers(payload) {
+  const rows = payload.rows || [];
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return corsResponse({ success: false, error: "No rows to import." });
+  }
+
+  const customerSheet = getCustomersSheet_();
+  const requiredHeaders = new Set(["Customer"]);
+  rows.forEach(rowData => {
+    Object.keys(rowData || {}).forEach(field => requiredHeaders.add(field));
+  });
+  const headers = ensureCustomerHeaders_(customerSheet, Array.from(requiredHeaders));
+  const colCount = headers.length;
+  const customerCol = headers.indexOf("Customer");
+  if (customerCol === -1) {
+    return corsResponse({ success: false, error: "Customer column not found in sheet." });
+  }
+
+  const lastRow = Math.max(customerSheet.getLastRow(), 1);
+  let sheetValues = customerSheet.getRange(1, 1, lastRow, colCount).getValues()
+    .map(row => padSheetRowToWidth_(row, colCount));
+  sheetValues[0] = headers.slice();
+
+  const customerIndexMap = buildPoIndexMap_(sheetValues, customerCol);
+  const rowsToAppend = [];
+  const updatedRowIndices = new Set();
+  const insertedCustomers = [];
+  const updatedCustomers = [];
+  let inserted = 0;
+  let updated = 0;
+  let skipped = 0;
+  const errors = [];
+
+  rows.forEach((rowData, index) => {
+    const customerKey = String(rowData["Customer"] ?? "").trim();
+    if (!customerKey) {
+      skipped++;
+      errors.push({ row: index + 1, error: "Missing Customer" });
+      return;
+    }
+
+    const updates = pickCustomerImportUpdates_(rowData);
+    const existingIdx = customerIndexMap.get(customerKey);
+
+    if (existingIdx !== undefined) {
+      const targetRow = existingIdx < sheetValues.length
+        ? sheetValues[existingIdx]
+        : rowsToAppend[existingIdx - sheetValues.length];
+      const changedUpdates = pickChangedImportUpdates_(targetRow, headers, updates);
+      if (Object.keys(changedUpdates).length === 0) return;
+
+      applyImportUpdatesToRowValues_(targetRow, headers, changedUpdates);
+      if (existingIdx < sheetValues.length) updatedRowIndices.add(existingIdx);
+      updatedCustomers.push(customerKey);
+      updated++;
+      return;
+    }
+
+    const newRowValues = buildPoRowValues_(headers, { "Customer": customerKey, ...updates });
+    rowsToAppend.push(newRowValues);
+    customerIndexMap.set(customerKey, sheetValues.length + rowsToAppend.length - 1);
+    insertedCustomers.push(customerKey);
+    inserted++;
+  });
+
+  const sortedIdx = Array.from(updatedRowIndices).sort((a, b) => a - b);
+  let runStart = 0;
+  while (runStart < sortedIdx.length) {
+    const start = sortedIdx[runStart];
+    let end = start;
+    let runEnd = runStart;
+    while (runEnd + 1 < sortedIdx.length && sortedIdx[runEnd + 1] === end + 1) {
+      runEnd++;
+      end = sortedIdx[runEnd];
+    }
+    const block = [];
+    for (let r = start; r <= end; r++) block.push(sheetValues[r]);
+    customerSheet.getRange(start + 1, 1, block.length, colCount).setValues(block);
+    runStart = runEnd + 1;
+  }
+
+  if (rowsToAppend.length > 0) {
+    customerSheet.getRange(sheetValues.length + 1, 1, rowsToAppend.length, colCount).setValues(rowsToAppend);
+  }
+
+  return corsResponse({
+    success: true,
+    inserted,
+    updated,
+    skipped,
+    errors,
+    insertedCustomers,
+    updatedCustomers,
+  });
+}
+
+const CUSTOMER_EMAIL_SITE_URL_ = "https://www.elevatordisco.com/";
+
+function buildCustomerEmailLogoHeaderHtml_() {
+  return "<p class=\"email-logo\" style=\"margin:0;font-size:20px;font-weight:700;letter-spacing:0.18em;" +
+    "text-transform:uppercase;line-height:1.2;\">" +
+    "<a href=\"" + CUSTOMER_EMAIL_SITE_URL_ + "\" style=\"color:#ffffff;text-decoration:none;\">Elevator Disco</a></p>";
+}
+
+function buildCustomerEmailHtml_(body) {
+  const bodyHtml = escapeHtml_(String(body ?? "")).replace(/\n/g, "<br>");
+  return renderEmailTemplate_("templates/email-customer", {
+    customerHeaderHtml: buildCustomerEmailLogoHeaderHtml_(),
+    bodyHtml: bodyHtml,
+  });
+}
+
+function applyCustomerEmailTemplate_(text, customerName) {
+  const name = String(customerName ?? "").trim();
+  return String(text ?? "").replace(/CUSTOMER/g, name);
+}
+
+function sendCustomerEmailTo_(to, subject, body) {
+  MailApp.sendEmail({
+    to: to,
+    subject: subject,
+    body: body,
+    htmlBody: buildCustomerEmailHtml_(body),
+  });
+}
+
+function handleSendCustomerEmail(payload) {
+  const to = String(payload.to ?? "").trim();
+  const subject = String(payload.subject ?? "").trim();
+  const body = String(payload.body ?? "").trim();
+  const customerKey = String(payload.customer ?? "").trim();
+  if (!to) return corsResponse({ success: false, error: "Recipient email is required." });
+  if (!subject) return corsResponse({ success: false, error: "Subject is required." });
+  if (!body) return corsResponse({ success: false, error: "Message body is required." });
+
+  sendCustomerEmailTo_(to, subject, body);
+  const sentAt = customerKey ? recordCustomerEmailSent_(customerKey) : null;
+  return corsResponse({ success: true, sentAt: sentAt });
+}
+
+function handleBatchSendCustomerEmail(payload) {
+  const customerKeys = Array.isArray(payload.customers)
+    ? payload.customers.map(key => String(key ?? "").trim()).filter(Boolean)
+    : [];
+  const subject = String(payload.subject ?? "").trim();
+  const body = String(payload.body ?? "").trim();
+  if (customerKeys.length === 0) {
+    return corsResponse({ success: false, error: "No customers selected." });
+  }
+  if (!subject) return corsResponse({ success: false, error: "Subject is required." });
+  if (!body) return corsResponse({ success: false, error: "Message body is required." });
+
+  const customerSheet = getCustomersSheet_();
+  const sentCustomers = [];
+  const sentAtByCustomer = {};
+  const errors = [];
+
+  customerKeys.forEach(customerKey => {
+    try {
+      const found = findCustomerRowIndex_(customerSheet, customerKey);
+      if (!found) {
+        errors.push({ customer: customerKey, error: "Customer not found." });
+        return;
+      }
+      const emailCol = found.headers.indexOf("Email");
+      const to = emailCol >= 0 ? String(customerSheet.getRange(found.rowIndex, emailCol + 1).getValue() ?? "").trim() : "";
+      if (!to) {
+        errors.push({ customer: customerKey, error: "No email on file." });
+        return;
+      }
+      const personalizedSubject = applyCustomerEmailTemplate_(subject, customerKey);
+      const personalizedBody = applyCustomerEmailTemplate_(body, customerKey);
+      sendCustomerEmailTo_(to, personalizedSubject, personalizedBody);
+      const sentAt = recordCustomerEmailSent_(customerKey);
+      sentCustomers.push(customerKey);
+      if (sentAt) sentAtByCustomer[customerKey] = sentAt;
+    } catch (err) {
+      errors.push({ customer: customerKey, error: String(err.message || err) });
+    }
+  });
+
+  if (sentCustomers.length === 0) {
+    return corsResponse({
+      success: false,
+      error: "No emails were sent.",
+      errors: errors,
+    });
+  }
+
+  return corsResponse({
+    success: true,
+    sent: sentCustomers.length,
+    sentCustomers: sentCustomers,
+    sentAtByCustomer: sentAtByCustomer,
+    errors: errors,
   });
 }
 
@@ -3912,6 +4189,7 @@ function doGet(e) {
     const packingCartonsSheet = getPackingCartonsSheet_();
     const stylePhotosSheet = getStylePhotosSheet_();
     const pendingPackingListsSheet = getPendingPackingListsSheet_();
+    const customersSheet = getCustomersSheet_();
     const data = sheetToObjects_(poSheet, "PO #");
     const shipments = sheetToObjects_(shipmentsSheet, SHIPMENT_ID_FIELD);
     const exfRequests = sheetToObjects_(exfRequestsSheet, EXF_REQUEST_ID_FIELD);
@@ -3928,6 +4206,7 @@ function doGet(e) {
       sheetToObjects_(pendingPackingListsSheet, PENDING_PACKING_LIST_ID_FIELD),
       data
     );
+    const customers = sheetToObjects_(customersSheet, "Customer");
 
     return corsResponse({
       success: true,
@@ -3946,6 +4225,7 @@ function doGet(e) {
       packingCartons: packingCartons,
       stylePhotos: stylePhotos,
       pendingPackingLists: pendingPackingLists,
+      customers: customers,
       vendorSubmitMode: getVendorSubmitMode_(),
       defaultColumns: getDefaultColumns_(),
       defaultStatusFilter: getDefaultStatusFilter_(),
@@ -4334,6 +4614,9 @@ function doPost(e) {
     if (action === "savePackingList") return handleSavePackingList(payload);
     if (action === "deletePackingList") return handleDeletePackingList(payload);
     if (action === "bulkUpsertPos") return handleBulkUpsertPos(payload);
+    if (action === "bulkUpsertCustomers") return handleBulkUpsertCustomers(payload);
+    if (action === "sendCustomerEmail") return handleSendCustomerEmail(payload);
+    if (action === "batchSendCustomerEmail") return handleBatchSendCustomerEmail(payload);
     if (action === "createVendorPortalLink") return handleCreateVendorPortalLink(payload);
     if (action === "setVendorSubmitMode") return handleSetVendorSubmitMode(payload);
     if (action === "approvePendingPackingList") return handleApprovePendingPackingList(payload);

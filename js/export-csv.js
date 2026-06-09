@@ -126,6 +126,21 @@ function getRequestsExportData() {
   return { headers, rows };
 }
 
+/** Customers: display columns only (no action column). */
+function getCustomersExportData() {
+  const headers = typeof CUSTOMER_DISPLAY_COLUMNS !== "undefined"
+    ? CUSTOMER_DISPLAY_COLUMNS.slice()
+    : [];
+  const rows = (typeof filteredCustomers !== "undefined" ? filteredCustomers : []).map(row => {
+    return headers.map(col => {
+      const val = row[col] ?? "";
+      if (isEmptyValue(val)) return "";
+      return String(val);
+    });
+  });
+  return { headers, rows };
+}
+
 /** Chargebacks: CHARGEBACK_TABLE_COLUMNS, full Notes. */
 function getChargebacksExportData() {
   const headers = CHARGEBACK_TABLE_COLUMNS.slice();
@@ -171,6 +186,10 @@ function exportCurrentViewCsv() {
     case "chargebacks":
       data = getChargebacksExportData();
       filename = `chargebacks_${today}.csv`;
+      break;
+    case "customers":
+      data = getCustomersExportData();
+      filename = `customers_${today}.csv`;
       break;
     default:
       return;

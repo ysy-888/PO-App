@@ -39,6 +39,7 @@
       </div>
     </div>
     <button type="button" class="app-title-tab" id="navTabChargebacks" role="tab" aria-selected="false">Chargebacks</button>
+    <button type="button" class="app-title-tab" id="navTabCustomers" role="tab" aria-selected="false">Customers</button>
     <button type="button" class="app-title-tab" id="navTabPackingReviews" role="tab" aria-selected="false">Vendor Submissions</button>
   </nav>
   <div class="header-right">
@@ -161,6 +162,17 @@
   <div class="toolbar-end">
     <button type="button" class="btn btn-danger" id="deleteChargebackBtn" hidden>Delete chargeback</button>
     <div class="counter" id="chargebackRowCounter">— chargebacks</div>
+  </div>
+</div>
+
+<div id="customersToolbar" class="toolbar" hidden>
+  <div class="search-wrap">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    <input type="search" id="customersSearchInput" placeholder="Search" />
+  </div>
+  <div class="toolbar-end">
+    <button type="button" class="btn btn-primary" id="customersBatchEmailBtn" hidden>Batch Email</button>
+    <div class="counter" id="customersRowCounter">— customers</div>
   </div>
 </div>
 
@@ -600,6 +612,50 @@
   </div>
 </div>
 
+<div id="customersTableWrap" class="table-scroll-y" hidden>
+  <div class="table-scroll-x">
+  <table id="customersTable">
+    <colgroup>
+      <col class="col-select" />
+      <col class="col-customer" />
+      <col class="col-customer-address" />
+      <col class="col-customer-line2" />
+      <col class="col-customer-city" />
+      <col class="col-customer-state" />
+      <col class="col-customer-zip" />
+      <col class="col-customer-country" />
+      <col class="col-customer-contact" />
+      <col class="col-customer-phone" />
+      <col class="col-customer-email" />
+      <col class="col-customer-email-sent" />
+      <col class="col-customer-action" />
+    </colgroup>
+    <thead>
+      <tr>
+        <th class="th-select-col">
+          <input type="checkbox" id="customersSelectAllCheckbox" aria-label="Select all customers with email" />
+        </th>
+        <th data-col="Customer">Customer</th>
+        <th data-col="Address">Address</th>
+        <th data-col="Line 2">Line 2</th>
+        <th data-col="City">City</th>
+        <th>State</th>
+        <th>Zip</th>
+        <th>Country</th>
+        <th data-col="Contact">Contact</th>
+        <th>Phone #</th>
+        <th>Email</th>
+        <th>Email Sent</th>
+        <th class="th-action-col" aria-label="Actions"></th>
+      </tr>
+    </thead>
+    <tbody id="customersTableBody">
+      <tr class="state-row"><td colspan="13">Loading customers…</td></tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
 <div id="packingReviewTableWrap" class="table-scroll-y" hidden>
   <div class="table-scroll-x">
   <table id="packingReviewTable">
@@ -1010,6 +1066,37 @@
   </div>
 </div>
 
+<div id="customerEmailOverlay" class="modal-backdrop">
+  <div class="modal-card customer-email-modal-card" onclick="event.stopPropagation()">
+    <div class="modal-header customer-email-modal-header">
+      <div class="modal-header-main">
+        <h3 id="customerEmailModalTitle">EMAIL CUSTOMER</h3>
+      </div>
+      <div class="modal-header-actions">
+        <button type="button" class="btn-close" id="customerEmailCloseBtn" aria-label="Close">✕</button>
+      </div>
+    </div>
+    <div class="modal-body customer-email-modal-body">
+      <label class="shipment-form-field" id="customerEmailToField">
+        <span class="shipment-form-label">To</span>
+        <input type="text" id="customerEmailTo" class="shipment-form-input" readonly />
+      </label>
+      <label class="shipment-form-field">
+        <span class="shipment-form-label">Subject</span>
+        <input type="text" id="customerEmailSubject" class="shipment-form-input" />
+      </label>
+      <label class="shipment-form-field shipment-form-field--notes">
+        <span class="shipment-form-label">Message</span>
+        <textarea id="customerEmailBody" class="shipment-form-input customer-email-body" rows="20"></textarea>
+      </label>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-primary" id="customerEmailSendBtn">Send</button>
+      <button type="button" class="btn" id="customerEmailCancelBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <div id="csvImportSummaryOverlay" class="modal-backdrop">
   <div class="modal-card csv-import-summary-card" onclick="event.stopPropagation()">
     <div class="modal-header">
@@ -1187,6 +1274,8 @@
 <script src="js/delivery-requests.js?v=20260605-8"></script>
 <script src="js/pickup-requests.js?v=20260605-8"></script>
 <script src="js/packing-reviews.js"></script>
+<script src="js/customers-import.js"></script>
+<script src="js/customers.js"></script>
 <script src="js/export-csv.js"></script>
 <script src="js/shipments-init.js"></script>
 <script src="js/packing-print.js"></script>
