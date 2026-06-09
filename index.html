@@ -317,7 +317,7 @@
       <span class="po-summary-label">Total Units</span>
       <span class="po-summary-value" id="poSummaryTotal_TotalUnits">0</span>
       <span class="po-summary-label">Total Weight</span>
-      <span class="po-summary-value" id="poSummaryTotal_TotalWeight">0 kg</span>
+      <span class="po-summary-value" id="poSummaryTotal_TotalWeight">0 lbs</span>
     </div>
     <div class="packing-list-table-panel" id="poPackingListTablePanel" hidden>
       <div class="packing-editor-main">
@@ -709,10 +709,6 @@
       <label for="poMultiCartonCount">Number of Cartons</label>
       <input type="number" id="poMultiCartonCount" min="1" step="1" value="1" />
     </div>
-    <div class="modal-field">
-      <label for="poMultiCartonWeight">Weight per Carton (kg)</label>
-      <input type="number" id="poMultiCartonWeight" min="0" step="0.01" value="" placeholder="0.00" />
-    </div>
     <div class="modal-footer">
       <button type="button" class="btn btn-sm" id="poMultiCartonCancel">Cancel</button>
       <button type="button" class="btn btn-primary btn-sm" id="poMultiCartonApply">Apply</button>
@@ -963,6 +959,8 @@
             <button type="button" class="btn btn-secondary" id="asnRequestAddSelectedPosBtn" hidden>Add</button>
             <button type="button" class="btn btn-secondary" id="asnRequestAddPoDoneBtn" hidden>Done</button>
             <button type="button" class="btn btn-secondary packing-list-print-btn" id="asnRequestPrintBtn" hidden title="Print packing list for linked POs">Print Packing List</button>
+            <button type="button" class="btn btn-secondary" id="asnPickupBtn" hidden>ASN Pickup</button>
+            <button type="button" class="btn btn-secondary" id="asnPickupResendBtn" hidden>Resend ASN Pickup</button>
             <button type="button" class="btn-close" id="asnRequestCancelBtn" aria-label="Close">✕</button>
           </div>
         </div>
@@ -976,6 +974,28 @@
         Create
       </button>
       <button type="button" class="btn" data-dismiss="asn-request">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div id="asnPickupLabelOverlay" class="modal-backdrop">
+  <div class="modal-card shipment-modal-card asn-pickup-label-modal" onclick="event.stopPropagation()">
+    <div class="modal-header email-header email-header-request">
+      <div class="email-header-inner">
+        <div class="email-header-titles">
+          <h1 class="email-heading">Carton Label Info</h1>
+          <p class="email-subheading" id="asnPickupLabelModalSubtitle">ASN Pickup</p>
+        </div>
+        <div class="modal-header-actions">
+          <button type="button" class="btn-close" id="asnPickupLabelCancelBtn" aria-label="Close">✕</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-body" id="asnPickupLabelBody"></div>
+    <div class="modal-footer">
+      <div id="asnPickupLabelFooterMessage" class="modal-footer-message shipment-footer-message" role="status" aria-live="polite" hidden></div>
+      <button type="button" class="btn btn-primary" id="asnPickupLabelSubmitBtn">Send ASN Pickup</button>
+      <button type="button" class="btn" id="asnPickupLabelDismissBtn">Cancel</button>
     </div>
   </div>
 </div>

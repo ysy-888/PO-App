@@ -341,6 +341,7 @@ function renderDeliveryRequestModal(poNumbers, request = {}) {
   setRequestModalPoCount(document.getElementById("deliveryRequestPoCount"), pos.length);
 
   const titleLabel = String(document.getElementById("deliveryRequestModalId")?.textContent ?? "").trim() || "Delivery Request";
+  const requestId = titleLabel !== "Delivery Request" && titleLabel !== "New" ? titleLabel : "";
   const deliveryForm = document.getElementById("deliveryRequestForm");
   const deliveryFormData = deliveryForm ? readRequestForm(deliveryForm) : {};
   if (typeof wirePackingListPrintButton === "function") {
@@ -351,6 +352,7 @@ function renderDeliveryRequestModal(poNumbers, request = {}) {
       titlePageType: "Delivery",
       typeDate: deliveryFormData[DELIVERY_DATE_FIELD] ?? (isExisting ? activeRequest[DELIVERY_DATE_FIELD] : deliveryRequestDraftDeliveryDate),
       requestDate: deliveryFormData[DELIVERY_REQ_SUBMIT_DATE_FIELD] ?? (isExisting ? activeRequest[DELIVERY_REQ_SUBMIT_DATE_FIELD] : submitDate),
+      requestId,
     });
   }
 

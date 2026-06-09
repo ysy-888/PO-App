@@ -375,6 +375,7 @@ function renderPickupRequestModal(poNumbers, request = {}) {
   setRequestModalPoCount(document.getElementById("pickupRequestPoCount"), pos.length);
 
   const titleLabel = String(document.getElementById("pickupRequestModalId")?.textContent ?? "").trim() || "Pickup Request";
+  const requestId = titleLabel !== "Pickup Request" && titleLabel !== "New" ? titleLabel : "";
   const pickupForm = document.getElementById("pickupRequestForm");
   const pickupFormData = pickupForm ? readRequestForm(pickupForm) : {};
   if (typeof wirePackingListPrintButton === "function") {
@@ -385,6 +386,7 @@ function renderPickupRequestModal(poNumbers, request = {}) {
       titlePageType: "Pickup",
       typeDate: pickupFormData[PICKUP_DATE_FIELD] ?? (isExisting ? activeRequest[PICKUP_DATE_FIELD] : pickupRequestDraftPickupDate),
       requestDate: pickupFormData[PICKUP_REQ_SUBMIT_DATE_FIELD] ?? (isExisting ? activeRequest[PICKUP_REQ_SUBMIT_DATE_FIELD] : submitDate),
+      requestId,
     });
   }
 

@@ -54,20 +54,21 @@ function poPaneCartonTotal(carton) {
   return poPackingPaneSizeLabels.reduce((sum, _, i) => sum + poPaneQty(carton["u" + i]), 0);
 }
 
-function poPaneFmtWeightKg(val) {
+function poPaneFmtWeightLbs(val) {
   const n = poPaneQty(val);
   return n > 0 ? n.toFixed(2) : "0";
 }
 
-function poPaneFmtTotalWeightKg(val) {
+function poPaneFmtTotalWeightLbs(val) {
   const n = Math.round(poPaneQty(val));
-  return n + " kg";
+  return n + " lbs";
 }
 
 function poPaneMakeEmptyCarton() {
   const c = {};
   poPackingPaneSizeLabels.forEach((_, i) => { c["u" + i] = 0; });
-  c.weight = 0;
+  c.weightKg = 0;
+  c.weightLbs = 0;
   return c;
 }
 
@@ -174,7 +175,10 @@ function poPaneSheetCartonsToPane(cartons) {
     poPackingPaneSizeLabels.forEach((_, i) => {
       out["u" + i] = poPaneQty(carton["Unit " + (i + 1)]);
     });
-    out.weight = poPaneQty(carton[CARTON_WEIGHT_FIELD]);
+    out.weightKg = poPaneQty(carton[CARTON_WEIGHT_FIELD]);
+    out.weightLbs = typeof getCartonWeightLbs === "function"
+      ? getCartonWeightLbs(carton)
+      : out.weightKg;
     return out;
   });
 }
@@ -187,7 +191,7 @@ function poPaneCartonsToSheet(cartons) {
       out["Unit " + (i + 1)] = qty ? String(qty) : "";
     });
     out["Total Units"] = poPaneCartonTotal(carton);
-    const weight = poPaneQty(carton.weight);
+    const weight = poPaneQty(carton.weightKg);
     out[CARTON_WEIGHT_FIELD] = weight ? String(weight) : "";
     return out;
   });
@@ -590,8 +594,8 @@ function poPaneRefreshSummaryTotals() {
   if (ctnEl) ctnEl.textContent = String(poPackingPaneCartons.length);
   const totalUnits = poPackingPaneCartons.reduce((sum, c) => sum + poPaneCartonTotal(c), 0);
   if (unitEl) unitEl.textContent = String(totalUnits);
-  const totalWeight = poPackingPaneCartons.reduce((sum, c) => sum + poPaneQty(c.weight), 0);
-  if (weightEl) weightEl.textContent = poPaneFmtTotalWeightKg(totalWeight);
+  const totalWeight = poPackingPaneCartons.reduce((sum, c) => sum + poPaneQty(c.weightLbs), 0);
+  if (weightEl) weightEl.textContent = poPaneFmtTotalWeightLbs(totalWeight);
   const actTotal = poPackingPaneSizeLabels.reduce((sum, _, i) => sum + poPanePackingUnitQty(i), 0);
   const actTotalEl = document.getElementById("poSummaryActTotal");
   if (actTotalEl) actTotalEl.textContent = poPaneFormatQtyCell(actTotal);
@@ -673,7 +677,7 @@ function poPaneCreateQtyInput(value, onInput, readOnly) {
   return input;
 }
 
-function poPaneCreateWeightField(value, onInput, readOnly) {
+function poPaneCreateWeightField(value) {
   const field = document.createElement("div");
   field.className = "carton-weight-field";
   const input = document.createElement("input");
@@ -684,12 +688,11 @@ function poPaneCreateWeightField(value, onInput, readOnly) {
   input.className = "carton-weight-input";
   input.value = value > 0 ? value : "";
   input.placeholder = EN_DASH;
-  if (readOnly) input.readOnly = true;
-  if (typeof bindNumberInput === "function") bindNumberInput(input);
-  input.addEventListener("input", onInput);
+  input.readOnly = true;
+  input.tabIndex = -1;
   const suffix = document.createElement("span");
   suffix.className = "carton-weight-suffix";
-  suffix.textContent = "kg";
+  suffix.textContent = "lbs";
   field.appendChild(input);
   field.appendChild(suffix);
   return { field, input };
@@ -732,10 +735,7 @@ function poPaneRenderCartonRows() {
 
     const weightCell = document.createElement("div");
     weightCell.className = "carton-grid-weight-cell";
-    const weightField = poPaneCreateWeightField(carton.weight, () => {
-      carton.weight = poPaneQty(weightField.input.value);
-      poPaneRefreshSummaryTotals();
-    }, readOnly);
+    const weightField = poPaneCreateWeightField(carton.weightLbs);
     weightCell.appendChild(weightField.field);
     row.appendChild(weightCell);
 
@@ -952,7 +952,6 @@ function initPoPackingPane() {
       fields.appendChild(div);
     });
     document.getElementById("poMultiCartonCount").value = "1";
-    document.getElementById("poMultiCartonWeight").value = "";
     mcModal.hidden = false;
   });
 
@@ -966,7 +965,6 @@ function initPoPackingPane() {
       return inp ? poPaneQty(inp.value) : 0;
     });
     const numCartons = Math.max(1, Math.floor(Number(document.getElementById("poMultiCartonCount")?.value) || 1));
-    const weight = poPaneQty(document.getElementById("poMultiCartonWeight")?.value);
 
     let startIdx = poPackingPaneCartons.findIndex(c =>
       poPackingPaneSizeLabels.every((_, i) => poPaneQty(c["u" + i]) === 0)
@@ -979,7 +977,6 @@ function initPoPackingPane() {
     for (let n = 0; n < numCartons; n++) {
       const c = poPackingPaneCartons[startIdx + n];
       poPackingPaneSizeLabels.forEach((_, i) => { c["u" + i] = sizeQtys[i]; });
-      c.weight = weight;
     }
 
     poPaneSyncCartonCount(poPackingPaneCartons.length);

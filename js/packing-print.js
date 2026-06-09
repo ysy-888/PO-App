@@ -34,6 +34,7 @@ function printPackingListLocal({
   titlePageType = "",
   typeDate = "",
   requestDate = "",
+  requestId = "",
 } = {}) {
   const root = document.getElementById("packingPrintRoot");
   if (!root) return;
@@ -45,6 +46,7 @@ function printPackingListLocal({
       titlePageType,
       typeDate,
       requestDate,
+      requestId,
     })
     : buildIndividualPackingListPrintHtml(poNumbers[0]);
 
@@ -67,6 +69,7 @@ function wirePackingListPrintButton(btnOrId, {
   titlePageType = "",
   typeDate = "",
   requestDate = "",
+  requestId = "",
 } = {}) {
   const btn = typeof btnOrId === "string" ? document.getElementById(btnOrId) : btnOrId;
   if (!btn) return;
@@ -82,6 +85,7 @@ function wirePackingListPrintButton(btnOrId, {
     titlePageType,
     typeDate,
     requestDate,
+    requestId,
   });
 }
 
@@ -93,6 +97,7 @@ async function printPackingListAsync({
   titlePageType = "",
   typeDate = "",
   requestDate = "",
+  requestId = "",
 } = {}) {
   const numbers = (Array.isArray(poNumbers) ? poNumbers : [])
     .map(po => String(po ?? "").trim())
@@ -108,6 +113,7 @@ async function printPackingListAsync({
       titlePageType,
       typeDate,
       requestDate,
+      requestId,
     });
     return;
   }
@@ -125,6 +131,7 @@ async function printPackingListAsync({
       titlePageType: String(titlePageType ?? "").trim(),
       typeDate: typeDate ?? "",
       requestDate: requestDate ?? "",
+      requestId: requestId ?? "",
     });
     if (!json.success || !json.html) {
       throw new Error(json.error || "Failed to load packing list");
@@ -148,6 +155,7 @@ function printPackingList({
   titlePageType = "",
   typeDate = "",
   requestDate = "",
+  requestId = "",
 } = {}) {
   void printPackingListAsync({
     poNumbers,
@@ -157,6 +165,7 @@ function printPackingList({
     titlePageType,
     typeDate,
     requestDate,
+    requestId,
   });
 }
 
@@ -187,12 +196,19 @@ function plPrintNum(val) {
   return n > 0 ? plPrintEsc(String(n)) : "0";
 }
 
+function plPrintFmtWeight(val) {
+  const n = toQtyNumber(val);
+  if (n <= 0) return "";
+  const num = Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100);
+  return num + "\u00a0lbs";
+}
+
 function plActiveCartons(cartons) {
   return (Array.isArray(cartons) ? cartons : []).filter(carton => {
     for (let i = 1; i <= 15; i++) {
       if (toQtyNumber(carton[`Unit ${i}`]) > 0) return true;
     }
-    return toQtyNumber(carton["Carton Weight"]) > 0;
+    return getCartonWeightLbs(carton) > 0;
   });
 }
 
@@ -230,16 +246,17 @@ function plPrintNotesPanel(notes) {
   </div>`;
 }
 
-function plPrintColgroup(sizeColCount) {
+function plPrintColgroup(sizeColCount, compact = false) {
   const contentWidth = 720;
-  const ctnWidth = 44;
-  const totalWidth = 40;
-  const wtWidth = 48;
+  const ctnWidth = compact ? 34 : 44;
+  const totalWidth = compact ? 34 : 40;
+  const wtWidth = compact ? 56 : 64;
+  const sizeWidth = compact ? 30 : null;
   const fixed = ctnWidth + totalWidth + wtWidth;
   const remaining = Math.max(0, contentWidth - fixed);
-  const sizeWidth = sizeColCount > 0 ? Math.max(28, Math.floor(remaining / sizeColCount)) : 0;
+  const resolvedSizeWidth = sizeWidth ?? (sizeColCount > 0 ? Math.max(28, Math.floor(remaining / sizeColCount)) : 0);
   let cols = `<colgroup><col width="${ctnWidth}">`;
-  for (let i = 0; i < sizeColCount; i++) cols += `<col width="${sizeWidth}">`;
+  for (let i = 0; i < sizeColCount; i++) cols += `<col width="${resolvedSizeWidth}">`;
   cols += `<col width="${totalWidth}"><col width="${wtWidth}"></colgroup>`;
   return cols;
 }
@@ -255,7 +272,8 @@ function plPrintPageStyles() {
     .pl-header-po{font-size:10px;font-weight:500;text-align:right;color:#1a1a18;}
     .pl-header-sub{margin-top:2px;font-size:9px;color:#6b7280;text-align:right;}
     .pl-body{padding:18px 0 0;}
-    .pl-section-title{margin:0 0 10px;font-size:8px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#374151;}
+    .pl-section-title{margin:0 0 6px;font-size:8px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#374151;}
+    .pl-section-title+.pl-summary-grid,.pl-section-title+.pl-carton-table,.pl-section-title+.pl-carton-table-wrap{margin-top:10px;}
     .pl-details-block{margin-bottom:20px;}
     .pl-packing-block{margin-top:4px;}
     .pl-summary-grid{width:100%;border-collapse:separate;border-spacing:12px 0;table-layout:fixed;}
@@ -270,8 +288,19 @@ function plPrintPageStyles() {
     .pl-carton-table{width:100%;border-collapse:collapse;border:1px solid #e5e7eb;table-layout:fixed;font-size:9px;}
     .pl-carton-table th{padding:6px 8px;font-size:8px;font-weight:600;text-transform:uppercase;color:#374151;background:#f7f7f8;border-bottom:1px solid #e5e7eb;}
     .pl-carton-table td{padding:6px 8px;border-bottom:1px solid #e5e7eb;font-size:9px;vertical-align:middle;}
+    .pl-carton-table th.pl-ctn-col,.pl-carton-table td.pl-ctn-col{padding-right:14px;text-align:center;}
+    .pl-carton-table tbody td.pl-ctn-col{font-weight:700;}
     .pl-carton-table th.pl-size-col,.pl-carton-table td.pl-size-col{padding:6px 8px;text-align:center;}
-    .pl-carton-table th.pl-wt-col,.pl-carton-table td.pl-wt-col{padding:6px 12px;text-align:center;}
+    .pl-carton-table th.pl-size-first,.pl-carton-table td.pl-size-first{padding-left:12px;}
+    .pl-carton-table th.pl-total-col,.pl-carton-table td.pl-total-col{text-align:center;border-left:1px solid #e5e7eb;padding-left:10px;padding-right:10px;}
+    .pl-carton-table th.pl-wt-col,.pl-carton-table td.pl-wt-col{padding:6px 12px;text-align:center;border-left:1px solid #e5e7eb;white-space:nowrap;}
+    .pl-carton-table-wrap{text-align:center;}
+    .pl-carton-table--compact{width:auto;display:inline-table;margin:0 auto;}
+    .pl-carton-table--compact th,.pl-carton-table--compact td{padding:6px 5px;}
+    .pl-carton-table--compact th.pl-ctn-col,.pl-carton-table--compact td.pl-ctn-col{padding-right:12px;}
+    .pl-carton-table--compact th.pl-size-first,.pl-carton-table--compact td.pl-size-first{padding-left:10px;}
+    .pl-carton-table--compact th.pl-total-col,.pl-carton-table--compact td.pl-total-col{padding-left:8px;padding-right:8px;}
+    .pl-carton-table--compact th.pl-wt-col,.pl-carton-table--compact td.pl-wt-col{padding:6px 10px;}
     .pl-carton-table tbody tr:last-child td{border-bottom:none;}
     .pl-carton-table tfoot td{padding:3px 4px;font-size:9px;font-weight:600;background:#eef0f3;border-top:1px solid #e5e7eb;border-bottom:none;}
     .pl-num{text-align:right;font-variant-numeric:tabular-nums;}
@@ -331,54 +360,58 @@ function buildPlPrintPackingListHtml(row) {
     cartons.reduce((sum, carton) => sum + toQtyNumber(carton[`Unit ${col.index + 1}`]), 0)
   );
   const grandTotal = unitTotals.reduce((s, n) => s + n, 0);
-  const totalWeight = cartons.reduce((s, c) => s + toQtyNumber(c["Carton Weight"]), 0);
+  const totalWeight = cartons.reduce((s, c) => s + getCartonWeightLbs(c), 0);
 
-  const sizeHeaderCols = sizeCols.map(col =>
-    `<th class="pl-center pl-size-col">${plPrintEsc(col.label)}</th>`
+  const sizeHeaderCols = sizeCols.map((col, i) =>
+    `<th class="pl-center pl-size-col${i === 0 ? " pl-size-first" : ""}">${plPrintEsc(col.label)}</th>`
   ).join("");
 
   const cartonRows = cartons.map(carton => {
     const rowTotal = sizeCols.reduce((s, col) => s + toQtyNumber(carton[`Unit ${col.index + 1}`]), 0);
-    const unitCols = sizeCols.map(col => {
+    const unitCols = sizeCols.map((col, i) => {
       const n = toQtyNumber(carton[`Unit ${col.index + 1}`]);
-      return `<td class="pl-center pl-size-col">${n > 0 ? n : ""}</td>`;
+      return `<td class="pl-center pl-size-col${i === 0 ? " pl-size-first" : ""}">${n > 0 ? n : ""}</td>`;
     }).join("");
-    const weight = toQtyNumber(carton["Carton Weight"]);
+    const weight = getCartonWeightLbs(carton);
     return `<tr>
-      <td class="pl-center">${plPrintEsc(String(carton["Carton #"] ?? ""))}</td>
+      <td class="pl-center pl-ctn-col">${plPrintEsc(String(carton["Carton #"] ?? ""))}</td>
       ${unitCols}
-      <td class="pl-num">${rowTotal}</td>
-      <td class="pl-center pl-wt-col">${weight > 0 ? weight : ""}</td>
+      <td class="pl-center pl-total-col">${rowTotal}</td>
+      <td class="pl-center pl-wt-col">${weight > 0 ? plPrintEsc(plPrintFmtWeight(weight)) : ""}</td>
     </tr>`;
   }).join("");
 
-  const unitTotalCols = unitTotals.map(n => `<td class="pl-center pl-size-col">${n}</td>`).join("");
+  const unitTotalCols = unitTotals.map((n, i) =>
+    `<td class="pl-center pl-size-col${i === 0 ? " pl-size-first" : ""}">${n}</td>`
+  ).join("");
   const notes = packingList ? String(packingList["Notes"] ?? "").trim() : "";
   const notesHtml = notes ? plPrintNotesPanel(notes) : "";
 
   return `
 <div class="pl-packing-block">
 <p class="pl-section-title">Cartons (${cartons.length})</p>
-<table class="pl-carton-table" cellpadding="0" cellspacing="0">
-  ${plPrintColgroup(sizeCols.length)}
+<div class="pl-carton-table-wrap">
+<table class="pl-carton-table pl-carton-table--compact" cellpadding="0" cellspacing="0">
+  ${plPrintColgroup(sizeCols.length, true)}
   <thead>
     <tr>
-      <th class="pl-center">Ctn #</th>
+      <th class="pl-center pl-ctn-col">Ctn #</th>
       ${sizeHeaderCols}
-      <th class="pl-num">Total</th>
-      <th class="pl-center pl-wt-col">Wt</th>
+      <th class="pl-center pl-total-col">Total</th>
+      <th class="pl-center pl-wt-col">Wt (lbs)</th>
     </tr>
   </thead>
   <tbody>${cartonRows}</tbody>
   <tfoot>
     <tr>
-      <td class="pl-center">Total</td>
+      <td class="pl-center pl-ctn-col">Total</td>
       ${unitTotalCols}
-      <td class="pl-num">${grandTotal}</td>
-      <td class="pl-center pl-wt-col">${totalWeight > 0 ? totalWeight : "—"}</td>
+      <td class="pl-center pl-total-col">${grandTotal}</td>
+      <td class="pl-center pl-wt-col">${totalWeight > 0 ? plPrintEsc(plPrintFmtWeight(totalWeight)) : "—"}</td>
     </tr>
   </tfoot>
 </table>
+</div>
 ${notesHtml}
 </div>`;
 }
@@ -401,7 +434,7 @@ function buildPlPrintPoSectionHtml(row) {
         <div class="pl-header-title">Packing List</div>
       </td>
       <td align="right">
-        <div class="pl-header-po">PO ${poNum}</div>
+        <div class="pl-header-po">PO #${poNum}</div>
         ${styleSubtitle}
       </td>
     </tr>
@@ -434,8 +467,7 @@ function plPrintCtnQtyForPo(row) {
 
 function plPrintWeightForPo(row) {
   const cartons = getPackingCartonsForPo(String(row["PO #"] ?? ""));
-  const weight = cartons.reduce((sum, c) => sum + toQtyNumber(c["Carton Weight"]), 0);
-  return weight;
+  return cartons.reduce((sum, c) => sum + getCartonWeightLbs(c), 0);
 }
 
 function buildPlPrintTitlePageHtml(rows, {
@@ -443,15 +475,16 @@ function buildPlPrintTitlePageHtml(rows, {
   titlePageType = "",
   typeDate = "",
   requestDate = "",
+  requestId = "",
 } = {}) {
   const label = String(titleLabel ?? "").trim() || "Packing List";
   const typeDateLabel = plPrintTitleTypeDateLabel(titlePageType);
   const typeDateDisplay = plPrintDate(typeDate);
   const requestDateDisplay = plPrintDate(requestDate);
+  const requestIdDisplay = plPrintVal(requestId);
   const headerSubtitle = typeDateDisplay !== "—"
     ? `${plPrintEsc(typeDateLabel)}: ${typeDateDisplay}`
     : plPrintEsc(typeDateLabel);
-  const totalPoQty = rows.reduce((sum, row) => sum + toQtyNumber(row["PO Qty"]), 0);
   const totalActQty = rows.reduce((sum, row) => sum + toQtyNumber(row["Actual Qty"]), 0);
   const totalCtnQty = rows.reduce((sum, row) => sum + plPrintCtnQtyForPo(row), 0);
   const totalWeight = rows.reduce((sum, row) => sum + plPrintWeightForPo(row), 0);
@@ -474,7 +507,7 @@ function buildPlPrintTitlePageHtml(rows, {
       <td class="pl-center">${plPrintVal(row["Buyer"])}</td>
       <td class="pl-center">${plPrintNum(row["Actual Qty"])}</td>
       <td class="pl-center">${plPrintEsc(String(ctnQty))}</td>
-      <td class="pl-center">${weight > 0 ? plPrintEsc(String(weight)) : "—"}</td>
+      <td class="pl-center">${weight > 0 ? plPrintEsc(plPrintFmtWeight(weight)) : "—"}</td>
     </tr>`;
   }).join("");
 
@@ -499,11 +532,13 @@ function buildPlPrintTitlePageHtml(rows, {
         [
           [typeDateLabel, typeDateDisplay],
           ["Request Date", requestDateDisplay],
+          ["Request ID", requestIdDisplay],
         ],
         [
-          ["PO Qty", plPrintEsc(String(totalPoQty))],
-          ["Act Qty", plPrintEsc(String(totalActQty))],
+          ["PO Count", plPrintEsc(String(rows.length))],
+          ["Total Qty", plPrintEsc(String(totalActQty))],
           ["Ctn Qty", plPrintEsc(String(totalCtnQty))],
+          ["Total Weight", totalWeight > 0 ? plPrintEsc(plPrintFmtWeight(totalWeight)) : "—"],
         ],
       ], { twoCol: true })}
     </div>
@@ -528,7 +563,7 @@ function buildPlPrintTitlePageHtml(rows, {
           <td colspan="${labelColspan}" class="pl-center">Total (${rows.length} PO${rows.length === 1 ? "" : "s"})</td>
           <td class="pl-center">${totalActQty}</td>
           <td class="pl-center">${totalCtnQty}</td>
-          <td class="pl-center">${totalWeight > 0 ? totalWeight : "—"}</td>
+          <td class="pl-center">${totalWeight > 0 ? plPrintEsc(plPrintFmtWeight(totalWeight)) : "—"}</td>
         </tr>
       </tfoot>
     </table>
@@ -542,13 +577,107 @@ function buildGroupPackingListPrintHtml(poNumbers, {
   titlePageType = "",
   typeDate = "",
   requestDate = "",
+  requestId = "",
 } = {}) {
   const rows = poNumbers
     .map(po => allRows.find(r => String(r["PO #"]) === String(po)))
     .filter(Boolean);
   if (rows.length === 0) return "<p>No POs found.</p>";
   const titlePage = includeTitlePage
-    ? buildPlPrintTitlePageHtml(rows, { titleLabel, titlePageType, typeDate, requestDate })
+    ? buildPlPrintTitlePageHtml(rows, { titleLabel, titlePageType, typeDate, requestDate, requestId })
     : "";
   return plPrintPageStyles() + titlePage + rows.map(row => buildPlPrintPoSectionHtml(row)).join("\n");
+}
+
+const CARTON_LABEL_PAGE_STYLES = `
+<style type="text/css">
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  @page { size: letter portrait; margin: 0; }
+  html, body { margin: 0; padding: 0; width: 816px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.4; color: #1a1a18; background: #fff; }
+  .pdf-page { width: 816px; min-height: 1056px; margin: 0; padding: 48px; page-break-after: always; background: #fff; display: flex; align-items: center; justify-content: center; }
+  .pdf-page:last-child, .pdf-page-last { page-break-after: auto; }
+  .carton-label { width: 100%; max-width: 520px; border: 2px solid #1a1a18; padding: 32px 36px; }
+  .carton-label-field { margin-bottom: 20px; }
+  .carton-label-field:last-child { margin-bottom: 0; }
+  .carton-label-label { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #6b7280; margin-bottom: 4px; }
+  .carton-label-value { font-size: 18px; font-weight: 700; color: #1a1a18; word-break: break-word; }
+  .carton-label-value--box { font-size: 24px; }
+  .carton-label-skus { margin-top: 24px; padding-top: 16px; border-top: 1px solid #e5e7eb; }
+  .carton-label-skus-title { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #6b7280; margin-bottom: 10px; }
+  .carton-label-sku-line { display: flex; justify-content: space-between; gap: 16px; padding: 6px 0; font-size: 14px; border-bottom: 1px solid #f3f4f6; }
+  .carton-label-sku-line:last-child { border-bottom: none; }
+  .carton-label-sku { font-weight: 600; flex: 1; word-break: break-word; }
+  .carton-label-qty { font-weight: 700; white-space: nowrap; }
+</style>`;
+
+function buildCartonLabelSkuLinesHtml(row, carton, allCartons, colorCode) {
+  const styleNum = String(row["Style #"] ?? "").trim();
+  const sizeCols = plActiveSizeColumns(row, plActiveCartons(allCartons));
+  const lines = sizeCols.map(col => {
+    const qty = toQtyNumber(carton[`Unit ${col.index + 1}`]);
+    if (qty <= 0) return "";
+    const sku = `SKU: ${styleNum}-${colorCode}-${col.label}`;
+    return `<div class="carton-label-sku-line"><span class="carton-label-sku">${plPrintEsc(sku)}</span><span class="carton-label-qty">${plPrintEsc(String(qty))}</span></div>`;
+  }).filter(Boolean);
+  if (lines.length === 0) {
+    return `<div class="carton-label-sku-line"><span class="carton-label-sku">No units</span></div>`;
+  }
+  return lines.join("");
+}
+
+function buildCartonLabelPageHtml(row, carton, cartonIndex, totalCartons, shipNotice, colorCode, allCartons, isLast) {
+  const buyerPo = String(row["Buyer PO #"] ?? "").trim();
+  const asnNumber = "ASN-ELEVATOR" + buyerPo;
+  const boxLabel = `BOX ${cartonIndex} / ${totalCartons}`;
+  const pageClass = "pdf-page" + (isLast ? " pdf-page-last" : "");
+  return `<div class="${pageClass}">
+  <div class="carton-label">
+    <div class="carton-label-field"><div class="carton-label-label">ASN #</div><div class="carton-label-value">${plPrintEsc(asnNumber)}</div></div>
+    <div class="carton-label-field"><div class="carton-label-label">Ship Notice #</div><div class="carton-label-value">${plPrintEsc(shipNotice)}</div></div>
+    <div class="carton-label-field"><div class="carton-label-label">Carton</div><div class="carton-label-value carton-label-value--box">${plPrintEsc(boxLabel)}</div></div>
+    <div class="carton-label-skus"><div class="carton-label-skus-title">Contents</div>${buildCartonLabelSkuLinesHtml(row, carton, allCartons, colorCode)}</div>
+  </div>
+</div>`;
+}
+
+function normalizeLabelInputsByPo(labelInputs) {
+  const map = {};
+  (Array.isArray(labelInputs) ? labelInputs : []).forEach(entry => {
+    const po = String(entry.poNumber ?? entry["PO #"] ?? "").trim();
+    if (!po) return;
+    map[po] = {
+      shipNotice: String(entry.shipNotice ?? "").trim(),
+      colorCode: String(entry.colorCode ?? "").trim(),
+    };
+  });
+  return map;
+}
+
+function buildCartonLabelsPrintHtml(poNumbers, labelInputs) {
+  const labelInputsByPo = normalizeLabelInputsByPo(labelInputs);
+  const rows = poNumbers
+    .map(po => allRows.find(r => String(r["PO #"]) === String(po)))
+    .filter(Boolean);
+  const pages = [];
+  rows.forEach(row => {
+    const po = String(row["PO #"] ?? "").trim();
+    const info = labelInputsByPo[po] || {};
+    const cartons = plActiveCartons(getPackingCartonsForPo(po)).slice().sort((a, b) =>
+      toQtyNumber(a["Carton #"]) - toQtyNumber(b["Carton #"])
+    );
+    const totalCartons = cartons.length;
+    cartons.forEach((carton, idx) => {
+      const cartonNum = toQtyNumber(carton["Carton #"]) || (idx + 1);
+      pages.push(buildCartonLabelPageHtml(
+        row, carton, cartonNum, totalCartons,
+        info.shipNotice ?? "", info.colorCode ?? "", cartons, false
+      ));
+    });
+  });
+  if (pages.length === 0) {
+    pages.push(`<div class="pdf-page pdf-page-last"><div class="carton-label"><div class="carton-label-value">No cartons on file.</div></div></div>`);
+  } else {
+    pages[pages.length - 1] = pages[pages.length - 1].replace('class="pdf-page"', 'class="pdf-page pdf-page-last"');
+  }
+  return CARTON_LABEL_PAGE_STYLES + pages.join("\n");
 }

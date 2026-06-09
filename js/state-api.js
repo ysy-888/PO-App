@@ -273,9 +273,19 @@ function getPackingCtnQtyForRow(row) {
   return getPackingCtnQtyForPo(row?.["PO #"]);
 }
 
+const CARTON_WEIGHT_LBS_FIELD = "Carton Weight (lbs)";
+const KG_TO_LBS = 2.2046226218;
+
+function getCartonWeightLbs(carton) {
+  const lbs = toQtyNumber(carton[CARTON_WEIGHT_LBS_FIELD]);
+  if (lbs > 0) return lbs;
+  const kg = toQtyNumber(carton["Carton Weight"]);
+  return kg > 0 ? Math.round(kg * KG_TO_LBS * 100) / 100 : 0;
+}
+
 function getPackingWeightForPo(poNumber) {
   return getPackingCartonsForPo(poNumber).reduce(
-    (sum, carton) => sum + toQtyNumber(carton["Carton Weight"]),
+    (sum, carton) => sum + getCartonWeightLbs(carton),
     0
   );
 }

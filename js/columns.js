@@ -167,12 +167,25 @@ const MERGED_GROUP_LABEL = "Ship Method / Shipment / Packing List";
 const FIXED_LEADING_COLUMNS = ["Flag", "Selected", "Status"];
 const NON_TOGGLEABLE_COLUMNS = new Set(["Selected", "Flag", "Packing List", "Status"]);
 
+/** Requested-flag columns — never shown in the PO table or column picker. */
+const PO_TABLE_HIDDEN_COLUMNS = new Set([
+  "EXF Requested",
+  "ASN Requested",
+  "Delivery Requested",
+  "Pickup Requested",
+]);
+
 function getEditableColumnOptions() {
-  return COLUMNS.filter(col => !ALWAYS_VISIBLE_COLUMNS.has(col) && !MERGED_COLUMN_GROUP.includes(col));
+  return COLUMNS.filter(col =>
+    !ALWAYS_VISIBLE_COLUMNS.has(col)
+    && !MERGED_COLUMN_GROUP.includes(col)
+    && !PO_TABLE_HIDDEN_COLUMNS.has(col)
+  );
 }
 
 function ensureAlwaysVisibleColumns(cols) {
   ALWAYS_VISIBLE_COLUMNS.forEach(col => cols.add(col));
+  PO_TABLE_HIDDEN_COLUMNS.forEach(col => cols.delete(col));
   return cols;
 }
 
@@ -184,7 +197,9 @@ function ensureMergedShipmentColumnsVisible(cols) {
 }
 
 function getSelectableColumnsFromVisible(visible) {
-  return new Set([...visible].filter(col => !ALWAYS_VISIBLE_COLUMNS.has(col)));
+  return new Set([...visible].filter(col =>
+    !ALWAYS_VISIBLE_COLUMNS.has(col) && !PO_TABLE_HIDDEN_COLUMNS.has(col)
+  ));
 }
 
 function buildVisibleColumnsFromDraft(draft) {
@@ -429,6 +444,7 @@ function moveEditTableKeyToHover(keys, fromIndex, hoverIndex) {
 }
 
 function isColumnShownInOrderList(col) {
+  if (PO_TABLE_HIDDEN_COLUMNS.has(col)) return false;
   if (NON_TOGGLEABLE_COLUMNS.has(col)) return true;
   if (MERGED_COLUMN_GROUP.includes(col)) {
     if (col === "Packing List") return true;
@@ -451,7 +467,7 @@ function getVisibleOrderKeys() {
 function getEditTablePickerItems() {
   const mergedCols = new Set(MERGED_COLUMN_GROUP);
   const items = COLUMNS
-    .filter(col => !mergedCols.has(col))
+    .filter(col => !mergedCols.has(col) && !PO_TABLE_HIDDEN_COLUMNS.has(col))
     .map(col => ({ key: col, label: getColumnLabel(col), type: "column" }));
   items.push({ key: MERGED_GROUP_KEY, label: MERGED_GROUP_LABEL, type: "merged" });
   items.sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
@@ -640,6 +656,9 @@ function loadColumnVisibility() {
 /** When new PO columns ship, show them if their sibling request-ID column is already visible. */
 function migrateVisibleColumnsForNewFields() {
   let changed = false;
+  PO_TABLE_HIDDEN_COLUMNS.forEach(col => {
+    if (visibleColumns.delete(col)) changed = true;
+  });
   if (!visibleColumns.has("EXF Request ID") && visibleColumns.has("ASN Request ID")) {
     visibleColumns.add("EXF Request ID");
     changed = true;

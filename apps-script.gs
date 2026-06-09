@@ -77,11 +77,20 @@ const EXF_REQUEST_DATA_FIELDS = [
   "Email Status", "Email Sent At", "Email Error", "Last Email Attempt At", "Created At", "Updated At"
 ];
 
+const ASN_PICKUP_EMAIL_STATUS_FIELD = "ASN Pickup Email Status";
+const ASN_PICKUP_EMAIL_SENT_AT_FIELD = "ASN Pickup Email Sent At";
+const ASN_PICKUP_EMAIL_ERROR_FIELD = "ASN Pickup Email Error";
+const ASN_PICKUP_LABEL_DATA_FIELD = "ASN Pickup Label Data";
+const DEFAULT_WAREHOUSE_ENTITY_ = "FORERUNNER LOGISTICS";
+
 const ASN_REQUEST_DATA_FIELDS = [
   ASN_DATE_FIELD, "Request Date", "Buyer", "Buyer Email", EXF_REQ_CC_FIELD,
   "PO Numbers", "PO Count",
   "Email Status", "Email Sent At", "Email Error", "Last Email Attempt At",
-  ASN_REQ_NOTES_FIELD, "Created At", "Updated At"
+  ASN_REQ_NOTES_FIELD,
+  ASN_PICKUP_EMAIL_STATUS_FIELD, ASN_PICKUP_EMAIL_SENT_AT_FIELD,
+  ASN_PICKUP_EMAIL_ERROR_FIELD, ASN_PICKUP_LABEL_DATA_FIELD,
+  "Created At", "Updated At"
 ];
 
 const DELIVERY_REQUEST_DATA_FIELDS = [
@@ -129,8 +138,11 @@ const PACKING_LIST_DATA_FIELDS = [
   "PO #", "Carton Count", "Notes", "Created At", "Updated At"
 ];
 
+const CARTON_WEIGHT_LBS_FIELD = "Carton Weight (lbs)";
+const KG_TO_LBS = 2.2046226218;
+
 const PACKING_CARTON_DATA_FIELDS = [
-  PACKING_LIST_ID_FIELD, "Carton #", ...PACKING_UNIT_FIELDS, "Total Units", "Carton Weight"
+  PACKING_LIST_ID_FIELD, "Carton #", ...PACKING_UNIT_FIELDS, "Total Units", "Carton Weight", CARTON_WEIGHT_LBS_FIELD
 ];
 
 const VENDOR_PORTAL_TOKEN_FIELDS = ["Vendor", "Active", "Created At", "Last Used At"];
@@ -938,6 +950,54 @@ function toPackingQty_(value) {
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
+function cartonWeightKgToLbs_(kg) {
+  const n = Number(String(kg ?? "").trim());
+  if (!Number.isFinite(n) || n <= 0) return "";
+  return Math.round(n * KG_TO_LBS * 100) / 100;
+}
+
+function getCartonWeightLbs_(carton) {
+  const lbs = Number(String(carton[CARTON_WEIGHT_LBS_FIELD] ?? "").trim());
+  if (Number.isFinite(lbs) && lbs > 0) return lbs;
+  const converted = cartonWeightKgToLbs_(carton["Carton Weight"]);
+  return converted === "" ? 0 : converted;
+}
+
+function backfillPackingCartonWeightLbs_() {
+  const props = PropertiesService.getScriptProperties();
+  if (props.getProperty("packingCartonWeightLbsBackfilled") === "1") return;
+
+  const sheet = getPackingCartonsSheet_();
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    props.setProperty("packingCartonWeightLbsBackfilled", "1");
+    return;
+  }
+
+  const lastCol = sheet.getLastColumn();
+  const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0]
+    .map(h => String(h ?? "").trim());
+  const kgCol = headers.indexOf("Carton Weight");
+  const lbsCol = headers.indexOf(CARTON_WEIGHT_LBS_FIELD);
+  if (kgCol === -1 || lbsCol === -1) {
+    props.setProperty("packingCartonWeightLbsBackfilled", "1");
+    return;
+  }
+
+  const data = sheet.getRange(2, 1, lastRow, lastCol).getValues();
+  let changed = false;
+  for (let r = 0; r < data.length; r++) {
+    const kg = Number(String(data[r][kgCol] ?? "").trim());
+    const lbs = Number(String(data[r][lbsCol] ?? "").trim());
+    if (Number.isFinite(kg) && kg > 0 && (!Number.isFinite(lbs) || lbs <= 0)) {
+      data[r][lbsCol] = cartonWeightKgToLbs_(kg);
+      changed = true;
+    }
+  }
+  if (changed) sheet.getRange(2, 1, lastRow, lastCol).setValues(data);
+  props.setProperty("packingCartonWeightLbsBackfilled", "1");
+}
+
 function normalizePackingCartons_(cartons) {
   const list = Array.isArray(cartons) ? cartons : [];
   return list.map((carton, index) => {
@@ -951,6 +1011,7 @@ function normalizePackingCartons_(cartons) {
     out["Total Units"] = total;
     const weight = Number(String(carton["Carton Weight"] ?? "").trim());
     out["Carton Weight"] = Number.isFinite(weight) && weight > 0 ? weight : "";
+    out[CARTON_WEIGHT_LBS_FIELD] = cartonWeightKgToLbs_(out["Carton Weight"]);
     return out;
   });
 }
@@ -2263,8 +2324,12 @@ const PDF_PAGE_MARGIN_ = 48;
 const PDF_CONTENT_WIDTH_ = PDF_PAGE_WIDTH_ - (PDF_PAGE_MARGIN_ * 2);
 const PDF_CTN_COL_WIDTH_ = 48;
 const PDF_TOTAL_COL_WIDTH_ = 42;
-const PDF_WT_COL_WIDTH_ = 52;
+const PDF_WT_COL_WIDTH_ = 64;
 const PDF_SIZE_COL_WIDTH_ = 30;
+const PDF_COMPACT_CTN_COL_WIDTH_ = 34;
+const PDF_COMPACT_TOTAL_COL_WIDTH_ = 34;
+const PDF_COMPACT_WT_COL_WIDTH_ = 56;
+const PDF_COMPACT_SIZE_COL_WIDTH_ = 30;
 const PDF_SUMMARY_COL_GAP_ = 12;
 
 /** Wrap a table cell with bgcolor for reliable PDF rendering. */
@@ -2364,10 +2429,10 @@ function getPackingWeightByPo_() {
   const weightByListId = {};
   cartons.forEach(carton => {
     const listId = String(carton[PACKING_LIST_ID_FIELD] ?? "");
-    const weight = Number(String(carton["Carton Weight"] ?? "").trim());
+    const weight = getCartonWeightLbs_(carton);
     if (!listId) return;
     if (!weightByListId[listId]) weightByListId[listId] = 0;
-    if (Number.isFinite(weight) && weight > 0) weightByListId[listId] += weight;
+    if (weight > 0) weightByListId[listId] += weight;
   });
   const weightByPo = {};
   lists.forEach(list => {
@@ -2469,7 +2534,7 @@ function pdfActiveCartons_(cartons) {
     for (let i = 1; i <= 15; i++) {
       if (toQtyNumber_(carton["Unit " + i]) > 0) return true;
     }
-    return toQtyNumber_(carton["Carton Weight"]) > 0;
+    return toQtyNumber_(carton["Carton Weight"]) > 0 || getCartonWeightLbs_(carton) > 0;
   });
 }
 
@@ -2531,7 +2596,7 @@ function buildPdfPackingListHeaderHtml_(opts) {
   const color = String(opts.color ?? "").trim();
   const rightPrimary = opts.rightPrimary != null
     ? String(opts.rightPrimary)
-    : ("PO " + pdfEsc_(po));
+    : ("PO #" + pdfEsc_(po));
   const rightSecondary = opts.rightSecondary != null
     ? String(opts.rightSecondary)
     : (styleNum
@@ -2557,6 +2622,7 @@ function buildPdfTitlePageHtml_(poRows, opts) {
   const typeDateLabel = getPdfTitlePageTypeDateLabel_(type);
   const typeDateValue = pdfDate_(opts.typeDate);
   const requestDateValue = pdfDate_(opts.requestDate);
+  const requestIdValue = pdfVal_(opts.requestId);
   const weightByPo = getPackingWeightByPo_();
   const { listsByPo, cartonsByListId } = getPackingDataMaps_();
   const totals = computeRequestEmailTotals_(rows, weightByPo);
@@ -2566,11 +2632,13 @@ function buildPdfTitlePageHtml_(poRows, opts) {
     [
       [typeDateLabel, typeDateValue],
       ["Request Date", requestDateValue],
+      ["Request ID", requestIdValue],
     ],
     [
-      ["PO Qty", pdfEsc_(String(totals.orderQty))],
-      ["Act Qty", pdfEsc_(String(totals.unitQty))],
+      ["PO Count", pdfEsc_(String(poCount))],
+      ["Total Qty", pdfEsc_(String(totals.unitQty))],
       ["Ctn Qty", pdfEsc_(String(totals.ctnQty))],
+      ["Total Weight", totals.totalWeight > 0 ? pdfEsc_(formatEmailWeight_(totals.totalWeight)) : "&mdash;"],
     ],
   ]);
 
@@ -2593,7 +2661,7 @@ function buildPdfTitlePageHtml_(poRows, opts) {
       pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-center", pdfVal_(row["Buyer"])) +
       pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-center", pdfEsc_(String(toQtyNumber_(row["Actual Qty"])))) +
       pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-center", pdfEsc_(String(ctnQty))) +
-      pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-center", weight > 0 ? pdfEsc_(String(weight)) : "&mdash;") +
+      pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-center", weight > 0 ? pdfEsc_(formatEmailWeight_(weight)) : "&mdash;") +
       "</tr>";
   }).join("");
 
@@ -2626,7 +2694,7 @@ function buildPdfTitlePageHtml_(poRows, opts) {
     "Total (" + pdfEsc_(String(poCount)) + (poCount === 1 ? " PO" : " POs") + ")</td>" +
     pdfBgCell_("td", PDF_TABLE_FOOTER_BG_, "pdf-center", String(totals.unitQty)) +
     pdfBgCell_("td", PDF_TABLE_FOOTER_BG_, "pdf-center", String(totals.ctnQty)) +
-    pdfBgCell_("td", PDF_TABLE_FOOTER_BG_, "pdf-center", totals.totalWeight > 0 ? pdfEsc_(String(totals.totalWeight)) : "&mdash;") +
+    pdfBgCell_("td", PDF_TABLE_FOOTER_BG_, "pdf-center", totals.totalWeight > 0 ? pdfEsc_(formatEmailWeight_(totals.totalWeight)) : "&mdash;") +
     "</tr></tfoot>" +
     "</table></div>";
 
@@ -2648,7 +2716,14 @@ function pdfNotesPanelHtml_(notes) {
     "<div>" + pdfEsc_(notes) + "</div></div>";
 }
 
-function pdfCartonColgroupHtml_(sizeColCount) {
+function pdfCartonColgroupHtml_(sizeColCount, compact) {
+  if (compact) {
+    const sizeWidth = PDF_COMPACT_SIZE_COL_WIDTH_;
+    let cols = "<colgroup><col width=\"" + PDF_COMPACT_CTN_COL_WIDTH_ + "\">";
+    for (let i = 0; i < sizeColCount; i++) cols += "<col width=\"" + sizeWidth + "\">";
+    cols += "<col width=\"" + PDF_COMPACT_TOTAL_COL_WIDTH_ + "\"><col width=\"" + PDF_COMPACT_WT_COL_WIDTH_ + "\"></colgroup>";
+    return cols;
+  }
   const fixed = PDF_CTN_COL_WIDTH_ + PDF_TOTAL_COL_WIDTH_ + PDF_WT_COL_WIDTH_;
   const remaining = Math.max(0, PDF_CONTENT_WIDTH_ - fixed);
   const sizeWidth = sizeColCount > 0
@@ -2706,52 +2781,56 @@ function buildPdfPoSectionHtml_(poRow, packingList, cartons, isLast) {
       activeCartons.reduce((sum, c) => sum + toQtyNumber_(c["Unit " + (col.index + 1)]), 0)
     );
     const grandTotal = unitTotals.reduce((s, n) => s + n, 0);
-    const totalWeight = activeCartons.reduce((s, c) => s + toQtyNumber_(c["Carton Weight"]), 0);
+    const totalWeight = activeCartons.reduce((s, c) => s + getCartonWeightLbs_(c), 0);
 
-    const sizeHeads = sizeCols.map(col =>
-      pdfBgCell_("th", PDF_TABLE_HEAD_BG_, "pdf-center pdf-size-col", pdfEsc_(col.label))
-    ).join("");
+    const sizeHeads = sizeCols.map((col, i) => {
+      const firstCls = i === 0 ? " pdf-size-first" : "";
+      return pdfBgCell_("th", PDF_TABLE_HEAD_BG_, "pdf-center pdf-size-col" + firstCls, pdfEsc_(col.label));
+    }).join("");
 
     const cartonRows = activeCartons.map(carton => {
       const rowTotal = sizeCols.reduce((s, col) => s + toQtyNumber_(carton["Unit " + (col.index + 1)]), 0);
-      const unitCells = sizeCols.map(col => {
+      const unitCells = sizeCols.map((col, i) => {
         const n = toQtyNumber_(carton["Unit " + (col.index + 1)]);
-        return pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-center pdf-size-col", n > 0 ? String(n) : "");
+        const firstCls = i === 0 ? " pdf-size-first" : "";
+        return pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-center pdf-size-col" + firstCls, n > 0 ? String(n) : "");
       }).join("");
-      const w = toQtyNumber_(carton["Carton Weight"]);
+      const w = getCartonWeightLbs_(carton);
       return "<tr>" +
-        pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-center", pdfEsc_(String(carton["Carton #"] ?? ""))) +
+        pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-center pdf-ctn-col", pdfEsc_(String(carton["Carton #"] ?? ""))) +
         unitCells +
-        pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-num", String(rowTotal)) +
-        pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-center pdf-wt-col", w > 0 ? String(w) : "") +
+        pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-center pdf-total-col", String(rowTotal)) +
+        pdfBgCell_("td", PDF_META_VALUE_BG_, "pdf-center pdf-wt-col", w > 0 ? pdfEsc_(pdfFormatWeight_(w)) : "") +
         "</tr>";
     }).join("");
 
-    const unitTotalCells = unitTotals.map(n =>
-      pdfBgCell_("td", PDF_TABLE_FOOTER_BG_, "pdf-center pdf-size-col", String(n))
-    ).join("");
+    const unitTotalCells = unitTotals.map((n, i) => {
+      const firstCls = i === 0 ? " pdf-size-first" : "";
+      return pdfBgCell_("td", PDF_TABLE_FOOTER_BG_, "pdf-center pdf-size-col" + firstCls, String(n));
+    }).join("");
 
     const plNotes = String(packingList["Notes"] ?? "").trim();
     const plNotesHtml = plNotes ? pdfNotesPanelHtml_(plNotes) : "";
 
     packingHtml = "<div class=\"pdf-packing-block\">" +
       "<p class=\"pdf-section-title\">Cartons (" + activeCartons.length + ")</p>" +
-      "<table class=\"pdf-carton-table\" cellpadding=\"0\" cellspacing=\"0\">" +
-      pdfCartonColgroupHtml_(sizeCols.length) +
+      "<div class=\"pdf-carton-table-wrap\">" +
+      "<table class=\"pdf-carton-table pdf-carton-table--compact\" cellpadding=\"0\" cellspacing=\"0\">" +
+      pdfCartonColgroupHtml_(sizeCols.length, true) +
       "<thead><tr>" +
-      pdfBgCell_("th", PDF_TABLE_HEAD_BG_, "pdf-center", "Ctn #") +
+      pdfBgCell_("th", PDF_TABLE_HEAD_BG_, "pdf-center pdf-ctn-col", "Ctn #") +
       sizeHeads +
-      pdfBgCell_("th", PDF_TABLE_HEAD_BG_, "pdf-num", "Total") +
-      pdfBgCell_("th", PDF_TABLE_HEAD_BG_, "pdf-center pdf-wt-col", "Wt") +
+      pdfBgCell_("th", PDF_TABLE_HEAD_BG_, "pdf-center pdf-total-col", "Total") +
+      pdfBgCell_("th", PDF_TABLE_HEAD_BG_, "pdf-center pdf-wt-col", "Wt (lbs)") +
       "</tr></thead>" +
       "<tbody>" + cartonRows + "</tbody>" +
       "<tfoot><tr>" +
-      pdfBgCell_("td", PDF_TABLE_FOOTER_BG_, "pdf-center", "Total") +
+      pdfBgCell_("td", PDF_TABLE_FOOTER_BG_, "pdf-center pdf-ctn-col", "Total") +
       unitTotalCells +
-      pdfBgCell_("td", PDF_TABLE_FOOTER_BG_, "pdf-num", String(grandTotal)) +
-      pdfBgCell_("td", PDF_TABLE_FOOTER_BG_, "pdf-center pdf-wt-col", totalWeight > 0 ? String(totalWeight) : "&mdash;") +
+      pdfBgCell_("td", PDF_TABLE_FOOTER_BG_, "pdf-center pdf-total-col", String(grandTotal)) +
+      pdfBgCell_("td", PDF_TABLE_FOOTER_BG_, "pdf-center pdf-wt-col", totalWeight > 0 ? pdfEsc_(pdfFormatWeight_(totalWeight)) : "&mdash;") +
       "</tr></tfoot>" +
-      "</table>" +
+      "</table></div>" +
       plNotesHtml +
       "</div>";
   }
@@ -2812,6 +2891,281 @@ function buildGroupPackingListPdfBlob_(poRows, opts) {
     .setName(filename);
 }
 
+function buildCartonLabelSkuLinesHtml_(poRow, carton, allCartons, colorCode) {
+  const styleNum = String(poRow["Style #"] ?? "").trim();
+  const sizeCols = getPdfActiveSizeColumns_(poRow, pdfActiveCartons_(allCartons));
+  const lines = [];
+  sizeCols.forEach(function(col) {
+    const qty = toQtyNumber_(carton["Unit " + (col.index + 1)]);
+    if (qty <= 0) return;
+    const sku = "SKU: " + styleNum + "-" + colorCode + "-" + col.label;
+    lines.push(
+      "<div class=\"carton-label-sku-line\">" +
+      "<span class=\"carton-label-sku\">" + pdfEsc_(sku) + "</span>" +
+      "<span class=\"carton-label-qty\">" + pdfEsc_(String(qty)) + "</span>" +
+      "</div>"
+    );
+  });
+  if (lines.length === 0) {
+    return "<div class=\"carton-label-sku-line\"><span class=\"carton-label-sku\">No units</span></div>";
+  }
+  return lines.join("");
+}
+
+function buildCartonLabelPageHtml_(poRow, carton, cartonIndex, totalCartons, shipNotice, colorCode, allCartons, isLast) {
+  const buyerPo = String(poRow["Buyer PO #"] ?? "").trim();
+  const asnNumber = "ASN-ELEVATOR" + buyerPo;
+  const boxLabel = "BOX " + String(cartonIndex) + " / " + String(totalCartons);
+  const pageClass = "pdf-page" + (isLast ? " pdf-page-last" : "");
+  return "<div class=\"" + pageClass + "\">" +
+    "<div class=\"carton-label\">" +
+    "<div class=\"carton-label-field\">" +
+    "<div class=\"carton-label-label\">ASN #</div>" +
+    "<div class=\"carton-label-value\">" + pdfEsc_(asnNumber) + "</div>" +
+    "</div>" +
+    "<div class=\"carton-label-field\">" +
+    "<div class=\"carton-label-label\">Ship Notice #</div>" +
+    "<div class=\"carton-label-value\">" + pdfEsc_(shipNotice) + "</div>" +
+    "</div>" +
+    "<div class=\"carton-label-field\">" +
+    "<div class=\"carton-label-label\">Carton</div>" +
+    "<div class=\"carton-label-value carton-label-value--box\">" + pdfEsc_(boxLabel) + "</div>" +
+    "</div>" +
+    "<div class=\"carton-label-skus\">" +
+    "<div class=\"carton-label-skus-title\">Contents</div>" +
+    buildCartonLabelSkuLinesHtml_(poRow, carton, allCartons, colorCode) +
+    "</div>" +
+    "</div></div>";
+}
+
+function buildCartonLabelsHtml_(poRows, labelInputsByPo) {
+  const { listsByPo, cartonsByListId } = getPackingDataMaps_();
+  const pageHtmlList = [];
+  const rows = Array.isArray(poRows) ? poRows : [];
+  rows.forEach(function(poRow) {
+    const po = String(poRow["PO #"] ?? "").trim();
+    const labelInfo = labelInputsByPo[po] || {};
+    const shipNotice = String(labelInfo.shipNotice ?? "").trim();
+    const colorCode = String(labelInfo.colorCode ?? "").trim();
+    const packingList = getPackingListForPoFromMap_(listsByPo, po);
+    const cartons = packingList
+      ? pdfActiveCartons_(cartonsByListId[String(packingList[PACKING_LIST_ID_FIELD] ?? "")] || [])
+      : [];
+    cartons.sort(function(a, b) {
+      return toQtyNumber_(a["Carton #"]) - toQtyNumber_(b["Carton #"]);
+    });
+    const totalCartons = cartons.length;
+    cartons.forEach(function(carton, idx) {
+      const cartonNum = toQtyNumber_(carton["Carton #"]) || (idx + 1);
+      pageHtmlList.push(buildCartonLabelPageHtml_(poRow, carton, cartonNum, totalCartons, shipNotice, colorCode, cartons, false));
+    });
+  });
+  if (pageHtmlList.length === 0) {
+    pageHtmlList.push("<div class=\"pdf-page pdf-page-last\"><div class=\"carton-label\"><div class=\"carton-label-value\">No cartons on file.</div></div></div>");
+  } else {
+    const lastIdx = pageHtmlList.length - 1;
+    pageHtmlList[lastIdx] = pageHtmlList[lastIdx].replace("class=\"pdf-page\"", "class=\"pdf-page pdf-page-last\"");
+  }
+  const labelPagesHtml = pageHtmlList.join("\n");
+  return renderEmailTemplate_("templates/carton-label-pdf", { labelPagesHtml: labelPagesHtml });
+}
+
+function buildCartonLabelsPdfBlob_(poRows, labelInputsByPo, filename) {
+  const html = buildCartonLabelsHtml_(poRows, labelInputsByPo);
+  const pdfName = filename || ("CartonLabels_" + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMdd") + ".pdf");
+  return HtmlService.createHtmlOutput(html)
+    .setWidth(PDF_PAGE_WIDTH_)
+    .setHeight(PDF_PAGE_HEIGHT_)
+    .getAs("application/pdf")
+    .setName(pdfName);
+}
+
+function normalizeLabelInputsByPo_(labelInputs) {
+  const map = {};
+  (Array.isArray(labelInputs) ? labelInputs : []).forEach(function(entry) {
+    const po = String(entry.poNumber ?? entry["PO #"] ?? "").trim();
+    if (!po) return;
+    map[po] = {
+      shipNotice: String(entry.shipNotice ?? "").trim(),
+      colorCode: String(entry.colorCode ?? "").trim(),
+    };
+  });
+  return map;
+}
+
+function is12thTribeBuyer_(buyer) {
+  return String(buyer ?? "").trim().toUpperCase() === "12TH TRIBE";
+}
+
+function buildAsnPickupRequestData_(asnRequest) {
+  const buyer = String(asnRequest["Buyer"] ?? "").trim();
+  const warehouse = DEFAULT_WAREHOUSE_ENTITY_;
+  return {
+    [PICKUP_DATE_FIELD]: asnRequest[ASN_DATE_FIELD] ?? "",
+    "Request Date": Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd"),
+    "From": warehouse,
+    "Pickup Address": getLocationAddress_(warehouse),
+    "To": buyer,
+    "Delivery Address": getLocationAddress_(buyer),
+    [PICKUP_REQ_NOTES_FIELD]: "",
+  };
+}
+
+function sendAsnPickupEmail_(asnRequestId, emailInfo, poRows, asnRequest, labelInputsByPo) {
+  if (!emailInfo.to) return false;
+  const pickupRequestId = "ASN Pickup " + asnRequestId;
+  const requestData = buildAsnPickupRequestData_(asnRequest);
+  const displayDate = formatEmailDate_(requestData[PICKUP_DATE_FIELD] ?? requestData["Request Date"]);
+  const to = String(requestData["To"] ?? "").trim();
+  const subject = renderEmailSubject_("templates/email-delivery-pickup-subject", {
+    requestType: "Pickup",
+    displayDate: displayDate,
+    to: to,
+  });
+  const options = {
+    to: emailInfo.to,
+    subject: subject,
+    body: buildDeliveryPickupRequestEmailText_("Pickup", pickupRequestId, poRows, requestData),
+    htmlBody: buildDeliveryPickupRequestEmailHtml_("Pickup", pickupRequestId, poRows, requestData),
+  };
+  if (emailInfo.cc) options.cc = emailInfo.cc;
+
+  const attachments = [];
+  try {
+    attachments.push(buildGroupPackingListPdfBlob_(poRows, {
+      filename: asnRequestId + "_PackingList.pdf",
+      includeTitlePage: true,
+      titleLabel: pickupRequestId,
+      titlePageType: "Pickup",
+      typeDate: requestData[PICKUP_DATE_FIELD],
+      requestDate: requestData["Request Date"],
+      requestId: pickupRequestId,
+    }));
+  } catch (pdfErr) {
+    Logger.log("ASN Pickup packing list PDF failed (" + asnRequestId + "): " + pdfErr);
+  }
+
+  if (is12thTribeBuyer_(asnRequest["Buyer"])) {
+    try {
+      attachments.push(buildCartonLabelsPdfBlob_(poRows, labelInputsByPo, asnRequestId + "_CartonLabels.pdf"));
+    } catch (labelErr) {
+      Logger.log("ASN Pickup carton label PDF failed (" + asnRequestId + "): " + labelErr);
+    }
+  }
+
+  if (attachments.length > 0) options.attachments = attachments;
+  MailApp.sendEmail(options);
+  return true;
+}
+
+function handleSendAsnPickupEmail(payload) {
+  const asnRequestId = String(payload.asnRequestId ?? "").trim();
+  if (!asnRequestId) return corsResponse({ success: false, error: "ASN Request ID is required." });
+
+  const sheet = getAsnRequestsSheet_();
+  const found = findRequestRowIndex_(sheet, ASN_REQUEST_ID_FIELD, asnRequestId);
+  if (!found) return corsResponse({ success: false, error: "ASN request not found: " + asnRequestId });
+
+  const asnRequest = {};
+  found.headers.forEach(function(field, i) { asnRequest[field] = found.values[i]; });
+
+  if (String(asnRequest["Email Status"] ?? "").trim() !== "Sent") {
+    return corsResponse({ success: false, error: "ASN request must be completed (email sent) before sending ASN Pickup." });
+  }
+
+  const poNumbers = String(asnRequest["PO Numbers"] ?? "").split(",").map(function(s) { return s.trim(); }).filter(Boolean);
+  if (poNumbers.length === 0) {
+    return corsResponse({ success: false, error: "No POs linked to this ASN request." });
+  }
+
+  const labelInputsByPo = normalizeLabelInputsByPo_(payload.labelInputs);
+  if (is12thTribeBuyer_(asnRequest["Buyer"])) {
+    for (let i = 0; i < poNumbers.length; i++) {
+      const po = poNumbers[i];
+      const info = labelInputsByPo[po];
+      if (!info || !info.shipNotice || !info.colorCode) {
+        return corsResponse({ success: false, error: "Ship Notice # and Color Code are required for every PO." });
+      }
+    }
+  }
+
+  const emailInfo = getContactEmailInfo_(DEFAULT_WAREHOUSE_ENTITY_);
+  if (!emailInfo.to) {
+    return corsResponse({ success: false, error: "No email address on file for FORERUNNER LOGISTICS." });
+  }
+
+  const poSheet = ensurePoWorkflowHeaders_();
+  let poRows = [];
+  try { poRows = getPoObjectsByNumbers_(poSheet, poNumbers); } catch (e) { /* best effort */ }
+
+  let emailSent = false;
+  let emailError = "";
+  try {
+    emailSent = sendAsnPickupEmail_(asnRequestId, emailInfo, poRows, asnRequest, labelInputsByPo);
+  } catch (err) {
+    emailError = err && err.message ? err.message : String(err);
+  }
+
+  const now = new Date();
+  const labelDataJson = is12thTribeBuyer_(asnRequest["Buyer"])
+    ? JSON.stringify(poNumbers.map(function(po) {
+        return {
+          poNumber: po,
+          shipNotice: labelInputsByPo[po].shipNotice,
+          colorCode: labelInputsByPo[po].colorCode,
+        };
+      }))
+    : (asnRequest[ASN_PICKUP_LABEL_DATA_FIELD] || "");
+
+  updateRequestRowFields_(sheet, found.rowIndex, found.headers, {
+    [ASN_PICKUP_EMAIL_STATUS_FIELD]: emailSent ? "Sent" : "Failed",
+    [ASN_PICKUP_EMAIL_SENT_AT_FIELD]: emailSent ? now : asnRequest[ASN_PICKUP_EMAIL_SENT_AT_FIELD],
+    [ASN_PICKUP_EMAIL_ERROR_FIELD]: emailError,
+    [ASN_PICKUP_LABEL_DATA_FIELD]: labelDataJson,
+    "Updated At": now,
+  });
+
+  return corsResponse({
+    success: emailSent,
+    asnRequestId: asnRequestId,
+    emailSent: emailSent,
+    emailError: emailError || (emailSent ? "" : "ASN Pickup email failed to send."),
+  });
+}
+
+function handleResendAsnPickupEmail(payload) {
+  const asnRequestId = String(payload.asnRequestId ?? "").trim();
+  if (!asnRequestId) return corsResponse({ success: false, error: "ASN Request ID is required." });
+
+  const sheet = getAsnRequestsSheet_();
+  const found = findRequestRowIndex_(sheet, ASN_REQUEST_ID_FIELD, asnRequestId);
+  if (!found) return corsResponse({ success: false, error: "ASN request not found: " + asnRequestId });
+
+  const asnRequest = {};
+  found.headers.forEach(function(field, i) { asnRequest[field] = found.values[i]; });
+
+  if (String(asnRequest["Email Status"] ?? "").trim() !== "Sent") {
+    return corsResponse({ success: false, error: "ASN request must be completed before resending ASN Pickup." });
+  }
+
+  let labelInputs = [];
+  if (is12thTribeBuyer_(asnRequest["Buyer"])) {
+    try {
+      labelInputs = JSON.parse(String(asnRequest[ASN_PICKUP_LABEL_DATA_FIELD] ?? "[]"));
+    } catch (_) {
+      labelInputs = [];
+    }
+    if (!Array.isArray(labelInputs) || labelInputs.length === 0) {
+      return corsResponse({ success: false, error: "No stored label data for this ASN request. Send ASN Pickup again from the detail modal." });
+    }
+  }
+
+  return handleSendAsnPickupEmail({
+    asnRequestId: asnRequestId,
+    labelInputs: labelInputs,
+  });
+}
+
 function handleGetPackingListPrintHtml(payload) {
   const poNumbers = payload.poNumbers;
   if (!Array.isArray(poNumbers) || poNumbers.length === 0) {
@@ -2834,6 +3188,7 @@ function handleGetPackingListPrintHtml(payload) {
       titlePageType: String(payload.titlePageType ?? "").trim(),
       typeDate: payload.typeDate,
       requestDate: payload.requestDate,
+      requestId: payload.requestId,
     }),
   });
 }
@@ -2860,6 +3215,12 @@ function formatEmailWeight_(value) {
   const n = toQtyNumber_(value);
   if (n <= 0) return "";
   return Number.isInteger(n) ? String(n) + " lbs" : String(Math.round(n * 100) / 100) + " lbs";
+}
+
+function pdfFormatWeight_(value) {
+  const formatted = formatEmailWeight_(value);
+  if (!formatted) return "";
+  return formatted.replace(" lbs", "\u00a0lbs");
 }
 
 function buildRequestEmailTotalsLine_(rows, weightByPo) {
@@ -3108,6 +3469,7 @@ function sendDeliveryPickupRequestEmail_(requestType, requestId, emailInfo, rows
       titlePageType: requestType,
       typeDate: requestData[dateField],
       requestDate: requestData["Request Date"],
+      requestId: requestId,
     });
     options.attachments = [pdfBlob];
   } catch (pdfErr) {
@@ -3182,6 +3544,7 @@ function sendAsnRequestEmail_(requestId, emailInfo, rows, requestData) {
       titlePageType: "ASN",
       typeDate: requestData[ASN_DATE_FIELD],
       requestDate: requestData["Request Date"],
+      requestId: requestId,
     });
     options.attachments = [pdfBlob];
   } catch (pdfErr) {
@@ -4187,6 +4550,7 @@ function doGet(e) {
     const chargebacksSheet = getChargebacksSheet_();
     const packingListsSheet = getPackingListsSheet_();
     const packingCartonsSheet = getPackingCartonsSheet_();
+    backfillPackingCartonWeightLbs_();
     const stylePhotosSheet = getStylePhotosSheet_();
     const pendingPackingListsSheet = getPendingPackingListsSheet_();
     const customersSheet = getCustomersSheet_();
@@ -4601,6 +4965,8 @@ function doPost(e) {
     if (action === "createAsnRequest") return handleCreateAsnRequest(payload);
     if (action === "resendExfRequestEmail") return handleResendExfRequestEmail(payload);
     if (action === "resendAsnRequestEmail") return handleResendAsnRequestEmail(payload);
+    if (action === "sendAsnPickupEmail") return handleSendAsnPickupEmail(payload);
+    if (action === "resendAsnPickupEmail") return handleResendAsnPickupEmail(payload);
     if (action === "resendDeliveryRequestEmail") return handleResendDeliveryRequestEmail(payload);
     if (action === "resendPickupRequestEmail") return handleResendPickupRequestEmail(payload);
     if (action === "batchUpdatePos") return handleBatchUpdatePos(payload);

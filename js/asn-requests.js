@@ -3,6 +3,11 @@
 const ASN_DATE_FIELD = "ASN Date";
 const ASN_REQ_NOTES_FIELD = "ASN Req Notes";
 const ASN_REQ_SUBMIT_DATE_FIELD = "Request Date";
+const ASN_PICKUP_EMAIL_STATUS_FIELD = "ASN Pickup Email Status";
+const ASN_PICKUP_EMAIL_SENT_AT_FIELD = "ASN Pickup Email Sent At";
+const ASN_PICKUP_EMAIL_ERROR_FIELD = "ASN Pickup Email Error";
+const ASN_PICKUP_LABEL_DATA_FIELD = "ASN Pickup Label Data";
+const ASN_PICKUP_BUYER_12TH_TRIBE = "12TH TRIBE";
 
 const ASN_REQUEST_TABLE_COLUMNS = [
   ASN_REQUEST_ID_FIELD,
@@ -36,11 +41,49 @@ let asnRequestDraftNotes = "";
 let asnRequestBuyer = "";
 let asnRequestModalRow = null;
 let asnRequestOpInProgress = false;
+let asnPickupPendingRequestId = "";
 // allAsnRequests is declared in state-api.js
 let filteredAsnRequests = [];
 
-function normalizeAsnRequest(row) {
-  return { ...row };
+function isAsnRequestEligibleForPickup(request) {
+  return Boolean(request) && isRequestEmailSent(request);
+}
+
+function is12thTribeAsnBuyer(buyer) {
+  return String(buyer ?? "").trim().toUpperCase() === ASN_PICKUP_BUYER_12TH_TRIBE;
+}
+
+function getLogisticsEmailInfo(entityName = DEFAULT_WAREHOUSE_ENTITY) {
+  const entityKey = String(entityName ?? "").trim().toLowerCase();
+  const contactRows = allContactRows ?? allVendorEmailRows ?? [];
+  const row = [...contactRows].reverse().find(r => {
+    const name = String(r["Name"] ?? r["Vendor"] ?? "").trim().toLowerCase();
+    return name === entityKey;
+  });
+  return {
+    email: String(row?.["Email"] ?? "").trim(),
+    cc: String(row?.["CC"] ?? "").trim(),
+  };
+}
+
+function parseAsnPickupLabelData(request) {
+  try {
+    const parsed = JSON.parse(String(request?.[ASN_PICKUP_LABEL_DATA_FIELD] ?? "[]"));
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function isAsnPickupEmailSent(request) {
+  return String(request?.[ASN_PICKUP_EMAIL_STATUS_FIELD] ?? "").trim() === "Sent";
+}
+
+function setAsnPickupLabelFooterMessage(message = "") {
+  const overlay = document.getElementById("asnPickupLabelOverlay");
+  if (!overlay) return;
+  clearModalFooterMessageForOverlay(overlay);
+  if (message) setModalFooterMessage(message, "error", { persist: true, overlay });
 }
 
 function onAsnRequestsDataLoaded(asnRequests) {
@@ -118,19 +161,42 @@ function renderAsnRequestEmailStatusCell(td, request) {
   else td.textContent = status;
 }
 
+function normalizeAsnRequest(row) {
+  return { ...row };
+}
+
 function renderAsnRequestActionCell(td, request) {
   const requestId = getAsnRequestRecordId(request);
   td.className = "readonly readonly-no-select asn-request-action-cell";
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = "btn btn-secondary asn-request-resend-btn";
-  btn.textContent = "Resend";
-  btn.disabled = !requestId || isAppSaving();
-  btn.addEventListener("click", e => {
+  const wrap = document.createElement("div");
+  wrap.className = "asn-request-action-wrap";
+
+  const resendBtn = document.createElement("button");
+  resendBtn.type = "button";
+  resendBtn.className = "btn btn-secondary asn-request-resend-btn";
+  resendBtn.textContent = "Resend";
+  resendBtn.disabled = !requestId || isAppSaving();
+  resendBtn.addEventListener("click", e => {
     e.stopPropagation();
     resendAsnRequestEmail(requestId);
   });
-  td.appendChild(btn);
+  wrap.appendChild(resendBtn);
+
+  if (isAsnRequestEligibleForPickup(request)) {
+    const pickupBtn = document.createElement("button");
+    pickupBtn.type = "button";
+    pickupBtn.className = "btn btn-secondary asn-request-pickup-btn";
+    pickupBtn.textContent = isAsnPickupEmailSent(request) ? "Resend Pickup" : "ASN Pickup";
+    pickupBtn.disabled = !requestId || isAppSaving();
+    pickupBtn.addEventListener("click", e => {
+      e.stopPropagation();
+      if (isAsnPickupEmailSent(request)) resendAsnPickupEmail(requestId);
+      else openAsnPickupFlow(requestId);
+    });
+    wrap.appendChild(pickupBtn);
+  }
+
+  td.appendChild(wrap);
 }
 
 function renderAsnRequestTable() {
@@ -380,6 +446,7 @@ function renderAsnRequestModal(poNumbers, { asnDate = formatDateToYmd(new Date()
   setRequestModalPoCount(headerCount, pos.length);
 
   const titleLabel = String(document.getElementById("asnRequestModalId")?.textContent ?? "").trim() || "ASN Request";
+  const requestId = titleLabel !== "ASN Request" && titleLabel !== "New" ? titleLabel : "";
   const asnForm = document.getElementById("asnRequestForm");
   const asnFormData = asnForm ? readRequestForm(asnForm) : {};
   if (typeof wirePackingListPrintButton === "function") {
@@ -390,6 +457,7 @@ function renderAsnRequestModal(poNumbers, { asnDate = formatDateToYmd(new Date()
       titlePageType: "ASN",
       typeDate: asnFormData[ASN_DATE_FIELD] ?? (isExisting ? request?.[ASN_DATE_FIELD] : asnRequestDraftAsnDate),
       requestDate: asnFormData[ASN_REQ_SUBMIT_DATE_FIELD] ?? (isExisting ? request?.[ASN_REQ_SUBMIT_DATE_FIELD] : submitDate),
+      requestId,
     });
   }
 
@@ -552,6 +620,23 @@ function updateAsnRequestActionButtons() {
   const submitBtn = document.getElementById("asnRequestSubmitBtn");
 
   const isView = submitBtn?.hidden === true;
+  const pickupBtn = document.getElementById("asnPickupBtn");
+  const pickupResendBtn = document.getElementById("asnPickupResendBtn");
+  const printBtn = document.getElementById("asnRequestPrintBtn");
+  if (printBtn) printBtn.hidden = !isView || asnRequestPoNumbers.length === 0;
+  if (pickupBtn || pickupResendBtn) {
+    const request = asnRequestModalRow;
+    const eligible = isView && isAsnRequestEligibleForPickup(request);
+    const sent = eligible && isAsnPickupEmailSent(request);
+    if (pickupBtn) {
+      pickupBtn.hidden = !eligible || sent;
+      pickupBtn.disabled = asnRequestOpInProgress || isAppSaving();
+    }
+    if (pickupResendBtn) {
+      pickupResendBtn.hidden = !sent;
+      pickupResendBtn.disabled = asnRequestOpInProgress || isAppSaving();
+    }
+  }
   if (isView) {
     if (addBtn) addBtn.hidden = true;
     if (removeBtn) removeBtn.hidden = true;
@@ -603,6 +688,10 @@ function closeAsnRequestModal() {
   clearAsnFormSelection();
   const printBtn = document.getElementById("asnRequestPrintBtn");
   if (printBtn) printBtn.hidden = true;
+  const pickupBtn = document.getElementById("asnPickupBtn");
+  const pickupResendBtn = document.getElementById("asnPickupResendBtn");
+  if (pickupBtn) pickupBtn.hidden = true;
+  if (pickupResendBtn) pickupResendBtn.hidden = true;
   setAsnRequestFooterMessage("");
   document.getElementById("asnRequestOverlay")?.classList.remove("open");
   setAsnRequestModalAddPanelClass(document.getElementById("asnRequestBody"), false);
@@ -702,6 +791,231 @@ function demoCreateAsnRequest(poNumbers, data) {
   applyAsnRequestCreatedLocally(generateDemoAsnRequestId(), poNumbers, data);
 }
 
+function openAsnPickupFlow(asnRequestId) {
+  if (asnRequestOpInProgress || !asnRequestId) return;
+  const request = getAsnRequestById(asnRequestId);
+  if (!isAsnRequestEligibleForPickup(request)) {
+    showIndicator("ASN request must be completed before sending ASN Pickup", "error");
+    return;
+  }
+  if (is12thTribeAsnBuyer(request["Buyer"])) {
+    asnPickupPendingRequestId = asnRequestId;
+    renderAsnPickupLabelModal(request);
+    return;
+  }
+  if (!window.confirm("Send ASN Pickup email to FORERUNNER LOGISTICS?")) return;
+  sendAsnPickupEmail(asnRequestId, []);
+}
+
+function closeAsnPickupLabelModal() {
+  asnPickupPendingRequestId = "";
+  setAsnPickupLabelFooterMessage("");
+  document.getElementById("asnPickupLabelOverlay")?.classList.remove("open");
+}
+
+function renderAsnPickupLabelModal(request) {
+  const body = document.getElementById("asnPickupLabelBody");
+  const subtitle = document.getElementById("asnPickupLabelModalSubtitle");
+  if (!body) return;
+
+  const requestId = getAsnRequestRecordId(request);
+  if (subtitle) subtitle.textContent = requestId ? `ASN Pickup · ${requestId}` : "ASN Pickup";
+
+  const poNumbers = getRequestPoNumbers(request, ASN_REQUEST_ID_FIELD);
+  const pos = poNumbers
+    .map(po => allRows.find(r => String(r["PO #"]) === String(po)))
+    .filter(Boolean);
+  const stored = parseAsnPickupLabelData(request);
+  const storedByPo = Object.fromEntries(stored.map(entry => [String(entry.poNumber ?? ""), entry]));
+
+  body.innerHTML = "";
+  const intro = document.createElement("p");
+  intro.className = "asn-pickup-label-intro";
+  intro.textContent = "Enter Ship Notice # and Color Code for each PO. These will be used on the carton labels attached to the ASN Pickup email.";
+  body.appendChild(intro);
+
+  const wrap = document.createElement("div");
+  wrap.className = "email-po-table-wrap";
+
+  const table = document.createElement("table");
+  table.className = "email-po-table shipment-linked-po-table asn-pickup-label-table";
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th>PO #</th>
+        <th>Buyer PO #</th>
+        <th>Style #</th>
+        <th>Ship Notice #</th>
+        <th>Color Code</th>
+      </tr>
+    </thead>
+  `;
+
+  const tbody = document.createElement("tbody");
+  pos.forEach(row => {
+    const po = String(row["PO #"] ?? "");
+    const saved = storedByPo[po] || {};
+    const tr = document.createElement("tr");
+    tr.dataset.po = po;
+
+    const poTd = document.createElement("td");
+    poTd.textContent = po;
+    tr.appendChild(poTd);
+
+    const buyerPoTd = document.createElement("td");
+    buyerPoTd.textContent = String(row["Buyer PO #"] ?? "");
+    tr.appendChild(buyerPoTd);
+
+    const styleTd = document.createElement("td");
+    styleTd.textContent = String(row["Style #"] ?? "");
+    tr.appendChild(styleTd);
+
+    const shipNoticeTd = document.createElement("td");
+    const shipNoticeInput = document.createElement("input");
+    shipNoticeInput.type = "text";
+    shipNoticeInput.className = "shipment-form-input asn-pickup-label-input";
+    shipNoticeInput.dataset.field = "shipNotice";
+    shipNoticeInput.value = String(saved.shipNotice ?? "");
+    shipNoticeTd.appendChild(shipNoticeInput);
+    tr.appendChild(shipNoticeTd);
+
+    const colorCodeTd = document.createElement("td");
+    const colorCodeInput = document.createElement("input");
+    colorCodeInput.type = "text";
+    colorCodeInput.className = "shipment-form-input asn-pickup-label-input";
+    colorCodeInput.dataset.field = "colorCode";
+    colorCodeInput.value = String(saved.colorCode ?? "");
+    colorCodeTd.appendChild(colorCodeInput);
+    tr.appendChild(colorCodeTd);
+
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+  body.appendChild(wrap);
+
+  setAsnPickupLabelFooterMessage("");
+  bringModalToFront(document.getElementById("asnPickupLabelOverlay"));
+  document.getElementById("asnPickupLabelOverlay")?.classList.add("open");
+}
+
+function readAsnPickupLabelInputs() {
+  const rows = [...document.querySelectorAll("#asnPickupLabelBody .asn-pickup-label-table tbody tr")];
+  return rows.map(tr => ({
+    poNumber: String(tr.dataset.po ?? "").trim(),
+    shipNotice: String(tr.querySelector('[data-field="shipNotice"]')?.value ?? "").trim(),
+    colorCode: String(tr.querySelector('[data-field="colorCode"]')?.value ?? "").trim(),
+  }));
+}
+
+function validateAsnPickupLabelInputs(labelInputs) {
+  for (const entry of labelInputs) {
+    if (!entry.shipNotice || !entry.colorCode) {
+      return "Ship Notice # and Color Code are required for every PO.";
+    }
+  }
+  return "";
+}
+
+function applyAsnPickupSentLocally(asnRequestId, labelInputs, { emailSent = true, emailError = "" } = {}) {
+  const request = getAsnRequestById(asnRequestId);
+  if (!request) return;
+  const now = formatDateToYmd(new Date());
+  request[ASN_PICKUP_EMAIL_STATUS_FIELD] = emailSent ? "Sent" : "Failed";
+  request[ASN_PICKUP_EMAIL_SENT_AT_FIELD] = emailSent ? now : (request[ASN_PICKUP_EMAIL_SENT_AT_FIELD] ?? "");
+  request[ASN_PICKUP_EMAIL_ERROR_FIELD] = emailError;
+  if (is12thTribeAsnBuyer(request["Buyer"]) && labelInputs.length > 0) {
+    request[ASN_PICKUP_LABEL_DATA_FIELD] = JSON.stringify(labelInputs);
+  }
+  request["Updated At"] = now;
+  applyAsnRequestFilters();
+  if (asnRequestModalRow && getAsnRequestRecordId(asnRequestModalRow) === asnRequestId) {
+    renderAsnRequestModal(asnRequestPoNumbers, { request });
+  }
+}
+
+async function sendAsnPickupEmail(asnRequestId, labelInputs) {
+  if (asnRequestOpInProgress || !asnRequestId) return;
+  const request = getAsnRequestById(asnRequestId);
+  if (!isAsnRequestEligibleForPickup(request)) {
+    showIndicator("ASN request must be completed before sending ASN Pickup", "error");
+    return;
+  }
+
+  const inputs = Array.isArray(labelInputs) ? labelInputs : [];
+  if (is12thTribeAsnBuyer(request["Buyer"])) {
+    const validationError = validateAsnPickupLabelInputs(inputs);
+    if (validationError) {
+      setAsnPickupLabelFooterMessage(validationError);
+      return;
+    }
+  }
+
+  asnRequestOpInProgress = true;
+  closeAsnPickupLabelModal();
+  showIndicator(`Sending ASN Pickup email${ELLIPSIS}`, "");
+
+  try {
+    if (isDemoMode()) {
+      const logistics = getLogisticsEmailInfo();
+      if (!logistics.email) throw new Error("No email address on file for FORERUNNER LOGISTICS.");
+      applyAsnPickupSentLocally(asnRequestId, inputs, { emailSent: true, emailError: "" });
+    } else {
+      const json = await postAppsScript({
+        action: "sendAsnPickupEmail",
+        asnRequestId,
+        labelInputs: inputs,
+      });
+      if (!json.success) throw new Error(json.error || json.emailError || "ASN Pickup email failed to send.");
+      applyAsnPickupSentLocally(asnRequestId, inputs, {
+        emailSent: json.emailSent,
+        emailError: json.emailError ?? "",
+      });
+      if (!json.emailSent) {
+        showIndicator(`ASN Pickup email not sent: ${json.emailError || "Unknown error"}`, "error");
+        return;
+      }
+    }
+    showIndicator(`ASN Pickup email sent ${CHECK_MARK}`, "success");
+  } catch (err) {
+    applyAsnPickupSentLocally(asnRequestId, inputs, { emailSent: false, emailError: err.message });
+    showIndicator("ASN Pickup failed: " + err.message, "error");
+  } finally {
+    asnRequestOpInProgress = false;
+  }
+}
+
+async function resendAsnPickupEmail(asnRequestId) {
+  if (asnRequestOpInProgress || !asnRequestId) return;
+  const request = getAsnRequestById(asnRequestId);
+  if (!isAsnRequestEligibleForPickup(request)) return;
+
+  if (is12thTribeAsnBuyer(request["Buyer"])) {
+    const stored = parseAsnPickupLabelData(request);
+    if (stored.length === 0) {
+      openAsnPickupFlow(asnRequestId);
+      return;
+    }
+    if (!window.confirm("Resend ASN Pickup email to FORERUNNER LOGISTICS?")) return;
+    await sendAsnPickupEmail(asnRequestId, stored);
+    return;
+  }
+
+  if (!window.confirm("Resend ASN Pickup email to FORERUNNER LOGISTICS?")) return;
+  await sendAsnPickupEmail(asnRequestId, []);
+}
+
+function submitAsnPickupLabelModal() {
+  if (!asnPickupPendingRequestId) return;
+  const labelInputs = readAsnPickupLabelInputs();
+  const validationError = validateAsnPickupLabelInputs(labelInputs);
+  if (validationError) {
+    setAsnPickupLabelFooterMessage(validationError);
+    return;
+  }
+  sendAsnPickupEmail(asnPickupPendingRequestId, labelInputs);
+}
+
 function initAsnRequests() {
   document.getElementById("asnRequestBtn")?.addEventListener("click", openAsnRequestFromSelection);
   document.getElementById("asnRequestSubmitBtn")?.addEventListener("click", submitAsnRequest);
@@ -710,6 +1024,18 @@ function initAsnRequests() {
   document.getElementById("asnRequestAddPoDoneBtn")?.addEventListener("click", closeAsnRequestAddPoPanel);
   document.getElementById("asnRequestAddSelectedPosBtn")?.addEventListener("click", addSelectedPosToAsnRequest);
   document.getElementById("asnRequestCancelBtn")?.addEventListener("click", closeAsnRequestModal);
+  document.getElementById("asnPickupBtn")?.addEventListener("click", () => {
+    const requestId = getAsnRequestRecordId(asnRequestModalRow);
+    if (requestId) openAsnPickupFlow(requestId);
+  });
+  document.getElementById("asnPickupResendBtn")?.addEventListener("click", () => {
+    const requestId = getAsnRequestRecordId(asnRequestModalRow);
+    if (requestId) resendAsnPickupEmail(requestId);
+  });
+  document.getElementById("asnPickupLabelSubmitBtn")?.addEventListener("click", submitAsnPickupLabelModal);
+  document.getElementById("asnPickupLabelCancelBtn")?.addEventListener("click", closeAsnPickupLabelModal);
+  document.getElementById("asnPickupLabelDismissBtn")?.addEventListener("click", closeAsnPickupLabelModal);
+  bindDirectBackdropDismiss(document.getElementById("asnPickupLabelOverlay"), closeAsnPickupLabelModal);
   document.querySelector('[data-dismiss="asn-request"]')?.addEventListener("click", closeAsnRequestModal);
   bindDirectBackdropDismiss(document.getElementById("asnRequestOverlay"), closeAsnRequestModal);
   document.getElementById("asnRequestSearchInput")?.addEventListener("input", applyAsnRequestFilters);

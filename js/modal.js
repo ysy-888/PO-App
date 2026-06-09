@@ -1362,7 +1362,7 @@ function formatPackingListTotal(qty) {
 }
 
 function computePackingWeightTotal(cartons) {
-  return cartons.reduce((sum, carton) => sum + toQtyNumber(carton[CARTON_WEIGHT_FIELD]), 0);
+  return cartons.reduce((sum, carton) => sum + getCartonWeightLbs(carton), 0);
 }
 
 function formatPackingWeightTotal(weight) {
@@ -1580,10 +1580,13 @@ function createPackingListEditor(row, packingList, sourceCartons) {
       weightInput.inputMode = "decimal";
       weightInput.className = "packing-list-weight-input";
       weightInput.placeholder = EN_DASH;
-      weightInput.value = isEmptyValue(carton[CARTON_WEIGHT_FIELD]) ? "" : String(carton[CARTON_WEIGHT_FIELD]);
+      weightInput.value = (() => {
+        const lbs = getCartonWeightLbs(carton);
+        return lbs > 0 ? String(lbs) : "";
+      })();
       weightInput.dataset.cartonIndex = String(cartonIndex);
       weightInput.dataset.field = CARTON_WEIGHT_FIELD;
-      if (readOnly) weightInput.readOnly = true;
+      weightInput.readOnly = true;
       bindNumberInput(weightInput);
       const weightSuffix = document.createElement("span");
       weightSuffix.className = "packing-list-weight-suffix";

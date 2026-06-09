@@ -251,6 +251,7 @@ function updateShipmentPackingListPrintBtn(scope) {
   let poNumbers = [];
   let titleLabel = "Shipment";
   let typeDate = "";
+  let requestId = "";
 
   if (isCreate) {
     poNumbers = createShipmentPoNumbers.slice();
@@ -261,6 +262,7 @@ function updateShipmentPackingListPrintBtn(scope) {
     poNumbers = getLinkedPoRows(shipmentModalRow).map(row => row["PO #"]);
     const shipmentId = String(shipmentModalRow[SHIPMENT_ID_FIELD] ?? "").trim();
     titleLabel = shipmentId ? `Shipment ${shipmentId}` : "Shipment";
+    requestId = shipmentId;
     const form = document.getElementById("shipmentEditForm");
     typeDate = form ? readShipmentForm(form).EXF : (shipmentModalRow.EXF ?? "");
   }
@@ -273,6 +275,7 @@ function updateShipmentPackingListPrintBtn(scope) {
       titlePageType: "Shipment",
       typeDate,
       requestDate: "",
+      requestId,
     });
   }
 }

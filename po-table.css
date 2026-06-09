@@ -526,6 +526,12 @@ select.filter-select:focus { border-color: var(--accent); }
   --status-filter-border: #c5e8dc;
 }
 
+#statusFilters .filter-btn[data-status="Scheduled"] {
+  --status-filter-bg: #e8f4fd;
+  --status-filter-fg: #1565a8;
+  --status-filter-border: #c8e0f0;
+}
+
 #statusFilters .filter-btn[data-status="In Warehouse"] {
   --status-filter-bg: #eaf3de;
   --status-filter-fg: #3b6d11;
@@ -900,6 +906,35 @@ table {
 #exfRequestTable .exf-request-email-status-cell[data-status="failed"] {
   color: #b91c1c;
   font-weight: 600;
+}
+
+#asnRequestTable .asn-request-action-cell {
+  text-align: center;
+}
+
+#asnRequestTable .asn-request-action-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: stretch;
+}
+
+#asnRequestTable .asn-request-resend-btn,
+#asnRequestTable .asn-request-pickup-btn {
+  padding: 4px 8px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.asn-pickup-label-intro {
+  margin: 0 0 16px;
+  color: #4b5563;
+  font-size: 14px;
+}
+
+.asn-pickup-label-table input.asn-pickup-label-input {
+  width: 100%;
+  min-width: 120px;
 }
 
 #exfRequestTable tbody tr.clickable-row,
@@ -5724,8 +5759,8 @@ td.n41-status-mismatch,
   border-bottom: 1px solid #e5e7eb;
 }
 
-.shipment-modal-card .email-meta-value .email-meta-input,
-.shipment-modal-card .email-meta-value .shipment-form-input.email-meta-input {
+.shipment-modal-card .email-meta-value .email-meta-input:not(.compact-date-input),
+.shipment-modal-card .email-meta-value .shipment-form-input.email-meta-input:not(.compact-date-input) {
   width: 100%;
   border: none;
   border-radius: 0;
@@ -5745,8 +5780,8 @@ td.n41-status-mismatch,
   min-width: 240px;
 }
 
-.request-form-edit .email-meta-value .email-meta-input,
-.request-form-edit .email-meta-value .shipment-form-input.email-meta-input,
+.request-form-edit .email-meta-value .email-meta-input:not(.compact-date-input),
+.request-form-edit .email-meta-value .shipment-form-input.email-meta-input:not(.compact-date-input),
 .request-form-edit .email-meta-value .compact-date-input-wrap {
   width: 240px;
   min-width: 240px;
@@ -5817,6 +5852,14 @@ td.n41-status-mismatch,
   padding: 8px 12px;
   font-size: 14px;
   box-shadow: none;
+  width: auto;
+  flex: 1;
+  min-width: 0;
+}
+
+.shipment-modal-card .email-meta-value .compact-date-input-wrap .compact-date-picker-btn {
+  flex-shrink: 0;
+  margin-right: 6px;
 }
 
 .shipment-modal-card .email-meta-sub.email-meta-address {

@@ -82,12 +82,17 @@
     margin: 0;
   }
   .pdf-section-title {
-    margin: 0 0 10px;
+    margin: 0 0 6px;
     font-size: 8px;
     font-weight: 600;
     letter-spacing: 0.05em;
     text-transform: uppercase;
     color: #374151;
+  }
+  .pdf-section-title + .pdf-summary-grid,
+  .pdf-section-title + .pdf-carton-table,
+  .pdf-section-title + .pdf-carton-table-wrap {
+    margin-top: 10px;
   }
   .pdf-section-block {
     margin-bottom: 20px;
@@ -173,17 +178,69 @@
     font-size: 9px;
     vertical-align: middle;
   }
+  .pdf-carton-table th.pdf-ctn-col,
+  .pdf-carton-table td.pdf-ctn-col {
+    padding-right: 14px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .pdf-carton-table tbody td.pdf-ctn-col {
+    font-weight: 700;
+  }
   .pdf-carton-table th.pdf-size-col,
   .pdf-carton-table td.pdf-size-col {
     padding: 6px 8px;
     text-align: center;
     font-variant-numeric: tabular-nums;
   }
-  .pdf-carton-table th.pdf-wt-col,
-  .pdf-carton-table td.pdf-wt-col {
-    padding: 6px 12px;
+  .pdf-carton-table th.pdf-size-first,
+  .pdf-carton-table td.pdf-size-first {
+    padding-left: 12px;
+  }
+  .pdf-carton-table th.pdf-total-col,
+  .pdf-carton-table td.pdf-total-col {
     text-align: center;
     font-variant-numeric: tabular-nums;
+    border-left: 1px solid #e5e7eb;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+  .pdf-carton-table th.pdf-wt-col,
+  .pdf-carton-table td.pdf-wt-col {
+    padding: 6px 12px 6px 12px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    border-left: 1px solid #e5e7eb;
+    white-space: nowrap;
+  }
+  .pdf-carton-table-wrap {
+    text-align: center;
+  }
+  .pdf-carton-table--compact {
+    width: auto;
+    display: inline-table;
+    margin: 0 auto;
+  }
+  .pdf-carton-table--compact th,
+  .pdf-carton-table--compact td {
+    padding: 6px 5px;
+  }
+  .pdf-carton-table--compact th.pdf-ctn-col,
+  .pdf-carton-table--compact td.pdf-ctn-col {
+    padding-right: 12px;
+  }
+  .pdf-carton-table--compact th.pdf-size-first,
+  .pdf-carton-table--compact td.pdf-size-first {
+    padding-left: 10px;
+  }
+  .pdf-carton-table--compact th.pdf-total-col,
+  .pdf-carton-table--compact td.pdf-total-col {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+  .pdf-carton-table--compact th.pdf-wt-col,
+  .pdf-carton-table--compact td.pdf-wt-col {
+    padding: 6px 10px 6px 10px;
   }
   .pdf-title-table th,
   .pdf-title-table td {

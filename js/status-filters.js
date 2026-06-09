@@ -144,6 +144,7 @@ const STATUS_FILTER_SECONDARY_GROUPS = [
   { label: "WIP", value: "WIP" },
   { label: "EXF REQ", value: STATUS_FILTER_EXF_REQ },
   { label: "OTW", value: "OTW" },
+  { label: "Scheduled", value: "Scheduled" },
   { label: "In WH", value: "In Warehouse" },
   { label: "Assigned", value: "Assigned" },
 ];
@@ -153,6 +154,7 @@ const STATUS_FILTER_COUNTED = [
   { label: "WIP", value: "WIP" },
   { label: "EXF REQ", value: STATUS_FILTER_EXF_REQ },
   { label: "OTW", value: "OTW" },
+  { label: "Scheduled", value: "Scheduled" },
   { label: "In WH", value: "In Warehouse" },
   { label: "Assigned", value: "Assigned" },
 ];
