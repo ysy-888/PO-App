@@ -124,6 +124,7 @@ function updateCustomerSelectionUi() {
     batchBtn.hidden = selectedCount < 2;
     batchBtn.disabled = customerEmailOpInProgress || isAppSaving();
   }
+  if (typeof syncViewActionToolbars === "function") syncViewActionToolbars();
 
   if (selectAllCb) {
     const allSelected = selectableKeys.length > 0 && selectedCount === selectableKeys.length;

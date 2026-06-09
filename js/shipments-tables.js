@@ -199,6 +199,7 @@ function updateDeleteShipmentButton() {
   const count = getCheckedFilteredShipments().length;
   const show = currentAppView === "shipments" && count > 0;
   btn.hidden = !show;
+  syncViewActionToolbars();
   if (!show) return;
   btn.textContent = count === 1 ? "Delete shipment" : `Delete shipments (${count})`;
 }
@@ -251,6 +252,7 @@ function updateDeleteChargebackButton() {
   const count = getCheckedFilteredChargebacks().length;
   const show = currentAppView === "chargebacks" && count > 0;
   btn.hidden = !show;
+  syncViewActionToolbars();
   if (!show) return;
   btn.textContent = count === 1 ? "Delete chargeback" : `Delete chargebacks (${count})`;
 }
@@ -383,17 +385,35 @@ function isSplitViewLayoutEnabled() {
   return document.body.classList.contains("split-view-enabled");
 }
 
+function syncViewActionToolbars(view = currentAppView) {
+  const configs = [
+    { toolbarId: "shipmentToolbar", buttonId: "deleteShipmentBtn", activeView: "shipments" },
+    { toolbarId: "chargebackToolbar", buttonId: "deleteChargebackBtn", activeView: "chargebacks" },
+    { toolbarId: "customersToolbar", buttonId: "customersBatchEmailBtn", activeView: "customers" },
+    { toolbarId: "packingReviewToolbar", buttonId: "packingReviewApproveAllBtn", activeView: "packingReviews" },
+  ];
+
+  configs.forEach(({ toolbarId, buttonId, activeView }) => {
+    const toolbar = document.getElementById(toolbarId);
+    const button = document.getElementById(buttonId);
+    if (!toolbar) return;
+    const viewActive = view === activeView;
+    const hasVisibleAction = button && !button.hidden;
+    toolbar.hidden = !viewActive || !hasVisibleAction;
+  });
+}
+
 function switchAppView(view) {
   currentAppView = view;
   const splitView = isSplitViewLayoutEnabled();
   const splitActive = splitView && isSplitViewTab(view);
   const poToolbar = document.getElementById("poToolbar");
-  const shipmentToolbar = document.getElementById("shipmentToolbar");
-  const requestsToolbar = document.getElementById("requestsToolbar");
-  const chargebackToolbar = document.getElementById("chargebackToolbar");
-  const packingReviewToolbar = document.getElementById("packingReviewToolbar");
-  const customersToolbar = document.getElementById("customersToolbar");
   const poHeaderMeta = document.getElementById("poHeaderMeta");
+  const shipmentHeaderMeta = document.getElementById("shipmentHeaderMeta");
+  const requestsHeaderMeta = document.getElementById("requestsHeaderMeta");
+  const chargebackHeaderMeta = document.getElementById("chargebackHeaderMeta");
+  const customersHeaderMeta = document.getElementById("customersHeaderMeta");
+  const packingReviewHeaderMeta = document.getElementById("packingReviewHeaderMeta");
   const appMain = document.getElementById("appMain");
   const poViewContent = document.getElementById("poViewContent");
   const poTableWrap = document.getElementById("poTableWrap");
@@ -412,12 +432,13 @@ function switchAppView(view) {
   if (appMain) appMain.classList.toggle("is-split-active", splitActive);
 
   if (poToolbar) poToolbar.hidden = view !== "po";
-  if (shipmentToolbar) shipmentToolbar.hidden = view !== "shipments";
-  if (requestsToolbar) requestsToolbar.hidden = view !== "requests";
-  if (chargebackToolbar) chargebackToolbar.hidden = view !== "chargebacks";
-  if (packingReviewToolbar) packingReviewToolbar.hidden = view !== "packingReviews";
-  if (customersToolbar) customersToolbar.hidden = view !== "customers";
   if (poHeaderMeta) poHeaderMeta.hidden = view !== "po" && !splitActive;
+  if (shipmentHeaderMeta) shipmentHeaderMeta.hidden = view !== "shipments";
+  if (requestsHeaderMeta) requestsHeaderMeta.hidden = view !== "requests";
+  if (chargebackHeaderMeta) chargebackHeaderMeta.hidden = view !== "chargebacks";
+  if (customersHeaderMeta) customersHeaderMeta.hidden = view !== "customers";
+  if (packingReviewHeaderMeta) packingReviewHeaderMeta.hidden = view !== "packingReviews";
+  syncViewActionToolbars(view);
 
   if (splitActive) {
     if (poViewContent) poViewContent.hidden = false;

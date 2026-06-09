@@ -8,6 +8,9 @@
   --text: #1a1a18;
   --text-muted: #8b929c;
   --empty-display: #d4d9df;
+  --qty-fg: #788392;
+  --qty-header-fg: #8b929c;
+  --qty-total-fg: #4a5568;
   --filter-icon: #b8bec8;
   --filter-icon-active: #4b5563;
   --header-bg: #eef1f4;
@@ -107,7 +110,7 @@ body.test-mode-active .app-header {
   font-size: 15px;
   font-weight: 600;
   letter-spacing: -0.02em;
-  color: #b8bec8;
+  color: #e2e5ea;
   cursor: pointer;
 }
 
@@ -146,7 +149,7 @@ body.test-mode-active .app-header {
 }
 
 .app-title-tab--dropdown-trigger:not(.is-active):hover {
-  color: #b8bec8;
+  color: #e2e5ea;
 }
 
 .app-title-tab-chevron {
@@ -187,6 +190,11 @@ body.test-mode-active .app-header {
 .app-title-tab-dropdown-wrap:hover:not(.is-dropdown-closed) .app-title-tab-dropdown,
 .app-title-tab-dropdown-wrap:focus-within:not(.is-dropdown-closed) .app-title-tab-dropdown {
   display: block;
+}
+
+.app-title-tab-dropdown-wrap:hover:not(.is-dropdown-closed) .app-title-tab--dropdown-trigger,
+.app-title-tab-dropdown-wrap:focus-within:not(.is-dropdown-closed) .app-title-tab--dropdown-trigger {
+  color: var(--text-muted);
 }
 
 .app-title-tab-dropdown-item {
@@ -231,20 +239,26 @@ body.test-mode-active .app-header {
   gap: 10px;
 }
 
-.header-po-meta {
+.header-view-meta {
   display: flex;
   align-items: center;
   gap: 10px;
   white-space: nowrap;
 }
 
-.header-po-meta[hidden] {
+.header-view-meta[hidden] {
   display: none !important;
 }
 
-.header-po-meta .counter {
+.header-view-meta .counter {
   text-align: left;
   font-weight: 600;
+}
+
+.header-search-wrap {
+  flex: 0 1 220px;
+  min-width: 140px;
+  max-width: 220px;
 }
 
 .header-menu-wrap {
@@ -663,7 +677,6 @@ select.filter-select:focus { border-color: var(--accent); }
 
 #poToolbar[hidden],
 #shipmentToolbar[hidden],
-#requestsToolbar[hidden],
 #chargebackToolbar[hidden],
 #packingReviewToolbar[hidden],
 #customersToolbar[hidden] {
@@ -1993,6 +2006,43 @@ tr.editing td { background: var(--edit-bg); }
 
 td.readonly { color: var(--text); }
 
+/* Qty values — semibold with a softer muted tone */
+:is(th, td)[data-col$=" Qty"]:not(.empty-display),
+.shipment-po-cell-qty:not(.empty-display),
+.modal-size-static:not(:empty),
+.modal-size-input:not(:placeholder-shown),
+.packing-list-input:not(:placeholder-shown),
+#poPackingPane .carton-grid-input:not(:placeholder-shown),
+#poPackingPane .po-summary-size-qty:not(.po-summary-size-total-col):not(:empty) {
+  font-weight: 600;
+  color: var(--qty-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Qty totals — darker emphasis */
+.email-po-table .email-num:not(.empty-display),
+.modal-size-total:not(.modal-size-total--match):not(:empty),
+.packing-list-total:not(:empty),
+.packing-list-row-total:not(:empty),
+.packing-list-grand-total:not(:empty),
+.packing-list-total-cell:not(:empty),
+#poPackingPane .carton-grid-total:not(:empty),
+#poPackingPane .po-summary-size-qty.po-summary-size-total-col:not(:empty),
+#poPackingPane .packing-list-summary-fields .po-summary-value {
+  font-weight: 700;
+  color: var(--qty-total-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+th[data-col$=" Qty"],
+th.shipment-po-cell-qty {
+  color: var(--qty-header-fg);
+}
+
+.modal-size-total--act.modal-size-total--match:not(:empty) {
+  color: var(--success);
+}
+
 td.empty-display,
 td.editable.empty-display,
 .modal-field-value.empty-display,
@@ -2652,12 +2702,12 @@ td.n41-status-mismatch,
 }
 
 #poTable col[data-col="Buyer PO #"] {
-  width: 120px;
+  width: 80px;
 }
 
 #poTable :is(th, td)[data-col="Buyer PO #"].col-w-m {
-  min-width: 120px;
-  max-width: 120px;
+  min-width: 80px;
+  max-width: 80px;
 }
 
 /* Full-screen dark overlay */
@@ -3430,7 +3480,6 @@ td.n41-status-mismatch,
   font-family: var(--font);
   font-size: 12px;
   text-align: center;
-  color: var(--text);
   transition: border-color 0.12s ease, background 0.12s ease;
   -moz-appearance: textfield;
   appearance: textfield;
@@ -3445,10 +3494,8 @@ td.n41-status-mismatch,
   border: 1px solid transparent;
   border-radius: 4px;
   background: transparent;
-  color: var(--text);
   font-family: var(--font);
   font-size: 12px;
-  font-weight: 600;
   line-height: 1.2;
   text-align: center;
 }
@@ -3473,6 +3520,8 @@ td.n41-status-mismatch,
   outline: none;
   border-color: var(--accent);
   background: #fff;
+  color: var(--text);
+  font-weight: 500;
 }
 
 .modal-size-input--variance-warn {
@@ -3488,8 +3537,6 @@ td.n41-status-mismatch,
   min-width: 0;
   text-align: center;
   font-size: 12px;
-  font-weight: 700;
-  color: var(--text);
   border-right: 1px solid var(--border-strong);
   padding-right: 6px;
   margin-right: 2px;
@@ -4698,6 +4745,33 @@ td.n41-status-mismatch,
   flex-shrink: 0;
 }
 
+.packing-list-grid--body {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.packing-list-grid-row {
+  display: grid;
+  grid-template-columns:
+    var(--packing-rowhead-width)
+    var(--packing-total-width)
+    repeat(var(--size-col-count), var(--packing-unit-width))
+    var(--packing-weight-width);
+  gap: 5px var(--packing-gap);
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  padding: 4px 0;
+}
+
+.packing-list-grid-row:last-child {
+  border-bottom: none;
+}
+
+.packing-list-grid-row:hover {
+  background: var(--row-hover);
+}
+
 .packing-list-grid-divider--horizontal {
   grid-column: 1 / -1;
   height: 0;
@@ -4843,10 +4917,8 @@ td.n41-status-mismatch,
   border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
-  color: var(--text);
   font-family: var(--font);
   font-size: 12px;
-  font-weight: 600;
   line-height: 1.2;
   text-align: center;
 }
@@ -4858,8 +4930,6 @@ td.n41-status-mismatch,
   min-width: 0;
   text-align: center;
   font-size: 12px;
-  font-weight: 700;
-  color: var(--text);
 }
 
 .packing-list-total-cell {
@@ -4894,7 +4964,6 @@ td.n41-status-mismatch,
   font-family: var(--font);
   font-size: 12px;
   text-align: center;
-  color: var(--text);
   transition: border-color 0.12s ease, background 0.12s ease;
   -moz-appearance: textfield;
   appearance: textfield;
@@ -4917,6 +4986,8 @@ td.n41-status-mismatch,
 .packing-list-input:focus {
   border-color: var(--accent);
   outline: none;
+  color: var(--text);
+  font-weight: 500;
 }
 
 #modalOverlay .modal-style-info .modal-field {
@@ -5796,6 +5867,11 @@ td.n41-status-mismatch,
   font-variant-numeric: tabular-nums;
 }
 
+.email-meta-value .request-form-display-value--qty-total {
+  font-weight: 700;
+  color: var(--qty-total-fg);
+}
+
 .email-info-meta .request-form-totals-meta {
   margin-top: 12px;
 }
@@ -6099,6 +6175,17 @@ td.n41-status-mismatch,
 .shipment-modal-card .email-po-table .email-num {
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+.shipment-modal-card .email-po-table td.shipment-po-cell-qty:not(.empty-display),
+.shipment-modal-card .shipment-linked-po-table td.shipment-po-cell-qty:not(.empty-display) {
+  font-weight: 600;
+  color: var(--qty-fg);
+}
+
+.shipment-modal-card .email-po-table tfoot td.email-num {
+  font-weight: 700;
+  color: var(--qty-total-fg);
 }
 
 .shipment-modal-card .shipment-linked-po-table th.shipment-po-cell-qty {
@@ -6539,7 +6626,7 @@ th.th-shipment-id-col.th-filterable.sorted-desc {
 #packingReviewTable .col-po { width: 88px; }
 #packingReviewTable .col-style { width: 88px; }
 #packingReviewTable .col-so { width: 88px; }
-#packingReviewTable .col-buyer-po { width: 100px; }
+#packingReviewTable .col-buyer-po { width: 80px; }
 #packingReviewTable .col-buyer { width: 120px; }
 #packingReviewTable .col-po-qty { width: 72px; }
 #packingReviewTable .col-actual-qty { width: 80px; }
@@ -7425,6 +7512,12 @@ body:not(.split-view-enabled) .app-main > .app-secondary-table:not([hidden]) {
   min-width: 0;
 }
 
+#poPackingPane .packing-list-summary-fields .po-summary-value {
+  font-weight: 700;
+  color: var(--qty-total-fg);
+  font-variant-numeric: tabular-nums;
+}
+
 #poPackingPane .po-summary-size-block {
   --po-size-total-width: 40px;
   --po-size-unit-width: 40px;
@@ -7479,21 +7572,6 @@ body:not(.split-view-enabled) .app-main > .app-secondary-table:not([hidden]) {
 
 #poPackingPane .po-summary-size-qty.po-summary-size-total-col {
   text-align: left;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text);
-}
-
-#poPackingPane .po-summary-size-qty--po:not(.po-summary-size-total-col) {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-muted);
-}
-
-#poPackingPane .po-summary-size-qty--act:not(.po-summary-size-total-col) {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text);
 }
 
 #poPackingPane .packing-pane-notes {
@@ -7757,6 +7835,17 @@ body:not(.split-view-enabled) .app-main > .app-secondary-table:not([hidden]) {
 #poPackingPane .carton-grid-input:focus {
   border-color: #6b7280;
   background: #fff;
+  color: var(--text);
+  font-weight: 500;
+}
+
+#poPackingPane .carton-grid-total {
+  font-size: 12px;
+  text-align: center;
+}
+
+#poPackingPane .carton-grid-total:empty {
+  font-weight: 500;
 }
 
 #poPackingPane .carton-weight-input {
@@ -7787,12 +7876,6 @@ body:not(.split-view-enabled) .app-main > .app-secondary-table:not([hidden]) {
 #poPackingPane .carton-weight-input:focus {
   border-color: #6b7280;
   background: #fff;
-}
-
-#poPackingPane .carton-grid-total {
-  font-weight: 600;
-  font-size: 12px;
-  text-align: center;
 }
 
 #poPackingPane .carton-weight-field {

@@ -182,10 +182,10 @@ function createRequestFormMetaRow(label, fieldName, value, { type = "text", read
   return { tr, input };
 }
 
-function createRequestFormDisplayMetaRow(label, displayValue) {
+function createRequestFormDisplayMetaRow(label, displayValue, { qtyTotal = false } = {}) {
   const { tr, valueTd } = createFormMetaRow(label);
   const span = document.createElement("span");
-  span.className = "request-form-display-value";
+  span.className = "request-form-display-value" + (qtyTotal ? " request-form-display-value--qty-total" : "");
   span.textContent = displayValue;
   valueTd.appendChild(span);
   return tr;
@@ -215,8 +215,8 @@ function createLinkedPoTotalsMetaRows(pos, { totalQty = 0, ctnQty = 0 } = {}) {
   if (!pos?.length) return [];
   return [
     createRequestFormDisplayMetaRow("PO Count", String(pos.length)),
-    createRequestFormDisplayMetaRow("Total CTN Qty", formatShipmentLinkedPoTotal(ctnQty)),
-    createRequestFormDisplayMetaRow("Total Qty", formatShipmentLinkedPoTotal(totalQty)),
+    createRequestFormDisplayMetaRow("Total CTN Qty", formatShipmentLinkedPoTotal(ctnQty), { qtyTotal: true }),
+    createRequestFormDisplayMetaRow("Total Qty", formatShipmentLinkedPoTotal(totalQty), { qtyTotal: true }),
   ];
 }
 

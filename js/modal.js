@@ -1542,16 +1542,19 @@ function createPackingListEditor(row, packingList, sourceCartons) {
     headGrid.appendChild(totalsDivider);
 
     cartons.forEach((carton, cartonIndex) => {
+      const gridRow = document.createElement("div");
+      gridRow.className = "packing-list-grid-row";
+
       const rowHead = document.createElement("div");
       rowHead.className = "packing-list-rowhead packing-list-rowhead--carton";
       rowHead.textContent = String(cartonIndex + 1);
-      bodyGrid.appendChild(rowHead);
+      gridRow.appendChild(rowHead);
 
       const rowTotal = document.createElement("div");
       rowTotal.className = "packing-list-total packing-list-row-total";
       rowTotal.dataset.cartonIndex = String(cartonIndex);
       rowTotal.textContent = formatPackingListTotal(computeCartonTotal(carton));
-      bodyGrid.appendChild(rowTotal);
+      gridRow.appendChild(rowTotal);
 
       labels.forEach((_, unitIndex) => {
         const field = `Unit ${unitIndex + 1}`;
@@ -1566,7 +1569,7 @@ function createPackingListEditor(row, packingList, sourceCartons) {
         input.dataset.field = field;
         if (readOnly) input.readOnly = true;
         bindNumberInput(input);
-        bodyGrid.appendChild(input);
+        gridRow.appendChild(input);
       });
 
       const weightField = document.createElement("div");
@@ -1593,7 +1596,9 @@ function createPackingListEditor(row, packingList, sourceCartons) {
       weightSuffix.textContent = "lbs";
       weightInner.append(weightInput, weightSuffix);
       weightField.appendChild(weightInner);
-      bodyGrid.appendChild(weightField);
+      gridRow.appendChild(weightField);
+
+      bodyGrid.appendChild(gridRow);
     });
 
     setPackingEditorTotals(editor, row, cartons);

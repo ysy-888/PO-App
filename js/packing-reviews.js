@@ -117,6 +117,7 @@ function updatePackingReviewSelectionUi() {
     approveAllBtn.hidden = selectedPendingCount < 2;
     approveAllBtn.disabled = packingReviewOpInProgress || isAppSaving();
   }
+  if (typeof syncViewActionToolbars === "function") syncViewActionToolbars();
 
   if (selectAllCb) {
     const allSelected = pendingIds.length > 0 && selectedPendingCount === pendingIds.length;
