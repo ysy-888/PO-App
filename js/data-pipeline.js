@@ -1,8 +1,5 @@
 
 async function loadData() {
-  // #region agent log
-  fetch('http://127.0.0.1:7896/ingest/1212f48a-df35-4839-b188-b7be9a87de77',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c417e3'},body:JSON.stringify({sessionId:'c417e3',location:'data-pipeline.js:loadData:entry',message:'loadData called',data:{isDemoMode:typeof isDemoMode==='function'?isDemoMode():'n/a',isTestMode:typeof isTestMode==='function'?isTestMode():'n/a'},timestamp:Date.now(),hypothesisId:'B,D'})}).catch(()=>{});
-  // #endregion
   showIndicator(`Refreshing${ELLIPSIS}`, "");
   try {
     if (isDemoMode()) {
@@ -42,14 +39,19 @@ async function loadData() {
       }
       buildStylePhotoIndex(DEMO_STYLE_PHOTOS);
       applyDefaultStatusFilter(STATUS_FILTER_OPEN);
-    } else {
-      const url = new URL(getAppsScriptUrl());
-      url.searchParams.set("_", String(Date.now()));
-      const res = await fetch(url.toString(), { cache: "no-store" });
+    } else if (typeof isApiMode === "function" && isApiMode()) {
+      // ── SaaS API path (Supabase backend) ──────────────────
+      const token = typeof getAccessToken === "function" ? getAccessToken() : null;
+      if (!token) {
+        // initAuth() will call loadData() again once the user signs in.
+        showIndicator("Waiting for sign-in…", "");
+        return;
+      }
+      const res = await fetch(`${getApiBaseUrl()}/api/app-state`, {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
+      });
       const json = await res.json();
-      // #region agent log
-      fetch('http://127.0.0.1:7896/ingest/1212f48a-df35-4839-b188-b7be9a87de77',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c417e3'},body:JSON.stringify({sessionId:'c417e3',location:'data-pipeline.js:loadData:afterFetch',message:'fetch+json done',data:{httpStatus:res.status,httpOk:res.ok,jsonSuccess:json&&json.success,jsonError:json&&json.error,dataLen:json&&Array.isArray(json.data)?json.data.length:'not-array'},timestamp:Date.now(),hypothesisId:'B,D'})}).catch(()=>{});
-      // #endregion
       if (!json.success) throw new Error(json.error);
       allRows = json.data.map(normalizeRow);
       allChargebacks = (json.chargebacks ?? []).map(normalizeChargeback);
@@ -71,6 +73,46 @@ async function loadData() {
       window.__pendingAsnRequests = json.asnRequests ?? [];
       window.__pendingDeliveryRequests = json.deliveryRequests ?? [];
       window.__pendingPickupRequests = json.pickupRequests ?? [];
+      window.__pendingApprovals = json.approvals ?? [];
+      if (typeof onShipmentsDataLoaded === "function") {
+        onShipmentsDataLoaded(window.__pendingShipments);
+        window.__pendingShipments = null;
+      }
+      if (typeof onExfRequestsDataLoaded === "function") {
+        onExfRequestsDataLoaded(window.__pendingExfRequests);
+        window.__pendingExfRequests = null;
+      }
+      if (json.defaultColumns) applyDefaultColumnsFromServer(json.defaultColumns);
+      applyDefaultStatusFilterFromServer(json.defaultStatusFilter);
+      saveProgramColumnDefaultToStorage();
+    } else {
+      // ── Apps Script path (original) ───────────────────────
+      const url = new URL(getAppsScriptUrl());
+      url.searchParams.set("_", String(Date.now()));
+      const res = await fetch(url.toString(), { cache: "no-store" });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error);
+      allRows = json.data.map(normalizeRow);
+      allChargebacks = (json.chargebacks ?? []).map(normalizeChargeback);
+      allAsnRequests = (json.asnRequests ?? []).map(row => ({ ...row }));
+      allPackingLists = (json.packingLists ?? []).map(normalizePackingList);
+      allPackingCartons = (json.packingCartons ?? []).map(normalizePackingCarton);
+      allContactRows = json.contacts ?? json.vendors ?? [];
+      allVendorEmailRows = allContactRows;
+      allLocationRows = json.locations ?? [];
+      buildStylePhotoIndex(json.stylePhotos ?? []);
+      if (typeof onPendingPackingListsDataLoaded === "function") {
+        onPendingPackingListsDataLoaded(json.pendingPackingLists ?? [], json.vendorSubmitMode);
+      }
+      if (typeof onCustomersDataLoaded === "function") {
+        onCustomersDataLoaded(json.customers ?? []);
+      }
+      window.__pendingShipments = json.shipments ?? [];
+      window.__pendingExfRequests = json.exfRequests ?? [];
+      window.__pendingAsnRequests = json.asnRequests ?? [];
+      window.__pendingDeliveryRequests = json.deliveryRequests ?? [];
+      window.__pendingPickupRequests = json.pickupRequests ?? [];
+      window.__pendingApprovals = json.approvals ?? [];
       if (typeof onShipmentsDataLoaded === "function") {
         onShipmentsDataLoaded(window.__pendingShipments);
         window.__pendingShipments = null;
@@ -104,6 +146,10 @@ async function loadData() {
       onAsnRequestsDataLoaded(isDemoMode() ? [] : (window.__pendingAsnRequests ?? []));
       window.__pendingAsnRequests = null;
     }
+    if (typeof onApprovalsDataLoaded === "function") {
+      onApprovalsDataLoaded(isDemoMode() ? [] : (window.__pendingApprovals ?? []));
+      window.__pendingApprovals = null;
+    }
     if (typeof onExfRequestsDataLoaded === "function" && window.__pendingExfRequests) {
       onExfRequestsDataLoaded(window.__pendingExfRequests);
       window.__pendingExfRequests = null;
@@ -114,9 +160,6 @@ async function loadData() {
     if (typeof onPoSelectionChanged === "function") onPoSelectionChanged();
     showIndicator("Loaded", "success");
   } catch (err) {
-    // #region agent log
-    fetch('http://127.0.0.1:7896/ingest/1212f48a-df35-4839-b188-b7be9a87de77',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c417e3'},body:JSON.stringify({sessionId:'c417e3',location:'data-pipeline.js:loadData:catch',message:'loadData threw',data:{errName:err&&err.name,errMessage:err&&err.message,stack:err&&err.stack?String(err.stack).slice(0,600):null},timestamp:Date.now(),hypothesisId:'B,C,D'})}).catch(()=>{});
-    // #endregion
     showIndicator("Load failed: " + err.message, "error");
   }
 }

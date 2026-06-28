@@ -11,7 +11,7 @@ function shouldIgnoreRequestTableDblClick(e) {
   const target = e.target;
   if (!(target instanceof Element)) return false;
   return Boolean(target.closest(
-    "input, textarea, select, button, .btn, .exf-request-resend-btn, .asn-request-resend-btn, .delivery-request-resend-btn, .pickup-request-resend-btn"
+    "input, textarea, select, button, .btn, .exf-request-resend-btn, .asn-request-resend-btn, .delivery-request-resend-btn, .pickup-request-resend-btn, .approval-request-resend-btn"
   ));
 }
 

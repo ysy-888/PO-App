@@ -152,7 +152,9 @@ async function importCsvRowsToSheet(rows) {
     setAppSaving(true, `Importing CSV… batch ${batchIndex}/${batchCount}`);
 
     const batch = rows.slice(i, i + CSV_IMPORT_BATCH_SIZE);
-    const json = await postAppsScript({ action: "bulkUpsertPos", rows: batch });
+    const json = (typeof isApiMode === "function" && isApiMode())
+      ? await postApi("/api/po/bulk-upsert", { rows: batch })
+      : await postAppsScript({ action: "bulkUpsertPos", rows: batch });
     if (!json.success) throw new Error(json.error || "Import batch failed");
     inserted += json.inserted || 0;
     updated += json.updated || 0;

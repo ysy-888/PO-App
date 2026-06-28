@@ -1,18 +1,3 @@
-// #region agent log
-(function () {
-  function __dbg(message, data) {
-    fetch('http://127.0.0.1:7896/ingest/1212f48a-df35-4839-b188-b7be9a87de77', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'c417e3' }, body: JSON.stringify({ sessionId: 'c417e3', location: 'config.js:globalError', message: message, data: data, timestamp: Date.now(), hypothesisId: 'A,C,E' }) }).catch(function () {});
-  }
-  window.addEventListener('error', function (e) {
-    __dbg('window.onerror', { message: e.message, source: e.filename, line: e.lineno, col: e.colno, errName: e.error && e.error.name, stack: e.error && e.error.stack ? String(e.error.stack).slice(0, 600) : null });
-  });
-  window.addEventListener('unhandledrejection', function (e) {
-    var r = e.reason;
-    __dbg('unhandledrejection', { message: r && r.message ? r.message : String(r), stack: r && r.stack ? String(r.stack).slice(0, 600) : null });
-  });
-})();
-// #endregion
-
 /*
   Test Mode (menu) = use the test Google Sheet backend. Live Mode = production sheet.
   Data and sheet settings stay separate; switching modes does not copy data.
@@ -26,12 +11,29 @@
 
   URL_PLACEHOLDER and TEST_URL_PLACEHOLDER are magic strings for isDemoMode() /
   isTestUrlConfigured() only — never put real deployment URLs there.
+
+  BACKEND controls which data source the app uses:
+    "appsscript" (default) — original Apps Script / Google Sheets path, unchanged.
+    "api"                  — new Express + Supabase path.
+  Switch to "api" once the Express server is deployed and data is imported.
 */
 
+// ── Apps Script backend (original path) ─────────────────────
 const APPS_SCRIPT_URL_LIVE =
   "https://script.google.com/macros/s/AKfycbxRySh1gggq5hOtA5rHx77tbTwQuYl9FX2rr2xCfHi2EXf3Vp2SLrIaPrVhO9AgISxRpA/exec";
 const APPS_SCRIPT_URL_TEST =
   "https://script.google.com/macros/s/AKfycbxrWo9TBsY2T40kqd-Pay45afo86oocOrDBKdz4UokGRJ5_2hRk8GCXR7uZbEAytAym/exec";
+
+// ── New SaaS backend config ──────────────────────────────────
+// Set BACKEND to "api" to route all data through the Express + Supabase layer.
+// Set API_BASE_URL to your deployed Express server URL (no trailing slash).
+const BACKEND = "api"; // "appsscript" | "api"
+const API_BASE_URL = "http://localhost:4000"; // replace with Render/Railway URL when deployed
+
+// Supabase anon key — safe to include in the browser (public key, not service-role).
+// Only used when BACKEND === "api".
+const SUPABASE_URL = "https://rlhxetfcnsdxogjzeztg.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJsaHhldGZjbnNkeG9nanplenRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1OTIzMDcsImV4cCI6MjA5ODE2ODMwN30.qQ3UYlBwqSyNFAeVj0BWquAUZXiK21-DHE5UBY4b8tQ";
 
 /** When false, hides the Vendor Submissions tab and related settings. */
 const VENDOR_SUBMISSIONS_ENABLED = true;
@@ -63,6 +65,19 @@ function isDemoMode() {
 
 function isTestUrlConfigured() {
   return APPS_SCRIPT_URL_TEST !== TEST_URL_PLACEHOLDER;
+}
+
+/** True when the app is running against the new Express + Supabase backend. */
+function isApiMode() {
+  return BACKEND === "api";
+}
+
+/**
+ * Base URL for the Express API (no trailing slash).
+ * Only meaningful when isApiMode() is true.
+ */
+function getApiBaseUrl() {
+  return API_BASE_URL;
 }
 
 function scopedStorageKey(base) {

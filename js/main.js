@@ -1,7 +1,4 @@
 
-// #region agent log
-fetch('http://127.0.0.1:7896/ingest/1212f48a-df35-4839-b188-b7be9a87de77',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c417e3'},body:JSON.stringify({sessionId:'c417e3',location:'main.js:initStart',message:'init sequence start',data:{loadDateFormatPreference:typeof loadDateFormatPreference,initHeaderMenu:typeof initHeaderMenu,loadData:typeof loadData},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
-// #endregion
 loadColumnVisibility();
 applyTwoLineTableHeaders();
 loadCxlCountdownPreference();
@@ -30,7 +27,12 @@ updateColumnFilterHeaderStates();
 updateFlagFilterHeaderState();
 applyColumnOrder();
 applyColumnVisibility();
-// #region agent log
-fetch('http://127.0.0.1:7896/ingest/1212f48a-df35-4839-b188-b7be9a87de77',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c417e3'},body:JSON.stringify({sessionId:'c417e3',location:'main.js:beforeLoadData',message:'init sequence completed, calling loadData',data:{},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
-// #endregion
-loadData();
+// In API mode, initAuth() handles the first loadData() call after sign-in.
+// In appsscript/demo mode, loadData() runs immediately as before.
+if (typeof initAuth === "function") {
+  initAuth().then(() => {
+    if (typeof isApiMode !== "function" || !isApiMode()) loadData();
+  });
+} else {
+  loadData();
+}

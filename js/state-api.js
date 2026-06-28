@@ -22,6 +22,7 @@ const DEMO_CONTACTS = [
   { Name: "LULU'S FASHION LOUNGE", Type: "Buyer", Email: "demo-buyer@example.com", CC: "" },
   { Name: "12TH TRIBE", Type: "Buyer", Email: "demo-buyer@example.com", CC: "" },
   { Name: "FORERUNNER LOGISTICS", Type: "Logistics", Email: "demo-logistics@example.com", CC: "" },
+  { Name: "Place Showroom", Type: "Showroom", Email: "demo-showroom@example.com", CC: "" },
 ];
 
 const DEMO_CUSTOMERS = [
@@ -332,6 +333,50 @@ async function postAppsScript(payload, options = {}) {
     const res = await fetch(getAppsScriptUrl(), {
       method: "POST",
       body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    const text = await res.text();
+    let json;
+    try {
+      json = text ? JSON.parse(text) : {};
+    } catch (_parseErr) {
+      throw new Error(text.trim() || `HTTP ${res.status}`);
+    }
+    return json;
+  } catch (err) {
+    if (err.name === "AbortError") {
+      throw new Error("Request timed out");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+const API_FETCH_TIMEOUT_MS = 5 * 60 * 1000;
+
+/** POST to the Express API (SaaS backend). Requires a valid auth session. */
+async function postApi(path, body, options = {}) {
+  if (isDemoMode()) {
+    throw new Error("Not available in demo mode");
+  }
+  const token = typeof getAccessToken === "function" ? getAccessToken() : null;
+  if (!token) {
+    throw new Error("Not signed in");
+  }
+
+  const timeoutMs = options.timeoutMs ?? API_FETCH_TIMEOUT_MS;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(`${getApiBaseUrl()}${path}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
       signal: controller.signal,
     });
     const text = await res.text();

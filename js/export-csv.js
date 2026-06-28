@@ -94,7 +94,11 @@ function getShipmentsExportData() {
 function getRequestsExportData() {
   let cols, filtered, formatFn, labelMap = {};
 
-  if (currentRequestType === "exf") {
+  if (currentRequestType === "approval") {
+    cols = APPROVAL_REQUEST_TABLE_COLUMNS.filter(c => c !== "Action");
+    filtered = filteredApprovals;
+    formatFn = formatApprovalRequestTableCell;
+  } else if (currentRequestType === "exf") {
     cols = EXF_REQUEST_TABLE_COLUMNS.filter(c => c !== "Action");
     filtered = filteredExfRequests;
     formatFn = formatExfRequestTableCell;

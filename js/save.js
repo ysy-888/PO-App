@@ -10,6 +10,37 @@ async function saveUpdate(poNumber, updates, options = {}) {
     if (!silent) showIndicator(`Demo mode ${EMPTY_DISPLAY} not saved to sheet`, "");
     return true;
   }
+
+  // ── SaaS API path ──────────────────────────────────────────
+  if (typeof isApiMode === "function" && isApiMode()) {
+    const token = typeof getAccessToken === "function" ? getAccessToken() : null;
+    if (!token) {
+      if (!silent) showIndicator("Not signed in", "error");
+      return false;
+    }
+    try {
+      if (!silent) showIndicator(`Saving${ELLIPSIS}`, "");
+      const res = await fetch(`${getApiBaseUrl()}/api/po/update`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ poNumber, updates: sheetUpdates }),
+      });
+      const text = await res.text();
+      let json = {};
+      try { json = text ? JSON.parse(text) : {}; } catch (e) { throw new Error(text.trim() || e.message); }
+      if (!json.success) throw new Error(json.error);
+      if (!silent) showIndicator(`Saved ${CHECK_MARK}`, "success");
+      return true;
+    } catch (err) {
+      if (!silent) showIndicator("Save failed: " + err.message, "error");
+      return false;
+    }
+  }
+
+  // ── Apps Script path (original) ────────────────────────────
   try {
     if (!silent) showIndicator(`Saving${ELLIPSIS}`, "");
     const res = await fetch(getAppsScriptUrl(), {

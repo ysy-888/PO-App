@@ -309,12 +309,14 @@ function renderShipmentIdCell(td, row) {
   td.appendChild(btn);
 }
 
-/** @type {null | "exf" | "asn" | "delivery" | "pickup"} */
+/** @type {null | "approval" | "exf" | "asn" | "delivery" | "pickup"} */
 let currentRequestType = null;
+
+const ALL_REQUEST_TYPES = ["approval", "exf", "asn", "delivery", "pickup"];
 
 function clearRequestTypeSelection() {
   currentRequestType = null;
-  ["exf", "asn", "delivery", "pickup"].forEach(t => {
+  ALL_REQUEST_TYPES.forEach(t => {
     const btn = document.querySelector(`[data-request-type="${t}"]`);
     if (btn) btn.classList.remove("active");
   });
@@ -324,7 +326,7 @@ function switchRequestType(type) {
   if (!type) return;
   currentRequestType = type;
 
-  ["exf", "asn", "delivery", "pickup"].forEach(t => {
+  ALL_REQUEST_TYPES.forEach(t => {
     const wrap = document.getElementById(t === "exf" ? "exfRequestTableWrap" : t + "RequestTableWrap");
     if (wrap) wrap.hidden = t !== type;
     const btn = document.querySelector(`[data-request-type="${t}"]`);
@@ -334,7 +336,10 @@ function switchRequestType(type) {
   // Route the shared search input to the active type's filter function
   const searchInput = document.getElementById("requestsSearchInput");
   const q = (searchInput?.value ?? "").toLowerCase();
-  if (type === "exf" && typeof applyExfRequestFilters === "function") {
+  if (type === "approval" && typeof applyApprovalFilters === "function") {
+    document.getElementById("approvalRequestSearchInput").value = q;
+    applyApprovalFilters();
+  } else if (type === "exf" && typeof applyExfRequestFilters === "function") {
     document.getElementById("exfRequestSearchInput").value = q;
     applyExfRequestFilters();
   } else if (type === "asn" && typeof applyAsnRequestFilters === "function") {
@@ -360,7 +365,10 @@ function updateRequestsRowCounter() {
   }
   let count = 0;
   let label = "requests";
-  if (currentRequestType === "exf") {
+  if (currentRequestType === "approval") {
+    count = typeof filteredApprovals !== "undefined" ? filteredApprovals.length : 0;
+    label = count === 1 ? "approval" : "approvals";
+  } else if (currentRequestType === "exf") {
     count = typeof filteredExfRequests !== "undefined" ? filteredExfRequests.length : 0;
     label = count === 1 ? "EXF request" : "EXF requests";
   } else if (currentRequestType === "asn") {

@@ -86,6 +86,20 @@ function bindFieldInteractions(fieldEl, col, row) {
 function setFieldDisplayContent(fieldEl, col, row) {
   const val = getColumnFilterRawValue(col, row);
 
+  // Overlay pending approval values in amber before the PO is updated
+  if (col === "CXL Date" && typeof getPendingApprovalDisplay === "function") {
+    const pending = getPendingApprovalDisplay(row["PO #"]);
+    if (pending && pending.cxlDate) {
+      fieldEl.classList.add("has-pending-approval");
+      const span = document.createElement("span");
+      span.className = "pending-approval-value";
+      span.title = "Pending approval";
+      span.textContent = formatDateForDisplay(pending.cxlDate);
+      fieldEl.appendChild(span);
+      return;
+    }
+  }
+
   if (col === "Status") {
     fieldEl.innerHTML = renderStatus(val);
   } else if (col === "N41 Status") {
@@ -361,6 +375,33 @@ function renderSizeGridBody(body, row) {
   const poRow = createSizeChartRow("modal-size-chart-row--qty");
   const poTotalCell = buildSizeGridRow(poRow, row, "PO Qty", PO_UNIT_FIELDS, colCount, "po");
   chart.appendChild(poRow);
+
+  // Pending approval row — overlay proposed qty in amber while status is Pending Approval
+  if (typeof getPendingApprovalDisplay === "function") {
+    const pendingDisplay = getPendingApprovalDisplay(row["PO #"]);
+    if (pendingDisplay?.units) {
+      const pendingRow = createSizeChartRow("modal-size-chart-row--qty");
+      const pendingHead = document.createElement("div");
+      pendingHead.className = "modal-size-rowhead";
+      setModalSizeRowheadLabel(pendingHead, "Approval Qty");
+      pendingRow.appendChild(pendingHead);
+      const pendingValues = createSizeChartValuesWrap(pendingRow);
+      let pendingTotal = 0;
+      const pendingTotalCell = document.createElement("div");
+      pendingTotalCell.className = "modal-size-total modal-size-total--po modal-size-cell--pending";
+      pendingValues.appendChild(pendingTotalCell);
+      for (let i = 0; i < colCount; i++) {
+        const cell = document.createElement("div");
+        cell.className = "modal-size-static modal-size-cell--pending";
+        const qty = toQtyNumber(pendingDisplay.units[`PO Unit ${i + 1}`]);
+        cell.textContent = qty > 0 ? String(qty) : "";
+        pendingValues.appendChild(cell);
+        pendingTotal += qty;
+      }
+      pendingTotalCell.textContent = String(pendingTotal);
+      chart.appendChild(pendingRow);
+    }
+  }
 
   if (showPackingVariance) {
     const varianceRow = createSizeChartRow("modal-size-chart-row--variance");
@@ -1238,6 +1279,9 @@ function rebuildPoModalMenuItems(row) {
   if (!closed && !isTruthy(row["Flag"])) {
     menu.appendChild(createPoModalMenuItem("Flag PO", () => toggleRowFlag(row)));
   }
+  menu.appendChild(createPoModalMenuItem("New Approval", () => {
+    if (typeof openNewApprovalFromPo === "function") openNewApprovalFromPo(row);
+  }));
   menu.appendChild(createPoModalMenuItem("New Chargeback", () => beginNewChargeback(row)));
   if (!closed) {
     menu.appendChild(createPoModalMenuItem(

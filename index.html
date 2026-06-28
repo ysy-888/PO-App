@@ -20,6 +20,10 @@
         <svg class="app-title-tab-chevron" xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
       </button>
       <div class="app-title-tab-dropdown" id="navTabRequestsDropdown" role="menu" aria-label="Request type">
+        <button type="button" class="app-title-tab-dropdown-item" data-request-type="approval" role="menuitem">
+          <span class="app-title-tab-dropdown-check" aria-hidden="true">✓</span>
+          <span>Approvals</span>
+        </button>
         <button type="button" class="app-title-tab-dropdown-item" data-request-type="exf" role="menuitem">
           <span class="app-title-tab-dropdown-check" aria-hidden="true">✓</span>
           <span>EXF</span>
@@ -167,6 +171,7 @@
 </div>
 
 <!-- Legacy hidden inputs for per-type search (wired to their respective filters via JS) -->
+<input type="search" id="approvalRequestSearchInput" style="display:none" aria-hidden="true" />
 <input type="search" id="exfRequestSearchInput" style="display:none" aria-hidden="true" />
 <input type="search" id="asnRequestSearchInput" style="display:none" aria-hidden="true" />
 <input type="search" id="deliveryRequestSearchInput" style="display:none" aria-hidden="true" />
@@ -384,6 +389,49 @@
 </div>
 
 <div id="requestsTableWrap" class="table-scroll-y app-secondary-table" hidden>
+
+  <!-- Approval Requests sub-table -->
+  <div id="approvalRequestTableWrap" class="table-scroll-x" hidden>
+  <table id="approvalRequestTable">
+    <colgroup>
+      <col class="col-exf-request-id" />
+      <col class="col-po-number" />
+      <col class="col-vendor" />
+      <col class="col-status" />
+      <col class="col-date" />
+      <col class="col-date" />
+      <col class="col-po-qty" />
+      <col class="col-email" />
+      <col class="col-email" />
+      <col class="col-notes" />
+      <col class="col-status" />
+      <col class="col-date" />
+      <col class="col-notes" />
+      <col class="col-actions" />
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Approval ID</th>
+        <th>PO #</th>
+        <th>Type</th>
+        <th>Status</th>
+        <th>Request Date</th>
+        <th>Ext CXL Date</th>
+        <th>Approval Qty</th>
+        <th>Email To</th>
+        <th>Email CC</th>
+        <th>Notes</th>
+        <th>Email Status</th>
+        <th>Email Sent</th>
+        <th>Email Error</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody id="approvalRequestTableBody">
+      <tr class="state-row"><td colspan="14">Loading approvals…</td></tr>
+    </tbody>
+  </table>
+  </div>
 
   <!-- EXF Requests sub-table -->
   <div id="exfRequestTableWrap" class="table-scroll-x">
@@ -1003,6 +1051,34 @@
   </div>
 </div>
 
+<div id="approvalRequestOverlay" class="modal-backdrop">
+  <div class="modal-card shipment-modal-card" onclick="event.stopPropagation()">
+    <div class="modal-header email-header email-header-request">
+      <div class="email-header-inner">
+        <div class="email-header-titles">
+          <h1 class="email-heading">Approval Request</h1>
+          <p class="email-subheading" id="approvalRequestModalTitle">New</p>
+        </div>
+        <div class="email-header-meta">
+          <div class="email-header-id-block">
+            <div class="email-request-id" id="approvalRequestModalId">New</div>
+            <div class="email-request-date" id="approvalRequestModalDate"></div>
+          </div>
+          <div class="modal-header-actions">
+            <button type="button" class="btn-close" id="approvalRequestCancelBtn" aria-label="Close">✕</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-body" id="approvalRequestBody"></div>
+    <div class="modal-footer">
+      <div id="approvalRequestFooterMessage" class="modal-footer-message shipment-footer-message" role="status" aria-live="polite" hidden></div>
+      <button type="button" class="btn btn-primary" id="approvalRequestSubmitBtn">Save</button>
+      <button type="button" class="btn" data-dismiss="approval-request">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <div id="deliveryRequestOverlay" class="modal-backdrop">
   <div class="modal-card shipment-modal-card" onclick="event.stopPropagation()">
     <div class="modal-header email-header email-header-request">
@@ -1268,7 +1344,11 @@
   </div>
 </div>
 
+<!-- Supabase JS — only used when BACKEND === "api" in js/config.js -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="js/config.js"></script>
+<!-- Auth layer for the SaaS backend path (no-op when BACKEND === "appsscript") -->
+<script src="js/auth.js"></script>
 <script src="js/header-menu.js"></script>
 <script src="js/columns.js"></script>
 <script src="js/status-filters.js"></script>
@@ -1296,6 +1376,7 @@
 <script src="js/asn-requests.js?v=20260605-8"></script>
 <script src="js/delivery-requests.js?v=20260605-8"></script>
 <script src="js/pickup-requests.js?v=20260605-8"></script>
+<script src="js/approval-requests.js"></script>
 <script src="js/packing-reviews.js"></script>
 <script src="js/customers-import.js"></script>
 <script src="js/customers.js"></script>

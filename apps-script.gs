@@ -132,6 +132,22 @@ const CHARGEBACK_EDITABLE_FIELDS = [
   "Amount", "Reason", "Status", "Notes"
 ];
 
+const APPROVALS_SHEET_NAME = "Approvals";
+const APPROVAL_ID_FIELD = "Approval ID";
+const APPROVAL_TYPE_FIELD = "Approval Type";
+const APPROVAL_REQ_NOTES_FIELD = "Approval Notes";
+const EXT_CXL_DATE_FIELD = "Ext CXL Date";
+
+const APPROVAL_UNIT_FIELDS_ = Array.from({ length: 15 }, (_, i) => "Approval Unit " + (i + 1));
+
+const APPROVAL_DATA_FIELDS = [
+  "PO #", APPROVAL_TYPE_FIELD, ...APPROVAL_UNIT_FIELDS_,
+  EXT_CXL_DATE_FIELD, "Status",
+  "Request Date", APPROVAL_REQ_NOTES_FIELD,
+  "Email To", "Email CC", "Email Status", "Email Sent At", "Email Error", "Last Email Attempt At",
+  "Created At", "Updated At"
+];
+
 const PACKING_UNIT_FIELDS = Array.from({ length: 15 }, (_, i) => `Unit ${i + 1}`);
 
 const PACKING_LIST_DATA_FIELDS = [
@@ -346,6 +362,19 @@ function getChargebacksSheet_() {
       CHARGEBACK_ID_FIELD, ...CHARGEBACK_DATA_FIELDS
     ]]);
   }
+  return sheet;
+}
+
+function getApprovalsSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(APPROVALS_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(APPROVALS_SHEET_NAME);
+    sheet.getRange(1, 1, 1, APPROVAL_DATA_FIELDS.length + 1).setValues([[
+      APPROVAL_ID_FIELD, ...APPROVAL_DATA_FIELDS
+    ]]);
+  }
+  ensureSheetHeaders_(sheet, [APPROVAL_ID_FIELD, ...APPROVAL_DATA_FIELDS]);
   return sheet;
 }
 
@@ -2101,6 +2130,15 @@ function generateAsnRequestId_(existing) {
   return "ASN-" + String(max + 1).padStart(4, "0");
 }
 
+function generateApprovalId_(existing) {
+  let max = 0;
+  existing.forEach(row => {
+    const m = /^APR-(\d+)$/.exec(String(row[APPROVAL_ID_FIELD] ?? ""));
+    if (m) max = Math.max(max, Number(m[1]));
+  });
+  return "APR-" + String(max + 1).padStart(4, "0");
+}
+
 function appendRequestRow_(sheet, idField, requestId, dataFields, data) {
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
     .map(h => String(h ?? "").trim());
@@ -3807,6 +3845,10 @@ function pickPickupRequestData_(raw) {
   return pickRequestData_(raw, PICKUP_REQUEST_DATA_FIELDS);
 }
 
+function pickApprovalData_(raw) {
+  return pickRequestData_(raw, APPROVAL_DATA_FIELDS);
+}
+
 function pickAsnRequestData_(raw) {
   return pickRequestData_(raw, ASN_REQUEST_DATA_FIELDS);
 }
@@ -4548,6 +4590,7 @@ function doGet(e) {
     const deliveryRequestsSheet = getDeliveryRequestsSheet_();
     const pickupRequestsSheet = getPickupRequestsSheet_();
     const chargebacksSheet = getChargebacksSheet_();
+    const approvalsSheet = getApprovalsSheet_();
     const packingListsSheet = getPackingListsSheet_();
     const packingCartonsSheet = getPackingCartonsSheet_();
     backfillPackingCartonWeightLbs_();
@@ -4563,6 +4606,7 @@ function doGet(e) {
     const deliveryRequests = sheetToObjects_(deliveryRequestsSheet, DELIVERY_REQUEST_ID_FIELD);
     const pickupRequests = sheetToObjects_(pickupRequestsSheet, PICKUP_REQUEST_ID_FIELD);
     const chargebacks = sheetToObjects_(chargebacksSheet, CHARGEBACK_ID_FIELD);
+    const approvals = sheetToObjects_(approvalsSheet, APPROVAL_ID_FIELD);
     const packingLists = sheetToObjects_(packingListsSheet, PACKING_LIST_ID_FIELD);
     const packingCartons = sheetToObjects_(packingCartonsSheet, PACKING_LIST_ID_FIELD);
     const stylePhotos = stylePhotosSheetToObjects_(stylePhotosSheet);
@@ -4585,6 +4629,7 @@ function doGet(e) {
       deliveryRequests: deliveryRequests,
       pickupRequests: pickupRequests,
       chargebacks: chargebacks,
+      approvals: approvals,
       packingLists: packingLists,
       packingCartons: packingCartons,
       stylePhotos: stylePhotos,
@@ -4941,6 +4986,323 @@ function handleRejectPendingPackingList(payload) {
   return corsResponse({ success: false, error: "Submission not found: " + submissionId });
 }
 
+// ============================================================
+// Approval Requests
+// ============================================================
+
+function buildApprovalUnitTableHtml_(poRow, approvalData) {
+  const labelStyle = "padding:6px 10px;font-size:11px;font-weight:600;color:#374151;background-color:#f7f7f8;border-bottom:1px solid #e5e7eb;white-space:nowrap;text-align:left;letter-spacing:0.03em;text-transform:uppercase;";
+  const cellStyle = "padding:6px 10px;font-size:13px;color:#1a1a18;border-bottom:1px solid #e5e7eb;text-align:center;";
+
+  const sizeLabels = [];
+  const approvalUnits = [];
+  for (let i = 1; i <= 15; i++) {
+    const label = poRow ? String(poRow["Size " + i] ?? "").trim() : "";
+    const qty = String(approvalData["Approval Unit " + i] ?? "").trim();
+    if (label || qty) {
+      sizeLabels.push(label || ("Unit " + i));
+      approvalUnits.push(qty || "0");
+    }
+  }
+  if (sizeLabels.length === 0) return "";
+
+  let headerRow = "<tr><td style=\"" + labelStyle + "\">Size</td>";
+  sizeLabels.forEach(label => {
+    headerRow += "<td style=\"" + labelStyle + "text-align:center;\">" + escapeHtml_(label) + "</td>";
+  });
+  headerRow += "</tr>";
+
+  let totalQty = approvalUnits.reduce((sum, q) => sum + (Number(q) || 0), 0);
+  let dataRow = "<tr><td style=\"" + cellStyle + "text-align:left;font-weight:600;\">Approval Qty</td>";
+  approvalUnits.forEach(qty => {
+    dataRow += "<td style=\"" + cellStyle + "\">" + escapeHtml_(qty) + "</td>";
+  });
+  dataRow += "</tr>";
+
+  let totalRow = "<tr><td style=\"padding:6px 10px;font-size:12px;font-weight:600;color:#374151;background-color:#f7f7f8;border-top:2px solid #e5e7eb;text-align:left;\">Total</td>";
+  sizeLabels.forEach(() => {
+    totalRow += "<td style=\"padding:6px 10px;font-size:12px;color:#1a1a18;background-color:#f7f7f8;border-top:2px solid #e5e7eb;text-align:center;\"></td>";
+  });
+  totalRow = totalRow.replace("</td>", "<span style=\"font-weight:700;\">" + totalQty + "</span></td>").replace(/(<td[^>]*>)(<\/td>)(?!.*<\/td>)/, "$1" + totalQty + "$2");
+  totalRow += "</tr>";
+
+  return "<div style=\"margin:0 0 20px 0;overflow-x:auto;\"><p style=\"margin:0 0 8px 0;font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:#374151;\">Approval Quantities</p>" +
+    "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;border:1px solid #e5e7eb;\">" +
+    headerRow + dataRow +
+    "<tr><td style=\"padding:6px 10px;font-size:12px;font-weight:700;color:#374151;background-color:#f7f7f8;border-top:2px solid #e5e7eb;\">Total</td>" +
+    sizeLabels.map((_, i) => "<td style=\"padding:6px 10px;font-size:12px;font-weight:" + (i === 0 ? "700" : "400") + ";color:#1a1a18;background-color:#f7f7f8;border-top:2px solid #e5e7eb;text-align:center;\">" + (i === 0 ? totalQty : "") + "</td>").join("") +
+    "</tr></table></div>";
+}
+
+function buildApprovalRequestEmailHtml_(approvalId, poRow, approvalData) {
+  const requestDate = formatEmailDate_(approvalData["Request Date"]);
+  const approvalType = String(approvalData[APPROVAL_TYPE_FIELD] ?? "").trim();
+  const poNumber = String(approvalData["PO #"] ?? "").trim();
+  const requestTypeLabel = "Approval Request";
+  const headerHtml = buildEmailRequestHeaderHtml_(requestTypeLabel, approvalId, requestDate);
+
+  const addMeta = function(label, value, isLast) {
+    const s = emailMetaRowStyles_(!!isLast);
+    return "<tr><td style=\"" + s.label + "\">" + escapeHtml_(label) + "</td>" +
+      "<td style=\"" + s.value + "\">" + escapeHtml_(String(value ?? "")) + "</td></tr>";
+  };
+
+  let metaRows = "";
+  metaRows += addMeta("Request Date", requestDate, false);
+  metaRows += addMeta("PO #", poNumber, false);
+  if (poRow && poRow["Style #"]) metaRows += addMeta("Style #", String(poRow["Style #"] ?? ""), false);
+  if (poRow && poRow["Buyer"]) metaRows += addMeta("Buyer", String(poRow["Buyer"] ?? ""), false);
+  metaRows += addMeta("Approval Type", approvalType, approvalType !== "Extension");
+  if (approvalType === "Extension") {
+    metaRows += addMeta("Ext CXL Date", formatEmailDate_(approvalData[EXT_CXL_DATE_FIELD] ?? ""), true);
+  }
+
+  let typeBlockHtml = "";
+  if (approvalType === "Shortage" || approvalType === "Overage") {
+    typeBlockHtml = buildApprovalUnitTableHtml_(poRow, approvalData);
+  }
+
+  return renderEmailTemplate_("templates/email-approval", {
+    requestHeaderHtml: headerHtml,
+    metaRowsHtml: metaRows,
+    notesBlockHtml: buildEmailNotesBlockHtml_(approvalData[APPROVAL_REQ_NOTES_FIELD]),
+    typeBlockHtml: typeBlockHtml,
+  });
+}
+
+function buildApprovalRequestEmailText_(approvalId, poRow, approvalData) {
+  const approvalType = String(approvalData[APPROVAL_TYPE_FIELD] ?? "").trim();
+  const lines = [
+    "Hello,",
+    "",
+    "Please see the approval request below.",
+    "",
+    "Approval Request: " + approvalId,
+    "Request Date: " + formatEmailDate_(approvalData["Request Date"]),
+    "PO #: " + String(approvalData["PO #"] ?? ""),
+    "Approval Type: " + approvalType,
+  ];
+  if (poRow && poRow["Style #"]) lines.push("Style #: " + String(poRow["Style #"] ?? ""));
+  if (poRow && poRow["Buyer"]) lines.push("Buyer: " + String(poRow["Buyer"] ?? ""));
+  if (approvalType === "Extension") {
+    lines.push("Ext CXL Date: " + formatEmailDate_(approvalData[EXT_CXL_DATE_FIELD] ?? ""));
+  } else if (approvalType === "Shortage" || approvalType === "Overage") {
+    lines.push("");
+    lines.push("Approval Quantities:");
+    let totalQty = 0;
+    for (let i = 1; i <= 15; i++) {
+      const label = poRow ? String(poRow["Size " + i] ?? "").trim() : "";
+      const qty = Number(approvalData["Approval Unit " + i] ?? 0) || 0;
+      if (label || qty) {
+        lines.push("  " + (label || ("Unit " + i)) + ": " + qty);
+        totalQty += qty;
+      }
+    }
+    lines.push("  Total: " + totalQty);
+  }
+  const notes = String(approvalData[APPROVAL_REQ_NOTES_FIELD] ?? "").trim();
+  if (notes) lines.push("Notes: " + notes);
+  lines.push("");
+  lines.push("www.elevatordisco.com");
+  return lines.join("\n");
+}
+
+function sendApprovalRequestEmail_(approvalId, emailInfo, poRow, approvalData) {
+  if (!emailInfo.to) return false;
+  const approvalType = String(approvalData[APPROVAL_TYPE_FIELD] ?? "").trim();
+  const poNumber = String(approvalData["PO #"] ?? "").trim();
+  const subject = renderEmailSubject_("templates/email-approval-subject", {
+    approvalType: approvalType,
+    poNumber: poNumber,
+  });
+  const options = {
+    to: emailInfo.to,
+    subject: subject,
+    body: buildApprovalRequestEmailText_(approvalId, poRow, approvalData),
+    htmlBody: buildApprovalRequestEmailHtml_(approvalId, poRow, approvalData),
+  };
+  if (emailInfo.cc) options.cc = emailInfo.cc;
+  MailApp.sendEmail(options);
+  return true;
+}
+
+function getApprovalEmailInfo_(approvalData) {
+  return {
+    to: normalizeEmailRecipients_(approvalData["Email To"]),
+    cc: normalizeEmailRecipients_(approvalData["Email CC"]),
+  };
+}
+
+function applyApprovalToPo_(poNumber, approvalData) {
+  const approvalType = String(approvalData[APPROVAL_TYPE_FIELD] ?? "").trim();
+  const poSheet = ensurePoWorkflowHeaders_();
+  const updates = {};
+  if (approvalType === "Extension") {
+    const extDate = String(approvalData[EXT_CXL_DATE_FIELD] ?? "").trim();
+    if (extDate) updates["CXL Date"] = extDate;
+  } else if (approvalType === "Shortage" || approvalType === "Overage") {
+    let totalQty = 0;
+    for (let i = 1; i <= 15; i++) {
+      const val = approvalData["Approval Unit " + i];
+      const qty = Number(val ?? 0) || 0;
+      updates["PO Unit " + i] = qty > 0 ? qty : "";
+      totalQty += qty;
+    }
+    updates["PO Qty"] = totalQty;
+  }
+  if (Object.keys(updates).length > 0) {
+    applyPoUpdatesBatch_(poSheet, [{ poNumber: poNumber, updates: updates }]);
+  }
+  return updates;
+}
+
+function handleCreateApproval(payload) {
+  const poNumber = String(payload.poNumber ?? "").trim();
+  if (!poNumber) return corsResponse({ success: false, error: "PO # is required." });
+
+  const requestData = pickApprovalData_(payload.approval || {});
+  const approvalType = String(requestData[APPROVAL_TYPE_FIELD] ?? "").trim();
+  if (!approvalType) return corsResponse({ success: false, error: "Approval Type is required." });
+
+  if (approvalType === "Extension") {
+    if (!String(requestData[EXT_CXL_DATE_FIELD] ?? "").trim()) {
+      return corsResponse({ success: false, error: "Ext CXL Date is required for Extension approvals." });
+    }
+  } else if (approvalType === "Shortage" || approvalType === "Overage") {
+    const hasQty = APPROVAL_UNIT_FIELDS_.some(f => Number(requestData[f] ?? 0) > 0);
+    if (!hasQty) return corsResponse({ success: false, error: "Enter at least one approval qty." });
+  } else {
+    return corsResponse({ success: false, error: "Invalid Approval Type: " + approvalType });
+  }
+
+  if (!requestData["Request Date"]) {
+    return corsResponse({ success: false, error: "Request Date is required." });
+  }
+
+  requestData["PO #"] = poNumber;
+  requestData["Status"] = "Pending Approval";
+
+  const emailInfo = getApprovalEmailInfo_(requestData);
+  const sheet = getApprovalsSheet_();
+  const existing = sheetToObjects_(sheet, APPROVAL_ID_FIELD);
+  const approvalId = generateApprovalId_(existing);
+
+  const poSheet = ensurePoWorkflowHeaders_();
+  let poRow = null;
+  try {
+    const poRows = getPoObjectsByNumbers_(poSheet, [poNumber]);
+    poRow = poRows[0] || null;
+  } catch (_) {}
+
+  let emailSent = false;
+  let emailError = "";
+  try {
+    emailSent = sendApprovalRequestEmail_(approvalId, emailInfo, poRow, requestData);
+  } catch (err) {
+    emailError = err && err.message ? err.message : String(err);
+  }
+
+  const now = new Date();
+  requestData["Email Status"] = emailInfo.to ? (emailSent ? "Sent" : "Failed") : "Not Sent";
+  requestData["Email Sent At"] = emailSent ? now : "";
+  requestData["Email Error"] = emailError;
+  requestData["Last Email Attempt At"] = emailInfo.to ? now : "";
+  requestData["Created At"] = now;
+  requestData["Updated At"] = now;
+
+  appendRequestRow_(sheet, APPROVAL_ID_FIELD, approvalId, APPROVAL_DATA_FIELDS, requestData);
+
+  if (!emailSent && emailInfo.to) {
+    return corsResponse({
+      success: false,
+      error: emailError || "Approval email failed to send.",
+      approvalId: approvalId,
+      emailSent: false,
+      emailError: emailError,
+    });
+  }
+  return corsResponse({ success: true, approvalId: approvalId, emailSent: emailSent });
+}
+
+function handleUpdateApproval(payload) {
+  const approvalId = String(payload.approvalId ?? "").trim();
+  if (!approvalId) return corsResponse({ success: false, error: "Approval ID is required." });
+
+  const newStatus = String(payload.status ?? "").trim();
+  const sheet = getApprovalsSheet_();
+  const found = findRequestRowIndex_(sheet, APPROVAL_ID_FIELD, approvalId);
+  if (!found) return corsResponse({ success: false, error: "Approval not found: " + approvalId });
+
+  const currentRow = {};
+  found.headers.forEach((field, i) => { currentRow[field] = found.values[i]; });
+  const prevStatus = String(currentRow["Status"] ?? "").trim();
+
+  const now = new Date();
+  updateRequestRowFields_(sheet, found.rowIndex, found.headers, {
+    "Status": newStatus,
+    "Updated At": now,
+  });
+
+  let poUpdates = null;
+  if (newStatus === "Approved" && prevStatus !== "Approved") {
+    const poNumber = String(currentRow["PO #"] ?? "").trim();
+    if (poNumber) {
+      try {
+        poUpdates = applyApprovalToPo_(poNumber, currentRow);
+      } catch (err) {
+        Logger.log("applyApprovalToPo_ failed for " + approvalId + ": " + err);
+      }
+    }
+  }
+
+  return corsResponse({ success: true, approvalId: approvalId, poUpdates: poUpdates });
+}
+
+function handleResendApprovalRequestEmail(payload) {
+  const approvalId = String(payload.approvalId ?? "").trim();
+  if (!approvalId) return corsResponse({ success: false, error: "Approval ID is required." });
+
+  const sheet = getApprovalsSheet_();
+  const found = findRequestRowIndex_(sheet, APPROVAL_ID_FIELD, approvalId);
+  if (!found) return corsResponse({ success: false, error: "Approval not found: " + approvalId });
+
+  const approvalData = {};
+  found.headers.forEach((field, i) => { approvalData[field] = found.values[i]; });
+
+  const emailInfo = getApprovalEmailInfo_(approvalData);
+  if (!emailInfo.to) return corsResponse({ success: false, error: "No email address on record for this approval." });
+
+  const poNumber = String(approvalData["PO #"] ?? "").trim();
+  const poSheet = ensurePoWorkflowHeaders_();
+  let poRow = null;
+  try {
+    const poRows = getPoObjectsByNumbers_(poSheet, [poNumber]);
+    poRow = poRows[0] || null;
+  } catch (_) {}
+
+  let emailSent = false;
+  let emailError = "";
+  try {
+    emailSent = sendApprovalRequestEmail_(approvalId, emailInfo, poRow, approvalData);
+  } catch (err) {
+    emailError = err && err.message ? err.message : String(err);
+  }
+
+  const now = new Date();
+  updateRequestRowFields_(sheet, found.rowIndex, found.headers, {
+    "Email Status": emailSent ? "Sent" : "Failed",
+    "Email Sent At": emailSent ? now : approvalData["Email Sent At"],
+    "Email Error": emailError,
+    "Last Email Attempt At": now,
+    "Updated At": now,
+  });
+
+  if (!emailSent) {
+    return corsResponse({ success: false, error: emailError || "Failed to resend approval email.", approvalId: approvalId });
+  }
+  return corsResponse({ success: true, approvalId: approvalId, emailSent: true });
+}
+
 function doPost(e) {
   const lock = LockService.getScriptLock();
   try {
@@ -4974,6 +5336,9 @@ function doPost(e) {
     if (action === "updateDeliveryRequest") return handleUpdateDeliveryRequest(payload);
     if (action === "createPickupRequest") return handleCreatePickupRequest(payload);
     if (action === "updatePickupRequest") return handleUpdatePickupRequest(payload);
+    if (action === "createApproval") return handleCreateApproval(payload);
+    if (action === "updateApproval") return handleUpdateApproval(payload);
+    if (action === "resendApprovalRequestEmail") return handleResendApprovalRequestEmail(payload);
     if (action === "createChargeback") return handleCreateChargeback(payload);
     if (action === "updateChargeback") return handleUpdateChargeback(payload);
     if (action === "deleteChargeback") return handleDeleteChargeback(payload);

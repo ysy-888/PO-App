@@ -294,7 +294,33 @@ function renderTable() {
 
 
 
-      if (col === "Status") {
+      if (col === "PO Qty" && typeof getPendingApprovalDisplay === "function") {
+        const pending = getPendingApprovalDisplay(row["PO #"]);
+        if (pending && pending.poQty != null) {
+          td.classList.add("has-pending-approval");
+          const span = document.createElement("span");
+          span.className = "pending-approval-value";
+          span.title = "Pending approval";
+          span.textContent = String(pending.poQty);
+          td.appendChild(span);
+        } else if (isEmptyValue(val)) {
+          setDisplayText(td, EMPTY_DISPLAY);
+        } else {
+          mountSearchHighlightedText(td, val, val);
+        }
+      } else if (col === "CXL Date" && typeof getPendingApprovalDisplay === "function") {
+        const pending = getPendingApprovalDisplay(row["PO #"]);
+        if (pending && pending.cxlDate) {
+          td.classList.add("has-pending-approval");
+          const span = document.createElement("span");
+          span.className = "pending-approval-value";
+          span.title = "Pending approval";
+          span.textContent = formatDateForDisplay(pending.cxlDate);
+          td.appendChild(span);
+        } else {
+          applyDateCellDisplay(td, col, row, { context: "table" });
+        }
+      } else if (col === "Status") {
 
         td.innerHTML = renderStatus(val);
 

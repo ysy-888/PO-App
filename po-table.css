@@ -8133,3 +8133,180 @@ body:not(.split-view-enabled) .app-main > .app-secondary-table:not([hidden]) {
   min-height: 480px;
   resize: vertical;
 }
+
+/* ── Approval Requests ──────────────────────────────────────── */
+
+/* List table — status column */
+.approval-request-status-cell {
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.approval-request-status-cell[data-approval-status="pending-approval"] {
+  color: #b45309;
+}
+.approval-request-status-cell[data-approval-status="approved"] {
+  color: var(--success, #2d7a3a);
+}
+.approval-request-status-cell[data-approval-status="updated"] {
+  color: var(--text);
+}
+
+/* List table — email status cell (mirrors delivery) */
+.approval-request-email-status-cell {
+  font-size: 12px;
+  white-space: nowrap;
+}
+.approval-request-email-status-cell[data-status="sent"] { color: var(--success, #2d7a3a); }
+.approval-request-email-status-cell[data-status="failed"] { color: var(--danger, #c0392b); }
+
+/* List table — action cell */
+.approval-request-action-cell {
+  text-align: center;
+  white-space: nowrap;
+}
+.approval-request-resend-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  min-height: 28px;
+}
+
+/* Approval modal — type-specific section */
+.approval-type-section {
+  margin-top: 12px;
+}
+.approval-ext-date-meta {
+  width: auto;
+  min-width: 280px;
+}
+
+/* Unit grid */
+.approval-unit-grid {
+  margin-top: 4px;
+}
+.approval-unit-grid-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-secondary, #6b7280);
+  margin: 0 0 6px 0;
+}
+.approval-unit-table {
+  border-collapse: collapse;
+  border: 1px solid var(--border);
+  font-size: 13px;
+  overflow-x: auto;
+  width: auto;
+}
+.approval-unit-table th,
+.approval-unit-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: center;
+}
+.approval-unit-col-header {
+  background: var(--surface-2, #f7f7f8);
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--text-secondary, #374151);
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+.approval-unit-col-total {
+  background: var(--surface-2, #f7f7f8);
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--text-secondary, #374151);
+}
+.approval-unit-row-label {
+  text-align: left;
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--text, #1a1a18);
+  white-space: nowrap;
+  padding-right: 14px;
+  background: var(--surface-2, #f7f7f8);
+}
+.approval-unit-row-label--ref {
+  font-weight: 400;
+  color: var(--text-secondary, #6b7280);
+}
+.approval-unit-cell {
+  min-width: 50px;
+}
+.approval-unit-cell--total {
+  font-weight: 700;
+  background: var(--surface-2, #f7f7f8);
+}
+.approval-unit-cell--ref {
+  color: var(--text-secondary, #6b7280);
+  font-size: 12px;
+  background: transparent;
+}
+.approval-unit-input {
+  width: 52px;
+  text-align: center;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 4px;
+  font-size: 13px;
+  background: var(--surface);
+  color: var(--text);
+}
+.approval-unit-input:focus {
+  outline: 2px solid var(--accent, #3b82f6);
+  outline-offset: 1px;
+}
+.approval-unit-ref-row td {
+  border-top: 1px dashed var(--border);
+}
+
+/* PO info summary panel (right side of approval modal) */
+.approval-po-info {
+  padding: 4px 0;
+}
+.approval-po-info-table {
+  width: 100%;
+}
+.approval-po-info-empty {
+  color: var(--empty-display, #aaa);
+  font-size: 13px;
+}
+
+/* ── Pending Approval display — table & modal ───────────────── */
+
+/* Amber pending-approval value, inline in table cells and modal fields */
+.pending-approval-value {
+  color: #b45309;
+  font-weight: 500;
+}
+.pending-approval-value::after {
+  content: " ★";
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+/* Table cell wrapper for pending value overlay */
+td.has-pending-approval {
+  position: relative;
+}
+td.has-pending-approval .pending-approval-value {
+  display: inline;
+}
+
+/* Modal field pending override */
+.modal-field-value.has-pending-approval .pending-approval-value {
+  display: block;
+}
+
+/* Size grid pending row */
+.modal-size-chart-row--qty .modal-size-cell--pending {
+  color: #b45309;
+  font-weight: 600;
+  background: #fffbeb;
+}
+
+#approvalRequestOverlay .shipment-modal-card {
+  max-width: 960px;
+}
