@@ -141,7 +141,8 @@ async function initAuth() {
   const { data: { session } } = await client.auth.getSession();
   if (session) {
     _session = session;
-    return; // session restored — loadData() will be called by main.js normally
+    if (typeof loadData === "function") loadData();
+    return;
   }
 
   // No session — block the UI and show the login form.
