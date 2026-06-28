@@ -23,6 +23,7 @@ function initShipments() {
   document.getElementById("navTabShipments")?.addEventListener("click", () => switchAppView("shipments"));
   document.getElementById("navTabChargebacks")?.addEventListener("click", () => switchAppView("chargebacks"));
   document.getElementById("navTabCustomers")?.addEventListener("click", () => switchAppView("customers"));
+  document.getElementById("navTabStyles")?.addEventListener("click", () => switchAppView("styles"));
   document.getElementById("navTabPackingReviews")?.addEventListener("click", () => switchAppView("packingReviews"));
   document.getElementById("shipmentSearchInput")?.addEventListener("input", applyShipmentFilters);
   document.getElementById("chargebackSearchInput")?.addEventListener("input", applyChargebackFilters);

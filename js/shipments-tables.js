@@ -419,6 +419,7 @@ function switchAppView(view) {
   const requestsHeaderMeta = document.getElementById("requestsHeaderMeta");
   const chargebackHeaderMeta = document.getElementById("chargebackHeaderMeta");
   const customersHeaderMeta = document.getElementById("customersHeaderMeta");
+  const stylesHeaderMeta = document.getElementById("stylesHeaderMeta");
   const packingReviewHeaderMeta = document.getElementById("packingReviewHeaderMeta");
   const appMain = document.getElementById("appMain");
   const poViewContent = document.getElementById("poViewContent");
@@ -428,12 +429,14 @@ function switchAppView(view) {
   const chargebackTableWrap = document.getElementById("chargebackTableWrap");
   const packingReviewTableWrap = document.getElementById("packingReviewTableWrap");
   const customersTableWrap = document.getElementById("customersTableWrap");
+  const stylesTableWrap = document.getElementById("stylesTableWrap");
   const poTab = document.getElementById("navTabPo");
   const requestsTab = document.getElementById("navTabRequests");
   const shipTab = document.getElementById("navTabShipments");
   const chargebackTab = document.getElementById("navTabChargebacks");
   const packingReviewTab = document.getElementById("navTabPackingReviews");
   const customersTab = document.getElementById("navTabCustomers");
+  const stylesTab = document.getElementById("navTabStyles");
 
   if (appMain) appMain.classList.toggle("is-split-active", splitActive);
 
@@ -443,6 +446,7 @@ function switchAppView(view) {
   if (requestsHeaderMeta) requestsHeaderMeta.hidden = view !== "requests";
   if (chargebackHeaderMeta) chargebackHeaderMeta.hidden = view !== "chargebacks";
   if (customersHeaderMeta) customersHeaderMeta.hidden = view !== "customers";
+  if (stylesHeaderMeta) stylesHeaderMeta.hidden = view !== "styles";
   if (packingReviewHeaderMeta) packingReviewHeaderMeta.hidden = view !== "packingReviews";
   syncViewActionToolbars(view);
 
@@ -462,6 +466,7 @@ function switchAppView(view) {
   if (chargebackTableWrap) chargebackTableWrap.hidden = view !== "chargebacks";
   if (packingReviewTableWrap) packingReviewTableWrap.hidden = view !== "packingReviews";
   if (customersTableWrap) customersTableWrap.hidden = view !== "customers";
+  if (stylesTableWrap) stylesTableWrap.hidden = view !== "styles";
   const poFooterEnd = document.getElementById("poFooterEnd");
   if (poFooterEnd) poFooterEnd.hidden = view !== "po" && !splitActive;
   poTab?.classList.toggle("is-active", view === "po");
@@ -476,6 +481,8 @@ function switchAppView(view) {
   packingReviewTab?.setAttribute("aria-selected", view === "packingReviews" ? "true" : "false");
   customersTab?.classList.toggle("is-active", view === "customers");
   customersTab?.setAttribute("aria-selected", view === "customers" ? "true" : "false");
+  stylesTab?.classList.toggle("is-active", view === "styles");
+  stylesTab?.setAttribute("aria-selected", view === "styles" ? "true" : "false");
 
   if (view !== "requests") {
     clearRequestTypeSelection();
@@ -487,6 +494,7 @@ function switchAppView(view) {
   if (view === "chargebacks") applyChargebackFilters();
   if (view === "packingReviews" && typeof applyPackingReviewFilters === "function") applyPackingReviewFilters();
   if (view === "customers" && typeof applyCustomerFilters === "function") applyCustomerFilters();
+  if (view === "styles" && typeof applyStyleFilters === "function") applyStyleFilters();
   updateDeleteShipmentButton();
   updateDeleteChargebackButton();
   updateToolbarRequestButtons();

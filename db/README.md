@@ -19,6 +19,8 @@ npx supabase db push
 | File | What it creates |
 |---|---|
 | `001_initial_schema.sql` | `tenants`, `profiles`, `tenant_memberships`, `purchase_orders` tables + RLS policies |
+| `002_full_schema.sql` | Shipments, requests, packing, customers, contacts, locations, style_photos, settings |
+| `003_styles.sql` | `styles` table (Style Master keyed by `Style #|Color`) |
 
 ## After running 001
 

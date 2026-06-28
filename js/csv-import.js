@@ -308,6 +308,13 @@ async function handleCsvImportFile(file) {
     return;
   }
 
+  if (typeof currentAppView !== "undefined" && currentAppView === "styles") {
+    if (typeof handleStyleCsvImportFile === "function") {
+      await handleStyleCsvImportFile(file);
+    }
+    return;
+  }
+
   if (isDemoMode()) {
     showIndicator("CSV import is not available in demo mode", "error");
     return;

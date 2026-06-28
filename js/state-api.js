@@ -8,6 +8,7 @@ let allContactRows = [];
 let allLocationRows = [];
 let allAsnRequests = [];
 let allCustomers = [];
+let allStyles = [];
 let packingListPanelOpen = false;
 let flagFilterActive = false;
 let sortCol = "CXL Date";
@@ -160,6 +161,7 @@ let packingListByPo = new Map();
 let packingCartonsByList = new Map();
 
 let stylePhotoByKey = new Map();
+let styleMasterByKey = new Map();
 
 function normalizeStyleColorKey(styleNum, color) {
   const style = String(styleNum ?? "").trim().toLowerCase();
@@ -182,6 +184,35 @@ function buildStylePhotoIndex(stylePhotos) {
 
 function getStylePhotosForRow(row) {
   return stylePhotoByKey.get(normalizeStyleColorKey(row?.["Style #"], row?.["Color"])) || null;
+}
+
+function buildStyleMasterIndex(styles) {
+  styleMasterByKey = new Map();
+  (styles || []).forEach(entry => {
+    const key = normalizeStyleColorKey(entry["Style #"], entry["Color"]);
+    if (!key) return;
+    styleMasterByKey.set(key, { ...entry });
+  });
+}
+
+function getStyleMasterForRow(row) {
+  return styleMasterByKey.get(normalizeStyleColorKey(row?.["Style #"], row?.["Color"])) || null;
+}
+
+function applyStyleSizesToRow(row) {
+  if (!row) return row;
+  const fromRow = SIZE_FIELDS.map(f => String(row[f] ?? "").trim()).filter(s => s !== "");
+  if (fromRow.length > 0) return row;
+  const master = getStyleMasterForRow(row);
+  if (!master) return row;
+  SIZE_FIELDS.forEach(field => {
+    const val = String(master[field] ?? "").trim();
+    if (val) row[field] = val;
+  });
+  if (!String(row["Style Category"] ?? "").trim() && String(master["Style Category"] ?? "").trim()) {
+    row["Style Category"] = master["Style Category"];
+  }
+  return row;
 }
 
 function invalidatePackingIndex() {

@@ -44,6 +44,7 @@
     </div>
     <button type="button" class="app-title-tab" id="navTabChargebacks" role="tab" aria-selected="false">Chargebacks</button>
     <button type="button" class="app-title-tab" id="navTabCustomers" role="tab" aria-selected="false">Customers</button>
+    <button type="button" class="app-title-tab" id="navTabStyles" role="tab" aria-selected="false">Styles</button>
     <button type="button" class="app-title-tab" id="navTabPackingReviews" role="tab" aria-selected="false">Vendor Submissions</button>
   </nav>
   <div class="header-right">
@@ -81,6 +82,13 @@
       <div class="search-wrap header-search-wrap">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
         <input type="search" id="customersSearchInput" placeholder="Search" />
+      </div>
+    </div>
+    <div class="header-view-meta" id="stylesHeaderMeta" hidden>
+      <div class="counter" id="stylesRowCounter">— styles</div>
+      <div class="search-wrap header-search-wrap">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="search" id="stylesSearchInput" placeholder="Search" />
       </div>
     </div>
     <div class="header-view-meta" id="packingReviewHeaderMeta" hidden>
@@ -702,6 +710,26 @@
     </thead>
     <tbody id="customersTableBody">
       <tr class="state-row"><td colspan="13">Loading customers…</td></tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<div id="stylesTableWrap" class="table-scroll-y" hidden>
+  <div class="table-scroll-x">
+  <table id="stylesTable">
+    <thead>
+      <tr>
+        <th>Style #</th>
+        <th>Color</th>
+        <th>Size Cat</th>
+        <th>Category</th>
+        <th>Description</th>
+        <th>Size Run</th>
+      </tr>
+    </thead>
+    <tbody id="stylesTableBody">
+      <tr class="state-row"><td colspan="6">Loading styles…</td></tr>
     </tbody>
   </table>
   </div>
@@ -1380,6 +1408,8 @@
 <script src="js/packing-reviews.js"></script>
 <script src="js/customers-import.js"></script>
 <script src="js/customers.js"></script>
+<script src="js/styles-import.js"></script>
+<script src="js/styles.js"></script>
 <script src="js/export-csv.js"></script>
 <script src="js/shipments-init.js"></script>
 <script src="js/packing-print.js"></script>

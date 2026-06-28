@@ -105,9 +105,41 @@ const SIZE_FIELDS = Array.from({ length: QTY_UNIT_COUNT }, (_, i) => `Size ${i +
 
 const PO_UNIT_FIELDS = Array.from({ length: QTY_UNIT_COUNT }, (_, i) => `PO Unit ${i + 1}`);
 
+const SIZE_CAT_LABELS = {
+  "XS-XL": ["XS", "S", "M", "L", "XL"],
+  "XXS-XXL": ["XXS", "XS", "S", "M", "L", "XL", "XXL"],
+  "XS-L": ["XS", "S", "M", "L"],
+  PL: ["1X", "2X", "3X"],
+  PT: ["XS PT", "S PT", "M PT", "L PT", "XL PT"],
+};
+
+/** Expand N41 sizeCat code into individual size label strings. */
+function expandSizeCatToLabels(sizeCat) {
+  const key = String(sizeCat ?? "").trim();
+  if (!key) return [];
+  const known = SIZE_CAT_LABELS[key];
+  if (known) return [...known];
+  return [];
+}
+
+function applySizeLabelsToDataRow(row, labels) {
+  SIZE_FIELDS.forEach((field, index) => {
+    row[field] = labels[index] ?? "";
+  });
+}
+
 /** Returns the non-empty size labels for a given row, derived from Size 1..15 fields. */
 function getSizeLabelsFromRow(row) {
-  return SIZE_FIELDS.map(f => String(row[f] ?? "").trim()).filter(s => s !== "");
+  const fromRow = SIZE_FIELDS.map(f => String(row[f] ?? "").trim()).filter(s => s !== "");
+  if (fromRow.length > 0) return fromRow;
+  if (typeof getStyleMasterForRow === "function") {
+    const master = getStyleMasterForRow(row);
+    if (master) {
+      const fromMaster = SIZE_FIELDS.map(f => String(master[f] ?? "").trim()).filter(s => s !== "");
+      if (fromMaster.length > 0) return fromMaster;
+    }
+  }
+  return [];
 }
 
 function toQtyNumber(val) {

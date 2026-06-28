@@ -34,6 +34,7 @@ router.get("/app-state", requireAuth, async (req, res) => {
       contactsResult,
       locationsResult,
       stylePhotosResult,
+      stylesResult,
       settingsResult,
     ] = await Promise.all([
       supabase.from("purchase_orders").select("data").eq("tenant_id", tid).order("created_at", { ascending: true }),
@@ -51,6 +52,7 @@ router.get("/app-state", requireAuth, async (req, res) => {
       supabase.from("contacts").select("data").eq("tenant_id", tid).order("created_at", { ascending: true }),
       supabase.from("locations").select("data").eq("tenant_id", tid).order("created_at", { ascending: true }),
       supabase.from("style_photos").select("data").eq("tenant_id", tid),
+      supabase.from("styles").select("data").eq("tenant_id", tid).order("created_at", { ascending: true }),
       supabase.from("tenant_settings").select("settings").eq("tenant_id", tid).maybeSingle(),
     ]);
 
@@ -61,7 +63,7 @@ router.get("/app-state", requireAuth, async (req, res) => {
       posResult, shipmentsResult, exfResult, asnResult, deliveryResult,
       pickupResult, approvalsResult, chargebacksResult, packingListsResult,
       packingCartonsResult, pendingPackingListsResult, customersResult,
-      contactsResult, locationsResult, stylePhotosResult,
+      contactsResult, locationsResult, stylePhotosResult, stylesResult,
     ].find(r => r.error);
 
     if (tableError?.error) {
@@ -116,6 +118,7 @@ router.get("/app-state", requireAuth, async (req, res) => {
       vendors: rows(contactsResult),  // legacy alias kept for cached clients
       locations: rows(locationsResult),
       stylePhotos: rows(stylePhotosResult),
+      styles: rows(stylesResult),
       // Settings
       vendorSubmitMode,
       defaultColumns,

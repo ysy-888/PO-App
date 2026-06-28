@@ -53,7 +53,6 @@ async function loadData() {
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.error);
-      allRows = json.data.map(normalizeRow);
       allChargebacks = (json.chargebacks ?? []).map(normalizeChargeback);
       allAsnRequests = (json.asnRequests ?? []).map(row => ({ ...row }));
       allPackingLists = (json.packingLists ?? []).map(normalizePackingList);
@@ -62,12 +61,17 @@ async function loadData() {
       allVendorEmailRows = allContactRows;
       allLocationRows = json.locations ?? [];
       buildStylePhotoIndex(json.stylePhotos ?? []);
+      buildStyleMasterIndex(json.styles ?? []);
       if (typeof onPendingPackingListsDataLoaded === "function") {
         onPendingPackingListsDataLoaded(json.pendingPackingLists ?? [], json.vendorSubmitMode);
       }
       if (typeof onCustomersDataLoaded === "function") {
         onCustomersDataLoaded(json.customers ?? []);
       }
+      if (typeof onStylesDataLoaded === "function") {
+        onStylesDataLoaded(json.styles ?? []);
+      }
+      allRows = json.data.map(row => applyStyleSizesToRow(normalizeRow(row)));
       window.__pendingShipments = json.shipments ?? [];
       window.__pendingExfRequests = json.exfRequests ?? [];
       window.__pendingAsnRequests = json.asnRequests ?? [];
