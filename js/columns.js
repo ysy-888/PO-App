@@ -726,16 +726,21 @@ async function saveDefaultColumnVisibility() {
 
   try {
     setEditTableFooterMessage(`Saving default${ELLIPSIS}`, "");
-    const res = await fetch(getAppsScriptUrl(), {
-      method: "POST",
-      body: JSON.stringify({
-        action: "saveColumnDefault",
-        columns: [...DEFAULT_VISIBLE_COLUMNS],
-        columnOrder: [...DEFAULT_COLUMN_ORDER],
-        statusFilter: defaultStatusFilter,
-      }),
-    });
-    const json = await res.json();
+    const payload = {
+      columns: [...DEFAULT_VISIBLE_COLUMNS],
+      columnOrder: [...DEFAULT_COLUMN_ORDER],
+      statusFilter: defaultStatusFilter,
+    };
+    let json;
+    if (typeof isApiMode === "function" && isApiMode()) {
+      json = await postApi("/api/settings/save-column", payload);
+    } else {
+      const res = await fetch(getAppsScriptUrl(), {
+        method: "POST",
+        body: JSON.stringify({ action: "saveColumnDefault", ...payload }),
+      });
+      json = await res.json();
+    }
     if (!json.success) throw new Error(json.error);
     setEditTableFooterMessage("Default view saved", "success");
   } catch (err) {

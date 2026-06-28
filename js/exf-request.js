@@ -1028,17 +1028,18 @@ async function submitExfRequest() {
         { cc: data[EXF_REQ_CC_FIELD], exfReqNotes, vendor }
       );
     } else {
-      const json = await postAppsScript({
-        action: "exfRequest",
-        poNumbers,
-        exfDate,
-        exfReqNotes,
-        vendorEmail: data["Vendor Email"],
-        vendorCc: data[EXF_REQ_CC_FIELD],
-        memos,
-        shipMethods,
-      });
-      if (!json.success) throw new Error(json.error || json.emailError || "EXF email failed to send");
+      const json = (typeof isApiMode === "function" && isApiMode())
+        ? await postApi("/api/requests/exf/create", {
+            poNumbers, exfDate, exfReqNotes,
+            vendorEmail: data["Vendor Email"], vendorCc: data[EXF_REQ_CC_FIELD],
+            memos, shipMethods,
+          })
+        : await postAppsScript({
+            action: "exfRequest", poNumbers, exfDate, exfReqNotes,
+            vendorEmail: data["Vendor Email"], vendorCc: data[EXF_REQ_CC_FIELD],
+            memos, shipMethods,
+          });
+      if (!json.success) throw new Error(json.error || json.emailError || "EXF request failed");
       applyExfRequestCreatedLocally(
         json.exfRequestId,
         poNumbers,

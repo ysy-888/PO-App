@@ -303,7 +303,12 @@ async function applyAutomaticStatusUpdates(rows, shipments) {
   if (isDemoMode()) return;
 
   try {
-    const json = await postAppsScript({ action: "batchUpdatePos", items: batch }, { silent: true });
+    let json;
+    if (typeof isApiMode === "function" && isApiMode()) {
+      json = await postApi("/api/po/batch-update", { items: batch });
+    } else {
+      json = await postAppsScript({ action: "batchUpdatePos", items: batch }, { silent: true });
+    }
     if (!json.success) console.warn("Auto status update failed:", json.error);
   } catch (err) {
     console.warn("Auto status update failed:", err.message);

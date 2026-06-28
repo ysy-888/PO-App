@@ -419,11 +419,9 @@ async function addPosToShipment(poNumbers, { keepPanelOpen = false } = {}) {
     if (isDemoMode()) {
       demoAddPosToShipment(shipmentId, poNumbers, shipmentModalRow);
     } else {
-      const json = await postAppsScript({
-        action: "addPosToShipment",
-        shipmentId,
-        poNumbers,
-      });
+      const json = (typeof isApiMode === "function" && isApiMode())
+        ? await postApi("/api/shipments/add-pos", { shipmentId, poNumbers })
+        : await postAppsScript({ action: "addPosToShipment", shipmentId, poNumbers });
       if (!json.success) throw new Error(json.error);
       applyPosAddedToShipmentLocally(shipmentId, poNumbers, shipmentModalRow);
       shipmentModalRow = getShipmentById(shipmentId) ?? shipmentModalRow;
@@ -472,11 +470,9 @@ async function removePosFromShipment() {
     if (isDemoMode()) {
       demoRemovePosFromShipment(shipmentId, poNumbers);
     } else {
-      const json = await postAppsScript({
-        action: "removePosFromShipment",
-        shipmentId,
-        poNumbers,
-      });
+      const json = (typeof isApiMode === "function" && isApiMode())
+        ? await postApi("/api/shipments/remove-pos", { shipmentId, poNumbers })
+        : await postAppsScript({ action: "removePosFromShipment", shipmentId, poNumbers });
       if (!json.success) throw new Error(json.error);
       applyPosRemovedFromShipmentLocally(shipmentId, poNumbers);
       openShipmentDetail(shipmentId);
@@ -636,11 +632,9 @@ async function submitCreateShipment() {
     if (isDemoMode()) {
       await demoCreateShipment(poNumbers, shipment);
     } else {
-      const json = await postAppsScript({
-        action: "createShipment",
-        poNumbers,
-        shipment,
-      });
+      const json = (typeof isApiMode === "function" && isApiMode())
+        ? await postApi("/api/shipments/create", { poNumbers, shipment })
+        : await postAppsScript({ action: "createShipment", poNumbers, shipment });
       if (!json.success) throw new Error(json.error);
       applyShipmentCreatedLocally(json.shipmentId, poNumbers, shipment);
     }
@@ -1015,11 +1009,9 @@ async function saveShipmentModal() {
 
   try {
     if (!isDemoMode()) {
-      const json = await postAppsScript({
-        action: "updateShipment",
-        shipmentId,
-        shipment,
-      });
+      const json = (typeof isApiMode === "function" && isApiMode())
+        ? await postApi("/api/shipments/update", { shipmentId, shipment })
+        : await postAppsScript({ action: "updateShipment", shipmentId, shipment });
       if (!json.success) throw new Error(json.error);
     }
     applyShipmentUpdatedLocally(shipmentId, shipment);
@@ -1050,10 +1042,9 @@ async function deleteSelectedShipments() {
 
   try {
     if (!isDemoMode()) {
-      const json = await postAppsScript({
-        action: "deleteShipment",
-        shipmentIds,
-      });
+      const json = (typeof isApiMode === "function" && isApiMode())
+        ? await postApi("/api/shipments/delete", { shipmentIds })
+        : await postAppsScript({ action: "deleteShipment", shipmentIds });
       if (!json.success) throw new Error(json.error);
     }
     applyShipmentsDeletedLocally(shipmentIds);
@@ -1089,10 +1080,9 @@ async function deleteSelectedChargebacks() {
     if (isDemoMode()) {
       demoDeleteChargebacks(chargebackIds);
     } else {
-      const json = await postAppsScript({
-        action: "deleteChargeback",
-        chargebackIds,
-      });
+      const json = (typeof isApiMode === "function" && isApiMode())
+        ? await postApi("/api/chargebacks/delete", { chargebackIds })
+        : await postAppsScript({ action: "deleteChargeback", chargebackIds });
       if (!json.success) throw new Error(json.error);
       await loadData();
     }

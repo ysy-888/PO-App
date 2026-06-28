@@ -161,4 +161,65 @@ router.post("/bulk-upsert", requireAuth, async (req, res) => {
   });
 });
 
+/**
+ * POST /api/po/batch-update
+ *
+ * Applies multiple field updates across multiple POs in one call.
+ * Body: { items: [{ poNumber, updates }, ...] }
+ * Mirrors handleBatchUpdatePos in apps-script.gs.
+ */
+router.post("/batch-update", requireAuth, async (req, res) => {
+  const items = req.body?.items;
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ success: false, error: "items array is required." });
+  }
+
+  const poNumbers = [...new Set(items.map(i => String(i.poNumber ?? "").trim()).filter(Boolean))];
+  if (poNumbers.length === 0) {
+    return res.status(400).json({ success: false, error: "All items are missing poNumber." });
+  }
+
+  // Fetch existing rows in one query.
+  const { data: existingRows, error: fetchErr } = await supabase
+    .from("purchase_orders")
+    .select("id, po_number, data")
+    .eq("tenant_id", req.tenantId)
+    .in("po_number", poNumbers);
+
+  if (fetchErr) {
+    console.error("batch-update fetch failed:", fetchErr);
+    return res.status(500).json({ success: false, error: "Failed to look up POs." });
+  }
+
+  const byPo = new Map((existingRows || []).map(r => [r.po_number, r]));
+  const errors = [];
+
+  for (const item of items) {
+    const poNumber = String(item.poNumber ?? "").trim();
+    if (!poNumber) continue;
+    const updates = item.updates;
+    if (!updates || typeof updates !== "object") continue;
+
+    const existing = byPo.get(poNumber);
+    if (!existing) {
+      errors.push({ poNumber, error: "PO not found" });
+      continue;
+    }
+
+    const merged = { ...(existing.data || {}), ...sanitizeUpdates(updates) };
+    const { error: updateErr } = await supabase
+      .from("purchase_orders")
+      .update({ data: merged })
+      .eq("id", existing.id)
+      .eq("tenant_id", req.tenantId);
+
+    if (updateErr) {
+      console.error(`batch-update PO ${poNumber} failed:`, updateErr);
+      errors.push({ poNumber, error: updateErr.message });
+    }
+  }
+
+  return res.json({ success: true, errors });
+});
+
 export default router;

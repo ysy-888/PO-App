@@ -727,12 +727,10 @@ async function submitAsnRequest() {
     if (isDemoMode()) {
       applyAsnRequestCreatedLocally(generateDemoAsnRequestId(), poNumbers, data);
     } else {
-      const json = await postAppsScript({
-        action: "createAsnRequest",
-        poNumbers,
-        request: data,
-      });
-      if (!json.success) throw new Error(json.error || json.emailError || "ASN email failed to send");
+      const json = (typeof isApiMode === "function" && isApiMode())
+        ? await postApi("/api/requests/asn/create", { poNumbers, request: data })
+        : await postAppsScript({ action: "createAsnRequest", poNumbers, request: data });
+      if (!json.success) throw new Error(json.error || json.emailError || "ASN request failed");
       applyAsnRequestCreatedLocally(json.asnRequestId, poNumbers, data);
     }
     showIndicator(`ASN requested and email sent ${CHECK_MARK}`, "success");

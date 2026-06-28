@@ -3,6 +3,13 @@ import express from "express";
 import cors from "cors";
 import appStateRouter from "./routes/appState.js";
 import poRouter from "./routes/po.js";
+import customersRouter from "./routes/customers.js";
+import settingsRouter from "./routes/settings.js";
+import packingListsRouter from "./routes/packingLists.js";
+import shipmentsRouter from "./routes/shipments.js";
+import requestsRouter from "./routes/requests.js";
+import chargebacksRouter from "./routes/chargebacks.js";
+import pendingPackingListsRouter from "./routes/pendingPackingLists.js";
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -35,6 +42,13 @@ app.get("/health", (_req, res) => res.json({ ok: true }));
 // ── Routes ──────────────────────────────────────────────────
 app.use("/api", appStateRouter);
 app.use("/api/po", poRouter);
+app.use("/api/customers", customersRouter);
+app.use("/api/settings", settingsRouter);
+app.use("/api/packing-list", packingListsRouter);
+app.use("/api/shipments", shipmentsRouter);
+app.use("/api/requests", requestsRouter);
+app.use("/api/chargebacks", chargebacksRouter);
+app.use("/api/pending-packing-lists", pendingPackingListsRouter);
 
 // ── Error handler ───────────────────────────────────────────
 app.use((err, _req, res, _next) => {

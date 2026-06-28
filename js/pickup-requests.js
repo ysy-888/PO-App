@@ -627,11 +627,18 @@ async function submitPickupRequest() {
         applyPickupRequestCreatedLocally(generateDemoPickupRequestId(), poNumbers, data);
       }
     } else {
-      const json = await postAppsScript(
-        isEdit
-          ? { action: "updatePickupRequest", pickupRequestId: savedRow[PICKUP_REQUEST_ID_FIELD], request: data }
-          : { action: "createPickupRequest", poNumbers, request: data }
-      );
+      let json;
+      if (typeof isApiMode === "function" && isApiMode()) {
+        json = isEdit
+          ? await postApi("/api/requests/pickup/update", { pickupRequestId: savedRow[PICKUP_REQUEST_ID_FIELD], request: data })
+          : await postApi("/api/requests/pickup/create", { poNumbers, request: data });
+      } else {
+        json = await postAppsScript(
+          isEdit
+            ? { action: "updatePickupRequest", pickupRequestId: savedRow[PICKUP_REQUEST_ID_FIELD], request: data }
+            : { action: "createPickupRequest", poNumbers, request: data }
+        );
+      }
       if (!json.success) throw new Error(json.error || "Pickup request failed");
       if (isEdit) {
         applyPickupRequestUpdatedLocally(savedRow[PICKUP_REQUEST_ID_FIELD], data);

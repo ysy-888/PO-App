@@ -588,11 +588,18 @@ async function submitDeliveryRequest() {
         applyDeliveryRequestCreatedLocally(generateDemoDeliveryRequestId(), poNumbers, data);
       }
     } else {
-      const json = await postAppsScript(
-        isEdit
-          ? { action: "updateDeliveryRequest", deliveryRequestId: savedRow[DELIVERY_REQUEST_ID_FIELD], request: data }
-          : { action: "createDeliveryRequest", poNumbers, request: data }
-      );
+      let json;
+      if (typeof isApiMode === "function" && isApiMode()) {
+        json = isEdit
+          ? await postApi("/api/requests/delivery/update", { deliveryRequestId: savedRow[DELIVERY_REQUEST_ID_FIELD], request: data })
+          : await postApi("/api/requests/delivery/create", { poNumbers, request: data });
+      } else {
+        json = await postAppsScript(
+          isEdit
+            ? { action: "updateDeliveryRequest", deliveryRequestId: savedRow[DELIVERY_REQUEST_ID_FIELD], request: data }
+            : { action: "createDeliveryRequest", poNumbers, request: data }
+        );
+      }
       if (!json.success) throw new Error(json.error || "Delivery request failed");
       if (isEdit) {
         applyDeliveryRequestUpdatedLocally(savedRow[DELIVERY_REQUEST_ID_FIELD], data);

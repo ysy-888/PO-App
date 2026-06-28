@@ -621,20 +621,16 @@ async function submitApproval() {
     } else {
       if (isEdit) {
         const newStatus = String(data[APPROVAL_STATUS_FIELD_FE] ?? "").trim();
-        const json = await postAppsScript({
-          action: "updateApproval",
-          approvalId: savedRow[APPROVAL_ID_FIELD_FE],
-          status: newStatus,
-        });
+        const json = (typeof isApiMode === "function" && isApiMode())
+          ? await postApi("/api/requests/approval/update", { approvalId: savedRow[APPROVAL_ID_FIELD_FE], status: newStatus })
+          : await postAppsScript({ action: "updateApproval", approvalId: savedRow[APPROVAL_ID_FIELD_FE], status: newStatus });
         if (!json.success) throw new Error(json.error || "Failed to update approval.");
         applyApprovalUpdatedLocally(savedRow[APPROVAL_ID_FIELD_FE], { ...data, [APPROVAL_STATUS_FIELD_FE]: newStatus }, poNumber, json.poUpdates);
       } else {
         data["Request Date"] = formatDateToYmd(new Date());
-        const json = await postAppsScript({
-          action: "createApproval",
-          poNumber,
-          approval: data,
-        });
+        const json = (typeof isApiMode === "function" && isApiMode())
+          ? await postApi("/api/requests/approval/create", { poNumber, approval: data })
+          : await postAppsScript({ action: "createApproval", poNumber, approval: data });
         if (!json.success) throw new Error(json.error || "Approval request failed.");
         applyApprovalCreatedLocally(json.approvalId, poNumber, data);
       }

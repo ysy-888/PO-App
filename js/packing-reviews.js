@@ -278,11 +278,9 @@ async function approvePendingPackingList(submissionId, { skipCartonSave = false,
   packingReviewOpInProgress = true;
   if (!silent) showIndicator(`Approving submission${ELLIPSIS}`, "");
   try {
-    const json = await postAppsScript({
-      action: "approvePendingPackingList",
-      submissionId,
-      skipCartonSave,
-    });
+    const json = (typeof isApiMode === "function" && isApiMode())
+      ? await postApi("/api/pending-packing-lists/approve", { submissionId, skipCartonSave })
+      : await postAppsScript({ action: "approvePendingPackingList", submissionId, skipCartonSave });
     if (!json.success) throw new Error(json.error);
     markPendingSubmissionApprovedLocally(submissionId);
     if (!silent) {
@@ -310,7 +308,9 @@ async function approveAllSelectedPendingPackingLists() {
   let failed = 0;
   try {
     for (const submissionId of ids) {
-      const json = await postAppsScript({ action: "approvePendingPackingList", submissionId });
+      const json = (typeof isApiMode === "function" && isApiMode())
+        ? await postApi("/api/pending-packing-lists/approve", { submissionId })
+        : await postAppsScript({ action: "approvePendingPackingList", submissionId });
       if (json.success) {
         markPendingSubmissionApprovedLocally(submissionId);
         ok++;
@@ -393,7 +393,12 @@ async function setVendorSubmitModeFromSettings(mode) {
   vendorSubmitModeLoaded = true;
   updateVendorSubmitModeCheck();
   try {
-    const json = await postAppsScript({ action: "setVendorSubmitMode", mode: newMode });
+    let json;
+    if (typeof isApiMode === "function" && isApiMode()) {
+      json = await postApi("/api/settings/vendor-submit-mode", { mode: newMode });
+    } else {
+      json = await postAppsScript({ action: "setVendorSubmitMode", mode: newMode });
+    }
     if (!json.success) throw new Error(json.error);
     showIndicator(`Vendor submissions: ${newMode === "direct" ? "Direct (immediate)" : "Review queue"} ${CHECK_MARK}`, "success");
   } catch (err) {

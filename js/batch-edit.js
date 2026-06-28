@@ -187,7 +187,12 @@ async function submitBatchEdit() {
   try {
     setAppSaving(true, `Updating ${items.length} POs...`);
     if (!isDemoMode()) {
-      const json = await postAppsScript({ action: "batchUpdatePos", items });
+      let json;
+      if (typeof isApiMode === "function" && isApiMode()) {
+        json = await postApi("/api/po/batch-update", { items });
+      } else {
+        json = await postAppsScript({ action: "batchUpdatePos", items });
+      }
       if (!json.success) throw new Error(json.error || "Batch edit failed");
     }
 
