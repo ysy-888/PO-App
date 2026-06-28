@@ -28,7 +28,7 @@ const APPS_SCRIPT_URL_TEST =
 // Set BACKEND to "api" to route all data through the Express + Supabase layer.
 // Set API_BASE_URL to your deployed Express server URL (no trailing slash).
 const BACKEND = "api"; // "appsscript" | "api"
-const API_BASE_URL = "http://localhost:4000"; // replace with Render/Railway URL when deployed
+const API_BASE_URL = "https://po-app-api.onrender.com";
 
 // Supabase anon key — safe to include in the browser (public key, not service-role).
 // Only used when BACKEND === "api".
