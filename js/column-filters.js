@@ -22,6 +22,15 @@ function getColumnFilterRawValue(col, row) {
     const qty = getPackingCtnQtyForRow(row);
     return qty > 0 ? qty : "";
   }
+  if (col === "PO Qty") {
+    const total = toQtyNumber(row["PO Qty"]);
+    if (total > 0) return total;
+    if (typeof computePoQtyFromUnits === "function") {
+      const fromUnits = computePoQtyFromUnits(row);
+      if (fromUnits > 0) return fromUnits;
+    }
+    return row[col];
+  }
   return row[col];
 }
 

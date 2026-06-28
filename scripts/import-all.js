@@ -23,6 +23,11 @@
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "fs";
 import { resolve } from "path";
+import {
+  pickImportUpdates,
+  pickChangedImportUpdates,
+  sanitizeUpdates,
+} from "../server/src/importHelpers.js";
 
 // ── Load .env ─────────────────────────────────────────────────────────────────
 try {
@@ -79,17 +84,64 @@ async function upsertSimple(tableName, rows, idField, { batchSize = 100 } = {}) 
 // ── POs ───────────────────────────────────────────────────────────────────────
 async function importPos(data) {
   if (!data || data.length === 0) { console.log("  purchase_orders: 0 rows."); return; }
-  const BATCH = 100;
-  for (let i = 0; i < data.length; i += BATCH) {
-    const records = data.slice(i, i + BATCH).map(row => ({
+
+  const poNumbers = [...new Set(data.map(row => String(row["PO #"] ?? "").trim()).filter(Boolean))];
+  const { data: existingRows, error: fetchErr } = await supabase
+    .from("purchase_orders")
+    .select("id, po_number, data")
+    .eq("tenant_id", TENANT_ID)
+    .in("po_number", poNumbers);
+
+  if (fetchErr) throw new Error("purchase_orders fetch failed: " + fetchErr.message);
+
+  const existingByPo = new Map((existingRows || []).map(row => [row.po_number, row]));
+  const toInsert = [];
+  const toUpdate = [];
+  let inserted = 0;
+  let updated = 0;
+
+  data.forEach(rowData => {
+    const poNumber = String(rowData["PO #"] ?? "").trim();
+    if (!poNumber) return;
+
+    const updates = pickImportUpdates(rowData);
+    const existing = existingByPo.get(poNumber);
+
+    if (existing) {
+      const changed = pickChangedImportUpdates(existing.data || {}, updates);
+      if (Object.keys(changed).length === 0) return;
+      toUpdate.push({
+        id: existing.id,
+        data: sanitizeUpdates({ ...(existing.data || {}), ...changed }),
+      });
+      updated++;
+      return;
+    }
+
+    toInsert.push({
       tenant_id: TENANT_ID,
-      po_number: String(row["PO #"] ?? "").trim(),
-      data: row,
-    })).filter(r => r.po_number !== "");
-    const { error } = await supabase.from("purchase_orders").upsert(records, { onConflict: "tenant_id,po_number" });
-    if (error) throw new Error("purchase_orders upsert failed: " + error.message);
+      po_number: poNumber,
+      data: sanitizeUpdates({ "PO #": poNumber, ...updates }),
+    });
+    inserted++;
+  });
+
+  const BATCH = 100;
+  for (let i = 0; i < toInsert.length; i += BATCH) {
+    const { error } = await supabase.from("purchase_orders").insert(toInsert.slice(i, i + BATCH));
+    if (error) throw new Error("purchase_orders insert failed: " + error.message);
   }
-  console.log(`  purchase_orders: ${data.length} rows upserted.`);
+
+  for (const row of toUpdate) {
+    const { error } = await supabase
+      .from("purchase_orders")
+      .update({ data: row.data })
+      .eq("id", row.id)
+      .eq("tenant_id", TENANT_ID);
+    if (error) throw new Error("purchase_orders update failed: " + error.message);
+  }
+
+  console.log(`  purchase_orders: ${inserted} inserted, ${updated} updated (${data.length} source rows).`);
 }
 
 // ── Packing Cartons (special: keyed by packing_list_entity_id + carton_number) ─
