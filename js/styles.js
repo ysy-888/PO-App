@@ -34,7 +34,7 @@ function onStylesDataLoaded(rows) {
 
 function applyStyleFilters() {
   const q = (document.getElementById("stylesSearchInput")?.value ?? "").toLowerCase();
-  filteredStyles = allStyles.filter(row => {
+  filteredStyles = (allStyles ?? []).filter(row => {
     if (!q) return true;
     return STYLE_SEARCH_COLUMNS
       .map(col => String(row[col] ?? ""))
@@ -89,6 +89,9 @@ function renderStylesTable() {
 
 function initStylesView() {
   document.getElementById("stylesSearchInput")?.addEventListener("input", applyStyleFilters);
+  document.getElementById("navTabStyles")?.addEventListener("click", () => {
+    if (typeof switchAppView === "function") switchAppView("styles");
+  });
 }
 
 initStylesView();

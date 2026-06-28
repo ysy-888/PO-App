@@ -37,6 +37,9 @@ async function loadData() {
           typeof DEMO_CUSTOMERS !== "undefined" ? DEMO_CUSTOMERS.map(r => ({ ...r })) : []
         );
       }
+      if (typeof onStylesDataLoaded === "function") {
+        onStylesDataLoaded([]);
+      }
       buildStylePhotoIndex(DEMO_STYLE_PHOTOS);
       applyDefaultStatusFilter(STATUS_FILTER_OPEN);
     } else if (typeof isApiMode === "function" && isApiMode()) {

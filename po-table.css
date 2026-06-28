@@ -7184,6 +7184,10 @@ body:not(.split-view-enabled) .app-main > .app-secondary-table:not([hidden]) {
   display: none !important;
 }
 
+#stylesTableWrap[hidden] {
+  display: none !important;
+}
+
 /* ── PO table + packing list side panel (vendor portal layout) ── */
 .po-view-content {
   flex: 1;
