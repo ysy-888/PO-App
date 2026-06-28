@@ -1281,11 +1281,9 @@ function clearPoShipmentDataAtRow_(poSheet, rowIndex, headers) {
   });
   const exfCol = headers.indexOf(EXF_REQUESTED_FIELD);
   const statusCol = headers.indexOf("Status");
-  if (exfCol !== -1) {
-    const exfRequested = poSheet.getRange(rowIndex, exfCol + 1).getValue();
-    if (isTruthyCell_(exfRequested) && statusCol !== -1) {
-      updates["Status"] = "Requested";
-    }
+  if (statusCol !== -1) {
+    const exfRequested = exfCol === -1 ? false : isTruthyCell_(poSheet.getRange(rowIndex, exfCol + 1).getValue());
+    updates["Status"] = exfRequested ? "Requested" : "WIP";
   }
   writePoFields_(poSheet, rowIndex, headers, updates);
 }
@@ -2095,10 +2093,18 @@ function assertPosEligibleForShipment_(poSheet, poNumbers) {
     if (!found) throw new Error("PO # not found: " + poNumber);
     const statusCol = found.headers.indexOf("Status");
     const exfCol = found.headers.indexOf(EXF_REQUESTED_FIELD);
+    const shipCol = found.headers.indexOf(SHIPMENT_ID_FIELD);
     const status = statusCol === -1 ? "" : String(poSheet.getRange(found.rowIndex, statusCol + 1).getValue() ?? "").trim();
     const exfRequested = exfCol === -1 ? false : isTruthyCell_(poSheet.getRange(found.rowIndex, exfCol + 1).getValue());
-    if (status !== "Requested" || !exfRequested) {
-      throw new Error("PO " + poNumber + " must be EXF Requested with Status Requested.");
+    const shipmentId = shipCol === -1 ? "" : String(poSheet.getRange(found.rowIndex, shipCol + 1).getValue() ?? "").trim();
+    if (shipmentId) {
+      throw new Error("PO " + poNumber + " is already assigned to a shipment.");
+    }
+    const eligible = exfRequested
+      ? status === "Requested"
+      : status === "WIP";
+    if (!eligible) {
+      throw new Error("PO " + poNumber + " must be WIP (without EXF request) or EXF Requested with Status Requested.");
     }
   });
 }

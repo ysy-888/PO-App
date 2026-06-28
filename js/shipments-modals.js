@@ -620,7 +620,7 @@ async function submitCreateShipment() {
     return row && !isPoEligibleForShipment(row);
   });
   if (ineligible.length > 0) {
-    showIndicator("Only EXF Requested POs with Status Requested can be added", "error");
+    showIndicator("POs must be WIP (no EXF request) or EXF Requested with Status Requested", "error");
     return;
   }
   beginToolbarCreatePending();
@@ -1112,7 +1112,7 @@ function openCreateShipmentFromSelection() {
   const skipped = selected.length - eligible.length;
 
   if (eligible.length === 0) {
-    showIndicator("Selected POs must be EXF Requested with Status Requested", "error");
+    showIndicator("Selected POs must be WIP (no EXF request) or EXF Requested with Status Requested", "error");
     return;
   }
 

@@ -1140,7 +1140,7 @@ function openCreateShipmentFromExfRequest() {
     .filter(Boolean);
   const eligible = rows.filter(isPoEligibleForShipment);
   if (eligible.length === 0) {
-    setExfRequestFooterMessage("No POs are eligible for shipment (already on a shipment or not in Requested status)");
+    setExfRequestFooterMessage("No POs are eligible for shipment (already on a shipment or ineligible status)");
     return;
   }
 

@@ -125,9 +125,10 @@ function isPoEligibleForExfRequest(row) {
 }
 
 function isPoEligibleForShipment(row) {
-  return isExfRequested(row) &&
-    getRowStatus(row) === "Requested" &&
-    !poHasShipment(row);
+  if (!row || poHasShipment(row)) return false;
+  const status = getRowStatus(row);
+  if (isExfRequested(row)) return status === "Requested";
+  return status === "WIP";
 }
 
 function poHasPackingList(row) {
@@ -223,11 +224,7 @@ function isPoEligibleForPickupRequest(row) {
 }
 
 function getAvailableRequestedPos() {
-  return allRows.filter(row =>
-    isExfRequested(row) &&
-    getRowStatus(row) === "Requested" &&
-    !poHasShipment(row)
-  );
+  return allRows.filter(isPoEligibleForShipment);
 }
 
 function validateShipmentRequiredFields(shipment) {

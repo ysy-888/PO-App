@@ -92,9 +92,7 @@ function clearPoShipmentData(row) {
   row[SHIPMENT_ID_FIELD] = "";
   SHIPMENT_PO_CLEAR_FIELDS.forEach(field => { row[field] = ""; });
   row["EST IHD"] = calculateEstIhd(row["Ship Method"], row["EST EXF"]);
-  if (isExfRequested(row)) {
-    row["Status"] = "Requested";
-  }
+  row["Status"] = isExfRequested(row) ? "Requested" : "WIP";
 }
 
 function getShipmentById(id) {
