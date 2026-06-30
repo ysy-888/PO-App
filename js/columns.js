@@ -332,6 +332,13 @@ const DEFAULT_COLUMN_ORDER = [...COLUMNS];
 const COLUMN_LAYOUT_STORAGE_BASE = "columnLayout";
 const PROGRAM_COLUMN_DEFAULT_STORAGE_BASE = "programColumnDefault";
 
+function getColumnLayoutPreferencePayload() {
+  return {
+    order: getColumnOrder(),
+    visible: [...visibleColumns],
+  };
+}
+
 function hasStoredColumnLayout() {
   try {
     return Boolean(localStorage.getItem(scopedStorageKey(COLUMN_LAYOUT_STORAGE_BASE)));
@@ -342,32 +349,43 @@ function hasStoredColumnLayout() {
 
 function saveColumnLayoutPreference() {
   try {
-    localStorage.setItem(scopedStorageKey(COLUMN_LAYOUT_STORAGE_BASE), JSON.stringify({
-      order: getColumnOrder(),
-      visible: [...visibleColumns],
-    }));
+    localStorage.setItem(scopedStorageKey(COLUMN_LAYOUT_STORAGE_BASE), JSON.stringify(getColumnLayoutPreferencePayload()));
   } catch {
     /* ignore storage failures */
   }
+}
+
+function applyColumnLayoutPreferenceData(data, { updateDom = false } = {}) {
+  if (!data || typeof data !== "object") return false;
+  const order = Array.isArray(data.order) ? normalizeColumnOrder(data.order) : null;
+  const visibleList = Array.isArray(data.visible) ? data.visible : null;
+  if (!order || !visibleList || visibleList.length === 0) return false;
+  columnOrder = order;
+  visibleColumns = buildVisibleColumnsFromDraft(
+    new Set(visibleList.filter(col => COLUMNS.includes(col)))
+  );
+  migrateVisibleColumnsForNewFields();
+  if (updateDom) {
+    applyColumnOrder();
+    applyColumnVisibility();
+  }
+  return true;
 }
 
 function loadColumnLayoutPreference() {
   try {
     const raw = localStorage.getItem(scopedStorageKey(COLUMN_LAYOUT_STORAGE_BASE));
     if (!raw) return false;
-    const data = JSON.parse(raw);
-    if (!data || typeof data !== "object") return false;
-    const order = Array.isArray(data.order) ? normalizeColumnOrder(data.order) : null;
-    const visibleList = Array.isArray(data.visible) ? data.visible : null;
-    if (!order || !visibleList || visibleList.length === 0) return false;
-    columnOrder = order;
-    visibleColumns = buildVisibleColumnsFromDraft(
-      new Set(visibleList.filter(col => COLUMNS.includes(col)))
-    );
-    return true;
+    return applyColumnLayoutPreferenceData(JSON.parse(raw));
   } catch {
     return false;
   }
+}
+
+function applyColumnLayoutFromServer(data) {
+  const ok = applyColumnLayoutPreferenceData(data, { updateDom: true });
+  if (ok) saveColumnLayoutPreference();
+  return ok;
 }
 
 function getColumnOrder() {
@@ -643,8 +661,9 @@ function loadProgramColumnDefaultFromStorage() {
 }
 
 function loadColumnVisibility() {
-  loadProgramColumnDefaultFromStorage();
-  if (loadColumnLayoutPreference()) {
+  const databaseSettingsMode = typeof isApiMode === "function" && isApiMode();
+  if (!databaseSettingsMode) loadProgramColumnDefaultFromStorage();
+  if (!databaseSettingsMode && loadColumnLayoutPreference()) {
     migrateVisibleColumnsForNewFields();
     return;
   }
@@ -699,7 +718,8 @@ function applyDefaultColumnsFromServer(data) {
     return false;
   }
 
-  if (!hasStoredColumnLayout()) {
+  const databaseSettingsMode = typeof isApiMode === "function" && isApiMode();
+  if (databaseSettingsMode || !hasStoredColumnLayout()) {
     columnOrder = normalizeColumnOrder([...DEFAULT_COLUMN_ORDER]);
     visibleColumns = getDefaultVisibleColumnsSet();
     applyColumnOrder();
@@ -730,6 +750,7 @@ async function saveDefaultColumnVisibility() {
       columns: [...DEFAULT_VISIBLE_COLUMNS],
       columnOrder: [...DEFAULT_COLUMN_ORDER],
       statusFilter: defaultStatusFilter,
+      columnLayout: getColumnLayoutPreferencePayload(),
     };
     let json;
     if (typeof isApiMode === "function" && isApiMode()) {
@@ -953,6 +974,9 @@ function applyEditTableFromPopover() {
   applyColumnOrder();
   applyColumnVisibility();
   saveColumnLayoutPreference();
+  if (typeof persistUserPreferencePatch === "function") {
+    persistUserPreferencePatch({ columnLayout: getColumnLayoutPreferencePayload() });
+  }
   if (typeof updateColumnFilterHeaderStates === "function") updateColumnFilterHeaderStates();
   clearEditTableFooterMessage();
   if (typeof closeSettingsModal === "function") closeSettingsModal();

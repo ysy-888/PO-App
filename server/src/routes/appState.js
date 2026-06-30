@@ -36,6 +36,7 @@ router.get("/app-state", requireAuth, async (req, res) => {
       stylePhotosResult,
       stylesResult,
       settingsResult,
+      userSettingsResult,
     ] = await Promise.all([
       supabase.from("purchase_orders").select("data").eq("tenant_id", tid).order("created_at", { ascending: true }),
       supabase.from("shipments").select("data").eq("tenant_id", tid).order("created_at", { ascending: true }),
@@ -54,6 +55,7 @@ router.get("/app-state", requireAuth, async (req, res) => {
       supabase.from("style_photos").select("data").eq("tenant_id", tid),
       supabase.from("styles").select("data").eq("tenant_id", tid).order("created_at", { ascending: true }),
       supabase.from("tenant_settings").select("settings").eq("tenant_id", tid).maybeSingle(),
+      supabase.from("user_settings").select("settings").eq("tenant_id", tid).eq("user_id", req.userId).maybeSingle(),
     ]);
 
     // Surface any Supabase errors.  Tables from migration 002 may not exist
@@ -78,6 +80,16 @@ router.get("/app-state", requireAuth, async (req, res) => {
       console.warn("Migration 002 not applied — returning POs only.");
     }
 
+    const settingsError = [settingsResult, userSettingsResult].find(r => r.error);
+    if (settingsError?.error) {
+      const code = settingsError.error.code;
+      if (code !== "42P01") {
+        console.error("settings query failed:", settingsError.error);
+        return res.status(500).json({ success: false, error: "Failed to load settings." });
+      }
+      console.warn("Settings migration not applied — returning default settings.");
+    }
+
     // Unwrap helpers
     const rows = (r) => (r.error ? [] : (r.data || []).map(row => row.data));
 
@@ -88,11 +100,19 @@ router.get("/app-state", requireAuth, async (req, res) => {
       ...row.data,
     }));
 
-    // Settings: fall back to defaults if no row exists yet.
-    const settings = settingsResult.data?.settings || {};
+    // Settings: vendor mode is tenant-wide; UI/table preferences are per-user.
+    const settings = settingsResult.error ? {} : (settingsResult.data?.settings || {});
+    const userSettings = userSettingsResult.error ? {} : (userSettingsResult.data?.settings || {});
     const vendorSubmitMode = settings.vendorSubmitMode ?? "review";
-    const defaultColumns = settings.defaultColumns ?? null;
-    const defaultStatusFilter = settings.defaultStatusFilter ?? "__open__";
+    const buildDefaultColumns = (source) => {
+      if (!source.defaultColumns) return null;
+      if (Array.isArray(source.defaultColumnOrder)) {
+        return { order: source.defaultColumnOrder, visible: source.defaultColumns };
+      }
+      return source.defaultColumns;
+    };
+    const defaultColumns = buildDefaultColumns(userSettings) ?? buildDefaultColumns(settings);
+    const defaultStatusFilter = userSettings.defaultStatusFilter ?? settings.defaultStatusFilter ?? "__open__";
 
     return res.json({
       success: true,
@@ -121,6 +141,7 @@ router.get("/app-state", requireAuth, async (req, res) => {
       styles: rows(stylesResult),
       // Settings
       vendorSubmitMode,
+      userSettings,
       defaultColumns,
       defaultStatusFilter,
     });

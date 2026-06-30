@@ -155,7 +155,9 @@ async function resendPickupRequestEmail(requestId) {
       }
       applyPickupRequestFilters();
     } else {
-      const json = await postAppsScript({ action: "resendPickupRequestEmail", pickupRequestId: requestId });
+      const json = (typeof isApiMode === "function" && isApiMode())
+        ? await postApi("/api/requests/pickup/resend-email", { pickupRequestId: requestId })
+        : await postAppsScript({ action: "resendPickupRequestEmail", pickupRequestId: requestId });
       if (!json.success) throw new Error(json.error);
       const request = allPickupRequests.find(r => String(r[PICKUP_REQUEST_ID_FIELD] ?? "").trim() === requestId);
       if (request) {
@@ -618,6 +620,7 @@ async function submitPickupRequest() {
     isEdit ? `Saving${ELLIPSIS}` : `Creating pickup request${ELLIPSIS}`,
     ""
   );
+  let emailWarning = "";
 
   try {
     if (isDemoMode()) {
@@ -644,11 +647,19 @@ async function submitPickupRequest() {
         applyPickupRequestUpdatedLocally(savedRow[PICKUP_REQUEST_ID_FIELD], data);
       } else {
         applyPickupRequestCreatedLocally(json.pickupRequestId, poNumbers, data);
+        if (json.request) {
+          const request = allPickupRequests.find(r => String(r[PICKUP_REQUEST_ID_FIELD] ?? "").trim() === json.pickupRequestId);
+          if (request) Object.assign(request, json.request);
+          applyPickupRequestFilters();
+        }
+        if (json.emailSent === false) emailWarning = json.emailError || "Unknown email error";
       }
     }
     showIndicator(
-      isEdit ? `Saved ${CHECK_MARK}` : `Pickup request created and email sent ${CHECK_MARK}`,
-      "success"
+      isEdit
+        ? `Saved ${CHECK_MARK}`
+        : (emailWarning ? `Pickup request created, but email not sent: ${emailWarning}` : `Pickup request created and email sent ${CHECK_MARK}`),
+      emailWarning ? "error" : "success"
     );
   } catch (err) {
     showIndicator("Pickup request failed: " + err.message, "error");

@@ -1,8 +1,8 @@
 /**
  * Request routes — EXF, ASN, Delivery, Pickup, Approval requests.
  *
- * Email actions (resend*Email, sendAsnPickupEmail) still call Apps Script and
- * are NOT handled here.  Those routes will be added when email is migrated.
+ * Email actions are handled through the API and use Apps Script only as the
+ * mail relay, so Supabase remains the source of truth for status fields.
  *
  * POST /api/requests/exf/create
  * POST /api/requests/asn/create
@@ -18,6 +18,13 @@ import { Router } from "express";
 import supabase from "../supabase.js";
 import { requireAuth } from "../auth.js";
 import { sanitizeUpdates } from "../importHelpers.js";
+import { sendEmail } from "../email.js";
+import {
+  buildApprovalEmail,
+  buildAsnEmail,
+  buildDeliveryPickupEmail,
+  buildExfEmail,
+} from "../emailTemplates.js";
 
 const router = Router();
 
@@ -53,6 +60,108 @@ async function updatePoFields(tenantId, poNumbers, updates) {
   }
 }
 
+function todayYmd() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function splitPoNumbers(value) {
+  if (Array.isArray(value)) return value.map(String).map(s => s.trim()).filter(Boolean);
+  return String(value ?? "").split(",").map(s => s.trim()).filter(Boolean);
+}
+
+async function fetchPoRows(tenantId, poNumbers) {
+  const normalized = splitPoNumbers(poNumbers);
+  if (normalized.length === 0) return [];
+  const { data, error } = await supabase
+    .from("purchase_orders")
+    .select("id, po_number, data")
+    .eq("tenant_id", tenantId)
+    .in("po_number", normalized.map(String));
+  if (error) throw error;
+  const byPo = new Map((data || []).map(row => [String(row.po_number), row.data || {}]));
+  return normalized.map(po => byPo.get(String(po))).filter(Boolean);
+}
+
+function emailFieldsFromResult(result, hasRecipient, now = todayYmd()) {
+  return {
+    "Email Status": result.emailSent ? "Sent" : (hasRecipient ? "Failed" : "Not Sent"),
+    "Email Sent At": result.emailSent ? now : "",
+    "Last Email Attempt At": hasRecipient ? now : "",
+    "Email Error": result.emailError || "",
+    "Updated At": now,
+  };
+}
+
+async function updateRequestData(tableName, tenantId, entityId, data) {
+  const { error } = await supabase
+    .from(tableName)
+    .update({ data })
+    .eq("tenant_id", tenantId)
+    .eq("entity_id", entityId);
+  if (error) throw error;
+}
+
+async function getRequestRow(tableName, tenantId, entityId) {
+  const { data, error } = await supabase
+    .from(tableName)
+    .select("id, entity_id, data")
+    .eq("tenant_id", tenantId)
+    .eq("entity_id", entityId)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+async function sendAndStoreRequestEmail({ tenantId, tableName, entityId, type, requestData, poRows = [], poRow = null }) {
+  const builders = {
+    exf: () => buildExfEmail(entityId, requestData, poRows),
+    asn: () => buildAsnEmail(entityId, requestData, poRows),
+    delivery: () => buildDeliveryPickupEmail("Delivery", entityId, requestData, poRows),
+    pickup: () => buildDeliveryPickupEmail("Pickup", entityId, requestData, poRows),
+    approval: () => buildApprovalEmail(entityId, requestData, poRow || poRows[0] || {}),
+  };
+  const message = builders[type]();
+  const hasRecipient = Boolean(String(message.to ?? "").trim());
+  const result = await sendEmail(message);
+  const fields = emailFieldsFromResult(result, hasRecipient);
+  const updatedData = { ...(requestData || {}), ...fields };
+  await updateRequestData(tableName, tenantId, entityId, updatedData);
+  return { ...result, data: updatedData };
+}
+
+async function resendStoredRequestEmail({ tenantId, tableName, entityId, type }) {
+  const row = await getRequestRow(tableName, tenantId, entityId);
+  if (!row) return { notFound: true };
+  const requestData = row.data || {};
+  const poRows = await fetchPoRows(tenantId, splitPoNumbers(requestData["PO Numbers"] || requestData["PO #"]));
+  return sendAndStoreRequestEmail({
+    tenantId,
+    tableName,
+    entityId,
+    type,
+    requestData,
+    poRows,
+    poRow: poRows[0] || null,
+  });
+}
+
+async function getContactEmailInfo(tenantId, entityName) {
+  const target = String(entityName ?? "").trim().toLowerCase();
+  if (!target) return { email: "", cc: "" };
+  const { data } = await supabase
+    .from("contacts")
+    .select("data")
+    .eq("tenant_id", tenantId);
+  const row = (data || [])
+    .map(item => item.data || {})
+    .reverse()
+    .find(item => String(item.Name ?? item.Entity ?? "").trim().toLowerCase() === target);
+  return {
+    email: String(row?.Email ?? "").trim(),
+    cc: String(row?.CC ?? row?.Cc ?? "").trim(),
+  };
+}
+
 // ── EXF REQUEST ───────────────────────────────────────────────────────────────
 
 router.post("/exf/create", requireAuth, async (req, res) => {
@@ -63,7 +172,7 @@ router.post("/exf/create", requireAuth, async (req, res) => {
 
   try {
     const requestId = await nextId(req.tenantId, "exf_requests", "EXF");
-    const now = new Date().toISOString().slice(0, 10);
+    const now = todayYmd();
 
     // Resolve vendor name from any matching PO.
     const { data: poRows } = await supabase
@@ -92,6 +201,15 @@ router.post("/exf/create", requireAuth, async (req, res) => {
     });
     if (insertErr) throw insertErr;
 
+    const emailResult = await sendAndStoreRequestEmail({
+      tenantId: req.tenantId,
+      tableName: "exf_requests",
+      entityId: requestId,
+      type: "exf",
+      requestData,
+      poRows: (poRows || []).map(row => row.data || {}),
+    });
+
     // Update linked POs with EXF fields.
     const poUpdateBase = {
       "EXF Requested": true,
@@ -113,7 +231,13 @@ router.post("/exf/create", requireAuth, async (req, res) => {
         .eq("data->>'PO #'", poNumber);
     }
 
-    return res.json({ success: true, exfRequestId: requestId });
+    return res.json({
+      success: true,
+      exfRequestId: requestId,
+      emailSent: emailResult.emailSent,
+      emailError: emailResult.emailError,
+      request: emailResult.data,
+    });
   } catch (err) {
     console.error("exf create failed:", err);
     return res.status(500).json({ success: false, error: err.message || "Failed to create EXF request." });
@@ -130,7 +254,7 @@ router.post("/asn/create", requireAuth, async (req, res) => {
 
   try {
     const requestId = await nextId(req.tenantId, "asn_requests", "ASN");
-    const now = new Date().toISOString().slice(0, 10);
+    const now = todayYmd();
 
     const requestData = sanitizeUpdates({
       "ASN Request ID": requestId,
@@ -149,6 +273,16 @@ router.post("/asn/create", requireAuth, async (req, res) => {
     });
     if (insertErr) throw insertErr;
 
+    const poRows = await fetchPoRows(req.tenantId, poNumbers);
+    const emailResult = await sendAndStoreRequestEmail({
+      tenantId: req.tenantId,
+      tableName: "asn_requests",
+      entityId: requestId,
+      type: "asn",
+      requestData,
+      poRows,
+    });
+
     await updatePoFields(req.tenantId, poNumbers, {
       "ASN Request ID": requestId,
       "ASN Requested": true,
@@ -156,7 +290,13 @@ router.post("/asn/create", requireAuth, async (req, res) => {
       "ASN Req Date": now,
     });
 
-    return res.json({ success: true, asnRequestId: requestId });
+    return res.json({
+      success: true,
+      asnRequestId: requestId,
+      emailSent: emailResult.emailSent,
+      emailError: emailResult.emailError,
+      request: emailResult.data,
+    });
   } catch (err) {
     console.error("asn create failed:", err);
     return res.status(500).json({ success: false, error: err.message || "Failed to create ASN request." });
@@ -170,7 +310,7 @@ router.post("/delivery/create", requireAuth, async (req, res) => {
 
   try {
     const requestId = await nextId(req.tenantId, "delivery_requests", "DR");
-    const now = new Date().toISOString().slice(0, 10);
+    const now = todayYmd();
 
     const requestData = sanitizeUpdates({
       "Delivery Request ID": requestId,
@@ -187,6 +327,16 @@ router.post("/delivery/create", requireAuth, async (req, res) => {
     });
     if (error) throw error;
 
+    const poRows = await fetchPoRows(req.tenantId, poNumbers);
+    const emailResult = await sendAndStoreRequestEmail({
+      tenantId: req.tenantId,
+      tableName: "delivery_requests",
+      entityId: requestId,
+      type: "delivery",
+      requestData,
+      poRows,
+    });
+
     if (Array.isArray(poNumbers) && poNumbers.length > 0) {
       await updatePoFields(req.tenantId, poNumbers, {
         "Delivery Request ID": requestId,
@@ -196,7 +346,13 @@ router.post("/delivery/create", requireAuth, async (req, res) => {
       });
     }
 
-    return res.json({ success: true, deliveryRequestId: requestId });
+    return res.json({
+      success: true,
+      deliveryRequestId: requestId,
+      emailSent: emailResult.emailSent,
+      emailError: emailResult.emailError,
+      request: emailResult.data,
+    });
   } catch (err) {
     console.error("delivery create failed:", err);
     return res.status(500).json({ success: false, error: err.message || "Failed to create delivery request." });
@@ -213,7 +369,7 @@ router.post("/delivery/update", requireAuth, async (req, res) => {
     if (fetchErr) throw fetchErr;
     if (!existing) return res.status(404).json({ success: false, error: "Delivery request not found." });
 
-    const now = new Date().toISOString().slice(0, 10);
+    const now = todayYmd();
     const merged = { ...(existing.data || {}), ...sanitizeUpdates(request || {}), "Updated At": now };
     const { error } = await supabase.from("delivery_requests").update({ data: merged }).eq("id", existing.id).eq("tenant_id", req.tenantId);
     if (error) throw error;
@@ -232,7 +388,7 @@ router.post("/pickup/create", requireAuth, async (req, res) => {
 
   try {
     const requestId = await nextId(req.tenantId, "pickup_requests", "PR");
-    const now = new Date().toISOString().slice(0, 10);
+    const now = todayYmd();
 
     const requestData = sanitizeUpdates({
       "Pickup Request ID": requestId,
@@ -249,6 +405,16 @@ router.post("/pickup/create", requireAuth, async (req, res) => {
     });
     if (error) throw error;
 
+    const poRows = await fetchPoRows(req.tenantId, poNumbers);
+    const emailResult = await sendAndStoreRequestEmail({
+      tenantId: req.tenantId,
+      tableName: "pickup_requests",
+      entityId: requestId,
+      type: "pickup",
+      requestData,
+      poRows,
+    });
+
     if (Array.isArray(poNumbers) && poNumbers.length > 0) {
       await updatePoFields(req.tenantId, poNumbers, {
         "Pickup Request ID": requestId,
@@ -258,7 +424,13 @@ router.post("/pickup/create", requireAuth, async (req, res) => {
       });
     }
 
-    return res.json({ success: true, pickupRequestId: requestId });
+    return res.json({
+      success: true,
+      pickupRequestId: requestId,
+      emailSent: emailResult.emailSent,
+      emailError: emailResult.emailError,
+      request: emailResult.data,
+    });
   } catch (err) {
     console.error("pickup create failed:", err);
     return res.status(500).json({ success: false, error: err.message || "Failed to create pickup request." });
@@ -275,7 +447,7 @@ router.post("/pickup/update", requireAuth, async (req, res) => {
     if (fetchErr) throw fetchErr;
     if (!existing) return res.status(404).json({ success: false, error: "Pickup request not found." });
 
-    const now = new Date().toISOString().slice(0, 10);
+    const now = todayYmd();
     const merged = { ...(existing.data || {}), ...sanitizeUpdates(request || {}), "Updated At": now };
     const { error } = await supabase.from("pickup_requests").update({ data: merged }).eq("id", existing.id).eq("tenant_id", req.tenantId);
     if (error) throw error;
@@ -295,7 +467,7 @@ router.post("/approval/create", requireAuth, async (req, res) => {
 
   try {
     const requestId = await nextId(req.tenantId, "approvals", "APR");
-    const now = new Date().toISOString().slice(0, 10);
+    const now = todayYmd();
 
     const approvalData = sanitizeUpdates({
       "Approval ID": requestId,
@@ -311,9 +483,26 @@ router.post("/approval/create", requireAuth, async (req, res) => {
     });
     if (insertErr) throw insertErr;
 
+    const poRows = await fetchPoRows(req.tenantId, [poNumber]);
+    const emailResult = await sendAndStoreRequestEmail({
+      tenantId: req.tenantId,
+      tableName: "approvals",
+      entityId: requestId,
+      type: "approval",
+      requestData: approvalData,
+      poRows,
+      poRow: poRows[0] || null,
+    });
+
     await updatePoFields(req.tenantId, [poNumber], { "Approval ID": requestId });
 
-    return res.json({ success: true, approvalId: requestId });
+    return res.json({
+      success: true,
+      approvalId: requestId,
+      emailSent: emailResult.emailSent,
+      emailError: emailResult.emailError,
+      request: emailResult.data,
+    });
   } catch (err) {
     console.error("approval create failed:", err);
     return res.status(500).json({ success: false, error: err.message || "Failed to create approval." });
@@ -330,7 +519,7 @@ router.post("/approval/update", requireAuth, async (req, res) => {
     if (fetchErr) throw fetchErr;
     if (!existing) return res.status(404).json({ success: false, error: "Approval not found." });
 
-    const now = new Date().toISOString().slice(0, 10);
+    const now = todayYmd();
     const merged = { ...(existing.data || {}), "Updated At": now };
     if (status !== undefined) merged["Status"] = status;
 
@@ -357,6 +546,143 @@ router.post("/approval/update", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("approval update failed:", err);
     return res.status(500).json({ success: false, error: err.message || "Failed to update approval." });
+  }
+});
+
+router.post("/exf/resend-email", requireAuth, async (req, res) => {
+  const { exfRequestId } = req.body || {};
+  if (!exfRequestId) return res.status(400).json({ success: false, error: "exfRequestId is required." });
+  try {
+    const result = await resendStoredRequestEmail({
+      tenantId: req.tenantId,
+      tableName: "exf_requests",
+      entityId: exfRequestId,
+      type: "exf",
+    });
+    if (result.notFound) return res.status(404).json({ success: false, error: "EXF request not found." });
+    return res.json({ success: true, emailSent: result.emailSent, emailError: result.emailError, request: result.data });
+  } catch (err) {
+    console.error("exf resend failed:", err);
+    return res.status(500).json({ success: false, error: err.message || "Failed to resend EXF email." });
+  }
+});
+
+router.post("/asn/resend-email", requireAuth, async (req, res) => {
+  const { asnRequestId } = req.body || {};
+  if (!asnRequestId) return res.status(400).json({ success: false, error: "asnRequestId is required." });
+  try {
+    const result = await resendStoredRequestEmail({
+      tenantId: req.tenantId,
+      tableName: "asn_requests",
+      entityId: asnRequestId,
+      type: "asn",
+    });
+    if (result.notFound) return res.status(404).json({ success: false, error: "ASN request not found." });
+    return res.json({ success: true, emailSent: result.emailSent, emailError: result.emailError, request: result.data });
+  } catch (err) {
+    console.error("asn resend failed:", err);
+    return res.status(500).json({ success: false, error: err.message || "Failed to resend ASN email." });
+  }
+});
+
+router.post("/delivery/resend-email", requireAuth, async (req, res) => {
+  const { deliveryRequestId } = req.body || {};
+  if (!deliveryRequestId) return res.status(400).json({ success: false, error: "deliveryRequestId is required." });
+  try {
+    const result = await resendStoredRequestEmail({
+      tenantId: req.tenantId,
+      tableName: "delivery_requests",
+      entityId: deliveryRequestId,
+      type: "delivery",
+    });
+    if (result.notFound) return res.status(404).json({ success: false, error: "Delivery request not found." });
+    return res.json({ success: true, emailSent: result.emailSent, emailError: result.emailError, request: result.data });
+  } catch (err) {
+    console.error("delivery resend failed:", err);
+    return res.status(500).json({ success: false, error: err.message || "Failed to resend delivery email." });
+  }
+});
+
+router.post("/pickup/resend-email", requireAuth, async (req, res) => {
+  const { pickupRequestId } = req.body || {};
+  if (!pickupRequestId) return res.status(400).json({ success: false, error: "pickupRequestId is required." });
+  try {
+    const result = await resendStoredRequestEmail({
+      tenantId: req.tenantId,
+      tableName: "pickup_requests",
+      entityId: pickupRequestId,
+      type: "pickup",
+    });
+    if (result.notFound) return res.status(404).json({ success: false, error: "Pickup request not found." });
+    return res.json({ success: true, emailSent: result.emailSent, emailError: result.emailError, request: result.data });
+  } catch (err) {
+    console.error("pickup resend failed:", err);
+    return res.status(500).json({ success: false, error: err.message || "Failed to resend pickup email." });
+  }
+});
+
+router.post("/approval/resend-email", requireAuth, async (req, res) => {
+  const { approvalId } = req.body || {};
+  if (!approvalId) return res.status(400).json({ success: false, error: "approvalId is required." });
+  try {
+    const result = await resendStoredRequestEmail({
+      tenantId: req.tenantId,
+      tableName: "approvals",
+      entityId: approvalId,
+      type: "approval",
+    });
+    if (result.notFound) return res.status(404).json({ success: false, error: "Approval not found." });
+    return res.json({ success: true, emailSent: result.emailSent, emailError: result.emailError, request: result.data });
+  } catch (err) {
+    console.error("approval resend failed:", err);
+    return res.status(500).json({ success: false, error: err.message || "Failed to resend approval email." });
+  }
+});
+
+router.post("/asn-pickup/send-email", requireAuth, async (req, res) => {
+  const { asnRequestId, labelInputs } = req.body || {};
+  if (!asnRequestId) return res.status(400).json({ success: false, error: "asnRequestId is required." });
+
+  try {
+    const row = await getRequestRow("asn_requests", req.tenantId, asnRequestId);
+    if (!row) return res.status(404).json({ success: false, error: "ASN request not found." });
+    const asnData = row.data || {};
+    if (String(asnData["Email Status"] ?? "").trim() !== "Sent") {
+      return res.status(400).json({ success: false, error: "ASN request must be completed before sending ASN Pickup." });
+    }
+
+    const logistics = await getContactEmailInfo(req.tenantId, "FORERUNNER LOGISTICS");
+    const pickupRequestId = `ASN Pickup ${asnRequestId}`;
+    const pickupData = {
+      "Pickup Date": asnData["ASN Date"] ?? "",
+      "Request Date": todayYmd(),
+      From: "FORERUNNER LOGISTICS",
+      To: asnData.Buyer ?? "",
+      "Email To": logistics.email,
+      "Email CC": logistics.cc,
+      "Pickup Req Notes": `ASN pickup for ${asnRequestId}`,
+    };
+    const poRows = await fetchPoRows(req.tenantId, splitPoNumbers(asnData["PO Numbers"]));
+    const message = buildDeliveryPickupEmail("Pickup", pickupRequestId, pickupData, poRows);
+    const hasRecipient = Boolean(String(message.to ?? "").trim());
+    const result = await sendEmail(message);
+    const now = todayYmd();
+    const updated = {
+      ...asnData,
+      "ASN Pickup Email Status": result.emailSent ? "Sent" : (hasRecipient ? "Failed" : "Not Sent"),
+      "ASN Pickup Email Sent At": result.emailSent ? now : (asnData["ASN Pickup Email Sent At"] ?? ""),
+      "ASN Pickup Email Error": result.emailError || "",
+      "ASN Pickup Label Data": Array.isArray(labelInputs) && labelInputs.length > 0
+        ? JSON.stringify(labelInputs)
+        : (asnData["ASN Pickup Label Data"] ?? ""),
+      "Updated At": now,
+    };
+    await updateRequestData("asn_requests", req.tenantId, asnRequestId, updated);
+
+    return res.json({ success: true, emailSent: result.emailSent, emailError: result.emailError, request: updated });
+  } catch (err) {
+    console.error("asn pickup email failed:", err);
+    return res.status(500).json({ success: false, error: err.message || "Failed to send ASN Pickup email." });
   }
 });
 

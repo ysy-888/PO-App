@@ -324,10 +324,12 @@ async function resendExfRequestEmail(requestId) {
       }
       applyExfRequestFilters();
     } else {
-      const json = await postAppsScript({
-        action: "resendExfRequestEmail",
-        exfRequestId: requestId,
-      });
+      const json = (typeof isApiMode === "function" && isApiMode())
+        ? await postApi("/api/requests/exf/resend-email", { exfRequestId: requestId })
+        : await postAppsScript({
+            action: "resendExfRequestEmail",
+            exfRequestId: requestId,
+          });
       if (!json.success) throw new Error(json.error);
       const request = allExfRequests.find(r => getExfRequestRecordId(r) === requestId);
       if (request) {
@@ -1015,6 +1017,7 @@ async function submitExfRequest() {
 
   const rows = getExfRequestRows();
   const vendor = getExfRequestVendorForRows(rows);
+  let emailWarning = "";
 
   try {
     if (isDemoMode()) {
@@ -1049,8 +1052,17 @@ async function submitExfRequest() {
         data["Vendor Email"],
         { cc: data[EXF_REQ_CC_FIELD], exfReqNotes, vendor }
       );
+      if (json.request) {
+        const request = allExfRequests.find(r => getExfRequestRecordId(r) === json.exfRequestId);
+        if (request) Object.assign(request, json.request);
+        applyExfRequestFilters();
+      }
+      if (json.emailSent === false) emailWarning = json.emailError || "Unknown email error";
     }
-    showIndicator(`EXF requested and email sent ${CHECK_MARK}`, "success");
+    showIndicator(
+      emailWarning ? `EXF requested, but email not sent: ${emailWarning}` : `EXF requested and email sent ${CHECK_MARK}`,
+      emailWarning ? "error" : "success"
+    );
   } catch (err) {
     showIndicator("EXF email not sent: " + err.message, "error");
   } finally {

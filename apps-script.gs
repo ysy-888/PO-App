@@ -2086,6 +2086,28 @@ function handleBatchSendCustomerEmail(payload) {
   });
 }
 
+function handleSendRawEmail(payload) {
+  const to = normalizeEmailRecipients_(payload.to);
+  const cc = normalizeEmailRecipients_(payload.cc);
+  const subject = String(payload.subject ?? "").trim();
+  const body = String(payload.body ?? "").trim();
+  const htmlBody = String(payload.htmlBody ?? "").trim();
+
+  if (!to) return corsResponse({ success: false, error: "Recipient email is required." });
+  if (!subject) return corsResponse({ success: false, error: "Subject is required." });
+  if (!body && !htmlBody) return corsResponse({ success: false, error: "Message body is required." });
+
+  const options = {
+    to: to,
+    subject: subject,
+    body: body || htmlBody.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim(),
+  };
+  if (htmlBody) options.htmlBody = htmlBody;
+  if (cc) options.cc = cc;
+  MailApp.sendEmail(options);
+  return corsResponse({ success: true });
+}
+
 function assertPosEligibleForShipment_(poSheet, poNumbers) {
   const list = Array.isArray(poNumbers) ? poNumbers.map(String) : [];
   list.forEach(poNumber => {
@@ -5354,6 +5376,7 @@ function doPost(e) {
     if (action === "bulkUpsertCustomers") return handleBulkUpsertCustomers(payload);
     if (action === "sendCustomerEmail") return handleSendCustomerEmail(payload);
     if (action === "batchSendCustomerEmail") return handleBatchSendCustomerEmail(payload);
+    if (action === "sendRawEmail") return handleSendRawEmail(payload);
     if (action === "createVendorPortalLink") return handleCreateVendorPortalLink(payload);
     if (action === "setVendorSubmitMode") return handleSetVendorSubmitMode(payload);
     if (action === "approvePendingPackingList") return handleApprovePendingPackingList(payload);

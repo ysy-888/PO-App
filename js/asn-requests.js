@@ -250,7 +250,9 @@ async function resendAsnRequestEmail(requestId) {
       }
       applyAsnRequestFilters();
     } else {
-      const json = await postAppsScript({ action: "resendAsnRequestEmail", asnRequestId: requestId });
+      const json = (typeof isApiMode === "function" && isApiMode())
+        ? await postApi("/api/requests/asn/resend-email", { asnRequestId: requestId })
+        : await postAppsScript({ action: "resendAsnRequestEmail", asnRequestId: requestId });
       if (!json.success) throw new Error(json.error);
       const request = allAsnRequests.find(r => getAsnRequestRecordId(r) === requestId);
       if (request) {
@@ -722,6 +724,7 @@ async function submitAsnRequest() {
   closeAsnRequestModal();
   asnRequestOpInProgress = true;
   showIndicator(`Sending ASN email${ELLIPSIS}`, "");
+  let emailWarning = "";
 
   try {
     if (isDemoMode()) {
@@ -732,8 +735,17 @@ async function submitAsnRequest() {
         : await postAppsScript({ action: "createAsnRequest", poNumbers, request: data });
       if (!json.success) throw new Error(json.error || json.emailError || "ASN request failed");
       applyAsnRequestCreatedLocally(json.asnRequestId, poNumbers, data);
+      if (json.request) {
+        const request = allAsnRequests.find(r => getAsnRequestRecordId(r) === json.asnRequestId);
+        if (request) Object.assign(request, json.request);
+        applyAsnRequestFilters();
+      }
+      if (json.emailSent === false) emailWarning = json.emailError || "Unknown email error";
     }
-    showIndicator(`ASN requested and email sent ${CHECK_MARK}`, "success");
+    showIndicator(
+      emailWarning ? `ASN requested, but email not sent: ${emailWarning}` : `ASN requested and email sent ${CHECK_MARK}`,
+      emailWarning ? "error" : "success"
+    );
   } catch (err) {
     showIndicator("ASN email not sent: " + err.message, "error");
   } finally {
@@ -959,11 +971,13 @@ async function sendAsnPickupEmail(asnRequestId, labelInputs) {
       if (!logistics.email) throw new Error("No email address on file for FORERUNNER LOGISTICS.");
       applyAsnPickupSentLocally(asnRequestId, inputs, { emailSent: true, emailError: "" });
     } else {
-      const json = await postAppsScript({
-        action: "sendAsnPickupEmail",
-        asnRequestId,
-        labelInputs: inputs,
-      });
+      const json = (typeof isApiMode === "function" && isApiMode())
+        ? await postApi("/api/requests/asn-pickup/send-email", { asnRequestId, labelInputs: inputs })
+        : await postAppsScript({
+            action: "sendAsnPickupEmail",
+            asnRequestId,
+            labelInputs: inputs,
+          });
       if (!json.success) throw new Error(json.error || json.emailError || "ASN Pickup email failed to send.");
       applyAsnPickupSentLocally(asnRequestId, inputs, {
         emailSent: json.emailSent,

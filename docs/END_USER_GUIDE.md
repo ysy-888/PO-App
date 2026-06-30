@@ -128,7 +128,7 @@ The Requests navigation tab contains five request queues:
 
 Each request type has its own list, search behavior, detail modal, linked PO table, email status fields, and resend email behavior.
 
-Email sending and resending still uses the Apps Script email/template path in the current codebase. The Express API stores and updates request records, but email migration is not fully moved into the API layer yet.
+In API mode, email sending and resending goes through the Express API so Supabase remains the source of truth for email status. The API uses the configured Apps Script deployment only as the mail relay.
 
 ### EXF Requests
 
@@ -331,7 +331,7 @@ This lets the frontend continue using spreadsheet-like field names while the bac
 - Shipment fields are synced from the shipment record to linked POs.
 - Packing quantities are calculated from cartons, not manually guessed.
 - Imports only upload new or changed rows after comparing against current data.
-- Email status belongs to request/customer records, while actual email sending still relies on the Apps Script email layer.
+- Email status belongs to request/customer records in Supabase; the API calls Apps Script only to relay the email.
 
 ## Troubleshooting
 
@@ -339,5 +339,5 @@ This lets the frontend continue using spreadsheet-like field names while the bac
 - If a save fails, check the error message shown in the app footer or modal and retry after the current save/import finishes.
 - If a request or shipment button is missing, the selected POs are not eligible for that action.
 - If packing list changes are blocked, check whether the PO is Closed.
-- If email status is not updating as expected, remember that email sending still depends on the Apps Script email layer.
+- If email status is not updating as expected, confirm the API has `APPS_SCRIPT_URL` configured and that the Apps Script deployment includes the `sendRawEmail` action.
 - If imported rows are skipped, the app may have found no differences compared with existing data, or the CSV row may be missing the required key such as PO number, customer code, or style/color.

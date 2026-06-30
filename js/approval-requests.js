@@ -610,6 +610,7 @@ async function submitApproval() {
   closeApprovalModal();
   approvalOpInProgress = true;
   showIndicator(isEdit ? `Saving${ELLIPSIS}` : `Creating approval request${ELLIPSIS}`, "");
+  let emailWarning = "";
 
   try {
     if (isDemoMode()) {
@@ -633,11 +634,19 @@ async function submitApproval() {
           : await postAppsScript({ action: "createApproval", poNumber, approval: data });
         if (!json.success) throw new Error(json.error || "Approval request failed.");
         applyApprovalCreatedLocally(json.approvalId, poNumber, data);
+        if (json.request) {
+          const approval = getApprovalById(json.approvalId);
+          if (approval) Object.assign(approval, json.request);
+          applyApprovalFilters();
+        }
+        if (json.emailSent === false) emailWarning = json.emailError || "Unknown email error";
       }
     }
     showIndicator(
-      isEdit ? `Saved ${CHECK_MARK}` : `Approval request created and email sent ${CHECK_MARK}`,
-      "success"
+      isEdit
+        ? `Saved ${CHECK_MARK}`
+        : (emailWarning ? `Approval request created, but email not sent: ${emailWarning}` : `Approval request created and email sent ${CHECK_MARK}`),
+      emailWarning ? "error" : "success"
     );
   } catch (err) {
     showIndicator("Approval request failed: " + err.message, "error");
@@ -725,12 +734,18 @@ async function resendApprovalRequestEmail(approvalId) {
     if (isDemoMode()) {
       throw new Error("Not available in demo mode");
     }
-    const json = await postAppsScript({ action: "resendApprovalRequestEmail", approvalId });
+    const json = (typeof isApiMode === "function" && isApiMode())
+      ? await postApi("/api/requests/approval/resend-email", { approvalId })
+      : await postAppsScript({ action: "resendApprovalRequestEmail", approvalId });
     if (!json.success) throw new Error(json.error || "Resend failed.");
-    approval["Email Status"] = "Sent";
-    approval["Email Sent At"] = formatDateToYmd(new Date());
-    approval["Email Error"] = "";
+    approval["Email Status"] = json.emailSent ? "Sent" : "Failed";
+    if (json.emailSent) approval["Email Sent At"] = formatDateToYmd(new Date());
+    approval["Email Error"] = json.emailError ?? "";
     applyApprovalFilters();
+    if (!json.emailSent) {
+      showIndicator(`Email not sent: ${json.emailError || "Unknown error"}`, "error");
+      return;
+    }
     showIndicator(`Email resent ${CHECK_MARK}`, "success");
   } catch (err) {
     showIndicator("Resend failed: " + err.message, "error");

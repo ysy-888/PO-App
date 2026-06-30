@@ -155,7 +155,9 @@ async function resendDeliveryRequestEmail(requestId) {
       }
       applyDeliveryRequestFilters();
     } else {
-      const json = await postAppsScript({ action: "resendDeliveryRequestEmail", deliveryRequestId: requestId });
+      const json = (typeof isApiMode === "function" && isApiMode())
+        ? await postApi("/api/requests/delivery/resend-email", { deliveryRequestId: requestId })
+        : await postAppsScript({ action: "resendDeliveryRequestEmail", deliveryRequestId: requestId });
       if (!json.success) throw new Error(json.error);
       const request = allDeliveryRequests.find(r => String(r[DELIVERY_REQUEST_ID_FIELD] ?? "").trim() === requestId);
       if (request) {
@@ -579,6 +581,7 @@ async function submitDeliveryRequest() {
     isEdit ? `Saving${ELLIPSIS}` : `Creating delivery request${ELLIPSIS}`,
     ""
   );
+  let emailWarning = "";
 
   try {
     if (isDemoMode()) {
@@ -605,11 +608,19 @@ async function submitDeliveryRequest() {
         applyDeliveryRequestUpdatedLocally(savedRow[DELIVERY_REQUEST_ID_FIELD], data);
       } else {
         applyDeliveryRequestCreatedLocally(json.deliveryRequestId, poNumbers, data);
+        if (json.request) {
+          const request = allDeliveryRequests.find(r => String(r[DELIVERY_REQUEST_ID_FIELD] ?? "").trim() === json.deliveryRequestId);
+          if (request) Object.assign(request, json.request);
+          applyDeliveryRequestFilters();
+        }
+        if (json.emailSent === false) emailWarning = json.emailError || "Unknown email error";
       }
     }
     showIndicator(
-      isEdit ? `Saved ${CHECK_MARK}` : `Delivery request created and email sent ${CHECK_MARK}`,
-      "success"
+      isEdit
+        ? `Saved ${CHECK_MARK}`
+        : (emailWarning ? `Delivery request created, but email not sent: ${emailWarning}` : `Delivery request created and email sent ${CHECK_MARK}`),
+      emailWarning ? "error" : "success"
     );
   } catch (err) {
     showIndicator("Delivery request failed: " + err.message, "error");

@@ -36,14 +36,16 @@ let cxlCountdownEnabled = false;
 let splitViewEnabled = true;
 
 function loadSplitViewPreference() {
+  if (typeof isApiMode === "function" && isApiMode()) {
+    applySplitViewPreference(true);
+    return;
+  }
   try {
     const stored = localStorage.getItem(scopedStorageKey(SPLIT_VIEW_STORAGE_BASE));
-    splitViewEnabled = stored === null ? true : stored === "1";
+    applySplitViewPreference(stored === null ? true : stored === "1");
   } catch {
-    splitViewEnabled = true;
+    applySplitViewPreference(true);
   }
-  document.body.classList.toggle("split-view-enabled", splitViewEnabled);
-  refreshSplitViewLayoutIfReady();
 }
 
 function refreshSplitViewLayoutIfReady() {
@@ -57,14 +59,21 @@ function saveSplitViewPreference() {
   } catch {
     /* ignore storage failures */
   }
+  if (typeof persistUserPreferencePatch === "function") {
+    persistUserPreferencePatch({ splitViewEnabled });
+  }
 }
 
-function setSplitViewEnabled(enabled) {
+function applySplitViewPreference(enabled) {
   splitViewEnabled = Boolean(enabled);
-  saveSplitViewPreference();
   document.body.classList.toggle("split-view-enabled", splitViewEnabled);
   if (typeof updateSettingsSplitViewUi === "function") updateSettingsSplitViewUi();
   refreshSplitViewLayoutIfReady();
+}
+
+function setSplitViewEnabled(enabled) {
+  applySplitViewPreference(enabled);
+  saveSplitViewPreference();
 }
 
 function toggleSplitView() {
@@ -76,10 +85,14 @@ function isSplitViewEnabled() {
 }
 
 function loadCxlCountdownPreference() {
+  if (typeof isApiMode === "function" && isApiMode()) {
+    applyCxlCountdownPreference(false);
+    return;
+  }
   try {
-    cxlCountdownEnabled = localStorage.getItem(scopedStorageKey(CXL_COUNTDOWN_STORAGE_BASE)) === "1";
+    applyCxlCountdownPreference(localStorage.getItem(scopedStorageKey(CXL_COUNTDOWN_STORAGE_BASE)) === "1");
   } catch {
-    cxlCountdownEnabled = false;
+    applyCxlCountdownPreference(false);
   }
 }
 
@@ -89,12 +102,19 @@ function saveCxlCountdownPreference() {
   } catch {
     /* ignore storage failures */
   }
+  if (typeof persistUserPreferencePatch === "function") {
+    persistUserPreferencePatch({ cxlCountdownEnabled });
+  }
+}
+
+function applyCxlCountdownPreference(enabled) {
+  cxlCountdownEnabled = Boolean(enabled);
+  if (typeof updateSettingsCountdownUi === "function") updateSettingsCountdownUi();
 }
 
 function setCxlCountdownEnabled(enabled) {
-  cxlCountdownEnabled = enabled;
+  applyCxlCountdownPreference(enabled);
   saveCxlCountdownPreference();
-  if (typeof updateSettingsCountdownUi === "function") updateSettingsCountdownUi();
   renderTable();
   updateModalIfOpen();
 }

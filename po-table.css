@@ -590,6 +590,7 @@ select.filter-select:focus { border-color: var(--accent); }
   background: var(--bg);
   color: var(--text);
   cursor: pointer;
+  position: relative;
   white-space: nowrap;
   transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
@@ -599,9 +600,27 @@ select.filter-select:focus { border-color: var(--accent); }
 }
 
 .filter-btn.active {
+  padding-left: 24px;
   background: var(--accent);
   color: #fff;
   border-color: var(--accent);
+  box-shadow:
+    0 0 0 2px #fff,
+    0 0 0 4px rgba(45, 45, 41, 0.28),
+    0 2px 6px rgba(0, 0, 0, 0.18);
+  font-weight: 700;
+}
+
+.filter-btn.active::before {
+  content: "";
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: currentColor;
+  transform: translateY(-50%);
 }
 
 .filter-btn.active:hover {
@@ -623,11 +642,12 @@ select.filter-select:focus { border-color: var(--accent); }
 #statusFilters .filter-btn[data-status]:not([data-status=""]):not([data-status="Closed"]).active:hover {
   background: var(--status-filter-bg);
   color: var(--status-filter-fg);
-  border-color: var(--status-filter-border);
+  border-color: var(--status-filter-fg);
   box-shadow:
-    0 0 0 1px var(--status-filter-border),
-    0 1px 3px rgba(0, 0, 0, 0.12);
-  font-weight: 600;
+    0 0 0 2px #fff,
+    0 0 0 4px rgba(45, 45, 41, 0.22),
+    0 2px 6px rgba(0, 0, 0, 0.16);
+  font-weight: 700;
   filter: none;
 }
 

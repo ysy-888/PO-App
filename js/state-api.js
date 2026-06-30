@@ -385,6 +385,7 @@ async function postAppsScript(payload, options = {}) {
 }
 
 const API_FETCH_TIMEOUT_MS = 5 * 60 * 1000;
+let userPreferenceSaveQueue = Promise.resolve();
 
 /** POST to the Express API (SaaS backend). Requires a valid auth session. */
 async function postApi(path, body, options = {}) {
@@ -426,6 +427,36 @@ async function postApi(path, body, options = {}) {
   } finally {
     clearTimeout(timeoutId);
   }
+}
+
+function shouldUseDatabaseUserSettings() {
+  return (
+    typeof isApiMode === "function" &&
+    isApiMode() &&
+    !isDemoMode() &&
+    typeof getAccessToken === "function" &&
+    Boolean(getAccessToken())
+  );
+}
+
+async function saveUserPreferencePatch(patch) {
+  const json = await postApi("/api/settings/user-preferences", patch, { timeoutMs: 15000 });
+  if (!json.success) throw new Error(json.error || "Failed to save settings.");
+  return json;
+}
+
+function persistUserPreferencePatch(patch) {
+  if (!shouldUseDatabaseUserSettings()) return false;
+
+  userPreferenceSaveQueue = userPreferenceSaveQueue
+    .then(() => saveUserPreferencePatch(patch))
+    .catch(err => {
+      if (typeof showIndicator === "function") {
+        showIndicator("Settings save failed: " + err.message, "error");
+      }
+    });
+
+  return true;
 }
 
 const CSV_IMPORT_BATCH_SIZE = 50;

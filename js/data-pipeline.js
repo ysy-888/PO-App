@@ -1,4 +1,25 @@
 
+function applyUserSettingsFromServer(settings) {
+  if (!settings || typeof settings !== "object") return;
+
+  if (settings.cxlCountdownEnabled !== undefined && typeof applyCxlCountdownPreference === "function") {
+    applyCxlCountdownPreference(settings.cxlCountdownEnabled);
+  }
+  if (settings.splitViewEnabled !== undefined && typeof applySplitViewPreference === "function") {
+    applySplitViewPreference(settings.splitViewEnabled);
+  }
+  if (settings.dateFormatId !== undefined && typeof applyDateFormatPreference === "function") {
+    applyDateFormatPreference(settings.dateFormatId);
+  }
+  if (settings.pageSize !== undefined) {
+    applyPageSize(settings.pageSize);
+  }
+  if (settings.columnLayout !== undefined && typeof applyColumnLayoutFromServer === "function") {
+    applyColumnLayoutFromServer(settings.columnLayout);
+  }
+  if (typeof updateSettingsUi === "function") updateSettingsUi();
+}
+
 async function loadData() {
   showIndicator(`Refreshing${ELLIPSIS}`, "");
   try {
@@ -91,6 +112,7 @@ async function loadData() {
       }
       if (json.defaultColumns) applyDefaultColumnsFromServer(json.defaultColumns);
       applyDefaultStatusFilterFromServer(json.defaultStatusFilter);
+      applyUserSettingsFromServer(json.userSettings);
       saveProgramColumnDefaultToStorage();
     } else {
       // ── Apps Script path (original) ───────────────────────
@@ -350,6 +372,9 @@ function normalizePageSizeValue(value) {
 }
 
 function loadPageSizePreference() {
+  if (typeof isApiMode === "function" && isApiMode()) {
+    return DEFAULT_PAGE_SIZE;
+  }
   try {
     const stored = localStorage.getItem(scopedStorageKey(PAGE_SIZE_STORAGE_BASE));
     if (stored == null) return DEFAULT_PAGE_SIZE;
@@ -360,10 +385,14 @@ function loadPageSizePreference() {
 }
 
 function savePageSizePreference(value) {
+  const normalized = normalizePageSizeValue(value);
   try {
-    localStorage.setItem(scopedStorageKey(PAGE_SIZE_STORAGE_BASE), normalizePageSizeValue(value));
+    localStorage.setItem(scopedStorageKey(PAGE_SIZE_STORAGE_BASE), normalized);
   } catch {
     /* ignore storage failures */
+  }
+  if (typeof persistUserPreferencePatch === "function") {
+    persistUserPreferencePatch({ pageSize: normalized });
   }
 }
 
@@ -451,19 +480,33 @@ function getDateFormatOption(id = dateFormatId) {
 }
 
 function loadDateFormatPreference() {
+  if (typeof isApiMode === "function" && isApiMode()) {
+    applyDateFormatPreference(DEFAULT_DATE_FORMAT_ID);
+    return;
+  }
   try {
     const stored = localStorage.getItem(scopedStorageKey(DATE_FORMAT_STORAGE_BASE));
-    dateFormatId = normalizeDateFormatId(stored ?? DEFAULT_DATE_FORMAT_ID);
+    applyDateFormatPreference(stored ?? DEFAULT_DATE_FORMAT_ID);
   } catch {
-    dateFormatId = DEFAULT_DATE_FORMAT_ID;
+    applyDateFormatPreference(DEFAULT_DATE_FORMAT_ID);
   }
 }
 
+function applyDateFormatPreference(value) {
+  dateFormatId = normalizeDateFormatId(value);
+  if (typeof updateSettingsDateFormatUi === "function") updateSettingsDateFormatUi();
+  return dateFormatId;
+}
+
 function saveDateFormatPreference(value) {
+  const normalized = normalizeDateFormatId(value);
   try {
-    localStorage.setItem(scopedStorageKey(DATE_FORMAT_STORAGE_BASE), normalizeDateFormatId(value));
+    localStorage.setItem(scopedStorageKey(DATE_FORMAT_STORAGE_BASE), normalized);
   } catch {
     /* ignore storage failures */
+  }
+  if (typeof persistUserPreferencePatch === "function") {
+    persistUserPreferencePatch({ dateFormatId: normalized });
   }
 }
 
@@ -523,9 +566,8 @@ function formatDateForDisplay(v) {
 function setDateFormat(value) {
   const next = normalizeDateFormatId(value);
   if (next === dateFormatId) return;
-  dateFormatId = next;
+  applyDateFormatPreference(next);
   saveDateFormatPreference(next);
-  if (typeof updateSettingsDateFormatUi === "function") updateSettingsDateFormatUi();
   refreshDateDisplays();
 }
 
