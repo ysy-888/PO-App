@@ -13,6 +13,26 @@ import { requireAuth } from "../auth.js";
 
 const router = Router();
 
+/** PostgREST / Postgres codes when a settings table is missing or not in schema cache. */
+function isMissingTableError(error) {
+  if (!error) return false;
+  const code = error.code;
+  if (code === "42P01" || code === "PGRST205") return true;
+  const msg = String(error.message || "").toLowerCase();
+  return msg.includes("does not exist") || msg.includes("could not find the table");
+}
+
+/** Read settings JSONB; log and return {} on any query failure so data still loads. */
+function unwrapSettings(result, label) {
+  if (!result.error) return result.data?.settings || {};
+  if (isMissingTableError(result.error)) {
+    console.warn(`${label} table not available — using default settings.`);
+  } else {
+    console.error(`${label} query failed:`, result.error);
+  }
+  return {};
+}
+
 router.get("/app-state", requireAuth, async (req, res) => {
   const tid = req.tenantId;
 
@@ -80,16 +100,6 @@ router.get("/app-state", requireAuth, async (req, res) => {
       console.warn("Migration 002 not applied — returning POs only.");
     }
 
-    const settingsError = [settingsResult, userSettingsResult].find(r => r.error);
-    if (settingsError?.error) {
-      const code = settingsError.error.code;
-      if (code !== "42P01") {
-        console.error("settings query failed:", settingsError.error);
-        return res.status(500).json({ success: false, error: "Failed to load settings." });
-      }
-      console.warn("Settings migration not applied — returning default settings.");
-    }
-
     // Unwrap helpers
     const rows = (r) => (r.error ? [] : (r.data || []).map(row => row.data));
 
@@ -101,8 +111,8 @@ router.get("/app-state", requireAuth, async (req, res) => {
     }));
 
     // Settings: vendor mode is tenant-wide; UI/table preferences are per-user.
-    const settings = settingsResult.error ? {} : (settingsResult.data?.settings || {});
-    const userSettings = userSettingsResult.error ? {} : (userSettingsResult.data?.settings || {});
+    const settings = unwrapSettings(settingsResult, "tenant_settings");
+    const userSettings = unwrapSettings(userSettingsResult, "user_settings");
     const vendorSubmitMode = settings.vendorSubmitMode ?? "review";
     const buildDefaultColumns = (source) => {
       if (!source.defaultColumns) return null;

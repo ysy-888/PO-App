@@ -1,23 +1,27 @@
 
 function applyUserSettingsFromServer(settings) {
-  if (!settings || typeof settings !== "object") return;
+  if (!settings || typeof settings !== "object" || Array.isArray(settings)) return;
 
-  if (settings.cxlCountdownEnabled !== undefined && typeof applyCxlCountdownPreference === "function") {
-    applyCxlCountdownPreference(settings.cxlCountdownEnabled);
+  try {
+    if (settings.cxlCountdownEnabled !== undefined && typeof applyCxlCountdownPreference === "function") {
+      applyCxlCountdownPreference(settings.cxlCountdownEnabled);
+    }
+    if (settings.splitViewEnabled !== undefined && typeof applySplitViewPreference === "function") {
+      applySplitViewPreference(settings.splitViewEnabled);
+    }
+    if (settings.dateFormatId !== undefined && typeof applyDateFormatPreference === "function") {
+      applyDateFormatPreference(settings.dateFormatId);
+    }
+    if (settings.pageSize !== undefined) {
+      applyPageSize(settings.pageSize);
+    }
+    if (settings.columnLayout !== undefined && typeof applyColumnLayoutFromServer === "function") {
+      applyColumnLayoutFromServer(settings.columnLayout);
+    }
+    if (typeof updateSettingsUi === "function") updateSettingsUi();
+  } catch (err) {
+    console.warn("Could not apply user settings from server; using defaults.", err);
   }
-  if (settings.splitViewEnabled !== undefined && typeof applySplitViewPreference === "function") {
-    applySplitViewPreference(settings.splitViewEnabled);
-  }
-  if (settings.dateFormatId !== undefined && typeof applyDateFormatPreference === "function") {
-    applyDateFormatPreference(settings.dateFormatId);
-  }
-  if (settings.pageSize !== undefined) {
-    applyPageSize(settings.pageSize);
-  }
-  if (settings.columnLayout !== undefined && typeof applyColumnLayoutFromServer === "function") {
-    applyColumnLayoutFromServer(settings.columnLayout);
-  }
-  if (typeof updateSettingsUi === "function") updateSettingsUi();
 }
 
 async function loadData() {
@@ -71,49 +75,27 @@ async function loadData() {
         showIndicator("Waiting for sign-in…", "");
         return;
       }
-      const res = await fetch(`${getApiBaseUrl()}/api/app-state`, {
-        headers: { Authorization: `Bearer ${token}` },
-        cache: "no-store",
-      });
-      const json = await res.json();
-      if (!json.success) throw new Error(json.error);
-      allChargebacks = (json.chargebacks ?? []).map(normalizeChargeback);
-      allAsnRequests = (json.asnRequests ?? []).map(row => ({ ...row }));
-      allPackingLists = (json.packingLists ?? []).map(normalizePackingList);
-      allPackingCartons = (json.packingCartons ?? []).map(normalizePackingCarton);
-      allContactRows = json.contacts ?? json.vendors ?? [];
-      allVendorEmailRows = allContactRows;
-      allLocationRows = json.locations ?? [];
-      buildStylePhotoIndex(json.stylePhotos ?? []);
-      buildStyleMasterIndex(json.styles ?? []);
-      if (typeof onPendingPackingListsDataLoaded === "function") {
-        onPendingPackingListsDataLoaded(json.pendingPackingLists ?? [], json.vendorSubmitMode);
+      let json;
+      try {
+        const res = await fetch(`${getApiBaseUrl()}/api/app-state`, {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+        });
+        try {
+          json = await res.json();
+        } catch {
+          throw new Error(res.ok ? "Invalid server response." : `Server error (${res.status}).`);
+        }
+        if (!json.success) throw new Error(json.error || `Server error (${res.status}).`);
+      } catch (err) {
+        if (typeof fetchSupabaseAppState === "function" && shouldFallbackToSupabaseAppState(err.message)) {
+          console.warn("API app-state unavailable; loading via Supabase fallback.", err.message);
+          json = await fetchSupabaseAppState();
+        } else {
+          throw err;
+        }
       }
-      if (typeof onCustomersDataLoaded === "function") {
-        onCustomersDataLoaded(json.customers ?? []);
-      }
-      if (typeof onStylesDataLoaded === "function") {
-        onStylesDataLoaded(json.styles ?? []);
-      }
-      allRows = json.data.map(row => applyStyleSizesToRow(normalizeRow(row)));
-      window.__pendingShipments = json.shipments ?? [];
-      window.__pendingExfRequests = json.exfRequests ?? [];
-      window.__pendingAsnRequests = json.asnRequests ?? [];
-      window.__pendingDeliveryRequests = json.deliveryRequests ?? [];
-      window.__pendingPickupRequests = json.pickupRequests ?? [];
-      window.__pendingApprovals = json.approvals ?? [];
-      if (typeof onShipmentsDataLoaded === "function") {
-        onShipmentsDataLoaded(window.__pendingShipments);
-        window.__pendingShipments = null;
-      }
-      if (typeof onExfRequestsDataLoaded === "function") {
-        onExfRequestsDataLoaded(window.__pendingExfRequests);
-        window.__pendingExfRequests = null;
-      }
-      if (json.defaultColumns) applyDefaultColumnsFromServer(json.defaultColumns);
-      applyDefaultStatusFilterFromServer(json.defaultStatusFilter);
-      applyUserSettingsFromServer(json.userSettings);
-      saveProgramColumnDefaultToStorage();
+      applyAppStatePayload(json);
     } else {
       // ── Apps Script path (original) ───────────────────────
       const url = new URL(getAppsScriptUrl());

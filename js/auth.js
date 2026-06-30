@@ -38,6 +38,11 @@ function getAuthSession() {
   return _session;
 }
 
+/** Exposed for direct Supabase reads (e.g. app-state fallback). */
+function getSupabaseClient() {
+  return _getSupabaseClient();
+}
+
 // ── Login UI ─────────────────────────────────────────────────
 
 function _buildLoginOverlay() {
