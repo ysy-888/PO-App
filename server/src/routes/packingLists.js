@@ -12,6 +12,36 @@ import { requireAuth } from "../auth.js";
 import { sanitizeUpdates, isPoClosed } from "../importHelpers.js";
 
 const router = Router();
+const CARTON_WEIGHT_LBS_FIELD = "Carton Weight (lbs)";
+const KG_TO_LBS = 2.2046226218;
+
+function toPositiveNumber(value) {
+  const n = Number(String(value ?? "").trim());
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+function roundWeight(value, decimals) {
+  const factor = 10 ** decimals;
+  return Math.round(value * factor) / factor;
+}
+
+function cartonWeightKgToLbs(kg) {
+  const n = toPositiveNumber(kg);
+  return n > 0 ? roundWeight(n * KG_TO_LBS, 2) : "";
+}
+
+function cartonWeightLbsToKg(lbs) {
+  const n = toPositiveNumber(lbs);
+  return n > 0 ? roundWeight(n / KG_TO_LBS, 6) : "";
+}
+
+function normalizePackingCartonWeight(carton) {
+  const out = { ...carton };
+  const kg = toPositiveNumber(out["Carton Weight"]) || cartonWeightLbsToKg(out[CARTON_WEIGHT_LBS_FIELD]);
+  out["Carton Weight"] = kg || "";
+  out[CARTON_WEIGHT_LBS_FIELD] = cartonWeightKgToLbs(kg);
+  return out;
+}
 
 /** Generate next PL-NNNN id from the max in the tenant's packing_lists table. */
 async function nextPackingListId(tenantId) {
@@ -99,6 +129,7 @@ router.post("/save", requireAuth, async (req, res) => {
     const now = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
     const cartonCount = packingList?.["Carton Count"] || cartons.length;
     const notes = packingList?.["Notes"] || "";
+    const normalizedCartons = cartons.map(normalizePackingCartonWeight);
 
     let packingListId;
 
@@ -142,7 +173,7 @@ router.post("/save", requireAuth, async (req, res) => {
 
     if (delCartonsErr) throw delCartonsErr;
 
-    const cartonInserts = cartons.map((carton, index) => ({
+    const cartonInserts = normalizedCartons.map((carton, index) => ({
       tenant_id: req.tenantId,
       packing_list_entity_id: packingListId,
       carton_number: index + 1,
@@ -159,7 +190,7 @@ router.post("/save", requireAuth, async (req, res) => {
     }
 
     // Update PO row with derived quantities + any PO edits.
-    const poUpdates = buildPackingPoUpdates(cartons, cartonCount, poEditUpdates || {});
+    const poUpdates = buildPackingPoUpdates(normalizedCartons, cartonCount, poEditUpdates || {});
     const updatedPoData = { ...(poRow.data || {}), ...sanitizeUpdates(poUpdates) };
     const { error: updatePoErr } = await supabase
       .from("purchase_orders")

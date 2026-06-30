@@ -50,18 +50,6 @@ function isN41ClosedStatusMismatch(row) {
   return getN41Status(row) === "Closed" && getRowStatus(row) !== "Closed";
 }
 
-/** Set PO Status to Closed when N41 is Closed and workflow Status is unset. */
-function syncStatusClosedFromN41(row) {
-  if (!row) return row;
-  if (getN41Status(row) !== "Closed") return row;
-  if (!getRowStatus(row)) row["Status"] = "Closed";
-  return row;
-}
-
-function syncAllStatusClosedFromN41(rows) {
-  rows.forEach(syncStatusClosedFromN41);
-}
-
 function migrateLegacyStatusValue(status, row) {
   const s = String(status ?? "").trim();
   if (s === "Received") return "In Warehouse";
@@ -89,7 +77,6 @@ function migrateLegacyRow(row) {
 
 function migrateAllRows(rows) {
   rows.forEach(migrateLegacyRow);
-  syncAllStatusClosedFromN41(rows);
 }
 
 function getAvailableStatusOptions(row) {
@@ -279,10 +266,6 @@ function collectAutomaticStatusUpdates(rows, shipments) {
       if (isDateOnOrBeforeToday(assignDate) && !isTruthy(row["Flag"])) {
         updates.Flag = true;
       }
-    }
-
-    if (getN41Status(row) === "Closed" && !status) {
-      updates.Status = "Closed";
     }
 
     if (Object.keys(updates).length > 0) {

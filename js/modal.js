@@ -1218,6 +1218,28 @@ function removeChargebackGridHeadersIfEmpty(block) {
 }
 
 const CARTON_WEIGHT_FIELD = "Carton Weight";
+const CARTON_WEIGHT_LBS_SAVE_FIELD = "Carton Weight (lbs)";
+const CARTON_WEIGHT_KG_TO_LBS = 2.2046226218;
+
+function roundCartonWeight(value, decimals) {
+  const factor = 10 ** decimals;
+  return Math.round(value * factor) / factor;
+}
+
+function cartonWeightLbsToKg(lbs) {
+  const n = toQtyNumber(lbs);
+  return n > 0 ? roundCartonWeight(n / CARTON_WEIGHT_KG_TO_LBS, 6) : 0;
+}
+
+function cartonWeightKgToLbs(kg) {
+  const n = toQtyNumber(kg);
+  return n > 0 ? roundCartonWeight(n * CARTON_WEIGHT_KG_TO_LBS, 2) : 0;
+}
+
+function formatCartonWeightValue(value) {
+  const n = toQtyNumber(value);
+  return n > 0 ? String(n) : "";
+}
 
 let poModalMenuOpen = false;
 let poModalMenuDismissBound = false;
@@ -1389,6 +1411,7 @@ function clonePackingCarton(carton, fallbackIndex) {
     out[`Unit ${i}`] = carton?.[`Unit ${i}`] ?? "";
   }
   out[CARTON_WEIGHT_FIELD] = carton?.[CARTON_WEIGHT_FIELD] ?? "";
+  out[CARTON_WEIGHT_LBS_SAVE_FIELD] = carton?.[CARTON_WEIGHT_LBS_SAVE_FIELD] ?? "";
   return out;
 }
 
@@ -1633,7 +1656,7 @@ function createPackingListEditor(row, packingList, sourceCartons) {
       })();
       weightInput.dataset.cartonIndex = String(cartonIndex);
       weightInput.dataset.field = CARTON_WEIGHT_FIELD;
-      weightInput.readOnly = true;
+      if (readOnly) weightInput.readOnly = true;
       bindNumberInput(weightInput);
       const weightSuffix = document.createElement("span");
       weightSuffix.className = "packing-list-weight-suffix";
@@ -1658,10 +1681,14 @@ function createPackingListEditor(row, packingList, sourceCartons) {
     const cartonIndex = Number(target.dataset.cartonIndex);
     const field = target.dataset.field;
     if (!field || !Number.isFinite(cartonIndex)) return;
-    cartons[cartonIndex][field] = target.value.trim() === "" ? "" : String(toQtyNumber(target.value));
     if (field === CARTON_WEIGHT_FIELD) {
+      const weightRaw = target.value.trim();
+      const weightLbs = toQtyNumber(weightRaw);
+      cartons[cartonIndex][CARTON_WEIGHT_LBS_SAVE_FIELD] = weightRaw === "" ? "" : formatCartonWeightValue(weightLbs);
+      cartons[cartonIndex][CARTON_WEIGHT_FIELD] = weightRaw === "" ? "" : formatCartonWeightValue(cartonWeightLbsToKg(weightLbs));
       setPackingEditorTotals(editor, row, cartons);
     } else {
+      cartons[cartonIndex][field] = target.value.trim() === "" ? "" : String(toQtyNumber(target.value));
       const rowTotal = bodyGrid.querySelector(`.packing-list-row-total[data-carton-index="${cartonIndex}"]`);
       if (rowTotal) rowTotal.textContent = formatPackingListTotal(computeCartonTotal(cartons[cartonIndex]));
       setPackingEditorTotals(editor, row, cartons);
@@ -2225,8 +2252,16 @@ function normalizePackingCartonsForSave(editorCartons) {
       out[field] = qty || "";
     }
     out["Total Units"] = computeCartonTotal(out);
-    const weightRaw = String(carton[CARTON_WEIGHT_FIELD] ?? "").trim();
-    out[CARTON_WEIGHT_FIELD] = weightRaw === "" ? "" : String(toQtyNumber(weightRaw));
+    const weightLbsRaw = String(carton[CARTON_WEIGHT_LBS_SAVE_FIELD] ?? "").trim();
+    const weightKgRaw = String(carton[CARTON_WEIGHT_FIELD] ?? "").trim();
+    const weightKg = weightLbsRaw === ""
+      ? toQtyNumber(weightKgRaw)
+      : cartonWeightLbsToKg(weightLbsRaw);
+    const weightLbs = weightLbsRaw === ""
+      ? cartonWeightKgToLbs(weightKg)
+      : toQtyNumber(weightLbsRaw);
+    out[CARTON_WEIGHT_FIELD] = formatCartonWeightValue(weightKg);
+    out[CARTON_WEIGHT_LBS_SAVE_FIELD] = formatCartonWeightValue(weightLbs);
     return out;
   });
 }
