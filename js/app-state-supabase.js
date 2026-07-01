@@ -60,6 +60,7 @@ async function fetchSupabaseAppState() {
     locationsRows,
     stylePhotosRows,
     stylesRows,
+    salesOrdersRows,
     tenantSettingsResult,
   ] = await Promise.all([
     querySupabaseRows(client, "purchase_orders", "data"),
@@ -78,6 +79,7 @@ async function fetchSupabaseAppState() {
     querySupabaseRows(client, "locations", "data"),
     querySupabaseRows(client, "style_photos", "data", null),
     querySupabaseRows(client, "styles", "data"),
+    querySupabaseRows(client, "sales_orders", "data"),
     client.from("tenant_settings").select("settings").maybeSingle(),
   ]);
 
@@ -108,6 +110,7 @@ async function fetchSupabaseAppState() {
     locations: unwrap(locationsRows),
     stylePhotos: unwrap(stylePhotosRows),
     styles: unwrap(stylesRows),
+    salesOrders: unwrap(salesOrdersRows),
     vendorSubmitMode: settings.vendorSubmitMode ?? "review",
     userSettings: {},
     defaultColumns: buildDefaultColumnsFromSettings(settings),
@@ -133,6 +136,9 @@ function applyAppStatePayload(json) {
   }
   if (typeof onStylesDataLoaded === "function") {
     onStylesDataLoaded(json.styles ?? []);
+  }
+  if (typeof onSalesOrdersDataLoaded === "function") {
+    onSalesOrdersDataLoaded(json.salesOrders ?? []);
   }
   allRows = (json.data ?? []).map(row => applyStyleSizesToRow(normalizeRow(row)));
   window.__pendingShipments = json.shipments ?? [];

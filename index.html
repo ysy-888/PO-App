@@ -46,6 +46,7 @@
     <button type="button" class="app-title-tab" id="navTabCustomers" role="tab" aria-selected="false">Customers</button>
     <button type="button" class="app-title-tab" id="navTabStyles" role="tab" aria-selected="false">Styles</button>
     <button type="button" class="app-title-tab" id="navTabPackingReviews" role="tab" aria-selected="false">Vendor Submissions</button>
+    <button type="button" class="app-title-tab" id="navTabSalesOrders" role="tab" aria-selected="false">Sales Orders</button>
   </nav>
   <div class="header-right">
     <div class="header-view-meta" id="poHeaderMeta">
@@ -96,6 +97,13 @@
       <div class="search-wrap header-search-wrap">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
         <input type="search" id="packingReviewSearchInput" placeholder="Search" />
+      </div>
+    </div>
+    <div class="header-view-meta" id="salesOrderHeaderMeta" hidden>
+      <div class="counter" id="salesOrderRowCounter">— sales orders</div>
+      <div class="search-wrap header-search-wrap">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="search" id="salesOrderSearchInput" placeholder="Search" />
       </div>
     </div>
     <button type="button" class="btn btn-primary btn-icon" onclick="loadData()" aria-label="Refresh">
@@ -735,6 +743,48 @@
   </div>
 </div>
 
+<div id="salesOrderTableWrap" class="table-scroll-y" hidden>
+  <div class="table-scroll-x">
+  <table id="salesOrderTable">
+    <colgroup>
+      <col class="col-so" />
+      <col class="col-buyer" />
+      <col class="col-buyer-po" />
+      <col class="col-date" />
+      <col class="col-date" />
+      <col class="col-cxl" />
+      <col class="col-vendor" />
+      <col class="col-n41-status" />
+      <col class="col-order-type" />
+      <col class="col-cust-type" />
+      <col class="col-so-styles" />
+      <col class="col-so-units" />
+      <col class="col-so-price" />
+    </colgroup>
+    <thead>
+      <tr>
+        <th>SO #</th>
+        <th>Customer</th>
+        <th>Customer PO #</th>
+        <th>Order Date</th>
+        <th>Ship Date</th>
+        <th>CXL Date</th>
+        <th>Store</th>
+        <th>N41 Status</th>
+        <th>Order Type</th>
+        <th>Customer Type</th>
+        <th>Styles</th>
+        <th>Total Units</th>
+        <th>Total Price</th>
+      </tr>
+    </thead>
+    <tbody id="salesOrderTableBody">
+      <tr class="state-row"><td colspan="13">Loading sales orders…</td></tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
 <div id="packingReviewTableWrap" class="table-scroll-y" hidden>
   <div class="table-scroll-x">
   <table id="packingReviewTable">
@@ -1224,6 +1274,22 @@
   </div>
 </div>
 
+<div id="salesOrderModalOverlay" class="modal-backdrop">
+  <div class="modal-card so-modal-card" onclick="event.stopPropagation()">
+    <div class="modal-header so-modal-header">
+      <div class="modal-header-main">
+        <h3 class="so-modal-heading">SO #—</h3>
+        <p class="so-modal-subheading"></p>
+      </div>
+      <div class="modal-header-actions">
+        <span class="so-modal-status" hidden></span>
+        <button type="button" class="btn-close" id="salesOrderModalCloseBtn" aria-label="Close">✕</button>
+      </div>
+    </div>
+    <div class="modal-body so-modal-body"></div>
+  </div>
+</div>
+
 <div id="csvImportSummaryOverlay" class="modal-backdrop">
   <div class="modal-card csv-import-summary-card" onclick="event.stopPropagation()">
     <div class="modal-header">
@@ -1412,6 +1478,8 @@
 <script src="js/styles-import.js?v=20260627-1"></script>
 <script src="js/styles.js?v=20260627-1"></script>
 <script src="js/export-csv.js"></script>
+<script src="js/sales-orders.js"></script>
+<script src="js/sales-orders-import.js"></script>
 <script src="js/shipments-init.js"></script>
 <script src="js/packing-print.js"></script>
 <div id="packingPrintRoot" aria-hidden="true"></div>

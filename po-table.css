@@ -8487,3 +8487,236 @@ td.has-pending-approval .pending-approval-value {
 #approvalRequestOverlay .shipment-modal-card {
   max-width: 960px;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   SALES ORDERS — table, modal, line-items, linked POs
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Sales Orders list table columns ───────────────────────── */
+#salesOrderTable .col-so-styles,
+#salesOrderTable .col-so-units,
+#salesOrderTable .col-so-price { text-align: right; }
+#salesOrderTable .td-num { text-align: right; }
+#salesOrderTable .col-so { min-width: 80px; }
+#salesOrderTable .col-so-price { min-width: 100px; }
+
+/* Status badge coloring in the list table */
+#salesOrderTable td[data-status="open"]   { color: var(--status-open, #16a34a); }
+#salesOrderTable td[data-status="closed"] { color: var(--status-closed, #64748b); }
+
+/* ── Sales Order modal card ─────────────────────────────────── */
+.so-modal-card {
+  max-width: 1100px;
+  width: 96vw;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+}
+.so-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 20px 20px;
+}
+.so-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.so-modal-heading {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+}
+.so-modal-subheading {
+  font-size: 13px;
+  color: var(--text-secondary, #666);
+  margin: 2px 0 0;
+}
+.so-modal-status {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--badge-bg, #f0f4f8);
+  color: var(--text-secondary, #555);
+}
+.so-modal-status[data-status="open"]   { background: #dcfce7; color: #15803d; }
+.so-modal-status[data-status="closed"] { background: #f1f5f9; color: #64748b; }
+
+/* ── Header fields grid ─────────────────────────────────────── */
+.so-header-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px 20px;
+  padding: 14px 0 12px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+.so-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.so-field-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.so-field-value {
+  font-size: 13px;
+  color: var(--text);
+}
+
+/* ── Totals bar ─────────────────────────────────────────────── */
+.so-totals-bar {
+  display: flex;
+  gap: 24px;
+  padding: 10px 0 12px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+.so-total-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.so-total-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.so-total-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* ── Section titles ─────────────────────────────────────────── */
+.so-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary, #888);
+  margin-bottom: 8px;
+}
+.so-lines-section { margin-bottom: 20px; }
+.so-modal-empty {
+  color: var(--empty-display, #aaa);
+  font-size: 13px;
+  padding: 8px 0;
+}
+
+/* ── Line items table ───────────────────────────────────────── */
+.so-line-table-wrap {
+  overflow-x: auto;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+.so-line-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.so-line-table thead th {
+  background: var(--table-header-bg, #f8fafc);
+  color: var(--text-secondary, #666);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 7px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.so-line-table thead th.so-size-col,
+.so-line-table thead th.so-price-col { text-align: right; }
+.so-line-table tbody td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-light, #f1f5f9);
+  vertical-align: middle;
+}
+.so-line-table tbody tr:last-child td { border-bottom: none; }
+.so-line-table tbody tr:hover { background: var(--row-hover, #f8fafc); }
+.so-line-table .td-num { text-align: right; }
+.so-line-table .so-size-col { min-width: 46px; }
+.so-line-table .so-price-col { min-width: 80px; white-space: nowrap; }
+.so-line-table .so-style-col { font-family: monospace; font-size: 12px; min-width: 90px; }
+.so-line-table .so-desc-col { min-width: 140px; color: var(--text-secondary, #666); font-size: 12px; }
+.so-line-table .so-total-col { font-weight: 600; }
+.so-line-table .so-cell-empty { color: var(--empty-display, #ccc); }
+
+/* Style order status badge */
+.so-status-badge { font-size: 12px; }
+.so-status-badge[data-status="open"]   { color: #16a34a; }
+.so-status-badge[data-status="closed"] { color: #64748b; }
+.so-status-badge[data-status="invoiced"] { color: #2563eb; }
+.so-status-badge[data-status="cancelled"],
+.so-status-badge[data-status="canceled"] { color: #dc2626; }
+
+/* ── Linked POs section ─────────────────────────────────────── */
+.so-linked-pos {
+  padding-top: 4px;
+}
+.so-linked-count {
+  font-weight: 400;
+  opacity: 0.7;
+}
+.so-linked-empty {
+  font-size: 13px;
+  color: var(--empty-display, #aaa);
+  padding: 4px 0;
+}
+.so-linked-po-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.so-linked-po-btn {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s, border-color 0.1s;
+}
+.so-linked-po-btn:hover {
+  background: var(--row-hover, #f8fafc);
+  border-color: var(--accent, #3b82f6);
+}
+.so-linked-po-num {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--accent, #3b82f6);
+  white-space: nowrap;
+}
+.so-linked-po-meta {
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+}
+
+/* ── SO # cell in PO table — clickable link style ───────────── */
+#tableBody td[data-col="SO #"]:not(:empty) {
+  cursor: pointer;
+  color: var(--accent, #3b82f6);
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  transition: text-decoration-color 0.15s;
+}
+#tableBody td[data-col="SO #"]:not(:empty):hover {
+  text-decoration-color: currentColor;
+}
+
+/* Only link SO # cells where a matching SO exists (class added dynamically — 
+   fallback: all non-empty SO # cells are styled as links) */

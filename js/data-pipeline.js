@@ -65,6 +65,9 @@ async function loadData() {
       if (typeof onStylesDataLoaded === "function") {
         onStylesDataLoaded([]);
       }
+      if (typeof onSalesOrdersDataLoaded === "function") {
+        onSalesOrdersDataLoaded([]);
+      }
       buildStylePhotoIndex(DEMO_STYLE_PHOTOS);
       applyDefaultStatusFilter(STATUS_FILTER_OPEN);
     } else if (typeof isApiMode === "function" && isApiMode()) {

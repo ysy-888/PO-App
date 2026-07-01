@@ -315,6 +315,13 @@ async function handleCsvImportFile(file) {
     return;
   }
 
+  if (typeof currentAppView !== "undefined" && currentAppView === "sales") {
+    if (typeof handleSalesOrderCsvImportFile === "function") {
+      await handleSalesOrderCsvImportFile(file);
+    }
+    return;
+  }
+
   if (isDemoMode()) {
     showIndicator("CSV import is not available in demo mode", "error");
     return;

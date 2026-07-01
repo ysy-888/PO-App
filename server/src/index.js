@@ -11,6 +11,7 @@ import shipmentsRouter from "./routes/shipments.js";
 import requestsRouter from "./routes/requests.js";
 import chargebacksRouter from "./routes/chargebacks.js";
 import pendingPackingListsRouter from "./routes/pendingPackingLists.js";
+import salesOrdersRouter from "./routes/salesOrders.js";
 import { getEmailServiceStatus } from "./email.js";
 
 const app = express();
@@ -36,7 +37,7 @@ app.use(
   })
 );
 
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
 
 // ── Health check ────────────────────────────────────────────
 app.get("/health", (_req, res) => {
@@ -64,6 +65,7 @@ app.use("/api/shipments", shipmentsRouter);
 app.use("/api/requests", requestsRouter);
 app.use("/api/chargebacks", chargebacksRouter);
 app.use("/api/pending-packing-lists", pendingPackingListsRouter);
+app.use("/api/sales-orders", salesOrdersRouter);
 
 // ── Error handler ───────────────────────────────────────────
 app.use((err, _req, res, _next) => {

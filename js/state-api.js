@@ -9,6 +9,7 @@ let allLocationRows = [];
 let allAsnRequests = [];
 let allCustomers = [];
 let allStyles = [];
+let allSalesOrders = [];
 let packingListPanelOpen = false;
 let flagFilterActive = false;
 let sortCol = "CXL Date";
