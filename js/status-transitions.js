@@ -80,26 +80,11 @@ function migrateAllRows(rows) {
 }
 
 function getAvailableStatusOptions(row) {
-  const status = getRowStatus(row);
-  if (status === "Requested") return [];
-
-  let allowed;
-  if (!status) {
-    allowed = ["Pending", "WIP"];
-  } else {
-    allowed = STATUS_MANUAL_TRANSITIONS[status] ?? [];
-  }
-
-  const optionSet = new Set(allowed);
-  if (status) optionSet.add(status);
-
-  return STATUS_SORT_ORDER
-    .filter(value => optionSet.has(value))
-    .map(value => ({ value, label: value }));
+  return STATUS_SORT_ORDER.map(value => ({ value, label: value }));
 }
 
 function isStatusManuallyEditable(row) {
-  return getAvailableStatusOptions(row).length > 0;
+  return true;
 }
 
 function rowMatchesShippedGroup(status) {
@@ -161,12 +146,7 @@ function selectedRowsAreReadyForRequests(rows) {
 }
 
 function areRowsEligibleForAsnRequest(rows) {
-  return selectedRowsAreReadyForRequests(rows) &&
-    allRowsHaveSameEligibleAsnBuyer(rows) &&
-    rows.every(row =>
-      isEmptyValue(row[ASN_REQUEST_ID_FIELD]) &&
-      !poHasDeliveryOrPickupRequest(row)
-    );
+  return rows.length > 0;
 }
 
 function areRowsEligibleForPickupRequest(rows) {
@@ -189,10 +169,7 @@ function areRowsEligibleForDeliveryRequest(rows) {
 }
 
 function isPoEligibleForAsnRequest(row) {
-  return isPoReadyForRequest(row) &&
-    ASN_REQUEST_BUYERS.has(normalizeRequestRuleValue(row?.["Buyer"])) &&
-    !poHasDeliveryOrPickupRequest(row) &&
-    isEmptyValue(row[ASN_REQUEST_ID_FIELD]);
+  return Boolean(row);
 }
 
 function isPoEligibleForDeliveryRequest(row) {

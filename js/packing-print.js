@@ -1,4 +1,4 @@
-/** Packing list print – uses the same server HTML as email PDF attachments. */
+/** Packing list print – API mode builds HTML from in-memory Supabase data; legacy Apps Script mode uses the sheet backend. */
 
 function printPackingListHtmlDocument(html) {
   const iframe = document.createElement("iframe");
@@ -25,7 +25,34 @@ function printPackingListHtmlDocument(html) {
   win.print();
 }
 
-/** Demo/offline fallback using in-memory sheet data. */
+function buildPackingListPrintHtmlLocal({
+  poNumbers,
+  mode = "individual",
+  includeTitlePage = false,
+  titleLabel = "",
+  titlePageType = "",
+  typeDate = "",
+  requestDate = "",
+  requestId = "",
+} = {}) {
+  const numbers = (Array.isArray(poNumbers) ? poNumbers : [])
+    .map(po => String(po ?? "").trim())
+    .filter(Boolean);
+  if (numbers.length === 0) return "";
+  if (mode === "group") {
+    return buildGroupPackingListPrintHtml(numbers, {
+      includeTitlePage,
+      titleLabel,
+      titlePageType,
+      typeDate,
+      requestDate,
+      requestId,
+    });
+  }
+  return buildIndividualPackingListPrintHtml(numbers[0]);
+}
+
+/** Demo/offline fallback using in-memory data. */
 function printPackingListLocal({
   poNumbers,
   mode = "individual",
@@ -39,16 +66,16 @@ function printPackingListLocal({
   const root = document.getElementById("packingPrintRoot");
   if (!root) return;
 
-  const html = mode === "group"
-    ? buildGroupPackingListPrintHtml(poNumbers, {
-      includeTitlePage,
-      titleLabel,
-      titlePageType,
-      typeDate,
-      requestDate,
-      requestId,
-    })
-    : buildIndividualPackingListPrintHtml(poNumbers[0]);
+  const html = buildPackingListPrintHtmlLocal({
+    poNumbers,
+    mode,
+    includeTitlePage,
+    titleLabel,
+    titlePageType,
+    typeDate,
+    requestDate,
+    requestId,
+  });
 
   root.innerHTML = html;
   document.body.classList.add("printing-packing-list");
@@ -123,6 +150,27 @@ async function printPackingListAsync({
   }
 
   try {
+    if (typeof isApiMode === "function" && isApiMode()) {
+      const html = buildPackingListPrintHtmlLocal({
+        poNumbers: numbers,
+        mode,
+        includeTitlePage,
+        titleLabel,
+        titlePageType,
+        typeDate,
+        requestDate,
+        requestId,
+      });
+      if (!html || /<p>(?:No POs found|PO not found)\.<\/p>/.test(html)) {
+        throw new Error("Failed to load packing list");
+      }
+      printPackingListHtmlDocument(html);
+      if (typeof showIndicator === "function") {
+        showIndicator("Packing list ready", "success");
+      }
+      return;
+    }
+
     const json = await postAppsScript({
       action: "getPackingListPrintHtml",
       poNumbers: numbers,

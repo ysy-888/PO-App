@@ -2104,6 +2104,16 @@ function handleSendRawEmail(payload) {
   };
   if (htmlBody) options.htmlBody = htmlBody;
   if (cc) options.cc = cc;
+  if (Array.isArray(payload.attachments) && payload.attachments.length > 0) {
+    options.attachments = payload.attachments.map(function(item) {
+      const bytes = Utilities.base64Decode(String(item.contentBase64 || ""));
+      return Utilities.newBlob(
+        bytes,
+        String(item.mimeType || "application/pdf"),
+        String(item.filename || "attachment.pdf")
+      );
+    });
+  }
   MailApp.sendEmail(options);
   return corsResponse({ success: true });
 }
@@ -2243,18 +2253,7 @@ function isFreesiaDivision_(row) {
 }
 
 function assertRowsEligibleForAsnRequest_(rows) {
-  assertRowsHavePackingLists_(rows);
-  rows.forEach(row => {
-    if (!isDeliveryPickupStatus_(row) || !isFreesiaDivision_(row)) {
-      throw new Error("PO " + row["PO #"] + " must be Freesia with Status OTW.");
-    }
-    if (String(row[ASN_REQUEST_ID_FIELD] ?? "").trim()) {
-      throw new Error("PO " + row["PO #"] + " already has an ASN request.");
-    }
-    if (String(row[DELIVERY_REQUEST_ID_FIELD] ?? "").trim() || String(row[PICKUP_REQUEST_ID_FIELD] ?? "").trim()) {
-      throw new Error("PO " + row["PO #"] + " already has a delivery or pickup request.");
-    }
-  });
+  if (!rows.length) throw new Error("Select at least one PO.");
 }
 
 function assertRowsEligibleForDeliveryPickupRequest_(rows) {

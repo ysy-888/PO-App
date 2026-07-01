@@ -331,8 +331,7 @@ function isTextTruncated(el) {
 function getThTooltipTarget(th) {
   if (th.classList.contains("th-flag-col")
     || th.classList.contains("th-packing-list-col")
-    || th.classList.contains("th-select-col")
-    || th.classList.contains("th-shipment-id-col")) {
+    || th.classList.contains("th-select-col")) {
     return null;
   }
   const label = th.querySelector(".th-label");

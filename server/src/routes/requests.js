@@ -25,6 +25,11 @@ import {
   buildDeliveryPickupEmail,
   buildExfEmail,
 } from "../emailTemplates.js";
+import {
+  buildAsnPickupEmailAttachments,
+  buildRequestEmailAttachments,
+} from "../packingListPrint/index.js";
+import { is12thTribeBuyer, normalizeLabelInputsByPo } from "../packingListPrint/helpers.js";
 
 const router = Router();
 
@@ -122,7 +127,16 @@ async function sendAndStoreRequestEmail({ tenantId, tableName, entityId, type, r
   };
   const message = builders[type]();
   const hasRecipient = Boolean(String(message.to ?? "").trim());
-  const result = await sendEmail(message);
+  let attachments = [];
+  if (["asn", "delivery", "pickup"].includes(type)) {
+    attachments = await buildRequestEmailAttachments(supabase, tenantId, {
+      type,
+      entityId,
+      requestData,
+      poRows,
+    });
+  }
+  const result = await sendEmail({ ...message, attachments });
   const fields = emailFieldsFromResult(result, hasRecipient);
   const updatedData = { ...(requestData || {}), ...fields };
   await updateRequestData(tableName, tenantId, entityId, updatedData);
@@ -662,10 +676,31 @@ router.post("/asn-pickup/send-email", requireAuth, async (req, res) => {
       "Email CC": logistics.cc,
       "Pickup Req Notes": `ASN pickup for ${asnRequestId}`,
     };
-    const poRows = await fetchPoRows(req.tenantId, splitPoNumbers(asnData["PO Numbers"]));
+    const poNumbers = splitPoNumbers(asnData["PO Numbers"]);
+    if (is12thTribeBuyer(asnData.Buyer)) {
+      const inputs = Array.isArray(labelInputs) ? labelInputs : [];
+      const byPo = normalizeLabelInputsByPo(inputs);
+      for (const po of poNumbers) {
+        const info = byPo[po];
+        if (!info?.shipNotice || !info?.colorCode) {
+          return res.status(400).json({
+            success: false,
+            error: "Ship Notice # and Color Code are required for every PO.",
+          });
+        }
+      }
+    }
+
+    const poRows = await fetchPoRows(req.tenantId, poNumbers);
     const message = buildDeliveryPickupEmail("Pickup", pickupRequestId, pickupData, poRows);
     const hasRecipient = Boolean(String(message.to ?? "").trim());
-    const result = await sendEmail(message);
+    const attachments = await buildAsnPickupEmailAttachments(supabase, req.tenantId, {
+      asnRequestId,
+      asnData,
+      poRows,
+      labelInputs: Array.isArray(labelInputs) ? labelInputs : [],
+    });
+    const result = await sendEmail({ ...message, attachments });
     const now = todayYmd();
     const updated = {
       ...asnData,

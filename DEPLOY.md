@@ -37,6 +37,18 @@ This app has two parts: **frontend** (HTML/JS/CSS on GitHub Pages) and **backend
    npx clasp login
    ```
 
+### API email relay (shipping@ — no spreadsheet)
+
+API mode sends mail through a **standalone** script in [email-relay/](email-relay/). Full steps: [email-relay/README.md](email-relay/README.md).
+
+Summary:
+
+1. Create a new Apps Script project as **shipping@elevatordisco.com** (not bound to a sheet).
+2. Fill [.clasp.email.json](.clasp.email.json) with `scriptId` and `deploymentId`.
+3. `npm run redeploy:email`
+4. Run `setupEmailRelayToken()` once in the editor; set `APPS_SCRIPT_EMAIL_TOKEN` on Render.
+5. Set `APPS_SCRIPT_URL` on Render to the new `/exec` URL.
+
 ### GitHub Pages
 
 - Repo: `https://github.com/ysy-888/PO-App.git`

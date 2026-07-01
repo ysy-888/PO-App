@@ -42,12 +42,9 @@ const SHIPMENT_MANAGED_PO_FIELDS = new Set([
 
 function isPoFieldEditable(col, row) {
   if (!EDITABLE.has(col)) return false;
-  if (typeof isPoClosed === "function" && isPoClosed(row)) return false;
+  if (col !== "Status" && typeof isPoClosed === "function" && isPoClosed(row)) return false;
   if (SHIPMENT_MANAGED_PO_FIELDS.has(col)) return false;
   if (col === "Ship Method" && typeof poHasShipment === "function" && poHasShipment(row)) {
-    return false;
-  }
-  if (col === "Status" && typeof isStatusManuallyEditable === "function" && !isStatusManuallyEditable(row)) {
     return false;
   }
   if (col === "Assign Date") {
@@ -60,7 +57,7 @@ function isPoFieldEditable(col, row) {
 const READONLY_NO_SELECT_COLS = new Set(["Division", "PO Date", "Vendor", "N41 Status"]);
 
 const COPY_ON_CLICK_COLS = new Set([
-  "Buyer", "Buyer PO #", "SO #", "PO #", "Style #", "Color",
+  "Buyer", "Buyer PO #", "SO #", "PO #", "Style #", "Color", "Shipment ID",
 ]);
 
 const MODAL_FIELD_SIZE = {

@@ -11,6 +11,7 @@ import shipmentsRouter from "./routes/shipments.js";
 import requestsRouter from "./routes/requests.js";
 import chargebacksRouter from "./routes/chargebacks.js";
 import pendingPackingListsRouter from "./routes/pendingPackingLists.js";
+import { getEmailServiceStatus } from "./email.js";
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -38,7 +39,19 @@ app.use(
 app.use(express.json());
 
 // ── Health check ────────────────────────────────────────────
-app.get("/health", (_req, res) => res.json({ ok: true }));
+app.get("/health", (_req, res) => {
+  const email = getEmailServiceStatus();
+  res.json({
+    ok: true,
+    email: {
+      configured: email.configured,
+      usingShippingRelay: email.usingShippingRelay,
+      relayReady: email.relayReady,
+      tokenConfigured: email.tokenConfigured,
+      deploymentIdSuffix: email.deploymentId ? email.deploymentId.slice(-8) : "",
+    },
+  });
+});
 
 // ── Routes ──────────────────────────────────────────────────
 app.use("/api", appStateRouter);

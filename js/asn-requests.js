@@ -317,7 +317,7 @@ function openAsnRequestFromSelection() {
   if (isAppSaving() || isToolbarCreateActionBlocked()) return;
   const selected = getCheckedFilteredPos();
   if (!areRowsEligibleForAsnRequest(selected)) {
-    showIndicator("Select OTW POs with packing lists, all LULU'S FASHION LOUNGE or all 12TH TRIBE, and no ASN request yet", "error");
+    showIndicator("Select at least one PO", "error");
     return;
   }
   asnRequestPoNumbers = selected.map(row => row["PO #"]);
@@ -470,13 +470,7 @@ function renderAsnRequestModal(poNumbers, { asnDate = formatDateToYmd(new Date()
 
 function getAvailableAsnRequestPanelRows() {
   const linked = new Set(asnRequestPoNumbers.map(String));
-  const buyer = asnRequestBuyer || getAsnRequestBuyerForRows(getAsnRequestRows());
-  const buyerKey = String(buyer ?? "").trim().toUpperCase();
-  return allRows.filter(row =>
-    isPoEligibleForAsnRequest(row) &&
-    String(row["Buyer"] ?? "").trim().toUpperCase() === buyerKey &&
-    !linked.has(String(row["PO #"] ?? ""))
-  );
+  return allRows.filter(row => !linked.has(String(row["PO #"] ?? "")));
 }
 
 function getAsnRequestModalRenderOptions(extra = {}) {

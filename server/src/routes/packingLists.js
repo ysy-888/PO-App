@@ -3,7 +3,7 @@
  * POST /api/packing-list/delete — delete packing list + cartons
  *
  * Mirrors savePackingListCore_ / handleDeletePackingList in apps-script.gs.
- * Print/PDF HTML is kept on Apps Script for now (packing-print.js).
+ * Print/PDF is generated on the API server (packingListPrint module).
  */
 
 import { Router } from "express";

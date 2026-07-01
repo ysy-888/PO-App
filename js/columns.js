@@ -115,6 +115,7 @@ const COLUMN_WIDTH_TIER_S = new Set([
   "N41 Status",
   "EXF Requested", "ASN Requested", "Delivery Requested", "Pickup Requested",
   "EXF Request ID", "ASN Request ID", "Delivery Request ID", "Pickup Request ID",
+  "Shipment ID",
 ]);
 
 const COLUMN_WIDTH_TIER_M = new Set([
@@ -161,9 +162,9 @@ const LOCAL_ONLY_COLS = new Set(["Selected", "Packing List"]);
 const ALWAYS_VISIBLE_COLUMNS = new Set(["Selected", "Flag", "Packing List", "Status"]);
 
 /** Merged table cells — always adjacent and move together in Edit Table. */
-const MERGED_COLUMN_GROUP = ["Ship Method", "Shipment ID", "Packing List"];
+const MERGED_COLUMN_GROUP = ["Ship Method", "Packing List"];
 const MERGED_GROUP_KEY = "__merged_shipment__";
-const MERGED_GROUP_LABEL = "Ship Method / Shipment / Packing List";
+const MERGED_GROUP_LABEL = "Ship Method / Packing List";
 const FIXED_LEADING_COLUMNS = ["Flag", "Selected", "Status"];
 const NON_TOGGLEABLE_COLUMNS = new Set(["Selected", "Flag", "Packing List", "Status"]);
 
@@ -189,10 +190,9 @@ function ensureAlwaysVisibleColumns(cols) {
   return cols;
 }
 
-/** Ship Method + Shipment ID stay with the always-visible Packing List column group. */
+/** Ship Method stays with the always-visible Packing List column group. */
 function ensureMergedShipmentColumnsVisible(cols) {
   cols.add("Ship Method");
-  cols.add("Shipment ID");
   return cols;
 }
 
@@ -226,7 +226,6 @@ function applyTwoLineTableHeaders() {
   table.querySelectorAll("thead th").forEach(th => {
     if (th.classList.contains("th-flag-col")
       || th.classList.contains("th-select-col")
-      || th.classList.contains("th-shipment-id-col")
       || th.classList.contains("th-packing-list-col")) {
       return;
     }
@@ -246,7 +245,7 @@ function applyTwoLineTableHeaders() {
 function getColumnWidthTier(col) {
   if (col === "Flag") return "flag";
   if (col === "Selected") return "select";
-  if (col === "Packing List" || col === "Shipment ID") return "packing";
+  if (col === "Packing List") return "packing";
   if (COLUMN_WIDTH_TIER_L.has(col)) return "l";
   if (COLUMN_WIDTH_TIER_M.has(col)) return "m";
   if (COLUMN_WIDTH_TIER_XS.has(col)) return "xs";
@@ -464,10 +463,8 @@ function moveEditTableKeyToHover(keys, fromIndex, hoverIndex) {
 function isColumnShownInOrderList(col) {
   if (PO_TABLE_HIDDEN_COLUMNS.has(col)) return false;
   if (NON_TOGGLEABLE_COLUMNS.has(col)) return true;
-  if (MERGED_COLUMN_GROUP.includes(col)) {
-    if (col === "Packing List") return true;
-    return columnVisibilityDraft.has(col);
-  }
+  if (col === "Packing List") return true;
+  if (MERGED_COLUMN_GROUP.includes(col)) return columnVisibilityDraft.has(col);
   return columnVisibilityDraft.has(col);
 }
 
@@ -546,7 +543,7 @@ function syncOrderDraftWithVisibility() {
 }
 
 function isMergedGroupVisible(draft) {
-  return draft.has("Ship Method") || draft.has("Shipment ID");
+  return draft.has("Ship Method");
 }
 
 function getOrderKeyLabel(key) {
@@ -555,13 +552,8 @@ function getOrderKeyLabel(key) {
 }
 
 function setMergedGroupVisible(draft, visible) {
-  if (visible) {
-    draft.add("Ship Method");
-    draft.add("Shipment ID");
-  } else {
-    draft.delete("Ship Method");
-    draft.delete("Shipment ID");
-  }
+  if (visible) draft.add("Ship Method");
+  else draft.delete("Ship Method");
 }
 
 const ROW_KEY_ALIASES = {
@@ -686,6 +678,10 @@ function migrateVisibleColumnsForNewFields() {
     const idx = columnOrder.indexOf("EXF Date");
     if (idx !== -1) columnOrder.splice(idx + 1, 0, "EXF Request ID");
     else columnOrder = normalizeColumnOrder([...columnOrder, "EXF Request ID"]);
+    changed = true;
+  }
+  if (visibleColumns.has("Ship Method") && !visibleColumns.has("Shipment ID")) {
+    visibleColumns.add("Shipment ID");
     changed = true;
   }
   ["EXF", "EXF Req Date", "EXF Request Date"].forEach(legacyCol => {

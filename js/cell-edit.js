@@ -452,7 +452,10 @@ function updateModalSaveState() {
   if (!saveBtn) return;
   const reviewing = typeof isModalPendingSubmissionReview === "function" && isModalPendingSubmissionReview();
   const closed = modalRow && typeof isPoClosed === "function" && isPoClosed(modalRow);
-  saveBtn.disabled = closed || !hasModalPendingChanges();
+  const pendingUpdates = getModalPendingUpdates();
+  const hasStatusUpdate = Object.prototype.hasOwnProperty.call(pendingUpdates, "Status");
+  const hasPendingChanges = reviewing || Object.keys(pendingUpdates).length > 0 || hasPackingListPendingChanges();
+  saveBtn.disabled = (closed && !hasStatusUpdate) || !hasPendingChanges;
   saveBtn.textContent = reviewing ? "Save & approve" : "Save";
 }
 

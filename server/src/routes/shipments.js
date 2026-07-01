@@ -39,6 +39,7 @@ async function syncShipmentToPos(tenantId, shipmentId, shipmentData, poNumbers) 
     if (shipmentData[f] !== undefined) syncUpdates[f] = shipmentData[f];
   });
   syncUpdates["Shipment ID"] = shipmentId;
+  syncUpdates["Status"] = "OTW";
 
   const { data: poRows } = await supabase
     .from("purchase_orders")
@@ -55,6 +56,15 @@ async function syncShipmentToPos(tenantId, shipmentId, shipmentData, poNumbers) 
   }
 }
 
+function clearedPoShipmentStatus(poData) {
+  const exfRequested = poData?.["EXF Requested"];
+  const truthy = exfRequested === true
+    || String(exfRequested ?? "").trim().toLowerCase() === "true"
+    || String(exfRequested ?? "").trim().toLowerCase() === "yes"
+    || String(exfRequested ?? "").trim() === "1";
+  return truthy ? "Requested" : "WIP";
+}
+
 /** Clear shipment fields on POs (when shipment is deleted or POs removed). */
 async function clearShipmentFromPos(tenantId, shipmentId) {
   const { data: poRows } = await supabase
@@ -67,6 +77,7 @@ async function clearShipmentFromPos(tenantId, shipmentId) {
     const cleared = { ...(row.data || {}) };
     cleared["Shipment ID"] = "";
     SHIPMENT_PO_SYNC_FIELDS.forEach(f => { cleared[f] = ""; });
+    cleared["Status"] = clearedPoShipmentStatus(row.data);
     await supabase.from("purchase_orders").update({ data: cleared }).eq("id", row.id).eq("tenant_id", tenantId);
   }
 }
@@ -198,6 +209,7 @@ router.post("/remove-pos", requireAuth, async (req, res) => {
       if (String(row.data?.["Shipment ID"] ?? "") !== String(shipmentId)) continue;
       const cleared = { ...(row.data || {}), "Shipment ID": "" };
       SHIPMENT_PO_SYNC_FIELDS.forEach(f => { cleared[f] = ""; });
+      cleared["Status"] = clearedPoShipmentStatus(row.data);
       await supabase.from("purchase_orders").update({ data: cleared }).eq("id", row.id).eq("tenant_id", req.tenantId);
     }
 
