@@ -1,6 +1,7 @@
 const latestPackingUnitTotalsByPo = new Map();
 let modalSaveInProgress = false;
 let modalPackingEditorSnapshot = null;
+let modalPackingListEditMode = false;
 
 let modalPendingSubmissionId = null;
 let modalPendingSubmissionDraft = null;
@@ -291,7 +292,6 @@ function createModalStyleSection(row) {
   qtyRow.className = "modal-style-qty-row";
   qtyRow.appendChild(createModalSizeGrid(row));
   details.appendChild(qtyRow);
-  details.appendChild(createModalStyleCostRow(row));
 
   grid.appendChild(details);
   grid.appendChild(createModalStylePhotosColumn(row));
@@ -416,21 +416,21 @@ function renderSizeGridBody(body, row) {
 
 function applyModalSizeChartDensity(chart, colCount) {
   let unitWidth = 40;
-  let gap = 4;
+  let gap = 8;
   let totalWidth = 44;
   if (colCount > 4) {
     unitWidth = 34;
-    gap = 3;
+    gap = 7;
     totalWidth = 40;
   }
   if (colCount > 6) {
     unitWidth = 28;
-    gap = 2;
+    gap = 6;
     totalWidth = 36;
   }
   if (colCount > 9) {
     unitWidth = 24;
-    gap = 2;
+    gap = 5;
     totalWidth = 32;
   }
   chart.style.setProperty("--modal-size-unit-width", `${unitWidth}px`);
@@ -1256,12 +1256,12 @@ function bindPoModalMenuDismiss() {
   if (poModalMenuDismissBound) return;
   poModalMenuDismissBound = true;
 
-  document.addEventListener("click", e => {
+  document.addEventListener("pointerdown", e => {
     if (!poModalMenuOpen) return;
-    const wrap = document.querySelector(".modal-header-menu-wrap");
+    const wrap = document.querySelector("#modalOverlay .modal-header-menu-wrap");
     if (wrap?.contains(e.target)) return;
     closePoModalMenu();
-  });
+  }, true);
 
   document.addEventListener("keydown", e => {
     if (e.key === "Escape" && poModalMenuOpen) closePoModalMenu();
@@ -1282,11 +1282,19 @@ function createPoModalMenuItem(label, onSelect) {
   return item;
 }
 
-function openModalPackingListPanel() {
+function openModalPackingListPanel({ edit = true } = {}) {
   if (modalRow && typeof isPoClosed === "function" && isPoClosed(modalRow)) return;
   packingListPanelOpen = true;
+  modalPackingListEditMode = Boolean(edit);
   updateModalIfOpen();
-  requestAnimationFrame(focusPackingListCartonInput);
+  if (modalPackingListEditMode) requestAnimationFrame(focusPackingListCartonInput);
+}
+
+function isModalPackingListEditable(row = modalRow) {
+  if (!packingListPanelOpen) return false;
+  if (isModalPendingSubmissionReview()) return true;
+  if (!modalPackingListEditMode) return false;
+  return !(row && typeof isPoClosed === "function" && isPoClosed(row));
 }
 
 function rebuildPoModalMenuItems(row) {
@@ -1308,7 +1316,7 @@ function rebuildPoModalMenuItems(row) {
   if (!closed) {
     menu.appendChild(createPoModalMenuItem(
       packingList ? "Edit Packing List" : "Add Packing List",
-      openModalPackingListPanel
+      () => openModalPackingListPanel({ edit: true })
     ));
   }
 
@@ -1451,9 +1459,92 @@ function setPackingEditorTotals(container, row, cartons) {
   refreshModalFreightPackingTotals(container, row, cartons);
 }
 
-function createPackingListEditor(row, packingList, sourceCartons) {
+function openPackingDuplicateDialog() {
+  return new Promise(resolve => {
+    const overlay = document.createElement("div");
+    overlay.className = "packing-dup-dialog-overlay";
+
+    const box = document.createElement("div");
+    box.className = "packing-dup-dialog-box";
+    box.setAttribute("role", "dialog");
+    box.setAttribute("aria-modal", "true");
+    box.addEventListener("click", e => e.stopPropagation());
+
+    const title = document.createElement("div");
+    title.className = "packing-dup-dialog-title";
+    title.textContent = "Duplicate Carton";
+
+    const field = document.createElement("div");
+    field.className = "packing-dup-dialog-field";
+    const inputLabel = document.createElement("label");
+    inputLabel.className = "packing-dup-dialog-label";
+    inputLabel.htmlFor = "packingDupCount";
+    inputLabel.textContent = "Number of cartons (2–99)";
+    const numInput = document.createElement("input");
+    numInput.type = "number";
+    numInput.id = "packingDupCount";
+    numInput.className = "packing-dup-dialog-input";
+    numInput.min = "2";
+    numInput.max = "99";
+    numInput.step = "1";
+    numInput.value = "2";
+    numInput.addEventListener("focus", () => numInput.select());
+    field.append(inputLabel, numInput);
+
+    const checkRow = document.createElement("label");
+    checkRow.className = "packing-dup-dialog-checkbox-row";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    const checkSpan = document.createElement("span");
+    checkSpan.textContent = "Insert rows";
+    checkRow.append(checkbox, checkSpan);
+
+    const footer = document.createElement("div");
+    footer.className = "modal-footer";
+    const cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.className = "btn btn-sm";
+    cancelBtn.textContent = "Cancel";
+    const okBtn = document.createElement("button");
+    okBtn.type = "button";
+    okBtn.className = "btn btn-primary btn-sm";
+    okBtn.textContent = "OK";
+    footer.append(cancelBtn, okBtn);
+
+    box.append(title, field, checkRow, footer);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    requestAnimationFrame(() => { numInput.focus(); numInput.select(); });
+
+    function cleanup(result) {
+      overlay.remove();
+      resolve(result);
+    }
+
+    function submit() {
+      const n = Math.round(Number(numInput.value));
+      if (!Number.isFinite(n) || n < 2 || n > 99) {
+        numInput.focus();
+        numInput.select();
+        return;
+      }
+      cleanup({ count: n, insert: checkbox.checked });
+    }
+
+    cancelBtn.addEventListener("click", () => cleanup(null));
+    okBtn.addEventListener("click", submit);
+    overlay.addEventListener("click", () => cleanup(null));
+    overlay.addEventListener("keydown", e => {
+      if (e.key === "Escape") { e.preventDefault(); cleanup(null); }
+      if (e.key === "Enter") { e.preventDefault(); submit(); }
+    });
+  });
+}
+
+function createPackingListEditor(row, packingList, sourceCartons, { editable = false } = {}) {
   const labels = getSizeLabelsFromRow(row);
-  const readOnly = typeof isPoClosed === "function" && isPoClosed(row);
+  const readOnly = !editable || (typeof isPoClosed === "function" && isPoClosed(row));
   const editor = document.createElement("div");
   editor.className = "packing-list-editor" + (readOnly ? " packing-list-editor--readonly" : "");
   const draftCount = modalPendingSubmissionDraft?.packingList?.["Carton Count"];
@@ -1586,6 +1677,10 @@ function createPackingListEditor(row, packingList, sourceCartons) {
     weightHead.setAttribute("aria-hidden", "true");
     headGrid.appendChild(weightHead);
 
+    const actionSpacerHead = document.createElement("div");
+    actionSpacerHead.setAttribute("aria-hidden", "true");
+    headGrid.appendChild(actionSpacerHead);
+
     const totalsLabel = document.createElement("div");
     totalsLabel.className = "packing-list-rowhead packing-list-rowhead--blank";
     headGrid.appendChild(totalsLabel);
@@ -1602,6 +1697,10 @@ function createPackingListEditor(row, packingList, sourceCartons) {
     const totalsWeightBlank = document.createElement("div");
     totalsWeightBlank.className = "packing-list-weight-blank";
     headGrid.appendChild(totalsWeightBlank);
+
+    const actionSpacerTotals = document.createElement("div");
+    actionSpacerTotals.setAttribute("aria-hidden", "true");
+    headGrid.appendChild(actionSpacerTotals);
 
     const totalsDivider = document.createElement("div");
     totalsDivider.className = "packing-list-grid-divider packing-list-grid-divider--horizontal";
@@ -1665,14 +1764,130 @@ function createPackingListEditor(row, packingList, sourceCartons) {
       weightField.appendChild(weightInner);
       gridRow.appendChild(weightField);
 
+      const actionCell = document.createElement("div");
+      actionCell.className = "packing-list-action-cell";
+      if (!readOnly) {
+        const dupBtn = document.createElement("button");
+        dupBtn.type = "button";
+        dupBtn.className = "packing-list-dup-btn";
+        dupBtn.title = "Duplicate carton";
+        dupBtn.setAttribute("aria-label", "Duplicate carton");
+        dupBtn.dataset.cartonIndex = String(cartonIndex);
+        dupBtn.textContent = "⧉";
+        actionCell.appendChild(dupBtn);
+      }
+      gridRow.appendChild(actionCell);
+
       bodyGrid.appendChild(gridRow);
     });
 
     setPackingEditorTotals(editor, row, cartons);
   }
 
+  function parsePackingClipboardTable(text) {
+    const normalized = String(text ?? "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    const withoutTrailingNewline = normalized.endsWith("\n") ? normalized.slice(0, -1) : normalized;
+    return withoutTrailingNewline.split("\n").map(line => line.split("\t"));
+  }
+
+  function normalizePackingPastedQty(value) {
+    const raw = String(value ?? "").trim();
+    if (raw === "") return "";
+    const n = Number(raw.replace(/,/g, ""));
+    return Number.isFinite(n) && n >= 0 ? String(n) : null;
+  }
+
+  function getPackingUnitIndex(field) {
+    const match = /^Unit (\d+)$/.exec(String(field ?? ""));
+    return match ? Number(match[1]) - 1 : -1;
+  }
+
+  function refreshPackingQtyRows(cartonIndexes) {
+    cartonIndexes.forEach(cartonIndex => {
+      const rowTotal = bodyGrid.querySelector(`.packing-list-row-total[data-carton-index="${cartonIndex}"]`);
+      if (rowTotal) rowTotal.textContent = formatPackingListTotal(computeCartonTotal(cartons[cartonIndex]));
+    });
+    setPackingEditorTotals(editor, row, cartons);
+    updateModalSaveState();
+  }
+
+  function writePackingQtyInput(input, value, { updateInputValue = false } = {}) {
+    const cartonIndex = Number(input.dataset.cartonIndex);
+    const field = input.dataset.field;
+    if (!field || !Number.isInteger(cartonIndex) || !cartons[cartonIndex]) return null;
+    if (getPackingUnitIndex(field) < 0) return null;
+    cartons[cartonIndex][field] = value;
+    if (updateInputValue) input.value = value;
+    return cartonIndex;
+  }
+
+  function handlePackingListPaste(e) {
+    if (readOnly) return;
+    const target = e.target;
+    if (!(target instanceof HTMLInputElement) || !target.classList.contains("packing-list-input")) return;
+    const clipboardText = e.clipboardData?.getData("text/plain") ?? "";
+    if (!clipboardText || !/[\t\r\n]/.test(clipboardText)) return;
+
+    const startCartonIndex = Number(target.dataset.cartonIndex);
+    const startUnitIndex = getPackingUnitIndex(target.dataset.field);
+    if (!Number.isInteger(startCartonIndex) || startUnitIndex < 0) return;
+
+    e.preventDefault();
+    setChargebackError(editor, "");
+
+    const changedCartonIndexes = new Set();
+    parsePackingClipboardTable(clipboardText).forEach((cells, rowOffset) => {
+      const cartonIndex = startCartonIndex + rowOffset;
+      if (!cartons[cartonIndex]) return;
+      cells.forEach((cellValue, colOffset) => {
+        const unitIndex = startUnitIndex + colOffset;
+        if (unitIndex >= labels.length) return;
+        const normalizedValue = normalizePackingPastedQty(cellValue);
+        if (normalizedValue === null) return;
+        const input = bodyGrid.querySelector(
+          `.packing-list-input[data-carton-index="${cartonIndex}"][data-field="Unit ${unitIndex + 1}"]`
+        );
+        if (!(input instanceof HTMLInputElement)) return;
+        const changedCartonIndex = writePackingQtyInput(input, normalizedValue, { updateInputValue: true });
+        if (changedCartonIndex !== null) changedCartonIndexes.add(changedCartonIndex);
+      });
+    });
+
+    if (changedCartonIndexes.size > 0) refreshPackingQtyRows(changedCartonIndexes);
+  }
+
   countInput.addEventListener("change", renderGrid);
   countInput.addEventListener("input", updateModalSaveState);
+  gridPanel.addEventListener("paste", handlePackingListPaste);
+  gridPanel.addEventListener("click", async e => {
+    if (readOnly) return;
+    const btn = e.target.closest(".packing-list-dup-btn");
+    if (!btn) return;
+    const R = Number(btn.dataset.cartonIndex);
+    if (!Number.isFinite(R) || R < 0 || R >= cartons.length) return;
+
+    const result = await openPackingDuplicateDialog();
+    if (!result) return;
+
+    const { count: n, insert } = result;
+    const copies = n - 1;
+    const source = clonePackingCarton(cartons[R], R);
+
+    if (insert) {
+      const newRows = Array.from({ length: copies }, (_, k) => clonePackingCarton(source, R + 1 + k));
+      cartons.splice(R + 1, 0, ...newRows);
+    } else {
+      const needed = R + 1 + copies;
+      while (cartons.length < needed) cartons.push(clonePackingCarton(null, cartons.length));
+      for (let k = 0; k < copies; k++) {
+        cartons[R + 1 + k] = clonePackingCarton(source, R + 1 + k);
+      }
+    }
+
+    countInput.value = String(cartons.length);
+    renderGrid();
+    updateModalSaveState();
+  });
   gridPanel.addEventListener("input", e => {
     if (readOnly) return;
     const target = e.target;
@@ -1687,20 +1902,40 @@ function createPackingListEditor(row, packingList, sourceCartons) {
       cartons[cartonIndex][CARTON_WEIGHT_LBS_SAVE_FIELD] = weightRaw === "" ? "" : formatCartonWeightValue(weightLbs);
       cartons[cartonIndex][CARTON_WEIGHT_FIELD] = weightRaw === "" ? "" : formatCartonWeightValue(cartonWeightLbsToKg(weightLbs));
       setPackingEditorTotals(editor, row, cartons);
+      updateModalSaveState();
     } else {
-      cartons[cartonIndex][field] = target.value.trim() === "" ? "" : String(toQtyNumber(target.value));
-      const rowTotal = bodyGrid.querySelector(`.packing-list-row-total[data-carton-index="${cartonIndex}"]`);
-      if (rowTotal) rowTotal.textContent = formatPackingListTotal(computeCartonTotal(cartons[cartonIndex]));
-      setPackingEditorTotals(editor, row, cartons);
+      const changedCartonIndex = writePackingQtyInput(
+        target,
+        target.value.trim() === "" ? "" : String(toQtyNumber(target.value))
+      );
+      if (changedCartonIndex !== null) refreshPackingQtyRows(new Set([changedCartonIndex]));
     }
-    updateModalSaveState();
   });
+
+  function focusNextPackingListRowInput(input) {
+    const currentRow = input.closest(".packing-list-grid-row");
+    const nextRow = currentRow?.nextElementSibling;
+    const nextInput = nextRow?.querySelector(".packing-list-input:not(.packing-list-weight-input)");
+    if (nextInput instanceof HTMLInputElement) {
+      nextInput.focus();
+      nextInput.select();
+      return;
+    }
+
+    const saveBtn = document.getElementById("modalSaveBtn");
+    if (saveBtn instanceof HTMLButtonElement) saveBtn.focus();
+  }
+
   gridPanel.addEventListener("keydown", e => {
     if (e.key !== "Enter") return;
     const target = e.target;
     if (!(target instanceof HTMLInputElement)) return;
     e.preventDefault();
-    target.blur();
+    if (readOnly) {
+      target.blur();
+      return;
+    }
+    focusNextPackingListRowInput(target);
   });
 
   renderGrid();
@@ -1738,9 +1973,9 @@ function createPackingListSidePanel(row) {
   const panel = document.createElement("aside");
   panel.className = "packing-list-side-panel";
 
-  const editor = createPackingListEditor(row, packingList, cartons);
-  const freightSection = createModalFreightSection(row, { includePackingTotals: true });
-  if (freightSection) editor.appendChild(freightSection);
+  const editor = createPackingListEditor(row, packingList, cartons, {
+    editable: isModalPackingListEditable(row),
+  });
   panel.appendChild(editor);
   return panel;
 }
@@ -1995,7 +2230,8 @@ function renderModalContent(row) {
 
   main.appendChild(createModalOrderProductSplit(row));
   main.appendChild(createModalStyleSection(row));
-  main.appendChild(createModalProductionSection(row));
+  const freightSection = createModalFreightSection(row);
+  if (freightSection) main.appendChild(freightSection);
   const chargebacksSection = createModalChargebacksSection(row);
   if (chargebacksSection) main.appendChild(chargebacksSection);
 
@@ -2031,6 +2267,7 @@ function openPODetail(row) {
   clearModalPendingSubmission();
   packingListPanelOpen = hasPackingList(row?.["PO #"])
     || (typeof poHasShipment === "function" && poHasShipment(row));
+  modalPackingListEditMode = false;
   modalRow = snapshotModalRow(row);
   modalSnapshot = snapshotModalRow(row);
   renderModalContent(modalRow);
@@ -2049,6 +2286,7 @@ function openPODetailForPendingSubmission(row, submission) {
   modalPendingSubmissionId = String(submission?.["Submission ID"] ?? "").trim();
   modalPendingSubmissionDraft = buildPendingSubmissionDraft(submission);
   packingListPanelOpen = true;
+  modalPackingListEditMode = true;
   modalRow = snapshotModalRow(row);
   modalSnapshot = snapshotModalRow(row);
   renderModalContent(modalRow);
@@ -2073,6 +2311,7 @@ function dismissModalOverlay() {
   modalSnapshot = null;
   modalPackingEditorSnapshot = null;
   packingListPanelOpen = false;
+  modalPackingListEditMode = false;
   clearModalPendingSubmission();
   clearModalFooterMessageForOverlay("modalOverlay");
   document.getElementById("modalOverlay")?.classList.remove("open");
@@ -2268,7 +2507,12 @@ function normalizePackingCartonsForSave(editorCartons) {
 
 function getActivePackingListPayload() {
   const editor = document.querySelector("#modalOverlay .packing-list-side-panel .packing-list-editor");
-  if (!packingListPanelOpen || !modalRow || !editor || typeof editor.__getPackingCartons !== "function") return null;
+  if (
+    !isModalPackingListEditable()
+    || !modalRow
+    || !editor
+    || typeof editor.__getPackingCartons !== "function"
+  ) return null;
   return {
     editor,
     row: modalRow,
@@ -2296,7 +2540,7 @@ function syncModalPackingEditorSnapshot() {
 }
 
 function hasPackingListPendingChanges() {
-  if (!packingListPanelOpen) return false;
+  if (!isModalPackingListEditable()) return false;
   const payload = getActivePackingListPayload();
   if (!payload || !modalPackingEditorSnapshot) return false;
   const current = serializePackingEditorState(payload.editor, payload.editor.__getPackingCartons());

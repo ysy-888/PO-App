@@ -3324,7 +3324,7 @@ td.n41-status-mismatch,
   --modal-size-rowhead-width: 58px;
   --modal-size-unit-width: 40px;
   --modal-size-total-width: 44px;
-  --modal-size-gap: 4px;
+  --modal-size-gap: 8px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -3408,7 +3408,7 @@ td.n41-status-mismatch,
   --modal-size-rowhead-gap: 10px;
   --modal-size-unit-width: 40px;
   --modal-size-total-width: 44px;
-  --modal-size-gap: 4px;
+  --modal-size-gap: 8px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -3811,7 +3811,7 @@ td.n41-status-mismatch,
   max-width: 100%;
   box-sizing: border-box;
   padding: 10px 0 0;
-  margin-top: auto;
+  margin-top: 0;
   flex-shrink: 0;
   border: none;
   border-top: 1px solid var(--border);
@@ -4705,6 +4705,29 @@ td.n41-status-mismatch,
   outline: none;
 }
 
+.packing-list-editor--readonly .packing-list-count-label:hover,
+.packing-list-editor--readonly .packing-list-count-label:focus-within {
+  gap: 2px;
+}
+
+.packing-list-editor--readonly .packing-list-count-label:hover .packing-list-count-stepper,
+.packing-list-editor--readonly .packing-list-count-label:focus-within .packing-list-count-stepper {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.packing-list-editor--readonly .packing-list-count-step {
+  cursor: default;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.packing-list-editor--readonly .packing-list-count-label:hover .packing-list-count-input,
+.packing-list-editor--readonly .packing-list-count-label:focus-within .packing-list-count-input {
+  width: 2.5ch;
+  padding: 0;
+}
+
 .packing-list-total-compare--match {
   color: var(--text);
 }
@@ -4746,13 +4769,15 @@ td.n41-status-mismatch,
   --packing-unit-width: 40px;
   --packing-total-width: 44px;
   --packing-weight-width: 58px;
+  --packing-action-width: 26px;
   --packing-gap: 4px;
   display: grid;
   grid-template-columns:
     var(--packing-rowhead-width)
     var(--packing-total-width)
     repeat(var(--size-col-count), var(--packing-unit-width))
-    var(--packing-weight-width);
+    var(--packing-weight-width)
+    var(--packing-action-width);
   gap: 5px var(--packing-gap);
   align-items: center;
   width: 100%;
@@ -4774,7 +4799,8 @@ td.n41-status-mismatch,
     var(--packing-rowhead-width)
     var(--packing-total-width)
     repeat(var(--size-col-count), var(--packing-unit-width))
-    var(--packing-weight-width);
+    var(--packing-weight-width)
+    var(--packing-action-width);
   gap: 5px var(--packing-gap);
   align-items: center;
   border-bottom: 1px solid var(--border);
@@ -4787,6 +4813,133 @@ td.n41-status-mismatch,
 
 .packing-list-grid-row:hover {
   background: var(--row-hover);
+}
+
+.packing-list-action-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+.packing-list-dup-btn {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 0;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.1s ease, color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+
+.packing-list-grid-row:hover .packing-list-dup-btn {
+  opacity: 1;
+}
+
+.packing-list-dup-btn:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+  background: #ebebeb;
+}
+
+.packing-list-dup-btn:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* ── Packing duplicate dialog ── */
+.packing-dup-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.4);
+  z-index: 1300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.packing-dup-dialog-box {
+  background: var(--surface);
+  border-radius: 10px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.18);
+  padding: 20px 22px 18px;
+  width: 280px;
+  max-width: 95vw;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.packing-dup-dialog-title {
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+
+.packing-dup-dialog-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.packing-dup-dialog-label {
+  display: block;
+  font-family: var(--font);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text);
+}
+
+.packing-dup-dialog-input {
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 6px 8px;
+  width: 100%;
+  box-sizing: border-box;
+  outline: none;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.packing-dup-dialog-input::-webkit-outer-spin-button,
+.packing-dup-dialog-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.packing-dup-dialog-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-light);
+}
+
+.packing-dup-dialog-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .packing-list-grid-divider--horizontal {
@@ -5021,6 +5174,18 @@ td.n41-status-mismatch,
   outline: none;
   color: var(--text);
   font-weight: 500;
+}
+
+.packing-list-editor--readonly .packing-list-input {
+  cursor: default;
+  background: transparent;
+}
+
+.packing-list-editor--readonly .packing-list-input:hover,
+.packing-list-editor--readonly .packing-list-input:focus {
+  border-color: transparent;
+  outline: none;
+  box-shadow: none;
 }
 
 #modalOverlay .modal-style-info .modal-field {
@@ -7196,6 +7361,7 @@ body:not(.split-view-enabled) .app-main > .app-secondary-table:not([hidden]) {
   flex: 1;
   min-height: 0;
   display: flex;
+  position: relative;
   overflow: hidden;
 }
 
@@ -7208,17 +7374,21 @@ body:not(.split-view-enabled) .app-main > .app-secondary-table:not([hidden]) {
   --packing-pane-width: 540px;
   --po-pane-photo-max-width: 240px;
   --po-pane-photo-max-height: 300px;
-  flex: 0 0 auto;
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 70;
   width: max(var(--packing-pane-width), 540px);
   min-width: 540px;
   min-height: 0;
   max-width: 720px;
   border-left: 1px solid var(--border);
+  box-shadow: -8px 0 18px rgba(15, 23, 42, 0.08);
   background: var(--surface);
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  flex-shrink: 0;
 }
 
 #poPackingPane.packing-pane[hidden] {

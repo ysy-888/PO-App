@@ -43,6 +43,7 @@ const PO_CARTON_COL = {
   paneMin: 540,
   sizeMin: 40,
   sizeDefault: 46,
+  rightGutter: 12,
 };
 
 function poPaneQty(val) {
@@ -629,7 +630,11 @@ function poPaneRefreshSummaryTotals() {
 
 function poPaneGetCartonGridLayout() {
   const count = Math.max(1, poPackingPaneSizeLabels.length);
-  const fixed = PO_CARTON_COL.num + PO_CARTON_COL.gap * 2 + PO_CARTON_COL.total + PO_CARTON_COL.weight;
+  const fixed = PO_CARTON_COL.num
+    + PO_CARTON_COL.gap * 2
+    + PO_CARTON_COL.total
+    + PO_CARTON_COL.weight
+    + PO_CARTON_COL.rightGutter;
   const sizeW = Math.max(
     PO_CARTON_COL.sizeMin,
     Math.min(
@@ -644,6 +649,7 @@ function poPaneGetCartonGridLayout() {
     PO_CARTON_COL.gap,
     PO_CARTON_COL.total,
     PO_CARTON_COL.weight,
+    PO_CARTON_COL.rightGutter,
   ];
   const tableW = colWidths.reduce((sum, w) => sum + w, 0);
   const paneW = Math.min(PO_CARTON_COL.paneMax, Math.max(PO_CARTON_COL.paneMin, tableW + PO_CARTON_COL.panePad));
@@ -660,6 +666,7 @@ function poPaneSyncCartonGridLayout() {
     PO_CARTON_COL.gap + "px",
     PO_CARTON_COL.total + "px",
     PO_CARTON_COL.weight + "px",
+    PO_CARTON_COL.rightGutter + "px",
   ].join(" ");
   const pane = document.getElementById(PO_PACKING_PANE.pane);
   const gridWrap = document.getElementById(PO_PACKING_PANE.gridWrap);
@@ -720,6 +727,75 @@ function poPaneCreateWeightField(value) {
   return { field, input };
 }
 
+function poPaneParseClipboardTable(text) {
+  const normalized = String(text ?? "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const withoutTrailingNewline = normalized.endsWith("\n") ? normalized.slice(0, -1) : normalized;
+  return withoutTrailingNewline.split("\n").map(line => line.split("\t"));
+}
+
+function poPaneNormalizePastedQty(value) {
+  const raw = String(value ?? "").trim();
+  if (raw === "") return "";
+  const n = Number(raw.replace(/,/g, ""));
+  return Number.isFinite(n) && n >= 0 ? String(n) : null;
+}
+
+function poPaneWriteCartonQtyInput(input, value) {
+  const cartonIndex = Number(input.dataset.cartonIndex);
+  const unitIndex = Number(input.dataset.unitIndex);
+  if (!Number.isInteger(cartonIndex) || !Number.isInteger(unitIndex) || !poPackingPaneCartons[cartonIndex]) {
+    return null;
+  }
+
+  input.value = value;
+  poPackingPaneCartons[cartonIndex]["u" + unitIndex] = poPaneQty(value);
+  const totalCell = document.querySelector(
+    `#${PO_PACKING_PANE.gridBody} .carton-grid-total[data-carton-index="${cartonIndex}"]`
+  );
+  if (totalCell) {
+    const total = poPaneCartonTotal(poPackingPaneCartons[cartonIndex]);
+    totalCell.textContent = total > 0 ? String(total) : "";
+  }
+  return cartonIndex;
+}
+
+function poPaneHandleCartonQtyPaste(e) {
+  const target = e.target;
+  if (!(target instanceof HTMLInputElement) || !target.classList.contains("carton-grid-input") || target.readOnly) {
+    return;
+  }
+
+  const clipboardText = e.clipboardData?.getData("text/plain") ?? "";
+  if (!clipboardText || !/[\t\r\n]/.test(clipboardText)) return;
+
+  const startCartonIndex = Number(target.dataset.cartonIndex);
+  const startUnitIndex = Number(target.dataset.unitIndex);
+  if (!Number.isInteger(startCartonIndex) || !Number.isInteger(startUnitIndex)) return;
+
+  e.preventDefault();
+  const changedCartonIndexes = new Set();
+  const body = document.getElementById(PO_PACKING_PANE.gridBody);
+
+  poPaneParseClipboardTable(clipboardText).forEach((cells, rowOffset) => {
+    const cartonIndex = startCartonIndex + rowOffset;
+    if (!poPackingPaneCartons[cartonIndex]) return;
+    cells.forEach((cellValue, colOffset) => {
+      const unitIndex = startUnitIndex + colOffset;
+      if (unitIndex >= poPackingPaneSizeLabels.length) return;
+      const normalizedValue = poPaneNormalizePastedQty(cellValue);
+      if (normalizedValue === null) return;
+      const input = body?.querySelector(
+        `.carton-grid-input[data-carton-index="${cartonIndex}"][data-unit-index="${unitIndex}"]`
+      );
+      if (!(input instanceof HTMLInputElement)) return;
+      const changedCartonIndex = poPaneWriteCartonQtyInput(input, normalizedValue);
+      if (changedCartonIndex !== null) changedCartonIndexes.add(changedCartonIndex);
+    });
+  });
+
+  if (changedCartonIndexes.size > 0) poPaneRefreshSummaryTotals();
+}
+
 function poPaneRenderCartonRows() {
   const body = document.getElementById(PO_PACKING_PANE.gridBody);
   if (!body) return;
@@ -744,6 +820,8 @@ function poPaneRenderCartonRows() {
         totalCell.textContent = poPaneCartonTotal(carton) > 0 ? String(poPaneCartonTotal(carton)) : "";
         poPaneRefreshSummaryTotals();
       }, readOnly);
+      input.dataset.cartonIndex = String(idx);
+      input.dataset.unitIndex = String(i);
       cell.appendChild(input);
       row.appendChild(cell);
     });
@@ -752,6 +830,7 @@ function poPaneRenderCartonRows() {
 
     const totalCell = document.createElement("div");
     totalCell.className = "carton-grid-total";
+    totalCell.dataset.cartonIndex = String(idx);
     totalCell.textContent = poPaneCartonTotal(carton) > 0 ? String(poPaneCartonTotal(carton)) : "";
     row.appendChild(totalCell);
 
@@ -915,6 +994,7 @@ function initPoPackingPane() {
     poPaneSyncCartonCount(next);
   });
   if (countInput && typeof bindNumberInput === "function") bindNumberInput(countInput);
+  document.getElementById(PO_PACKING_PANE.gridBody)?.addEventListener("paste", poPaneHandleCartonQtyPaste);
 
   menuBtn?.addEventListener("click", e => {
     e.stopPropagation();

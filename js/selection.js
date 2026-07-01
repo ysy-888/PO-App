@@ -539,6 +539,7 @@ function refreshModalPackingQtyDisplay(row) {
 function closePackingListPanelInModal(row) {
   if (typeof closePoModalMenu === "function") closePoModalMenu();
   packingListPanelOpen = false;
+  if (typeof modalPackingListEditMode !== "undefined") modalPackingListEditMode = false;
   document.querySelector("#modalOverlay .modal-layout")?.classList.remove("modal-layout--packing-open");
   document.querySelector("#modalOverlay .modal-card")?.classList.remove("modal-card--packing-open");
   document.querySelector("#modalOverlay .packing-list-side-panel")?.remove();
