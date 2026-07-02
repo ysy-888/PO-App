@@ -408,6 +408,7 @@ function switchAppView(view) {
   const stylesHeaderMeta = document.getElementById("stylesHeaderMeta");
   const packingReviewHeaderMeta = document.getElementById("packingReviewHeaderMeta");
   const salesOrderHeaderMeta = document.getElementById("salesOrderHeaderMeta");
+  const invoiceHeaderMeta = document.getElementById("invoiceHeaderMeta");
   const appMain = document.getElementById("appMain");
   const poViewContent = document.getElementById("poViewContent");
   const poTableWrap = document.getElementById("poTableWrap");
@@ -418,6 +419,7 @@ function switchAppView(view) {
   const customersTableWrap = document.getElementById("customersTableWrap");
   const stylesTableWrap = document.getElementById("stylesTableWrap");
   const salesOrderTableWrap = document.getElementById("salesOrderTableWrap");
+  const invoiceTableWrap = document.getElementById("invoiceTableWrap");
   const poTab = document.getElementById("navTabPo");
   const requestsTab = document.getElementById("navTabRequests");
   const shipTab = document.getElementById("navTabShipments");
@@ -426,11 +428,14 @@ function switchAppView(view) {
   const customersTab = document.getElementById("navTabCustomers");
   const stylesTab = document.getElementById("navTabStyles");
   const salesOrdersTab = document.getElementById("navTabSalesOrders");
+  const invoicesTab = document.getElementById("navTabInvoices");
 
   if (appMain) appMain.classList.toggle("is-split-active", splitActive);
 
+  const invoiceToolbar = document.getElementById("invoiceToolbar");
   if (poToolbar) poToolbar.hidden = view !== "po";
   if (salesOrderToolbar) salesOrderToolbar.hidden = view !== "sales";
+  if (invoiceToolbar) invoiceToolbar.hidden = view !== "invoices";
   if (poHeaderMeta) poHeaderMeta.hidden = view !== "po" && !splitActive;
   if (shipmentHeaderMeta) shipmentHeaderMeta.hidden = view !== "shipments";
   if (requestsHeaderMeta) requestsHeaderMeta.hidden = view !== "requests";
@@ -439,6 +444,7 @@ function switchAppView(view) {
   if (stylesHeaderMeta) stylesHeaderMeta.hidden = view !== "styles";
   if (packingReviewHeaderMeta) packingReviewHeaderMeta.hidden = view !== "packingReviews";
   if (salesOrderHeaderMeta) salesOrderHeaderMeta.hidden = view !== "sales";
+  if (invoiceHeaderMeta) invoiceHeaderMeta.hidden = view !== "invoices";
   syncViewActionToolbars(view);
 
   if (splitActive) {
@@ -459,10 +465,13 @@ function switchAppView(view) {
   if (customersTableWrap) customersTableWrap.hidden = view !== "customers";
   if (stylesTableWrap) stylesTableWrap.hidden = view !== "styles";
   if (salesOrderTableWrap) salesOrderTableWrap.hidden = view !== "sales";
+  if (invoiceTableWrap) invoiceTableWrap.hidden = view !== "invoices";
   const poFooterEnd = document.getElementById("poFooterEnd");
-  if (poFooterEnd) poFooterEnd.hidden = view !== "po" && view !== "sales" && !splitActive;
+  if (poFooterEnd) poFooterEnd.hidden = view !== "po" && view !== "sales" && view !== "invoices" && !splitActive;
   if (view === "sales" && typeof syncPaginationFooterForSales === "function") {
     syncPaginationFooterForSales();
+  } else if (view === "invoices" && typeof syncPaginationFooterForInvoices === "function") {
+    syncPaginationFooterForInvoices();
   } else if (view === "po" && typeof syncPaginationFooterForPo === "function") {
     syncPaginationFooterForPo();
   }
@@ -482,6 +491,8 @@ function switchAppView(view) {
   stylesTab?.setAttribute("aria-selected", view === "styles" ? "true" : "false");
   salesOrdersTab?.classList.toggle("is-active", view === "sales");
   salesOrdersTab?.setAttribute("aria-selected", view === "sales" ? "true" : "false");
+  invoicesTab?.classList.toggle("is-active", view === "invoices");
+  invoicesTab?.setAttribute("aria-selected", view === "invoices" ? "true" : "false");
 
   if (view !== "requests") {
     clearRequestTypeSelection();
@@ -495,6 +506,7 @@ function switchAppView(view) {
   if (view === "customers" && typeof applyCustomerFilters === "function") applyCustomerFilters();
   if (view === "styles" && typeof applyStyleFilters === "function") applyStyleFilters();
   if (view === "sales" && typeof applySalesOrderFilters === "function") applySalesOrderFilters();
+  if (view === "invoices" && typeof applyInvoiceFilters === "function") applyInvoiceFilters();
   updateDeleteShipmentButton();
   updateDeleteChargebackButton();
   updateToolbarRequestButtons();

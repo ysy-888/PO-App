@@ -166,6 +166,22 @@ function getChargebacksExportData() {
   return { headers, rows };
 }
 
+/** Invoices: visible columns in current order, filtered rows. */
+function getInvoicesExportData() {
+  const exportCols = typeof getInvColumnOrder === "function"
+    ? getInvColumnOrder().filter(col => typeof isInvColumnVisible === "function" ? isInvColumnVisible(col) : true).filter(col => col !== "Flag" && col !== "Selected")
+    : (typeof INV_COLUMNS !== "undefined" ? INV_COLUMNS.filter(c => c !== "Flag" && c !== "Selected") : []);
+  const headers = exportCols;
+  const rows = (typeof filteredInvoices !== "undefined" ? filteredInvoices : []).map(inv => {
+    return headers.map(col => {
+      const val = inv[col] ?? "";
+      if (isEmptyValue(val)) return "";
+      return String(val);
+    });
+  });
+  return { headers, rows };
+}
+
 // ---------------------------------------------------------------------------
 // Dispatcher
 // ---------------------------------------------------------------------------
@@ -194,6 +210,10 @@ function exportCurrentViewCsv() {
     case "customers":
       data = getCustomersExportData();
       filename = `customers_${today}.csv`;
+      break;
+    case "invoices":
+      data = getInvoicesExportData();
+      filename = `invoices_${today}.csv`;
       break;
     default:
       return;

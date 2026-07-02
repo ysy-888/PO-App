@@ -670,9 +670,6 @@ function applyPickupRequestCreatedLocally(requestId, poNumbers, data) {
     row["Pickup Date"] = data[PICKUP_DATE_FIELD] ?? "";
     row["Pickup Req Date"] = data[PICKUP_REQ_SUBMIT_DATE_FIELD] ?? now;
     row["Assign Date"] = data[PICKUP_DATE_FIELD] ?? "";
-    if (String(row["Division"] ?? "").trim() === "Freesia") {
-      row["Status"] = "Assigned";
-    }
   });
   resetLocalSelectedState(allRows);
   applyFilters();

@@ -63,7 +63,7 @@ function isSoColumnFilterActive(col) {
 }
 
 function hasActiveSoColumnFilters() {
-  return SO_COLUMN_FILTER_COLS.some(col => isSoColumnFilterActive(col));
+  return soFlagFilterActive || SO_COLUMN_FILTER_COLS.some(col => isSoColumnFilterActive(col));
 }
 
 function updateSoClearAllFiltersButton() {
@@ -72,10 +72,12 @@ function updateSoClearAllFiltersButton() {
 }
 
 function clearAllSoColumnFilters() {
+  soFlagFilterActive = false;
   SO_COLUMN_FILTER_COLS.forEach(col => { soColumnFilters[col] = null; });
   [...SO_DATE_FILTER_COLUMNS].forEach(col => { soDateColumnRangeFilters[col] = null; });
   closeSoColumnFilterPopover();
   updateSoColumnFilterHeaderStates();
+  updateSoFlagFilterHeaderState();
   applySalesOrderFilters();
 }
 

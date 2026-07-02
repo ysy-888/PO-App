@@ -484,6 +484,28 @@ function buildSettingsDateFormatSelect() {
   updateSettingsDateFormatUi();
 }
 
+function getEditTableTarget() {
+  const select = document.getElementById("editTableTargetSelect");
+  return select?.value ?? "po";
+}
+
+function prepareCurrentEditTableTarget() {
+  const target = getEditTableTarget();
+  if (target === "po" && typeof prepareEditTableDraft === "function") prepareEditTableDraft();
+  else if (target === "so" && typeof prepareSoEditTableDraft === "function") prepareSoEditTableDraft();
+  else if (target === "inv" && typeof prepareInvoiceEditTableDraft === "function") prepareInvoiceEditTableDraft();
+}
+
+function syncEditTableGroupVisibility() {
+  const target = getEditTableTarget();
+  const groupPo = document.getElementById("editTableGroupPo");
+  const groupSo = document.getElementById("editTableGroupSo");
+  const groupInv = document.getElementById("editTableGroupInv");
+  if (groupPo) groupPo.hidden = target !== "po";
+  if (groupSo) groupSo.hidden = target !== "so";
+  if (groupInv) groupInv.hidden = target !== "inv";
+}
+
 function selectSettingsSection(sectionId) {
   settingsSectionId = sectionId;
   document.querySelectorAll(".settings-nav-item").forEach(btn => {
@@ -495,19 +517,12 @@ function selectSettingsSection(sectionId) {
     panel.hidden = panel.dataset.settingsSection !== sectionId;
   });
   const editTableFooter = document.getElementById("settingsEditTableFooter");
-  const isPoEdit = sectionId === "edit-table";
-  const isSoEdit = sectionId === "edit-so-table";
-  if (editTableFooter) editTableFooter.hidden = !isPoEdit && !isSoEdit;
-  const editOk = document.getElementById("editTableOk");
-  const editCancel = document.getElementById("editTableCancel");
-  const soOk = document.getElementById("soEditTableOk");
-  const soCancel = document.getElementById("soEditTableCancel");
-  if (editOk) editOk.hidden = !isPoEdit;
-  if (editCancel) editCancel.hidden = !isPoEdit;
-  if (soOk) soOk.hidden = !isSoEdit;
-  if (soCancel) soCancel.hidden = !isSoEdit;
-  if (sectionId === "edit-table" && typeof prepareEditTableDraft === "function") prepareEditTableDraft();
-  if (sectionId === "edit-so-table" && typeof prepareSoEditTableDraft === "function") prepareSoEditTableDraft();
+  const isEdit = sectionId === "edit-table";
+  if (editTableFooter) editTableFooter.hidden = !isEdit;
+  if (isEdit) {
+    syncEditTableGroupVisibility();
+    prepareCurrentEditTableTarget();
+  }
 }
 
 function openSettingsModal(sectionId = "general") {
@@ -541,6 +556,42 @@ function initSettings() {
     btn.addEventListener("click", () => {
       selectSettingsSection(btn.dataset.settingsSection || "general");
     });
+  });
+
+  document.getElementById("editTableTargetSelect")?.addEventListener("change", () => {
+    syncEditTableGroupVisibility();
+    prepareCurrentEditTableTarget();
+  });
+
+  document.getElementById("editTableOk")?.addEventListener("click", () => {
+    const target = getEditTableTarget();
+    if (target === "po" && typeof applyEditTableFromPopover === "function") {
+      applyEditTableFromPopover();
+    } else if (target === "so" && typeof applySoEditTableFromPopover === "function") {
+      applySoEditTableFromPopover();
+    } else if (target === "inv" && typeof applyInvoiceEditTableFromPopover === "function") {
+      applyInvoiceEditTableFromPopover();
+    }
+    closeSettingsModal();
+  });
+
+  document.getElementById("editTableCancel")?.addEventListener("click", () => {
+    const target = getEditTableTarget();
+    if (target === "po" && typeof cancelEditTableFromPopover === "function") {
+      cancelEditTableFromPopover();
+    } else if (target === "so" && typeof cancelSoEditTableFromPopover === "function") {
+      cancelSoEditTableFromPopover();
+    } else if (target === "inv" && typeof cancelInvoiceEditTableFromPopover === "function") {
+      cancelInvoiceEditTableFromPopover();
+    }
+    closeSettingsModal();
+  });
+
+  document.getElementById("invEditTableSelectAll")?.addEventListener("click", () => {
+    if (typeof setInvEditTableDraftSelectAll === "function") setInvEditTableDraftSelectAll(true);
+  });
+  document.getElementById("invEditTableClearAll")?.addEventListener("click", () => {
+    if (typeof setInvEditTableDraftSelectAll === "function") setInvEditTableDraftSelectAll(false);
   });
 
   document.getElementById("settingsCountdownToggle")?.addEventListener("click", () => {

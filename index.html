@@ -35,6 +35,7 @@
         </button>
       </div>
     </div>
+    <button type="button" class="app-title-tab" id="navTabInvoices" role="tab" aria-selected="false">Invoices</button>
     <button type="button" class="app-title-tab" id="navTabChargebacks" role="tab" aria-selected="false">Chargebacks</button>
     <button type="button" class="app-title-tab" id="navTabCustomers" role="tab" aria-selected="false">Customers</button>
     <button type="button" class="app-title-tab" id="navTabStyles" role="tab" aria-selected="false" hidden>Styles</button>
@@ -98,6 +99,13 @@
         <input type="search" id="salesOrderSearchInput" placeholder="Search" />
       </div>
     </div>
+    <div class="header-view-meta" id="invoiceHeaderMeta" hidden>
+      <div class="counter" id="invoiceRowCounter">— invoices</div>
+      <div class="search-wrap header-search-wrap">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="search" id="invoiceSearchInput" placeholder="Search" />
+      </div>
+    </div>
     <button type="button" class="btn btn-primary btn-icon" onclick="loadData()" aria-label="Refresh">
       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
     </button>
@@ -127,6 +135,15 @@
 <div id="salesOrderToolbar" class="toolbar" hidden>
   <div class="toolbar-end">
     <button type="button" class="btn btn-secondary" id="soClearAllColumnFiltersBtn" hidden>
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M7 12h10"/><path d="M10 18h4"/><path d="m14 4-4 16"/></svg>
+      Clear all filters
+    </button>
+  </div>
+</div>
+
+<div id="invoiceToolbar" class="toolbar" hidden>
+  <div class="toolbar-end">
+    <button type="button" class="btn btn-secondary" id="invClearAllColumnFiltersBtn" hidden>
       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M7 12h10"/><path d="M10 18h4"/><path d="m14 4-4 16"/></svg>
       Clear all filters
     </button>
@@ -651,6 +668,8 @@
   <div class="table-scroll-x">
   <table id="salesOrderTable">
     <colgroup>
+      <col class="col-flag" data-col="Flag" />
+      <col class="col-select" data-col="Selected" />
       <col class="col-so" data-col="SO #" />
       <col class="col-buyer" data-col="Customer" />
       <col class="col-buyer-po" data-col="Customer PO #" />
@@ -662,11 +681,21 @@
       <col class="col-order-type" data-col="Order Type" />
       <col class="col-cust-type" data-col="Customer Type" />
       <col class="col-so-styles" data-col="Styles" />
+      <col class="col-so-style-nums" data-col="Style #s" />
       <col class="col-so-units" data-col="Total Units" />
       <col class="col-so-price" data-col="Total Price" />
+      <col class="col-so-memo" data-col="Memo" />
     </colgroup>
     <thead>
       <tr>
+        <th class="th-flag-col" data-col="Flag" aria-label="Flag">
+          <span class="th-flag-icon" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+          </span>
+        </th>
+        <th class="th-select-col" data-col="Selected">
+          <input type="checkbox" id="soSelectAllRowsCheckbox" aria-label="Select all filtered sales orders" />
+        </th>
         <th data-col="SO #"><span class="th-label">SO #</span></th>
         <th class="th-filterable" data-col="Customer"><span class="th-label">Customer</span></th>
         <th class="th-filterable" data-col="Customer PO #"><span class="th-label">Customer PO #</span></th>
@@ -678,12 +707,74 @@
         <th class="th-filterable" data-col="Order Type"><span class="th-label">Order Type</span></th>
         <th class="th-filterable" data-col="Customer Type"><span class="th-label">Customer Type</span></th>
         <th data-col="Styles"><span class="th-label">Styles</span></th>
+        <th data-col="Style #s"><span class="th-label">Style #s</span></th>
         <th data-col="Total Units"><span class="th-label">Total Units</span></th>
         <th data-col="Total Price"><span class="th-label">Total Price</span></th>
+        <th data-col="Memo"><span class="th-label">Memo</span></th>
       </tr>
     </thead>
     <tbody id="salesOrderTableBody">
-      <tr class="state-row"><td colspan="13">Loading sales orders…</td></tr>
+      <tr class="state-row"><td colspan="17">Loading sales orders…</td></tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<div id="invoiceTableWrap" class="table-scroll-y" hidden>
+  <div class="table-scroll-x">
+  <table id="invoiceTable">
+    <colgroup>
+      <col class="col-flag" data-col="Flag" />
+      <col class="col-select" data-col="Selected" />
+      <col class="col-so" data-col="Invoice #" />
+      <col class="col-status" data-col="Status" />
+      <col class="col-date" data-col="INV DATE" />
+      <col class="col-buyer" data-col="Customer" />
+      <col class="col-so-price" data-col="Subtotal" />
+      <col class="col-so-price" data-col="Discount" />
+      <col class="col-so-price" data-col="Freight" />
+      <col class="col-so-price" data-col="Total" />
+      <col class="col-so-price" data-col="Received" />
+      <col class="col-so-price" data-col="Balance" />
+      <col class="col-buyer-po" data-col="Pick #" />
+      <col class="col-notes" data-col="Tracking #" />
+      <col class="col-so" data-col="SO #" />
+      <col class="col-so-units" data-col="Unit Qty" />
+      <col class="col-so-memo" data-col="Memo" />
+      <col class="col-so-memo" data-col="House Memo" />
+      <col class="col-so-price" data-col="Sales Commission" />
+    </colgroup>
+    <thead>
+      <tr>
+        <th class="th-flag-col" data-col="Flag" aria-label="Flag">
+          <span class="th-flag-icon" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+          </span>
+        </th>
+        <th class="th-select-col" data-col="Selected">
+          <input type="checkbox" id="invSelectAllRowsCheckbox" aria-label="Select all filtered invoices" />
+        </th>
+        <th data-col="Invoice #"><span class="th-label">Invoice #</span></th>
+        <th class="th-filterable" data-col="Status"><span class="th-label">Status</span></th>
+        <th class="th-filterable" data-col="INV DATE"><span class="th-label">INV DATE</span></th>
+        <th class="th-filterable" data-col="Customer"><span class="th-label">Customer</span></th>
+        <th data-col="Subtotal"><span class="th-label">Subtotal</span></th>
+        <th data-col="Discount"><span class="th-label">Discount</span></th>
+        <th data-col="Freight"><span class="th-label">Freight</span></th>
+        <th data-col="Total"><span class="th-label">Total</span></th>
+        <th data-col="Received"><span class="th-label">Received</span></th>
+        <th data-col="Balance"><span class="th-label">Balance</span></th>
+        <th data-col="Pick #"><span class="th-label">Pick #</span></th>
+        <th data-col="Tracking #"><span class="th-label">Tracking #</span></th>
+        <th data-col="SO #"><span class="th-label">SO #</span></th>
+        <th data-col="Unit Qty"><span class="th-label">Unit Qty</span></th>
+        <th data-col="Memo"><span class="th-label">Memo</span></th>
+        <th data-col="House Memo"><span class="th-label">House Memo</span></th>
+        <th data-col="Sales Commission"><span class="th-label">Commission</span></th>
+      </tr>
+    </thead>
+    <tbody id="invoiceTableBody">
+      <tr class="state-row"><td colspan="19">Loading invoices…</td></tr>
     </tbody>
   </table>
   </div>
@@ -801,6 +892,19 @@
   <div class="column-filter-footer">
     <button type="button" class="btn btn-primary column-filter-ok" id="soColumnFilterOk">OK</button>
     <button type="button" class="btn column-filter-cancel" id="soColumnFilterCancel">Cancel</button>
+  </div>
+</div>
+
+<div id="invColumnFilterPopover" class="column-filter-popover" hidden>
+  <div class="column-filter-toolbar" id="invColumnFilterToolbar">
+    <button type="button" class="column-filter-link" id="invColumnFilterSelectAll">Select all</button>
+    <span class="column-filter-sep" id="invColumnFilterSelectSep">|</span>
+    <button type="button" class="column-filter-link" id="invColumnFilterClearAll">Clear all</button>
+  </div>
+  <div class="column-filter-list" id="invColumnFilterList"></div>
+  <div class="column-filter-footer">
+    <button type="button" class="btn btn-primary column-filter-ok" id="invColumnFilterOk">OK</button>
+    <button type="button" class="btn column-filter-cancel" id="invColumnFilterCancel">Cancel</button>
   </div>
 </div>
 
@@ -1122,6 +1226,22 @@
   </div>
 </div>
 
+<div id="invoiceModalOverlay" class="modal-backdrop">
+  <div class="modal-card so-modal-card" onclick="event.stopPropagation()">
+    <div class="modal-header so-modal-header">
+      <div class="modal-header-main">
+        <h3 class="inv-modal-heading">Invoice #—</h3>
+        <p class="inv-modal-subheading"></p>
+      </div>
+      <div class="modal-header-actions">
+        <span class="inv-modal-status so-modal-status" hidden></span>
+        <button type="button" class="btn-close" id="invoiceModalCloseBtn" aria-label="Close">✕</button>
+      </div>
+    </div>
+    <div class="modal-body inv-modal-body so-modal-body"></div>
+  </div>
+</div>
+
 <div id="csvImportSummaryOverlay" class="modal-backdrop">
   <div class="modal-card csv-import-summary-card" onclick="event.stopPropagation()">
     <div class="modal-header">
@@ -1161,8 +1281,7 @@
       <nav class="settings-nav" id="settingsNav" aria-label="Settings sections">
         <button type="button" class="settings-nav-item is-active" data-settings-section="general">General</button>
         <button type="button" class="settings-nav-item" data-settings-section="asn-defaults">ASN</button>
-        <button type="button" class="settings-nav-item" data-settings-section="edit-table">Edit PO table</button>
-        <button type="button" class="settings-nav-item" data-settings-section="edit-so-table">Edit Sales Order table</button>
+        <button type="button" class="settings-nav-item" data-settings-section="edit-table">Edit table</button>
         <button type="button" class="settings-nav-item" data-settings-section="vendor-portal">Vendor Submissions</button>
         <button type="button" class="settings-nav-item" data-settings-section="features">Features</button>
       </nav>
@@ -1238,39 +1357,68 @@
         </section>
         <section class="settings-section settings-section--edit-table" id="settingsSectionEditTable" data-settings-section="edit-table" hidden>
           <h4 class="settings-section-title">Edit table</h4>
+          <div class="edit-table-target-row">
+            <label class="settings-switch-label" for="editTableTargetSelect">Table</label>
+            <select id="editTableTargetSelect" class="filter-select edit-table-target-select">
+              <option value="po">Purchase Orders</option>
+              <option value="so">Sales Orders</option>
+              <option value="inv">Invoices</option>
+            </select>
+          </div>
           <p class="edit-table-subtitle">Choose columns on the left. Drag the list on the right to set display order.</p>
-          <div class="edit-table-toolbar-links">
-            <button type="button" class="column-filter-link" id="editTableSelectAll">Select all</button>
-            <span class="column-filter-sep">|</span>
-            <button type="button" class="column-filter-link" id="editTableClearAll">Clear all</button>
-          </div>
-          <div class="edit-table-panels">
-            <div class="edit-table-panel edit-table-panel-picker">
-              <div class="edit-table-picker-list" id="editTableColumnPicker"></div>
+
+          <!-- Purchase Orders editor -->
+          <div id="editTableGroupPo">
+            <div class="edit-table-toolbar-links">
+              <button type="button" class="column-filter-link" id="editTableSelectAll">Select all</button>
+              <span class="column-filter-sep">|</span>
+              <button type="button" class="column-filter-link" id="editTableClearAll">Clear all</button>
             </div>
-            <div class="edit-table-panel edit-table-panel-order">
-              <div class="edit-table-order-list" id="editTableColumnOrder"></div>
+            <div class="edit-table-panels">
+              <div class="edit-table-panel edit-table-panel-picker">
+                <div class="edit-table-picker-list" id="editTableColumnPicker"></div>
+              </div>
+              <div class="edit-table-panel edit-table-panel-order">
+                <div class="edit-table-order-list" id="editTableColumnOrder"></div>
+              </div>
+            </div>
+            <div class="edit-table-default-actions">
+              <button type="button" class="btn edit-table-default-btn" id="editTableSaveDefault">Save as default</button>
+              <button type="button" class="btn edit-table-default-btn" id="editTableResetDefault">Reset to default</button>
             </div>
           </div>
-          <div class="edit-table-default-actions">
-            <button type="button" class="btn edit-table-default-btn" id="editTableSaveDefault">Save as default</button>
-            <button type="button" class="btn edit-table-default-btn" id="editTableResetDefault">Reset to default</button>
-          </div>
-        </section>
-        <section class="settings-section settings-section--edit-table" id="settingsSectionEditSoTable" data-settings-section="edit-so-table" hidden>
-          <h4 class="settings-section-title">Edit Sales Order table</h4>
-          <p class="edit-table-subtitle">Choose columns on the left. Drag the list on the right to set display order.</p>
-          <div class="edit-table-toolbar-links">
-            <button type="button" class="column-filter-link" id="soEditTableSelectAll">Select all</button>
-            <span class="column-filter-sep">|</span>
-            <button type="button" class="column-filter-link" id="soEditTableClearAll">Clear all</button>
-          </div>
-          <div class="edit-table-panels">
-            <div class="edit-table-panel edit-table-panel-picker">
-              <div class="edit-table-picker-list" id="soEditTableColumnPicker"></div>
+
+          <!-- Sales Orders editor -->
+          <div id="editTableGroupSo" hidden>
+            <div class="edit-table-toolbar-links">
+              <button type="button" class="column-filter-link" id="soEditTableSelectAll">Select all</button>
+              <span class="column-filter-sep">|</span>
+              <button type="button" class="column-filter-link" id="soEditTableClearAll">Clear all</button>
             </div>
-            <div class="edit-table-panel edit-table-panel-order">
-              <div class="edit-table-order-list" id="soEditTableColumnOrder"></div>
+            <div class="edit-table-panels">
+              <div class="edit-table-panel edit-table-panel-picker">
+                <div class="edit-table-picker-list" id="soEditTableColumnPicker"></div>
+              </div>
+              <div class="edit-table-panel edit-table-panel-order">
+                <div class="edit-table-order-list" id="soEditTableColumnOrder"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Invoices editor -->
+          <div id="editTableGroupInv" hidden>
+            <div class="edit-table-toolbar-links">
+              <button type="button" class="column-filter-link" id="invEditTableSelectAll">Select all</button>
+              <span class="column-filter-sep">|</span>
+              <button type="button" class="column-filter-link" id="invEditTableClearAll">Clear all</button>
+            </div>
+            <div class="edit-table-panels">
+              <div class="edit-table-panel edit-table-panel-picker">
+                <div class="edit-table-picker-list" id="invEditTableColumnPicker"></div>
+              </div>
+              <div class="edit-table-panel edit-table-panel-order">
+                <div class="edit-table-order-list" id="invEditTableColumnOrder"></div>
+              </div>
             </div>
           </div>
         </section>
@@ -1319,8 +1467,6 @@
       <div id="editTableFooterMessage" class="modal-footer-message" role="status" aria-live="polite" hidden></div>
       <button type="button" class="btn btn-primary" id="editTableOk">OK</button>
       <button type="button" class="btn" id="editTableCancel">Cancel</button>
-      <button type="button" class="btn btn-primary" id="soEditTableOk" hidden>OK</button>
-      <button type="button" class="btn" id="soEditTableCancel" hidden>Cancel</button>
     </div>
   </div>
 </div>
@@ -1397,6 +1543,10 @@
 <script src="js/sales-orders-filters.js"></script>
 <script src="js/sales-orders.js"></script>
 <script src="js/sales-orders-import.js"></script>
+<script src="js/invoices-columns.js"></script>
+<script src="js/invoices-filters.js"></script>
+<script src="js/invoices.js"></script>
+<script src="js/invoices-import.js"></script>
 <script src="js/shipments-init.js"></script>
 <script src="js/packing-print.js"></script>
 <div id="packingPrintRoot" aria-hidden="true"></div>

@@ -984,6 +984,5 @@ function initEditTable() {
   document.getElementById("editTableClearAll")?.addEventListener("click", () => setEditTableDraftSelectAll(false));
   document.getElementById("editTableSaveDefault")?.addEventListener("click", saveDefaultColumnVisibility);
   document.getElementById("editTableResetDefault")?.addEventListener("click", resetEditTableToDefault);
-  document.getElementById("editTableOk")?.addEventListener("click", applyEditTableFromPopover);
-  document.getElementById("editTableCancel")?.addEventListener("click", cancelEditTableFromPopover);
+  // OK/Cancel are dispatched centrally in settings.js (supports all table targets).
 }

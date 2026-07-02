@@ -1,6 +1,8 @@
 /** Sales Order table column order, visibility, and settings edit table. */
 
 const SO_COLUMNS = [
+  "Flag",
+  "Selected",
   "SO #",
   "Customer",
   "Customer PO #",
@@ -12,9 +14,14 @@ const SO_COLUMNS = [
   "Order Type",
   "Customer Type",
   "Styles",
+  "Style #s",
   "Total Units",
   "Total Price",
+  "Memo",
 ];
+
+const SO_FIXED_LEADING_COLUMNS = ["Flag", "Selected"];
+const SO_NON_TOGGLEABLE_COLUMNS = new Set(SO_FIXED_LEADING_COLUMNS);
 
 const SO_FILTERABLE_COLUMNS = new Set([
   "Customer",
@@ -65,7 +72,19 @@ function normalizeSoColumnOrder(order) {
   SO_COLUMNS.forEach(col => {
     if (!seen.has(col)) next.push(col);
   });
-  return next;
+  return [
+    ...SO_FIXED_LEADING_COLUMNS,
+    ...next.filter(col => !SO_NON_TOGGLEABLE_COLUMNS.has(col)),
+  ];
+}
+
+function ensureSoAlwaysVisibleColumns(cols) {
+  SO_NON_TOGGLEABLE_COLUMNS.forEach(col => cols.add(col));
+  return cols;
+}
+
+function getSoEditableColumns() {
+  return SO_COLUMNS.filter(col => !SO_NON_TOGGLEABLE_COLUMNS.has(col));
 }
 
 function saveSoColumnLayoutPreference() {
@@ -88,9 +107,13 @@ function loadSoColumnLayoutPreference() {
     if (!raw) return false;
     const data = JSON.parse(raw);
     if (!data || !Array.isArray(data.order) || !Array.isArray(data.visible)) return false;
+    const storedOrder = data.order.filter(col => SO_COLUMNS.includes(col));
     soColumnOrder = normalizeSoColumnOrder(data.order);
-    soVisibleColumns = new Set(data.visible.filter(col => SO_COLUMNS.includes(col)));
-    if (soVisibleColumns.size === 0) soVisibleColumns = new Set(SO_COLUMNS);
+    soVisibleColumns = ensureSoAlwaysVisibleColumns(new Set(data.visible.filter(col => SO_COLUMNS.includes(col))));
+    SO_COLUMNS.forEach(col => {
+      if (!storedOrder.includes(col)) soVisibleColumns.add(col);
+    });
+    if (soVisibleColumns.size === SO_NON_TOGGLEABLE_COLUMNS.size) soVisibleColumns = new Set(SO_COLUMNS);
     return true;
   } catch {
     return false;
@@ -161,7 +184,7 @@ function renderSoEditTablePicker() {
   const list = document.getElementById("soEditTableColumnPicker");
   if (!list) return;
   list.replaceChildren();
-  [...SO_COLUMNS].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" })).forEach(col => {
+  getSoEditableColumns().sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" })).forEach(col => {
     const label = document.createElement("label");
     label.className = "edit-table-picker-option";
     const cb = document.createElement("input");
@@ -190,7 +213,9 @@ function renderSoEditTablePicker() {
 }
 
 function getSoEditTableOrderKeys(order) {
-  return normalizeSoColumnOrder(order).filter(col => soColumnVisibilityDraft.has(col));
+  return normalizeSoColumnOrder(order).filter(col =>
+    soColumnVisibilityDraft.has(col) && !SO_NON_TOGGLEABLE_COLUMNS.has(col)
+  );
 }
 
 function renderSoEditTableOrder() {
@@ -234,7 +259,7 @@ function applySoEditTableFromPopover() {
   const visible = getSoEditTableOrderKeys(soColumnOrderDraft);
   if (visible.length === 0) return false;
   soColumnOrder = normalizeSoColumnOrder(soColumnOrderDraft);
-  soVisibleColumns = new Set(visible);
+  soVisibleColumns = ensureSoAlwaysVisibleColumns(new Set(visible));
   saveSoColumnLayoutPreference();
   indexSoTableColumns();
   applySoColumnOrder();

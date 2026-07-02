@@ -535,22 +535,10 @@ select.filter-select:focus { border-color: var(--accent); }
   --status-filter-border: #c5e8dc;
 }
 
-#statusFilters .filter-btn[data-status="Scheduled"] {
-  --status-filter-bg: #e8f4fd;
-  --status-filter-fg: #1565a8;
-  --status-filter-border: #c8e0f0;
-}
-
 #statusFilters .filter-btn[data-status="In Warehouse"] {
   --status-filter-bg: #eaf3de;
   --status-filter-fg: #3b6d11;
   --status-filter-border: #d4e8c0;
-}
-
-#statusFilters .filter-btn[data-status="Assigned"] {
-  --status-filter-bg: #eeedfe;
-  --status-filter-fg: #534ab7;
-  --status-filter-border: #d8d6f5;
 }
 
 #statusFilters .filter-btn .filter-btn-count {
@@ -1756,6 +1744,18 @@ th.th-filterable .th-label {
   max-height: none;
 }
 
+.edit-table-target-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.edit-table-target-select {
+  flex: 1;
+  max-width: 200px;
+}
+
 .edit-table-subtitle {
   margin: 0 0 8px;
   font-size: 11px;
@@ -2468,9 +2468,7 @@ td.editable:not(.select-cell):hover .editable-preview {
 .badge-pending     { background: #eef0f3; color: #4b5563; }
 .badge-received    { background: #e6f1fb; color: #185fa5; }
 .badge-port        { background: #faeeda; color: #854f0b; }
-.badge-scheduled   { background: #e8f4fd; color: #1565a8; }
 .badge-wh          { background: #eaf3de; color: #3b6d11; }
-.badge-assigned    { background: #eeedfe; color: #534ab7; }
 .badge-otw         { background: #e1f5ee; color: #0f6e56; }
 .badge-requested   { background: #fbeaf0; color: #993556; }
 .badge-hold        { background: #fcebeb; color: var(--danger); }
@@ -7030,8 +7028,10 @@ td.n41-status-mismatch,
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-width: 0;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 16px 20px 20px;
 }
 
@@ -7129,14 +7129,18 @@ td.n41-status-mismatch,
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-width: 980px;
+  width: 100%;
+  max-width: 640px;
 }
 
 .settings-asn-default-email-row {
   display: grid;
-  grid-template-columns: minmax(180px, 0.8fr) minmax(300px, 1.6fr) minmax(300px, 1.6fr);
-  gap: 14px;
-  align-items: end;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  align-items: stretch;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -7154,6 +7158,7 @@ td.n41-status-mismatch,
   display: flex;
   flex-direction: column;
   gap: 5px;
+  min-width: 0;
   font-size: 12px;
   color: var(--text-muted);
 }
@@ -7161,6 +7166,7 @@ td.n41-status-mismatch,
 .settings-email-input {
   min-height: 58px;
   width: 100%;
+  box-sizing: border-box;
   line-height: 1.35;
   resize: vertical;
 }
@@ -7173,14 +7179,18 @@ td.n41-status-mismatch,
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-width: 860px;
+  width: 100%;
+  max-width: 640px;
 }
 
 .settings-carrier-row {
   display: grid;
-  grid-template-columns: minmax(160px, 1fr) minmax(200px, 1.4fr) minmax(160px, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
-  align-items: center;
+  align-items: stretch;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
   padding: 8px 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -7209,6 +7219,7 @@ td.n41-status-mismatch,
 
 .settings-carrier-input {
   width: 100%;
+  box-sizing: border-box;
 }
 
 .settings-carrier-action-btn {
@@ -7219,14 +7230,18 @@ td.n41-status-mismatch,
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-width: 600px;
+  width: 100%;
+  max-width: 640px;
 }
 
 .settings-asn-default-carrier-row {
   display: grid;
-  grid-template-columns: minmax(180px, 0.8fr) minmax(220px, 1fr);
-  gap: 14px;
-  align-items: end;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  align-items: stretch;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -8672,12 +8687,71 @@ td.has-pending-approval .pending-approval-value {
    ══════════════════════════════════════════════════════════════ */
 
 /* ── Sales Orders list table columns ───────────────────────── */
+#salesOrderTableWrap .table-scroll-x {
+  padding-left: 8px;
+  box-sizing: border-box;
+}
+#salesOrderTable { min-width: 1700px; }
+#salesOrderTable .col-flag       { width: 58px;  max-width: 58px; }
+#salesOrderTable .col-select     { width: 44px;  max-width: 44px; }
+#salesOrderTable .col-so         { width: 70px;  max-width: 70px; }
+#salesOrderTable .col-buyer      { width: 180px; min-width: 160px; }
+#salesOrderTable .col-buyer-po   { width: 150px; min-width: 130px; }
+#salesOrderTable .col-date       { width: 76px;  max-width: 76px; }
+#salesOrderTable .col-cxl        { width: 76px;  max-width: 76px; }
+#salesOrderTable .col-vendor     { width: 104px; max-width: 104px; }
+#salesOrderTable .col-n41-status { width: 90px;  max-width: 90px; }
+#salesOrderTable .col-order-type { width: 112px; max-width: 112px; }
+#salesOrderTable .col-so-styles  { width: 68px;  max-width: 68px; }
+#salesOrderTable .col-so-units   { width: 68px;  max-width: 68px; }
+#salesOrderTable .col-so-price   { width: 84px;  max-width: 84px; }
+#salesOrderTable .col-so-style-nums { width: 420px; min-width: 340px; }
+#salesOrderTable .col-so-memo    { min-width: 140px; }
+
+#salesOrderTable th.th-flag-col,
+#salesOrderTable td.td-flag-cell {
+  padding-left: 24px;
+}
+
+#salesOrderTable th.th-select-col,
+#salesOrderTable td.td-select-cell {
+  padding-left: 2px;
+  padding-right: 2px;
+  text-align: center;
+}
+
+/* Numeric cells right-align by default */
+#salesOrderTable .td-num { text-align: right; }
 #salesOrderTable .col-so-styles,
 #salesOrderTable .col-so-units,
 #salesOrderTable .col-so-price { text-align: right; }
-#salesOrderTable .td-num { text-align: right; }
-#salesOrderTable .col-so { min-width: 80px; }
-#salesOrderTable .col-so-price { min-width: 100px; }
+
+/* Styles + Total Units → center */
+#salesOrderTable :is(th, td)[data-col="Styles"],
+#salesOrderTable :is(th, td)[data-col="Total Units"] { text-align: center; }
+
+/* Store → left */
+#salesOrderTable :is(th, td)[data-col="Store"] { text-align: left; }
+
+/* Style # list → left, wrapping */
+#salesOrderTable td[data-col="Style #s"] {
+  text-align: left;
+  white-space: normal;
+  word-break: break-word;
+  font-size: 12px;
+  color: var(--text-secondary, #555);
+  line-height: 1.4;
+}
+
+/* Memo cell → truncate to one line */
+#salesOrderTable td[data-col="Memo"] {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+}
 
 /* Status badge coloring in the list table */
 #salesOrderTable td[data-status="open"]   { color: var(--status-open, #16a34a); }
@@ -8817,6 +8891,7 @@ td.has-pending-approval .pending-approval-value {
 }
 .so-line-table thead th.so-size-col,
 .so-line-table thead th.so-price-col { text-align: right; }
+.so-line-table thead th.so-size-col { padding-left: 5px; padding-right: 5px; }
 .so-line-table tbody td {
   padding: 6px 10px;
   border-bottom: 1px solid var(--border-light, #f1f5f9);
@@ -8825,11 +8900,23 @@ td.has-pending-approval .pending-approval-value {
 .so-line-table tbody tr:last-child td { border-bottom: none; }
 .so-line-table tbody tr:hover { background: var(--row-hover, #f8fafc); }
 .so-line-table .td-num { text-align: right; }
-.so-line-table .so-size-col { min-width: 46px; }
+.so-line-table .so-size-col {
+  width: 34px;
+  min-width: 34px;
+  max-width: 42px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
 .so-line-table .so-price-col { min-width: 80px; white-space: nowrap; }
 .so-line-table .so-style-col { font-family: monospace; font-size: 12px; min-width: 90px; }
-.so-line-table .so-desc-col { min-width: 140px; color: var(--text-secondary, #666); font-size: 12px; }
-.so-line-table .so-total-col { font-weight: 600; }
+.so-line-table .so-desc-col { min-width: 240px; color: var(--text-secondary, #666); font-size: 12px; }
+.so-line-table .so-color-col { min-width: 120px; }
+.so-line-table .so-total-col {
+  width: 42px;
+  min-width: 42px;
+  max-width: 50px;
+  font-weight: 600;
+}
 .so-line-table .so-cell-empty { color: var(--empty-display, #ccc); }
 
 /* Style order status badge */
@@ -8899,3 +8986,55 @@ td.has-pending-approval .pending-approval-value {
 
 /* Only link SO # cells where a matching SO exists (class added dynamically — 
    fallback: all non-empty SO # cells are styled as links) */
+
+/* ── SO Memo section in modal ───────────────────────────────── */
+.so-memo-section {
+  padding-top: 12px;
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.so-memo-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 72px;
+  max-height: 200px;
+  resize: vertical;
+  font-size: 13px;
+  font-family: inherit;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface, #fff);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.so-memo-textarea:focus {
+  border-color: var(--accent, #3b82f6);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, #3b82f6) 15%, transparent);
+}
+.so-memo-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 6px;
+}
+.so-memo-status {
+  font-size: 12px;
+  color: var(--text-secondary, #888);
+}
+.so-memo-status.is-saved { color: #16a34a; }
+.so-memo-status.is-error { color: #dc2626; }
+.so-memo-save-btn {
+  font-size: 12px;
+  padding: 4px 14px;
+  border-radius: 5px;
+  border: 1px solid var(--accent, #3b82f6);
+  background: var(--accent, #3b82f6);
+  color: #fff;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.so-memo-save-btn:hover { opacity: 0.88; }
+.so-memo-save-btn:disabled { opacity: 0.45; cursor: default; }

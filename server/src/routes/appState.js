@@ -56,6 +56,7 @@ router.get("/app-state", requireAuth, async (req, res) => {
       stylePhotosResult,
       stylesResult,
       salesOrdersResult,
+      invoicesResult,
       settingsResult,
       userSettingsResult,
     ] = await Promise.all([
@@ -76,6 +77,7 @@ router.get("/app-state", requireAuth, async (req, res) => {
       supabase.from("style_photos").select("data").eq("tenant_id", tid),
       supabase.from("styles").select("data").eq("tenant_id", tid).order("created_at", { ascending: true }),
       supabase.from("sales_orders").select("data").eq("tenant_id", tid).order("created_at", { ascending: true }),
+      supabase.from("invoices").select("data").eq("tenant_id", tid).order("created_at", { ascending: true }),
       supabase.from("tenant_settings").select("settings").eq("tenant_id", tid).maybeSingle(),
       supabase.from("user_settings").select("settings").eq("tenant_id", tid).eq("user_id", req.userId).maybeSingle(),
     ]);
@@ -88,7 +90,7 @@ router.get("/app-state", requireAuth, async (req, res) => {
       pickupResult, approvalsResult, chargebacksResult, packingListsResult,
       packingCartonsResult, pendingPackingListsResult, customersResult,
       contactsResult, locationsResult, stylePhotosResult, stylesResult,
-      salesOrdersResult,
+      salesOrdersResult, invoicesResult,
     ].find(r => r.error);
 
     if (tableError?.error) {
@@ -153,6 +155,7 @@ router.get("/app-state", requireAuth, async (req, res) => {
       stylePhotos: rows(stylePhotosResult),
       styles: rows(stylesResult),
       salesOrders: rows(salesOrdersResult),
+      invoices: rows(invoicesResult),
       // Settings
       vendorSubmitMode,
       chargebacksEnabled: settings.chargebacksEnabled !== false,

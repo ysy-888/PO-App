@@ -237,6 +237,10 @@ function updatePaginationUI() {
     updateSoPaginationUI();
     return;
   }
+  if (typeof currentAppView !== "undefined" && currentAppView === "invoices" && typeof updateInvPaginationUI === "function") {
+    updateInvPaginationUI();
+    return;
+  }
   const nav = document.getElementById("paginationNav");
   if (!nav) return;
 
@@ -269,6 +273,10 @@ function scrollTableToTop() {
 function goToPage(page) {
   if (typeof currentAppView !== "undefined" && currentAppView === "sales" && typeof goToSoPage === "function") {
     goToSoPage(page);
+    return;
+  }
+  if (typeof currentAppView !== "undefined" && currentAppView === "invoices" && typeof goToInvPage === "function") {
+    goToInvPage(page);
     return;
   }
   const totalPages = getTotalPages();
@@ -334,6 +342,8 @@ function initPagination() {
   select?.addEventListener("change", () => {
     if (typeof currentAppView !== "undefined" && currentAppView === "sales" && typeof setSoPageSize === "function") {
       setSoPageSize(select.value);
+    } else if (typeof currentAppView !== "undefined" && currentAppView === "invoices" && typeof setInvPageSize === "function") {
+      setInvPageSize(select.value);
     } else {
       setPageSize(select.value);
     }
@@ -342,15 +352,19 @@ function initPagination() {
   document.getElementById("pageFirst")?.addEventListener("click", () => goToPage(1));
   document.getElementById("pagePrev")?.addEventListener("click", () => {
     if (typeof currentAppView !== "undefined" && currentAppView === "sales") goToPage(soCurrentPage - 1);
+    else if (typeof currentAppView !== "undefined" && currentAppView === "invoices") goToPage(invCurrentPage - 1);
     else goToPage(currentPage - 1);
   });
   document.getElementById("pageNext")?.addEventListener("click", () => {
     if (typeof currentAppView !== "undefined" && currentAppView === "sales") goToPage(soCurrentPage + 1);
+    else if (typeof currentAppView !== "undefined" && currentAppView === "invoices") goToPage(invCurrentPage + 1);
     else goToPage(currentPage + 1);
   });
   document.getElementById("pageLast")?.addEventListener("click", () => {
     if (typeof currentAppView !== "undefined" && currentAppView === "sales" && typeof getSoTotalPages === "function") {
       goToPage(getSoTotalPages());
+    } else if (typeof currentAppView !== "undefined" && currentAppView === "invoices" && typeof getInvTotalPages === "function") {
+      goToPage(getInvTotalPages());
     } else {
       goToPage(getTotalPages());
     }

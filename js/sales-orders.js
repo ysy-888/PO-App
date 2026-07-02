@@ -14,6 +14,11 @@ const SO_DEFAULT_SORT_COLUMNS = ["SO #", "Order Date"];
 const SO_PAGE_SIZE_STORAGE_BASE = "soPageSize";
 
 let filteredSalesOrders = [];
+let soFlagFilterActive = false;
+
+const SO_FLAG_ICON_SVG = typeof FLAG_ICON_SVG !== "undefined"
+  ? FLAG_ICON_SVG
+  : `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>`;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -77,6 +82,120 @@ function formatSoDate(val) {
   return s;
 }
 
+function renderSoSelectedCell(td, order) {
+  td.className = "td-select-cell readonly-no-select";
+  const cb = document.createElement("input");
+  cb.type = "checkbox";
+  cb.className = "po-select-checkbox";
+  cb.checked = isTruthy(order.Selected);
+  cb.setAttribute("aria-label", `Select SO ${order["SO #"] ?? ""}`);
+  cb.addEventListener("click", e => {
+    e.stopPropagation();
+    order.Selected = cb.checked;
+    updateSoSelectAllHeader();
+  });
+  td.appendChild(cb);
+}
+
+function createSoFlagButton(order) {
+  const flagged = isTruthy(order.Flag);
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "po-flag-btn" + (flagged ? " is-flagged" : "");
+  btn.setAttribute("aria-label", flagged ? "Unflag sales order" : "Flag sales order");
+  btn.title = flagged ? "Unflag" : "Flag";
+  btn.innerHTML = SO_FLAG_ICON_SVG;
+  btn.addEventListener("click", e => {
+    e.stopPropagation();
+    toggleSalesOrderFlag(order);
+  });
+  return btn;
+}
+
+function renderSoFlagCell(td, order) {
+  td.className = "td-flag-cell readonly-no-select";
+  td.replaceChildren(createSoFlagButton(order));
+}
+
+async function toggleSalesOrderFlag(order) {
+  if (isAppSaving()) return;
+  const soNumber = String(order["SO #"] ?? "").trim();
+  if (!soNumber) return;
+
+  const previous = isTruthy(order.Flag);
+  const next = !previous;
+  order.Flag = next;
+  renderSalesOrdersTable();
+
+  try {
+    const json = await postApi("/api/sales-orders/flag", { soNumber, flag: next });
+    if (!json.success) throw new Error(json.error || "Failed to save flag.");
+    order.Flag = json.flag;
+    renderSalesOrdersTable();
+  } catch (err) {
+    order.Flag = previous;
+    renderSalesOrdersTable();
+    if (typeof showIndicator === "function") {
+      showIndicator("Flag save failed: " + (err.message || err), "error");
+    }
+  }
+}
+
+function updateSoSelectAllHeader() {
+  const cb = document.getElementById("soSelectAllRowsCheckbox");
+  if (!cb) return;
+
+  if (filteredSalesOrders.length === 0) {
+    cb.checked = false;
+    cb.indeterminate = false;
+    cb.disabled = true;
+    return;
+  }
+
+  cb.disabled = false;
+  const selectedCount = filteredSalesOrders.filter(order => isTruthy(order.Selected)).length;
+  cb.checked = selectedCount === filteredSalesOrders.length;
+  cb.indeterminate = selectedCount > 0 && selectedCount < filteredSalesOrders.length;
+}
+
+function setAllFilteredSalesOrdersSelected(selected) {
+  const next = toSheetBool(selected);
+  filteredSalesOrders.forEach(order => {
+    order.Selected = next;
+  });
+  renderSalesOrdersTable();
+}
+
+function updateSoFlagFilterHeaderState() {
+  const th = document.querySelector('#salesOrderTable th.th-flag-col[data-col="Flag"]');
+  if (!th) return;
+  th.classList.toggle("filter-active", soFlagFilterActive);
+  th.setAttribute("aria-pressed", soFlagFilterActive ? "true" : "false");
+  th.title = soFlagFilterActive ? "Show all sales orders" : "Show flagged only";
+}
+
+function toggleSoFlagFilter() {
+  soFlagFilterActive = !soFlagFilterActive;
+  updateSoFlagFilterHeaderState();
+  applySalesOrderFilters();
+}
+
+function initSoSelectionAndFlagControls() {
+  const selectAll = document.getElementById("soSelectAllRowsCheckbox");
+  selectAll?.addEventListener("click", e => {
+    e.stopPropagation();
+    setAllFilteredSalesOrdersSelected(selectAll.checked);
+  });
+
+  const flagHeader = document.querySelector('#salesOrderTable th.th-flag-col[data-col="Flag"]');
+  if (flagHeader) {
+    flagHeader.setAttribute("role", "button");
+    flagHeader.setAttribute("aria-pressed", "false");
+    flagHeader.title = "Show flagged only";
+    flagHeader.addEventListener("click", toggleSoFlagFilter);
+  }
+}
+
 // ── State ────────────────────────────────────────────────────────────────────
 
 function onSalesOrdersDataLoaded(rows) {
@@ -94,6 +213,7 @@ function onSalesOrdersDataLoaded(rows) {
 
 function getSoSortValue(order, col) {
   if (col === "Styles") return (order.Lines ?? []).length;
+  if (col === "Style #s") return (order.Lines ?? []).map(l => l["Style #"] ?? "").join(", ");
   if (col === "Total Units") return soTotalUnits(order);
   if (col === "Total Price") return soTotalPrice(order);
   return order[col];
@@ -103,7 +223,7 @@ function compareSoOrdersByColumn(col, a, b) {
   if (SO_DATE_FILTER_COLUMNS.has(col)) {
     return compareDateFieldValues(a[col], b[col]);
   }
-  if (col === "Styles" || col === "Total Units" || col === "Total Price") {
+  if (col === "Styles" || col === "Style #s" || col === "Total Units" || col === "Total Price") {
     return compareTextFieldValues(getSoSortValue(a, col), getSoSortValue(b, col));
   }
   if (col === "SO #") {
@@ -135,6 +255,7 @@ function compareSoOrdersForSort(a, b) {
 function applySalesOrderFilters() {
   const q = (document.getElementById("salesOrderSearchInput")?.value ?? "").trim().toLowerCase();
   filteredSalesOrders = (allSalesOrders ?? []).filter(order => {
+    if (soFlagFilterActive && !isTruthy(order.Flag)) return false;
     if (typeof rowPassesSoColumnFilters === "function" && !rowPassesSoColumnFilters(order)) return false;
     if (!q) return true;
     const haystack = SO_SEARCH_COLUMNS
@@ -153,8 +274,10 @@ function applySalesOrderFilters() {
   soCurrentPage = 1;
   renderSalesOrdersTable();
   updateSalesOrderRowCounter();
+  updateSoSelectAllHeader();
   updateSoClearAllFiltersButton();
   if (typeof updateSoPaginationUI === "function") updateSoPaginationUI();
+  updateSoFlagFilterHeaderState();
 }
 
 function sortBySo(col) {
@@ -327,6 +450,7 @@ function renderSalesOrdersTable() {
   pageOrders.forEach(order => {
     const tr = document.createElement("tr");
     tr.className = "clickable-row";
+    if (isTruthy(order.Flag)) tr.classList.add("row-flagged");
     tr.dataset.so = String(order["SO #"] ?? "");
 
     const columnOrder = typeof getSoColumnOrder === "function" ? getSoColumnOrder() : SO_COLUMNS;
@@ -336,9 +460,18 @@ function renderSalesOrdersTable() {
       const td = document.createElement("td");
       td.dataset.col = col;
 
-      if (col === "Styles") {
+      if (col === "Selected") {
+        renderSoSelectedCell(td, order);
+      } else if (col === "Flag") {
+        renderSoFlagCell(td, order);
+      } else if (col === "Styles") {
         td.textContent = String((order.Lines ?? []).length);
         td.className = "td-num";
+      } else if (col === "Style #s") {
+        const styleNums = (order.Lines ?? []).map(l => String(l["Style #"] ?? "").trim()).filter(Boolean);
+        td.textContent = styleNums.length ? styleNums.join(", ") : "—";
+      } else if (col === "Memo") {
+        td.textContent = String(order.Memo ?? "");
       } else if (col === "Total Units") {
         td.textContent = soTotalUnits(order).toLocaleString();
         td.className = "td-num";
@@ -359,6 +492,7 @@ function renderSalesOrdersTable() {
 
     tbody.appendChild(tr);
   });
+  updateSoSelectAllHeader();
 }
 
 // ── Modal ────────────────────────────────────────────────────────────────────
@@ -414,8 +548,8 @@ function buildSoLineItemsTable(lines) {
 <thead>
 <tr>
   <th>Style #</th>
-  <th>Description</th>
-  <th>Color</th>
+  <th class="so-desc-col">Description</th>
+  <th class="so-color-col">Color</th>
   <th>Status</th>
   ${sizeHeaders.map(h => `<th class="so-size-col">${escSo(h)}</th>`).join("")}
   <th class="so-size-col">Total</th>
@@ -446,7 +580,7 @@ function buildSoLineItemsTable(lines) {
 <tr>
   <td class="so-style-col">${escSo(line["Style #"] ?? "—")}</td>
   <td class="so-desc-col">${escSo(line["Style Description"] ?? "")}</td>
-  <td>${escSo(line.Color ?? "—")}</td>
+  <td class="so-color-col">${escSo(line.Color ?? "—")}</td>
   <td><span class="so-status-badge" data-status="${escSo(statusVal.toLowerCase())}">${escSo(statusVal || "—")}</span></td>
   ${unitCells.join("")}
   <td class="so-size-col td-num so-total-col">${totalUnits.toLocaleString()}</td>
@@ -544,11 +678,44 @@ function openSalesOrderModal(order) {
 </div>
 
 <div class="so-lines-section">
-  <div class="so-section-title">Style Lines</div>
   ${buildSoLineItemsTable(lines)}
 </div>
 
+<div class="so-memo-section">
+  <div class="so-section-title">Memo</div>
+  <textarea class="so-memo-textarea" id="soMemoTextarea" placeholder="Add a note for this sales order…" rows="3">${escSo(order.Memo ?? "")}</textarea>
+  <div class="so-memo-footer">
+    <span class="so-memo-status" id="soMemoStatus"></span>
+    <button type="button" class="so-memo-save-btn" id="soMemoSaveBtn">Save</button>
+  </div>
+</div>
+
 ${buildLinkedPosSection(order)}`;
+
+  // Wire Memo save button
+  const memoTextarea = bodyEl.querySelector("#soMemoTextarea");
+  const memoSaveBtn = bodyEl.querySelector("#soMemoSaveBtn");
+  const memoStatus = bodyEl.querySelector("#soMemoStatus");
+
+  if (memoSaveBtn && memoTextarea) {
+    memoSaveBtn.addEventListener("click", async () => {
+      const memo = memoTextarea.value;
+      memoSaveBtn.disabled = true;
+      if (memoStatus) { memoStatus.textContent = "Saving…"; memoStatus.className = "so-memo-status"; }
+      try {
+        const json = await postApi("/api/sales-orders/memo", { soNumber: soNum, memo });
+        if (!json.success) throw new Error(json.error || "Failed to save memo.");
+        order.Memo = json.memo;
+        if (memoStatus) { memoStatus.textContent = "Saved"; memoStatus.className = "so-memo-status is-saved"; }
+        renderSalesOrdersTable();
+        setTimeout(() => { if (memoStatus) memoStatus.textContent = ""; }, 2500);
+      } catch (err) {
+        if (memoStatus) { memoStatus.textContent = err.message || "Error"; memoStatus.className = "so-memo-status is-error"; }
+      } finally {
+        memoSaveBtn.disabled = false;
+      }
+    });
+  }
 
   // Wire linked PO buttons
   bodyEl.querySelectorAll(".so-linked-po-btn[data-po]").forEach(btn => {
@@ -617,7 +784,9 @@ function initSalesOrdersView() {
   initSoColumnFilterHeaders();
   initSoEditTable();
 
-  document.querySelectorAll("#salesOrderTable thead th[data-col]:not(.th-filterable)").forEach(th => {
+  initSoSelectionAndFlagControls();
+
+  document.querySelectorAll("#salesOrderTable thead th[data-col]:not(.th-filterable):not(.th-flag-col):not(.th-select-col)").forEach(th => {
     th.addEventListener("click", () => sortBySo(th.dataset.col));
   });
 
@@ -631,14 +800,7 @@ function initSalesOrdersView() {
   const tbody = document.getElementById("salesOrderTableBody");
   if (tbody) {
     tbody.addEventListener("dblclick", e => {
-      const tr = e.target.closest("tr[data-so]");
-      if (!tr) return;
-      const order = (filteredSalesOrders ?? []).find(o => String(o["SO #"] ?? "") === tr.dataset.so);
-      if (order) openSalesOrderModal(order);
-    });
-
-    // Single click also opens modal (same as row-click pattern)
-    tbody.addEventListener("click", e => {
+      if (e.target.closest("input, button, .td-select-cell, .td-flag-cell")) return;
       const tr = e.target.closest("tr[data-so]");
       if (!tr) return;
       const order = (filteredSalesOrders ?? []).find(o => String(o["SO #"] ?? "") === tr.dataset.so);
@@ -667,6 +829,8 @@ function initSalesOrdersView() {
   initSoLinkFromPoTable();
   updateSoSortHeaders();
   updateSoColumnFilterHeaderStates();
+  updateSoFlagFilterHeaderState();
+  updateSoSelectAllHeader();
 }
 
 initSalesOrdersView();

@@ -31,6 +31,22 @@ const ASN_REQUEST_TABLE_COLUMN_LABELS = {
   "CC": "CC",
 };
 
+const ASN_REQUEST_LINKED_PO_COLUMNS = DELIVERY_PICKUP_LINKED_PO_COLUMNS.filter(({ col }) => col !== "Buyer");
+
+const ASN_REQUEST_LINKED_PO_COLUMN_WIDTHS = [
+  52, 52, 170, 72, 108, 72, 64, 64, 64, 76,
+];
+
+function appendAsnRequestLinkedPoColgroup(table) {
+  const colgroup = document.createElement("colgroup");
+  ASN_REQUEST_LINKED_PO_COLUMN_WIDTHS.forEach(width => {
+    const col = document.createElement("col");
+    col.style.width = `${width}px`;
+    colgroup.appendChild(col);
+  });
+  table.appendChild(colgroup);
+}
+
 let asnRequestPoNumbers = [];
 let asnRequestAddPoPanelOpen = false;
 const asnRequestAvailablePoSelection = createAvailablePoPickerSelection();
@@ -586,8 +602,8 @@ function renderAsnRequestModal(poNumbers, { asnDate = formatDateToYmd(new Date()
   if (!isView && asnRequestAddPoPanelOpen) {
     appendAvailablePoPanelToModalRight(outer, renderAvailablePoLinkedSection(getAvailableAsnRequestPanelRows(), {
       sectionId: "asnRequestAddPoPanel",
-      columns: DELIVERY_PICKUP_LINKED_PO_COLUMNS,
-      appendColgroup: appendDeliveryPickupLinkedPoColgroup,
+      columns: ASN_REQUEST_LINKED_PO_COLUMNS,
+      appendColgroup: appendAsnRequestLinkedPoColgroup,
       emptyMessage: "No eligible POs available.",
       selection: asnRequestAvailablePoSelection,
       onSelectionChange: updateAsnRequestActionButtons,
@@ -691,7 +707,7 @@ function renderAsnRequestLinkedPoSection(pos, isView = false) {
 
   const table = document.createElement("table");
   table.className = "email-po-table shipment-linked-po-table request-linked-po-table";
-  appendDeliveryPickupLinkedPoColgroup(table);
+  appendAsnRequestLinkedPoColgroup(table);
 
   const thead = document.createElement("thead");
   const headRow = document.createElement("tr");
@@ -712,7 +728,7 @@ function renderAsnRequestLinkedPoSection(pos, isView = false) {
   }
   headRow.appendChild(selectTh);
 
-  DELIVERY_PICKUP_LINKED_PO_COLUMNS.forEach(({ col, label, cellClass }) => {
+  ASN_REQUEST_LINKED_PO_COLUMNS.forEach(({ col, label, cellClass }) => {
     const th = document.createElement("th");
     renderLinkedPoTableHeaderCell(th, { label, col, cellClass });
     headRow.appendChild(th);
@@ -735,7 +751,7 @@ function renderAsnRequestLinkedPoSection(pos, isView = false) {
     }
     tr.appendChild(selectTd);
 
-    DELIVERY_PICKUP_LINKED_PO_COLUMNS.forEach(({ col, cellClass }) => {
+    ASN_REQUEST_LINKED_PO_COLUMNS.forEach(({ col, cellClass }) => {
       const td = document.createElement("td");
       renderRequestLinkedPoDataCell(td, col, row, { cellClass });
       tr.appendChild(td);

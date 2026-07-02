@@ -12,6 +12,7 @@ import requestsRouter from "./routes/requests.js";
 import chargebacksRouter from "./routes/chargebacks.js";
 import pendingPackingListsRouter from "./routes/pendingPackingLists.js";
 import salesOrdersRouter from "./routes/salesOrders.js";
+import invoicesRouter from "./routes/invoices.js";
 import { getEmailServiceStatus } from "./email.js";
 
 const app = express();
@@ -66,6 +67,7 @@ app.use("/api/requests", requestsRouter);
 app.use("/api/chargebacks", chargebacksRouter);
 app.use("/api/pending-packing-lists", pendingPackingListsRouter);
 app.use("/api/sales-orders", salesOrdersRouter);
+app.use("/api/invoices", invoicesRouter);
 
 // ── Error handler ───────────────────────────────────────────
 app.use((err, _req, res, _next) => {

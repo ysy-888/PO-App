@@ -10,6 +10,7 @@ let allAsnRequests = [];
 let allCustomers = [];
 let allStyles = [];
 let allSalesOrders = [];
+let allInvoices = [];
 let packingListPanelOpen = false;
 let flagFilterActive = false;
 let sortCol = "CXL Date";
@@ -20,6 +21,10 @@ let soSortCol = "SO #";
 let soSortDir = 1;
 let soPageSize = 60;
 let soCurrentPage = 1;
+let invSortCol = "Invoice #";
+let invSortDir = 1;
+let invPageSize = 60;
+let invCurrentPage = 1;
 
 function resetLocalSelectedState(rows) {
   rows.forEach(row => { row["Selected"] = false; });

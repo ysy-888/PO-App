@@ -320,6 +320,13 @@ async function handleCsvImportFile(file) {
     return;
   }
 
+  if (typeof currentAppView !== "undefined" && currentAppView === "invoices") {
+    if (typeof handleInvoiceCsvImportFile === "function") {
+      await handleInvoiceCsvImportFile(file);
+    }
+    return;
+  }
+
   closeHeaderMenu();
   setAppSaving(true, "Importing CSV…");
 

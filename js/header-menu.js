@@ -125,11 +125,23 @@ function isSalesOrdersViewActive() {
   return Boolean(wrap && !wrap.hidden);
 }
 
+function isInvoicesViewActive() {
+  const wrap = document.getElementById("invoiceTableWrap");
+  return Boolean(wrap && !wrap.hidden);
+}
+
 function isPaginationKeyboardEnabled() {
   if (isSalesOrdersViewActive()) {
     if (typeof isSoPageSizeAll === "function" && isSoPageSizeAll()) return false;
     if (typeof filteredSalesOrders !== "undefined" && typeof soPageSize !== "undefined") {
       return filteredSalesOrders.length > soPageSize;
+    }
+    return false;
+  }
+  if (isInvoicesViewActive()) {
+    if (typeof isInvPageSizeAll === "function" && isInvPageSizeAll()) return false;
+    if (typeof filteredInvoices !== "undefined" && typeof invPageSize !== "undefined") {
+      return filteredInvoices.length > invPageSize;
     }
     return false;
   }
@@ -152,6 +164,11 @@ function initPaginationKeyboard() {
     if (isSalesOrdersViewActive() && typeof goToSoPage === "function") {
       if (e.key === "ArrowLeft") goToSoPage(soCurrentPage - 1);
       else goToSoPage(soCurrentPage + 1);
+      return;
+    }
+    if (isInvoicesViewActive() && typeof goToInvPage === "function") {
+      if (e.key === "ArrowLeft") goToInvPage(invCurrentPage - 1);
+      else goToInvPage(invCurrentPage + 1);
       return;
     }
     if (e.key === "ArrowLeft") goToPage(currentPage - 1);

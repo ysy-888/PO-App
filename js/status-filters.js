@@ -24,13 +24,13 @@ function normalizeShipMethod(value) {
 // Single source of truth for status filter, cell editor, and filter popover order.
 // Table default sort uses STATUS_TABLE_SORT_ORDER below.
 const STATUS_SORT_ORDER = [
-  "Pending", "WIP", "Requested", "OTW", "Scheduled",
-  "In Warehouse", "Assigned", "Closed", "Hold", "CXL",
+  "Pending", "WIP", "Requested", "OTW",
+  "In Warehouse", "Closed", "Hold", "CXL",
 ];
 
 /** Default Status column sort priority (top = first). */
 const STATUS_TABLE_SORT_ORDER = [
-  "Assigned", "In Warehouse", "OTW", "Requested",
+  "In Warehouse", "OTW", "Requested",
   "Hold", "WIP", "Pending", "CXL", "Closed",
 ];
 
@@ -144,9 +144,7 @@ const STATUS_FILTER_SECONDARY_GROUPS = [
   { label: "WIP", value: "WIP" },
   { label: "EXF REQ", value: STATUS_FILTER_EXF_REQ },
   { label: "OTW", value: "OTW" },
-  { label: "Scheduled", value: "Scheduled" },
   { label: "In WH", value: "In Warehouse" },
-  { label: "Assigned", value: "Assigned" },
 ];
 
 const STATUS_FILTER_COUNTED = [
@@ -154,9 +152,7 @@ const STATUS_FILTER_COUNTED = [
   { label: "WIP", value: "WIP" },
   { label: "EXF REQ", value: STATUS_FILTER_EXF_REQ },
   { label: "OTW", value: "OTW" },
-  { label: "Scheduled", value: "Scheduled" },
   { label: "In WH", value: "In Warehouse" },
-  { label: "Assigned", value: "Assigned" },
 ];
 
 const STATUS_FILTER_BUTTONS = [

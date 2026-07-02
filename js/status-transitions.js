@@ -6,7 +6,7 @@ const DELIVERY_REQUEST_ID_FIELD = "Delivery Request ID";
 const PICKUP_REQUEST_ID_FIELD = "Pickup Request ID";
 
 const SHIPPED_GROUP_STATUSES = new Set([
-  "OTW", "Scheduled",
+  "OTW",
 ]);
 
 const DELIVERY_REQUEST_ELIGIBLE_STATUSES = new Set(["OTW"]);
@@ -19,9 +19,7 @@ const STATUS_MANUAL_TRANSITIONS = {
   Hold: ["CXL", "WIP"],
   WIP: ["Hold", "CXL"],
   OTW: ["In Warehouse", "Hold", "CXL", "Closed"],
-  Scheduled: ["In Warehouse", "Hold", "CXL", "Closed"],
   "In Warehouse": ["Hold", "CXL", "Closed"],
-  Assigned: ["In Warehouse", "Hold", "CXL", "Closed"],
 };
 
 function isExfRequested(row) {
@@ -54,6 +52,8 @@ function migrateLegacyStatusValue(status, row) {
   const s = String(status ?? "").trim();
   if (s === "Received") return "In Warehouse";
   if (s === "Arrived at Port") return "OTW";
+  if (s === "Scheduled") return "OTW";
+  if (s === "Assigned") return "In Warehouse";
   if (s === "Shipped") {
     const hasShipment = typeof poHasShipment === "function" && poHasShipment(row);
     return hasShipment ? "OTW" : "In Warehouse";
@@ -197,13 +197,6 @@ function validateShipmentRequiredFields(shipment) {
   return `Required: ${missing.join(", ")}`;
 }
 
-function isDateOnOrBeforeToday(ymd) {
-  const normalized = normalizeToYmd(ymd);
-  if (!normalized) return false;
-  const today = formatDateToYmd(new Date());
-  return normalized <= today;
-}
-
 function getPickupRequestDateForRow(row) {
   const id = String(row[PICKUP_REQUEST_ID_FIELD] ?? "").trim();
   if (!id || typeof getPickupRequestById !== "function") {
@@ -235,15 +228,7 @@ function collectAutomaticStatusUpdates(rows, shipments) {
     const poNumber = String(row["PO #"] ?? "").trim();
     if (!poNumber) return;
 
-    const status = getRowStatus(row);
     const updates = {};
-
-    if (status === "Assigned") {
-      const assignDate = getPickupRequestDateForRow(row);
-      if (isDateOnOrBeforeToday(assignDate) && !isTruthy(row["Flag"])) {
-        updates.Flag = true;
-      }
-    }
 
     if (Object.keys(updates).length > 0) {
       batch.push({ poNumber, updates });

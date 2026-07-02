@@ -744,8 +744,8 @@ function initColumnFilterHeaders() {
 
 const STATUS_BADGE = {
   "Pending":"badge-pending","WIP":"badge-wip","Requested":"badge-requested",
-  "OTW":"badge-otw","Scheduled":"badge-scheduled",
-  "In Warehouse":"badge-wh","Assigned":"badge-assigned","Hold":"badge-hold",
+  "OTW":"badge-otw",
+  "In Warehouse":"badge-wh","Hold":"badge-hold",
   "CXL":"badge-cancelled","Closed":"badge-closed",
 };
 

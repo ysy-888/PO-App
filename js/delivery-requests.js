@@ -630,7 +630,6 @@ function applyDeliveryRequestCreatedLocally(requestId, poNumbers, data) {
     row["Delivery Requested"] = true;
     row["Delivery Date"] = data[DELIVERY_DATE_FIELD] ?? "";
     row["Delivery Req Date"] = data[DELIVERY_REQ_SUBMIT_DATE_FIELD] ?? now;
-    row["Status"] = "Scheduled";
   });
   resetLocalSelectedState(allRows);
   applyFilters();
