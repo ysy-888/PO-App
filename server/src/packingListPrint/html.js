@@ -99,8 +99,8 @@ export function createPackingHtmlBuilder(ctx) {
 
   function plPrintPageStyles() {
     return `<style>
-    .pl-print-page{width:100%;min-height:100vh;margin:0;padding:48px;page-break-after:always;${PL_PRINT_FONT}font-size:9px;line-height:1.3;color:#1a1a18;box-sizing:border-box;}
-    .pl-print-page:last-child{page-break-after:auto;}
+    .pl-print-page{width:100%;margin:0;padding:48px;page-break-after:always;break-after:page;${PL_PRINT_FONT}font-size:9px;line-height:1.3;color:#1a1a18;box-sizing:border-box;}
+    .pl-print-page:last-child{page-break-after:auto;break-after:avoid;}
     .pl-header{width:100%;border-collapse:collapse;background:#fff;color:#1a1a18;border-bottom:1px solid #e5e7eb;}
     .pl-header td{padding:10px 0;vertical-align:middle;background:#fff;}
     .pl-header-brand{margin:0 0 3px;font-size:13px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#1a1a18;}

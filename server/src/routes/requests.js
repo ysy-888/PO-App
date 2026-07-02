@@ -317,6 +317,36 @@ router.post("/asn/create", requireAuth, async (req, res) => {
   }
 });
 
+router.post("/asn/update", requireAuth, async (req, res) => {
+  const { asnRequestId, request } = req.body || {};
+  if (!asnRequestId) return res.status(400).json({ success: false, error: "asnRequestId is required." });
+
+  try {
+    const { data: existing, error: fetchErr } = await supabase
+      .from("asn_requests").select("id, data").eq("tenant_id", req.tenantId).eq("entity_id", asnRequestId).maybeSingle();
+    if (fetchErr) throw fetchErr;
+    if (!existing) return res.status(404).json({ success: false, error: "ASN request not found." });
+
+    const now = todayYmd();
+    const merged = { ...(existing.data || {}), ...sanitizeUpdates(request || {}), "Updated At": now };
+    const { error } = await supabase.from("asn_requests").update({ data: merged }).eq("id", existing.id).eq("tenant_id", req.tenantId);
+    if (error) throw error;
+
+    // Mirror ASN Date to all linked POs when it was updated.
+    if (request?.["ASN Date"] !== undefined) {
+      const poNumbers = splitPoNumbers(merged["PO Numbers"] || "");
+      if (poNumbers.length > 0) {
+        await updatePoFields(req.tenantId, poNumbers, { "ASN Date": request["ASN Date"] });
+      }
+    }
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error("asn update failed:", err);
+    return res.status(500).json({ success: false, error: err.message || "Failed to update ASN request." });
+  }
+});
+
 // ── DELIVERY REQUEST ──────────────────────────────────────────────────────────
 
 router.post("/delivery/create", requireAuth, async (req, res) => {

@@ -360,6 +360,7 @@ function isVendorSubmissionsFeatureEnabled() {
 
 function isVendorSubmissionsReviewEnabled() {
   if (!isVendorSubmissionsFeatureEnabled() || !vendorSubmitModeLoaded) return false;
+  if (typeof isVendorSubmissionsTenantEnabled === "function" && !isVendorSubmissionsTenantEnabled()) return false;
   return vendorSubmitMode !== "direct";
 }
 

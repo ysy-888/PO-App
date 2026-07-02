@@ -16,6 +16,7 @@ initPagination();
 initPaginationKeyboard();
 initHeaderMenu();
 initSettings();
+initFeatureSettings();
 initHeaderTooltips();
 initCsvImportSummary();
 initEditTable();

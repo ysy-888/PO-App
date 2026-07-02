@@ -37,6 +37,7 @@ function updateSettingsUi() {
   if (typeof updateSettingsVendorSubmissionsVisibility === "function") {
     updateSettingsVendorSubmissionsVisibility();
   }
+  if (typeof updateFeatureTogglesUi === "function") updateFeatureTogglesUi();
 }
 
 function initSettingsVendorSubmitMode() {

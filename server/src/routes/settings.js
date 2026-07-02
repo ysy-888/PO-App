@@ -147,4 +147,39 @@ router.post("/vendor-submit-mode", requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * POST /api/settings/features
+ * Body: { chargebacksEnabled?: boolean, vendorSubmissionsEnabled?: boolean }
+ * Persists tenant-wide feature visibility flags.
+ */
+router.post("/features", requireAuth, async (req, res) => {
+  const { chargebacksEnabled, vendorSubmissionsEnabled } = req.body || {};
+  const patch = {};
+
+  if (chargebacksEnabled !== undefined) {
+    if (typeof chargebacksEnabled !== "boolean") {
+      return res.status(400).json({ success: false, error: "chargebacksEnabled must be a boolean." });
+    }
+    patch.chargebacksEnabled = chargebacksEnabled;
+  }
+  if (vendorSubmissionsEnabled !== undefined) {
+    if (typeof vendorSubmissionsEnabled !== "boolean") {
+      return res.status(400).json({ success: false, error: "vendorSubmissionsEnabled must be a boolean." });
+    }
+    patch.vendorSubmissionsEnabled = vendorSubmissionsEnabled;
+  }
+
+  if (Object.keys(patch).length === 0) {
+    return res.json({ success: true });
+  }
+
+  try {
+    await mergeSettings(req.tenantId, patch);
+    return res.json({ success: true, ...patch });
+  } catch (err) {
+    console.error("features settings failed:", err);
+    return res.status(500).json({ success: false, error: err.message || "Failed to save feature settings." });
+  }
+});
+
 export default router;

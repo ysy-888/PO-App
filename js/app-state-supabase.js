@@ -112,6 +112,8 @@ async function fetchSupabaseAppState() {
     styles: unwrap(stylesRows),
     salesOrders: unwrap(salesOrdersRows),
     vendorSubmitMode: settings.vendorSubmitMode ?? "review",
+    chargebacksEnabled: settings.chargebacksEnabled !== false,
+    vendorSubmissionsEnabled: settings.vendorSubmissionsEnabled !== false,
     userSettings: {},
     defaultColumns: buildDefaultColumnsFromSettings(settings),
     defaultStatusFilter: settings.defaultStatusFilter ?? "__open__",
@@ -158,5 +160,6 @@ function applyAppStatePayload(json) {
   if (json.defaultColumns) applyDefaultColumnsFromServer(json.defaultColumns);
   applyDefaultStatusFilterFromServer(json.defaultStatusFilter);
   applyUserSettingsFromServer(json.userSettings);
+  if (typeof applyTenantFeaturesFromServer === "function") applyTenantFeaturesFromServer(json);
   saveProgramColumnDefaultToStorage();
 }

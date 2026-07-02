@@ -455,10 +455,10 @@ function switchAppView(view) {
 
   if (splitActive) {
     if (poViewContent) poViewContent.hidden = false;
-    else if (poTableWrap) poTableWrap.hidden = false;
+    if (poTableWrap) poTableWrap.hidden = false;
   } else {
     if (poViewContent) poViewContent.hidden = view !== "po";
-    else if (poTableWrap) poTableWrap.hidden = view !== "po";
+    if (poTableWrap) poTableWrap.hidden = view !== "po";
     if (view !== "po" && typeof closePoPackingPane === "function") {
       closePoPackingPane({ clearSelection: false });
     }

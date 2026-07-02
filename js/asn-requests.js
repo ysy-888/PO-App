@@ -393,7 +393,7 @@ function renderAsnRequestModal(poNumbers, { asnDate = formatDateToYmd(new Date()
       "ASN Date",
       ASN_DATE_FIELD,
       isExisting ? (request[ASN_DATE_FIELD] ?? "") : (asnRequestDraftAsnDate || asnDate),
-      { type: "date", readOnly: isView }
+      { type: "date", readOnly: false }
     ).tr,
     createRequestFormMetaRow(
       "Request Date",
@@ -616,6 +616,8 @@ function updateAsnRequestActionButtons() {
   const submitBtn = document.getElementById("asnRequestSubmitBtn");
 
   const isView = submitBtn?.hidden === true;
+  const saveDateBtn = document.getElementById("asnRequestSaveDateBtn");
+  if (saveDateBtn) saveDateBtn.hidden = !isView;
   const pickupBtn = document.getElementById("asnPickupBtn");
   const pickupResendBtn = document.getElementById("asnPickupResendBtn");
   const printBtn = document.getElementById("asnRequestPrintBtn");
@@ -672,6 +674,55 @@ function clearAsnFormSelection() {
   _asnFormSelectedPos.clear();
 }
 
+async function updateAsnRequestDate() {
+  if (asnRequestOpInProgress || !asnRequestModalRow) return;
+  const requestId = getAsnRequestRecordId(asnRequestModalRow);
+  if (!requestId) return;
+
+  const form = document.getElementById("asnRequestForm");
+  const data = readRequestForm(form);
+  const newDate = data[ASN_DATE_FIELD] ?? "";
+  if (isEmptyValue(newDate)) {
+    setAsnRequestFooterMessage("ASN Date is required");
+    return;
+  }
+
+  setAsnRequestFooterMessage("");
+  asnRequestOpInProgress = true;
+  showIndicator(`Saving${ELLIPSIS}`, "");
+
+  try {
+    if (!isDemoMode()) {
+      const json = (typeof isApiMode === "function" && isApiMode())
+        ? await postApi("/api/requests/asn/update", { asnRequestId: requestId, request: { [ASN_DATE_FIELD]: newDate } })
+        : await postAppsScript({ action: "updateAsnRequest", asnRequestId: requestId, request: { [ASN_DATE_FIELD]: newDate } });
+      if (!json.success) throw new Error(json.error || "Update failed");
+    }
+
+    // Update in-memory request record.
+    const request = allAsnRequests.find(r => getAsnRequestRecordId(r) === requestId);
+    if (request) request[ASN_DATE_FIELD] = newDate;
+    if (asnRequestModalRow) asnRequestModalRow[ASN_DATE_FIELD] = newDate;
+
+    // Mirror the new date to every linked PO row.
+    const poNumbers = getRequestPoNumbers(asnRequestModalRow, ASN_REQUEST_ID_FIELD);
+    poNumbers.forEach(poNumber => {
+      const row = allRows.find(r => String(r["PO #"]) === String(poNumber));
+      if (row) row[ASN_DATE_FIELD] = newDate;
+    });
+
+    applyAsnRequestFilters();
+    applyFilters();
+    renderAsnRequestModal(asnRequestPoNumbers, { request: asnRequestModalRow });
+    showIndicator(`ASN Date updated ${CHECK_MARK}`, "success");
+  } catch (err) {
+    setAsnRequestFooterMessage("Save failed: " + err.message);
+    showIndicator("Save failed: " + err.message, "error");
+  } finally {
+    asnRequestOpInProgress = false;
+  }
+}
+
 function closeAsnRequestModal() {
   asnRequestPoNumbers = [];
   asnRequestAddPoPanelOpen = false;
@@ -684,6 +735,8 @@ function closeAsnRequestModal() {
   clearAsnFormSelection();
   const printBtn = document.getElementById("asnRequestPrintBtn");
   if (printBtn) printBtn.hidden = true;
+  const saveDateBtn = document.getElementById("asnRequestSaveDateBtn");
+  if (saveDateBtn) saveDateBtn.hidden = true;
   const pickupBtn = document.getElementById("asnPickupBtn");
   const pickupResendBtn = document.getElementById("asnPickupResendBtn");
   if (pickupBtn) pickupBtn.hidden = true;
@@ -1030,6 +1083,7 @@ function initAsnRequests() {
   document.getElementById("asnRequestAddPoDoneBtn")?.addEventListener("click", closeAsnRequestAddPoPanel);
   document.getElementById("asnRequestAddSelectedPosBtn")?.addEventListener("click", addSelectedPosToAsnRequest);
   document.getElementById("asnRequestCancelBtn")?.addEventListener("click", closeAsnRequestModal);
+  document.getElementById("asnRequestSaveDateBtn")?.addEventListener("click", updateAsnRequestDate);
   document.getElementById("asnPickupBtn")?.addEventListener("click", () => {
     const requestId = getAsnRequestRecordId(asnRequestModalRow);
     if (requestId) openAsnPickupFlow(requestId);

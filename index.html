@@ -1126,6 +1126,7 @@
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
         Create
       </button>
+      <button type="button" class="btn btn-primary" id="asnRequestSaveDateBtn" hidden>Save Date</button>
       <button type="button" class="btn" data-dismiss="asn-request">Cancel</button>
     </div>
   </div>
@@ -1355,6 +1356,7 @@
         <button type="button" class="settings-nav-item" data-settings-section="edit-table">Edit PO table</button>
         <button type="button" class="settings-nav-item" data-settings-section="edit-so-table">Edit Sales Order table</button>
         <button type="button" class="settings-nav-item" data-settings-section="vendor-portal">Vendor Portal Links</button>
+        <button type="button" class="settings-nav-item" data-settings-section="features">Features</button>
       </nav>
       <div class="settings-panel-wrap">
         <section class="settings-section" id="settingsSectionGeneral" data-settings-section="general">
@@ -1441,6 +1443,28 @@
           <p class="settings-hint settings-hint--block">Generate a packing-list submission link for each vendor. Links stay valid until deactivated in the Vendor Portal Tokens sheet.</p>
           <div id="settingsVendorLinksList" class="settings-vendor-links-list"></div>
         </section>
+        <section class="settings-section" id="settingsSectionFeatures" data-settings-section="features" hidden>
+          <h4 class="settings-section-title">Features</h4>
+          <p class="settings-hint settings-hint--block">Enable or disable tabs in the main navigation. Changes apply to all users in your organization.</p>
+          <div class="settings-group">
+            <div class="settings-switch-row">
+              <span class="settings-switch-label" id="settingsChargebacksLabel">Chargebacks</span>
+              <button type="button" class="settings-round-switch" id="settingsChargebacksToggle" role="switch" aria-labelledby="settingsChargebacksLabel" aria-checked="true">
+                <span class="settings-round-switch-thumb" aria-hidden="true"></span>
+              </button>
+            </div>
+            <p class="settings-hint">Show the Chargebacks tab in the main navigation.</p>
+          </div>
+          <div class="settings-group" id="settingsFeaturesVendorSubmissionsGroup">
+            <div class="settings-switch-row">
+              <span class="settings-switch-label" id="settingsVendorSubmissionsFeatureLabel">Vendor Submissions</span>
+              <button type="button" class="settings-round-switch" id="settingsVendorSubmissionsToggle" role="switch" aria-labelledby="settingsVendorSubmissionsFeatureLabel" aria-checked="true">
+                <span class="settings-round-switch-thumb" aria-hidden="true"></span>
+              </button>
+            </div>
+            <p class="settings-hint">Show the Vendor Submissions tab in the main navigation.</p>
+          </div>
+        </section>
       </div>
     </div>
     <div class="modal-footer settings-modal-footer" id="settingsEditTableFooter" hidden>
@@ -1498,6 +1522,7 @@
 <script src="js/csv-import.js"></script>
 <script src="js/data-pipeline.js"></script>
 <script src="js/settings.js"></script>
+<script src="js/feature-settings.js"></script>
 <script src="js/date-input.js"></script>
 <script src="js/selection.js"></script>
 <script src="js/row-context-menu.js"></script>

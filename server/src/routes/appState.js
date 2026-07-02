@@ -155,6 +155,8 @@ router.get("/app-state", requireAuth, async (req, res) => {
       salesOrders: rows(salesOrdersResult),
       // Settings
       vendorSubmitMode,
+      chargebacksEnabled: settings.chargebacksEnabled !== false,
+      vendorSubmissionsEnabled: settings.vendorSubmissionsEnabled !== false,
       userSettings,
       defaultColumns,
       defaultStatusFilter,
