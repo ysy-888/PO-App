@@ -152,9 +152,7 @@ async function importCsvRowsToSheet(rows) {
     setAppSaving(true, `Importing CSV… batch ${batchIndex}/${batchCount}`);
 
     const batch = rows.slice(i, i + CSV_IMPORT_BATCH_SIZE);
-    const json = (typeof isApiMode === "function" && isApiMode())
-      ? await postApi("/api/po/bulk-upsert", { rows: batch })
-      : await postAppsScript({ action: "bulkUpsertPos", rows: batch });
+    const json = await postApi("/api/po/bulk-upsert", { rows: batch });
     if (!json.success) throw new Error(json.error || "Import batch failed");
     inserted += json.inserted || 0;
     updated += json.updated || 0;
@@ -319,11 +317,6 @@ async function handleCsvImportFile(file) {
     if (typeof handleSalesOrderCsvImportFile === "function") {
       await handleSalesOrderCsvImportFile(file);
     }
-    return;
-  }
-
-  if (isDemoMode()) {
-    showIndicator("CSV import is not available in demo mode", "error");
     return;
   }
 

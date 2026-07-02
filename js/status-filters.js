@@ -382,11 +382,11 @@ const SELECT_EDIT_COLS = new Set(["Status", "Ship Method"]);
 
 const COLUMN_FILTER_COLS = [
   "Vendor", "Buyer", "Ship Method", "Shipment ID",
-  "EST EXF", "EST IHD", "ETA", "IHD", "CXL Date", "Assign Date",
+  "EST EXF", "EST IHD", "ETA", "IHD", "CXL Date", "SO CXL Date", "Assign Date",
 ];
 
 const DATE_FILTER_COLS = new Set([
-  "EST EXF", "EST IHD", "ETA", "IHD", "CXL Date", "Assign Date",
+  "EST EXF", "EST IHD", "ETA", "IHD", "CXL Date", "SO CXL Date", "Assign Date",
 ]);
 
 const BLANK_FILTER_LABEL = "(Blanks)";

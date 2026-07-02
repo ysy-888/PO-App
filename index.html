@@ -126,10 +126,6 @@
           <svg class="header-menu-item-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
           <span>Settings</span>
         </button>
-        <button type="button" class="header-menu-item" id="headerMenuToggleAppMode" role="menuitem">
-          <svg class="header-menu-item-icon header-menu-item-icon--mode" id="headerMenuAppModeIcon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6v7.5l4 3.5-4 3.5V21H9v-4.5l-4-3.5 4-3.5V3z"/><path d="M9 3v5.5"/><path d="M15 3v5.5"/></svg>
-          <span id="headerMenuAppModeLabel">Test Mode</span>
-        </button>
       </div>
     </div>
   </div>
@@ -228,7 +224,7 @@
       <col class="col-flag" /><col class="col-select" />
       <col class="col-status" /><col class="col-n41-status" /><col class="col-division" /><col class="col-vendor" />
       <col class="col-buyer" /><col class="col-buyer-po" />
-      <col class="col-so" /><col class="col-po-date" /><col class="col-po" />
+      <col class="col-so" /><col class="col-so-cxl" /><col class="col-po-date" /><col class="col-po" />
       <col class="col-old-po" /><col class="col-style" /><col class="col-color" /><col class="col-style-category" />
       <col class="col-po-qty" /><col class="col-actual-qty" /><col class="col-ctn-qty" />
       <col class="col-received-qty" /><col class="col-fob-cost" /><col class="col-po-total-cost" />
@@ -260,6 +256,7 @@
         <th class="th-filterable" data-col="Buyer"><span class="th-label">Buyer</span></th>
         <th data-col="Buyer PO #" onclick="sortBy('Buyer PO #')">Buyer PO #</th>
         <th data-col="SO #" onclick="sortBy('SO #')">SO #</th>
+        <th class="th-filterable" data-col="SO CXL Date"><span class="th-label">SO CXL Date</span></th>
         <th data-col="PO Date" onclick="sortBy('PO Date')">PO Date</th>
         <th data-col="PO #" onclick="sortBy('PO #')">PO #</th>
         <th data-col="Old PO #" onclick="sortBy('Old PO #')">Old PO #</th>
@@ -305,7 +302,7 @@
       </tr>
     </thead>
     <tbody id="tableBody">
-      <tr class="state-row"><td colspan="52">Loading POs…</td></tr>
+      <tr class="state-row"><td colspan="53">Loading POs…</td></tr>
     </tbody>
   </table>
   </div>
@@ -855,9 +852,6 @@
 
 <footer id="appFooter" class="app-footer">
   <div class="app-footer-message-slot">
-    <div id="testModeBanner" class="test-mode-status" hidden role="status" aria-live="polite">
-      Test Mode
-    </div>
     <div class="save-indicator-wrap" id="saveIndicatorWrap" hidden>
       <div class="save-indicator" id="saveIndicator" role="alert" aria-live="polite"></div>
       <button type="button" class="message-dismiss-btn save-indicator-dismiss" id="saveIndicatorDismiss" aria-label="Dismiss message" hidden>✕</button>
@@ -1353,9 +1347,10 @@
     <div class="settings-modal-body">
       <nav class="settings-nav" id="settingsNav" aria-label="Settings sections">
         <button type="button" class="settings-nav-item is-active" data-settings-section="general">General</button>
+        <button type="button" class="settings-nav-item" data-settings-section="asn-defaults">ASN Defaults</button>
         <button type="button" class="settings-nav-item" data-settings-section="edit-table">Edit PO table</button>
         <button type="button" class="settings-nav-item" data-settings-section="edit-so-table">Edit Sales Order table</button>
-        <button type="button" class="settings-nav-item" data-settings-section="vendor-portal">Vendor Portal Links</button>
+        <button type="button" class="settings-nav-item" data-settings-section="vendor-portal">Vendor Submissions</button>
         <button type="button" class="settings-nav-item" data-settings-section="features">Features</button>
       </nav>
       <div class="settings-panel-wrap">
@@ -1383,6 +1378,37 @@
             <div class="settings-date-format-row">
               <label class="settings-switch-label" for="settingsDateFormatSelect">Date format</label>
               <select id="settingsDateFormatSelect" class="filter-select settings-date-format-select" aria-label="Date format"></select>
+            </div>
+          </div>
+        </section>
+        <section class="settings-section" id="settingsSectionAsnDefaults" data-settings-section="asn-defaults" hidden>
+          <h4 class="settings-section-title">ASN Defaults</h4>
+          <div class="settings-group">
+            <div class="settings-group-label">ASN Request Defaults</div>
+            <p class="settings-hint settings-hint--block">Default Buyer Email and CC values for new ASN Requests. Enter multiple addresses separated by commas.</p>
+            <div class="settings-asn-default-email-list">
+              <div class="settings-asn-default-email-row" data-asn-default-email-buyer="lulusFashionLounge">
+                <div class="settings-asn-default-email-buyer">Lulu's Fashion Lounge</div>
+                <label class="settings-email-field">
+                  <span>Email</span>
+                  <textarea class="shipment-form-input settings-email-input" data-asn-default-email-field="email" rows="2" autocomplete="off" placeholder="name@example.com, name2@example.com"></textarea>
+                </label>
+                <label class="settings-email-field">
+                  <span>CC</span>
+                  <textarea class="shipment-form-input settings-email-input" data-asn-default-email-field="cc" rows="2" autocomplete="off" placeholder="name@example.com, name2@example.com"></textarea>
+                </label>
+              </div>
+              <div class="settings-asn-default-email-row" data-asn-default-email-buyer="12thTribe">
+                <div class="settings-asn-default-email-buyer">12th Tribe</div>
+                <label class="settings-email-field">
+                  <span>Email</span>
+                  <textarea class="shipment-form-input settings-email-input" data-asn-default-email-field="email" rows="2" autocomplete="off" placeholder="name@example.com, name2@example.com"></textarea>
+                </label>
+                <label class="settings-email-field">
+                  <span>CC</span>
+                  <textarea class="shipment-form-input settings-email-input" data-asn-default-email-field="cc" rows="2" autocomplete="off" placeholder="name@example.com, name2@example.com"></textarea>
+                </label>
+              </div>
             </div>
           </div>
         </section>
@@ -1425,7 +1451,7 @@
           </div>
         </section>
         <section class="settings-section" id="settingsSectionVendorPortal" data-settings-section="vendor-portal" hidden>
-          <h4 class="settings-section-title">Vendor Portal Links</h4>
+          <h4 class="settings-section-title">Vendor Submissions</h4>
           <div class="settings-group" id="settingsVendorSubmissionsGroup">
             <div class="settings-group-label">Vendor submissions</div>
             <div class="settings-option-list" id="settingsVendorSubmitModeList" role="radiogroup" aria-label="Vendor submissions mode">
@@ -1440,8 +1466,6 @@
             </div>
             <p class="settings-hint">Review sends vendor packing lists to the Vendor Submissions tab for approve or reject. Direct saves them to the PO immediately.</p>
           </div>
-          <p class="settings-hint settings-hint--block">Generate a packing-list submission link for each vendor. Links stay valid until deactivated in the Vendor Portal Tokens sheet.</p>
-          <div id="settingsVendorLinksList" class="settings-vendor-links-list"></div>
         </section>
         <section class="settings-section" id="settingsSectionFeatures" data-settings-section="features" hidden>
           <h4 class="settings-section-title">Features</h4>
@@ -1506,17 +1530,17 @@
   </div>
 </div>
 
-<!-- Supabase JS — only used when BACKEND === "api" in js/config.js -->
+<!-- Supabase JS for authentication and API fallback reads -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="js/config.js"></script>
-<!-- Auth layer for the SaaS backend path (no-op when BACKEND === "appsscript") -->
+<!-- Auth layer for the API backend path -->
 <script src="js/auth.js?v=20260627-1"></script>
 <script src="js/header-menu.js"></script>
 <script src="js/columns.js"></script>
 <script src="js/status-filters.js"></script>
 <script src="js/status-transitions.js?v=20260627-1"></script>
 <script src="js/rules.js"></script>
-<script src="js/column-filters.js"></script>
+<script src="js/column-filters.js?v=20260701-1"></script>
 <script src="js/state-api.js"></script>
 <script src="js/app-state-supabase.js"></script>
 <script src="js/csv-import.js"></script>

@@ -257,15 +257,9 @@ function collectAutomaticStatusUpdates(rows, shipments) {
 async function applyAutomaticStatusUpdates(rows, shipments) {
   const batch = collectAutomaticStatusUpdates(rows, shipments);
   if (batch.length === 0) return;
-  if (isDemoMode()) return;
 
   try {
-    let json;
-    if (typeof isApiMode === "function" && isApiMode()) {
-      json = await postApi("/api/po/batch-update", { items: batch });
-    } else {
-      json = await postAppsScript({ action: "batchUpdatePos", items: batch }, { silent: true });
-    }
+    const json = await postApi("/api/po/batch-update", { items: batch });
     if (!json.success) console.warn("Auto status update failed:", json.error);
   } catch (err) {
     console.warn("Auto status update failed:", err.message);

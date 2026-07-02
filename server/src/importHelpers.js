@@ -1,6 +1,5 @@
 /**
- * CSV import helpers — mirrors the allowlist / compare logic in apps-script.gs
- * used by handleBulkUpsertPos().
+ * CSV import helpers for PO bulk upsert allowlist / compare logic.
  */
 
 const IMPORT_ALLOWED_PO_FIELDS = new Set([

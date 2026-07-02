@@ -2374,7 +2374,7 @@ function restorePackingStateForPo(snapshot, row) {
 }
 
 function applyPackingListLocally(poNumber, existingPackingList, packingList, cartons, filteredPoUpdates, row) {
-  const provisionalId = getPackingListId(existingPackingList) || generateDemoPackingListId();
+  const provisionalId = getPackingListId(existingPackingList) || generateProvisionalPackingListId();
   const packingPoUpdates = buildPackingPoUpdatesFromCartons(cartons, cartons.length);
   const mergedUpdates = { ...filteredPoUpdates, ...packingPoUpdates };
   upsertLocalPackingList(poNumber, provisionalId, packingList, cartons);
@@ -2385,9 +2385,7 @@ function applyPackingListLocally(poNumber, existingPackingList, packingList, car
 }
 
 async function syncPackingListToServer(poNumber, packingList, cartons, filteredPoUpdates, provisionalId, row) {
-  const json = (typeof isApiMode === "function" && isApiMode())
-    ? await postApi("/api/packing-list/save", { poNumber, packingList, cartons, updates: filteredPoUpdates })
-    : await postAppsScript({ action: "savePackingList", poNumber, packingList, cartons, updates: filteredPoUpdates });
+  const json = await postApi("/api/packing-list/save", { poNumber, packingList, cartons, updates: filteredPoUpdates });
   if (!json.success) throw new Error(json.error);
 
   const packingListId = json.packingListId || provisionalId;
@@ -2446,25 +2444,10 @@ async function deletePackingListFromPanel(row, packingList) {
   if (!packingListId && !poNumber) return;
   if (!confirm("Delete this packing list?")) return;
 
-  if (isDemoMode()) {
-    allPackingLists = allPackingLists.filter(item => getPackingListId(item) !== packingListId);
-    allPackingCartons = allPackingCartons.filter(carton =>
-      String(carton?.[PACKING_LIST_ID_FIELD] ?? "").trim() !== packingListId
-    );
-    invalidatePackingIndex();
-    if (typeof closePoPackingPane === "function") closePoPackingPane({ clearSelection: false });
-    else closePackingListPanelInModal(row);
-    renderTable();
-    showIndicator("Packing list deleted", "success");
-    return;
-  }
-
   modalSaveInProgress = true;
   showIndicator(`Deleting packing list${ELLIPSIS}`, "");
   try {
-    const json = (typeof isApiMode === "function" && isApiMode())
-      ? await postApi("/api/packing-list/delete", { packingListId, poNumber })
-      : await postAppsScript({ action: "deletePackingList", packingListId, poNumber });
+    const json = await postApi("/api/packing-list/delete", { packingListId, poNumber });
     if (!json.success) throw new Error(json.error);
     allPackingLists = allPackingLists.filter(item => getPackingListId(item) !== packingListId);
     allPackingCartons = allPackingCartons.filter(carton =>
@@ -2556,26 +2539,13 @@ function preparePackingListSave({ editor, row, existingPackingList, cartons }, p
     return null;
   }
 
-  const filteredPoUpdates = filterAppsScriptPoUpdates(poEditUpdates);
+  const filteredPoUpdates = filterPoUpdatePayload(poEditUpdates);
   const packingList = {
     "Carton Count": cartons.length,
     "Notes": existingPackingList?.["Notes"]
       || modalPendingSubmissionDraft?.packingList?.["Notes"]
       || "",
   };
-
-  if (isDemoMode()) {
-    const packingListId = getPackingListId(existingPackingList) || generateDemoPackingListId();
-    upsertLocalPackingList(poNumber, packingListId, packingList, cartons);
-    latestPackingUnitTotalsByPo.set(poNumber, computePackingTotalsByUnit(cartons));
-    const mergedUpdates = {
-      ...filteredPoUpdates,
-      ...buildPackingPoUpdatesFromCartons(cartons, cartons.length),
-    };
-    Object.assign(row, mergedUpdates);
-    applyModalUpdatesToTableRow(poNumber, mergedUpdates);
-    return { mergedUpdates, syncToServer: null };
-  }
 
   const snapshot = snapshotPackingStateForPo(poNumber, row);
   const { mergedUpdates, provisionalId } = applyPackingListLocally(
@@ -2617,23 +2587,9 @@ async function addChargebackRow(rowEl, poNumber) {
     return;
   }
 
-  if (isDemoMode()) {
-    allChargebacks.push({
-      [CHARGEBACK_ID_FIELD]: generateDemoChargebackId(),
-      "PO #": poNumber,
-      "Date": formatDateToYmd(new Date()),
-      ...chargeback,
-    });
-    showIndicator("Chargeback added", "success");
-    refreshChargebacksForPo(poNumber);
-    return;
-  }
-
   setAppSaving(true, "Adding chargeback...");
   try {
-    const json = (typeof isApiMode === "function" && isApiMode())
-      ? await postApi("/api/chargebacks/create", { poNumber, chargeback })
-      : await postAppsScript({ action: "createChargeback", poNumber, chargeback });
+    const json = await postApi("/api/chargebacks/create", { poNumber, chargeback });
     if (!json.success) throw new Error(json.error);
     allChargebacks.push({
       [CHARGEBACK_ID_FIELD]: json.chargebackId,
@@ -2657,19 +2613,9 @@ async function saveChargebackRow(rowEl, poNumber) {
   if (!chargebackId) return;
   if (!validateChargebackForm(rowEl, chargeback)) return;
 
-  if (isDemoMode()) {
-    const existing = allChargebacks.find(item => getChargebackId(item) === chargebackId);
-    if (existing) Object.assign(existing, chargeback);
-    showIndicator("Chargeback saved", "success");
-    refreshChargebacksForPo(poNumber);
-    return;
-  }
-
   setAppSaving(true, "Saving chargeback...");
   try {
-    const json = (typeof isApiMode === "function" && isApiMode())
-      ? await postApi("/api/chargebacks/update", { chargebackId, chargeback })
-      : await postAppsScript({ action: "updateChargeback", chargebackId, chargeback });
+    const json = await postApi("/api/chargebacks/update", { chargebackId, chargeback });
     if (!json.success) throw new Error(json.error);
     const existing = allChargebacks.find(item => getChargebackId(item) === chargebackId);
     if (existing) Object.assign(existing, chargeback);
@@ -2687,18 +2633,9 @@ async function deleteChargebackRow(rowEl, poNumber) {
   const chargebackId = rowEl.dataset.chargebackId;
   if (!chargebackId) return;
 
-  if (isDemoMode()) {
-    allChargebacks = allChargebacks.filter(item => getChargebackId(item) !== chargebackId);
-    showIndicator("Chargeback deleted", "success");
-    refreshChargebacksForPo(poNumber);
-    return;
-  }
-
   setAppSaving(true, "Deleting chargeback...");
   try {
-    const json = (typeof isApiMode === "function" && isApiMode())
-      ? await postApi("/api/chargebacks/delete", { chargebackId })
-      : await postAppsScript({ action: "deleteChargeback", chargebackId });
+    const json = await postApi("/api/chargebacks/delete", { chargebackId });
     if (!json.success) throw new Error(json.error);
     allChargebacks = allChargebacks.filter(item => getChargebackId(item) !== chargebackId);
     showIndicator("Chargeback deleted", "success");

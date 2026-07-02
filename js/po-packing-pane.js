@@ -909,20 +909,6 @@ async function poPaneSavePackingList() {
   showIndicator(`Saving packing list${ELLIPSIS}`, "");
 
   try {
-    if (isDemoMode()) {
-      const poNumber = normalizePoNumber(poPackingPaneRow["PO #"]);
-      const packingListId = getPackingListId(existingPackingList) || generateDemoPackingListId();
-      upsertLocalPackingList(poNumber, packingListId, packingList, cartons);
-      Object.assign(poPackingPaneRow, buildPackingPoUpdatesFromCartons(cartons, cartons.length));
-      if (typeof applyModalUpdatesToTableRow === "function") {
-        applyModalUpdatesToTableRow(poNumber, buildPackingPoUpdatesFromCartons(cartons, cartons.length));
-      }
-      renderTable();
-      openPoPackingPane(poPackingPaneRow);
-      showIndicator(`Saved ${CHECK_MARK}`, "success");
-      return;
-    }
-
     const existingForSave = { ...(existingPackingList || {}), Notes: notes };
     const prepared = preparePackingListSave({
       editor: editorRoot,

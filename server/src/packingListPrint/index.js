@@ -28,6 +28,7 @@ export async function buildRequestEmailAttachments(supabase, tenantId, {
 
   const pdfOptions = getPackingListPdfOptions(type, entityId, requestData);
   if (!pdfOptions) return [];
+  pdfOptions.showInternalPoFields = false;
 
   try {
     const attachment = await buildGroupPackingListPdfAttachment(
@@ -69,6 +70,7 @@ export async function buildAsnPickupEmailAttachments(supabase, tenantId, {
         typeDate: asnData?.["ASN Date"] ?? "",
         requestDate: today,
         requestId: pickupRequestId,
+        showInternalPoFields: false,
       }
     );
     attachments.push(packingAttachment);

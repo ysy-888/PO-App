@@ -106,6 +106,6 @@ npm run redeploy:email
 - Only the API server should know that token (`APPS_SCRIPT_EMAIL_TOKEN`).
 - To rotate: run `setupEmailRelayToken()` again and update Render/local env.
 
-## Legacy sheet-bound script
+## Scope
 
-The main [apps-script.gs](../apps-script.gs) (bound to the production spreadsheet) is still used for **Test Mode / `BACKEND = appsscript`**. API mode only needs this email relay.
+This standalone relay is the only remaining Apps Script component. The app data backend is the Express/Supabase API.

@@ -74,9 +74,7 @@ async function importCustomerCsvRowsToSheet(rows) {
     setAppSaving(true, `Importing customers… batch ${batchIndex}/${batchCount}`);
 
     const batch = rows.slice(i, i + CSV_IMPORT_BATCH_SIZE);
-    const json = (typeof isApiMode === "function" && isApiMode())
-      ? await postApi("/api/customers/bulk-upsert", { rows: batch })
-      : await postAppsScript({ action: "bulkUpsertCustomers", rows: batch });
+    const json = await postApi("/api/customers/bulk-upsert", { rows: batch });
     if (!json.success) throw new Error(json.error || "Import batch failed");
     inserted += json.inserted || 0;
     updated += json.updated || 0;
@@ -153,11 +151,6 @@ function showCustomerImportSummary(result, skippedInFile = 0) {
 async function handleCustomerCsvImportFile(file) {
   if (!file) return;
   if (isAppSaving()) return;
-
-  if (isDemoMode()) {
-    showIndicator("CSV import is not available in demo mode", "error");
-    return;
-  }
 
   closeHeaderMenu();
   setAppSaving(true, "Importing customers…");

@@ -54,7 +54,7 @@ function isPoFieldEditable(col, row) {
   return true;
 }
 
-const READONLY_NO_SELECT_COLS = new Set(["Division", "PO Date", "Vendor", "N41 Status"]);
+const READONLY_NO_SELECT_COLS = new Set(["Division", "PO Date", "Vendor", "N41 Status", "SO CXL Date"]);
 
 const COPY_ON_CLICK_COLS = new Set([
   "Buyer", "Buyer PO #", "SO #", "PO #", "Style #", "Color", "Shipment ID",
@@ -196,8 +196,8 @@ function formatQtyVariancePercent(value) {
   return `${Math.round(value)}%`;
 }
 
-/** Mirror apps-script.gs EDITABLE_FIELDS for PO update payloads. */
-const APPS_SCRIPT_EDITABLE_PO_FIELDS = new Set([
+/** Fields allowed in PO update payloads. */
+const EDITABLE_PO_UPDATE_FIELDS = new Set([
   "Flag",
   "PO Qty", "Status", "N41 Status", "Ship Method",
   "Vessel", "House #", "Shipped", "ETD", "ETA", "IHD",
@@ -212,9 +212,9 @@ const APPS_SCRIPT_EDITABLE_PO_FIELDS = new Set([
   ...PO_UNIT_FIELDS,
 ]);
 
-function filterAppsScriptPoUpdates(updates) {
+function filterPoUpdatePayload(updates) {
   return Object.fromEntries(
-    Object.entries(updates || {}).filter(([field]) => APPS_SCRIPT_EDITABLE_PO_FIELDS.has(field))
+    Object.entries(updates || {}).filter(([field]) => EDITABLE_PO_UPDATE_FIELDS.has(field))
   );
 }
 

@@ -17,6 +17,36 @@ let filteredSalesOrders = [];
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+function normalizeSoNumber(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const n = Number(raw);
+  return Number.isFinite(n) ? String(n) : raw;
+}
+
+function getLinkedSalesOrderForPo(poRow) {
+  const orders = allSalesOrders ?? [];
+  if (!orders.length || !poRow) return null;
+
+  const soNum = normalizeSoNumber(poRow["SO #"]);
+  if (soNum) {
+    const bySo = orders.find(o => normalizeSoNumber(o["SO #"]) === soNum);
+    if (bySo) return bySo;
+  }
+
+  const buyerPo = String(poRow["Buyer PO #"] ?? "").trim();
+  if (buyerPo) {
+    return orders.find(o => String(o["Customer PO #"] ?? "").trim() === buyerPo) ?? null;
+  }
+
+  return null;
+}
+
+function getSoCxlDateForPo(poRow) {
+  const order = getLinkedSalesOrderForPo(poRow);
+  return order?.["CXL Date"] ?? "";
+}
+
 function soTotalUnits(order) {
   return (order.Lines ?? []).reduce((sum, line) => {
     return sum + toSoQty(line["Total Units"]);
@@ -52,6 +82,14 @@ function formatSoDate(val) {
 function onSalesOrdersDataLoaded(rows) {
   allSalesOrders = (rows ?? []).map(row => ({ ...row }));
   applySalesOrderFilters();
+  if (
+    (allRows ?? []).length > 0
+    && typeof currentAppView !== "undefined"
+    && currentAppView === "po"
+    && typeof applyFilters === "function"
+  ) {
+    applyFilters();
+  }
 }
 
 function getSoSortValue(order, col) {
@@ -218,7 +256,6 @@ function goToSoPage(page) {
 }
 
 function loadSoPageSizePreference() {
-  if (typeof isApiMode === "function" && isApiMode()) return DEFAULT_PAGE_SIZE;
   try {
     const stored = localStorage.getItem(scopedStorageKey(SO_PAGE_SIZE_STORAGE_BASE));
     if (stored == null) return DEFAULT_PAGE_SIZE;

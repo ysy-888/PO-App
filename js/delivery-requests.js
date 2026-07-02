@@ -146,30 +146,18 @@ async function resendDeliveryRequestEmail(requestId) {
   deliveryRequestOpInProgress = true;
   showIndicator(`Resending delivery email${ELLIPSIS}`, "");
   try {
-    if (isDemoMode()) {
-      const request = allDeliveryRequests.find(r => String(r[DELIVERY_REQUEST_ID_FIELD] ?? "").trim() === requestId);
-      if (request) {
-        request["Email Status"] = "Sent";
-        request["Email Error"] = "";
-        request["Email Sent At"] = formatDateToYmd(new Date());
-      }
+    const json = await postApi("/api/requests/delivery/resend-email", { deliveryRequestId: requestId });
+    if (!json.success) throw new Error(json.error);
+    const request = allDeliveryRequests.find(r => String(r[DELIVERY_REQUEST_ID_FIELD] ?? "").trim() === requestId);
+    if (request) {
+      request["Email Status"] = json.emailSent ? "Sent" : "Failed";
+      request["Email Error"] = json.emailError ?? "";
+      if (json.emailSent) request["Email Sent At"] = formatDateToYmd(new Date());
       applyDeliveryRequestFilters();
-    } else {
-      const json = (typeof isApiMode === "function" && isApiMode())
-        ? await postApi("/api/requests/delivery/resend-email", { deliveryRequestId: requestId })
-        : await postAppsScript({ action: "resendDeliveryRequestEmail", deliveryRequestId: requestId });
-      if (!json.success) throw new Error(json.error);
-      const request = allDeliveryRequests.find(r => String(r[DELIVERY_REQUEST_ID_FIELD] ?? "").trim() === requestId);
-      if (request) {
-        request["Email Status"] = json.emailSent ? "Sent" : "Failed";
-        request["Email Error"] = json.emailError ?? "";
-        if (json.emailSent) request["Email Sent At"] = formatDateToYmd(new Date());
-        applyDeliveryRequestFilters();
-      }
-      if (!json.emailSent) {
-        showIndicator(`Delivery email not sent: ${json.emailError || "Missing email"}`, "error");
-        return;
-      }
+    }
+    if (!json.emailSent) {
+      showIndicator(`Delivery email not sent: ${json.emailError || "Missing email"}`, "error");
+      return;
     }
     showIndicator(`Delivery email sent ${CHECK_MARK}`, "success");
   } catch (err) {
@@ -584,37 +572,20 @@ async function submitDeliveryRequest() {
   let emailWarning = "";
 
   try {
-    if (isDemoMode()) {
-      if (isEdit) {
-        applyDeliveryRequestUpdatedLocally(savedRow[DELIVERY_REQUEST_ID_FIELD], data);
-      } else {
-        applyDeliveryRequestCreatedLocally(generateDemoDeliveryRequestId(), poNumbers, data);
-      }
+    const json = isEdit
+      ? await postApi("/api/requests/delivery/update", { deliveryRequestId: savedRow[DELIVERY_REQUEST_ID_FIELD], request: data })
+      : await postApi("/api/requests/delivery/create", { poNumbers, request: data });
+    if (!json.success) throw new Error(json.error || "Delivery request failed");
+    if (isEdit) {
+      applyDeliveryRequestUpdatedLocally(savedRow[DELIVERY_REQUEST_ID_FIELD], data);
     } else {
-      let json;
-      if (typeof isApiMode === "function" && isApiMode()) {
-        json = isEdit
-          ? await postApi("/api/requests/delivery/update", { deliveryRequestId: savedRow[DELIVERY_REQUEST_ID_FIELD], request: data })
-          : await postApi("/api/requests/delivery/create", { poNumbers, request: data });
-      } else {
-        json = await postAppsScript(
-          isEdit
-            ? { action: "updateDeliveryRequest", deliveryRequestId: savedRow[DELIVERY_REQUEST_ID_FIELD], request: data }
-            : { action: "createDeliveryRequest", poNumbers, request: data }
-        );
+      applyDeliveryRequestCreatedLocally(json.deliveryRequestId, poNumbers, data);
+      if (json.request) {
+        const request = allDeliveryRequests.find(r => String(r[DELIVERY_REQUEST_ID_FIELD] ?? "").trim() === json.deliveryRequestId);
+        if (request) Object.assign(request, json.request);
+        applyDeliveryRequestFilters();
       }
-      if (!json.success) throw new Error(json.error || "Delivery request failed");
-      if (isEdit) {
-        applyDeliveryRequestUpdatedLocally(savedRow[DELIVERY_REQUEST_ID_FIELD], data);
-      } else {
-        applyDeliveryRequestCreatedLocally(json.deliveryRequestId, poNumbers, data);
-        if (json.request) {
-          const request = allDeliveryRequests.find(r => String(r[DELIVERY_REQUEST_ID_FIELD] ?? "").trim() === json.deliveryRequestId);
-          if (request) Object.assign(request, json.request);
-          applyDeliveryRequestFilters();
-        }
-        if (json.emailSent === false) emailWarning = json.emailError || "Unknown email error";
-      }
+      if (json.emailSent === false) emailWarning = json.emailError || "Unknown email error";
     }
     showIndicator(
       isEdit
@@ -628,15 +599,6 @@ async function submitDeliveryRequest() {
     deliveryRequestOpInProgress = false;
     if (!isEdit) endToolbarCreatePending();
   }
-}
-
-function generateDemoDeliveryRequestId() {
-  let max = 0;
-  allDeliveryRequests.forEach(r => {
-    const m = /^DR-(\d+)$/.exec(String(r[DELIVERY_REQUEST_ID_FIELD] ?? ""));
-    if (m) max = Math.max(max, Number(m[1]));
-  });
-  return `DR-${String(max + 1).padStart(4, "0")}`;
 }
 
 function applyDeliveryRequestCreatedLocally(requestId, poNumbers, data) {
@@ -680,14 +642,6 @@ function applyDeliveryRequestUpdatedLocally(requestId, data) {
   const existing = getDeliveryRequestById(requestId);
   if (existing) Object.assign(existing, data);
   applyDeliveryRequestFilters();
-}
-
-function demoCreateOrUpdateDeliveryRequest(poNumbers, data, existing) {
-  if (existing?.[DELIVERY_REQUEST_ID_FIELD]) {
-    applyDeliveryRequestUpdatedLocally(existing[DELIVERY_REQUEST_ID_FIELD], data);
-  } else {
-    applyDeliveryRequestCreatedLocally(generateDemoDeliveryRequestId(), poNumbers, data);
-  }
 }
 
 function initDeliveryRequests() {

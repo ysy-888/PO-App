@@ -240,32 +240,19 @@ async function resendAsnRequestEmail(requestId) {
   asnRequestOpInProgress = true;
   showIndicator(`Resending ASN email${ELLIPSIS}`, "");
   try {
-    if (isDemoMode()) {
-      const request = allAsnRequests.find(r => getAsnRequestRecordId(r) === requestId);
-      if (request) {
-        request["Email Status"] = "Sent";
-        request["Email Error"] = "";
-        request["Email Sent At"] = formatDateToYmd(new Date());
-        request["Last Email Attempt At"] = formatDateToYmd(new Date());
-      }
+    const json = await postApi("/api/requests/asn/resend-email", { asnRequestId: requestId });
+    if (!json.success) throw new Error(json.error);
+    const request = allAsnRequests.find(r => getAsnRequestRecordId(r) === requestId);
+    if (request) {
+      request["Email Status"] = json.emailSent ? "Sent" : "Failed";
+      request["Email Error"] = json.emailError ?? "";
+      if (json.emailSent) request["Email Sent At"] = formatDateToYmd(new Date());
+      request["Last Email Attempt At"] = formatDateToYmd(new Date());
       applyAsnRequestFilters();
-    } else {
-      const json = (typeof isApiMode === "function" && isApiMode())
-        ? await postApi("/api/requests/asn/resend-email", { asnRequestId: requestId })
-        : await postAppsScript({ action: "resendAsnRequestEmail", asnRequestId: requestId });
-      if (!json.success) throw new Error(json.error);
-      const request = allAsnRequests.find(r => getAsnRequestRecordId(r) === requestId);
-      if (request) {
-        request["Email Status"] = json.emailSent ? "Sent" : "Failed";
-        request["Email Error"] = json.emailError ?? "";
-        if (json.emailSent) request["Email Sent At"] = formatDateToYmd(new Date());
-        request["Last Email Attempt At"] = formatDateToYmd(new Date());
-        applyAsnRequestFilters();
-      }
-      if (!json.emailSent) {
-        showIndicator(`ASN email not sent: ${json.emailError || "Missing buyer email"}`, "error");
-        return;
-      }
+    }
+    if (!json.emailSent) {
+      showIndicator(`ASN email not sent: ${json.emailError || "Missing buyer email"}`, "error");
+      return;
     }
     showIndicator(`ASN email sent ${CHECK_MARK}`, "success");
   } catch (err) {
@@ -291,6 +278,9 @@ function getAsnRequestBuyerForRows(rows) {
 
 function getAsnRequestBuyerEmailInfo(buyer) {
   const buyerKey = String(buyer ?? "").trim().toLowerCase();
+  const defaults = typeof getAsnDefaultEmailAddressForBuyer === "function"
+    ? getAsnDefaultEmailAddressForBuyer(buyer)
+    : { email: "", cc: "" };
   const contactRows = allContactRows ?? allVendorEmailRows ?? [];
   const row = [...contactRows].reverse().find(r => {
     const name = String(r["Name"] ?? r["Vendor"] ?? "").trim().toLowerCase();
@@ -301,8 +291,10 @@ function getAsnRequestBuyerEmailInfo(buyer) {
     !isEmptyValue(r["Buyer Email"])
   );
   return {
-    email: String(row?.["Email"] ?? "").trim() || String(previousRequest?.["Buyer Email"] ?? "").trim(),
-    cc: String(row?.["CC"] ?? "").trim(),
+    email: String(defaults.email ?? "").trim() ||
+      String(row?.["Email"] ?? "").trim() ||
+      String(previousRequest?.["Buyer Email"] ?? "").trim(),
+    cc: String(defaults.cc ?? "").trim() || String(row?.["CC"] ?? "").trim(),
   };
 }
 
@@ -692,12 +684,8 @@ async function updateAsnRequestDate() {
   showIndicator(`Saving${ELLIPSIS}`, "");
 
   try {
-    if (!isDemoMode()) {
-      const json = (typeof isApiMode === "function" && isApiMode())
-        ? await postApi("/api/requests/asn/update", { asnRequestId: requestId, request: { [ASN_DATE_FIELD]: newDate } })
-        : await postAppsScript({ action: "updateAsnRequest", asnRequestId: requestId, request: { [ASN_DATE_FIELD]: newDate } });
-      if (!json.success) throw new Error(json.error || "Update failed");
-    }
+    const json = await postApi("/api/requests/asn/update", { asnRequestId: requestId, request: { [ASN_DATE_FIELD]: newDate } });
+    if (!json.success) throw new Error(json.error || "Update failed");
 
     // Update in-memory request record.
     const request = allAsnRequests.find(r => getAsnRequestRecordId(r) === requestId);
@@ -774,21 +762,15 @@ async function submitAsnRequest() {
   let emailWarning = "";
 
   try {
-    if (isDemoMode()) {
-      applyAsnRequestCreatedLocally(generateDemoAsnRequestId(), poNumbers, data);
-    } else {
-      const json = (typeof isApiMode === "function" && isApiMode())
-        ? await postApi("/api/requests/asn/create", { poNumbers, request: data })
-        : await postAppsScript({ action: "createAsnRequest", poNumbers, request: data });
-      if (!json.success) throw new Error(json.error || json.emailError || "ASN request failed");
-      applyAsnRequestCreatedLocally(json.asnRequestId, poNumbers, data);
-      if (json.request) {
-        const request = allAsnRequests.find(r => getAsnRequestRecordId(r) === json.asnRequestId);
-        if (request) Object.assign(request, json.request);
-        applyAsnRequestFilters();
-      }
-      if (json.emailSent === false) emailWarning = json.emailError || "Unknown email error";
+    const json = await postApi("/api/requests/asn/create", { poNumbers, request: data });
+    if (!json.success) throw new Error(json.error || json.emailError || "ASN request failed");
+    applyAsnRequestCreatedLocally(json.asnRequestId, poNumbers, data);
+    if (json.request) {
+      const request = allAsnRequests.find(r => getAsnRequestRecordId(r) === json.asnRequestId);
+      if (request) Object.assign(request, json.request);
+      applyAsnRequestFilters();
     }
+    if (json.emailSent === false) emailWarning = json.emailError || "Unknown email error";
     showIndicator(
       emailWarning ? `ASN requested, but email not sent: ${emailWarning}` : `ASN requested and email sent ${CHECK_MARK}`,
       emailWarning ? "error" : "success"
@@ -799,15 +781,6 @@ async function submitAsnRequest() {
     asnRequestOpInProgress = false;
     endToolbarCreatePending();
   }
-}
-
-function generateDemoAsnRequestId() {
-  let max = 0;
-  allAsnRequests.forEach(r => {
-    const m = /^ASN-(\d+)$/.exec(String(r[ASN_REQUEST_ID_FIELD] ?? ""));
-    if (m) max = Math.max(max, Number(m[1]));
-  });
-  return `ASN-${String(max + 1).padStart(4, "0")}`;
 }
 
 function applyAsnRequestCreatedLocally(requestId, poNumbers, data) {
@@ -842,10 +815,6 @@ function applyAsnRequestCreatedLocally(requestId, poNumbers, data) {
   applyFilters();
   applyAsnRequestFilters();
   if (typeof updateToolbarRequestButtons === "function") updateToolbarRequestButtons();
-}
-
-function demoCreateAsnRequest(poNumbers, data) {
-  applyAsnRequestCreatedLocally(generateDemoAsnRequestId(), poNumbers, data);
 }
 
 function openAsnPickupFlow(asnRequestId) {
@@ -1013,27 +982,15 @@ async function sendAsnPickupEmail(asnRequestId, labelInputs) {
   showIndicator(`Sending ASN Pickup email${ELLIPSIS}`, "");
 
   try {
-    if (isDemoMode()) {
-      const logistics = getLogisticsEmailInfo();
-      if (!logistics.email) throw new Error("No email address on file for FORERUNNER LOGISTICS.");
-      applyAsnPickupSentLocally(asnRequestId, inputs, { emailSent: true, emailError: "" });
-    } else {
-      const json = (typeof isApiMode === "function" && isApiMode())
-        ? await postApi("/api/requests/asn-pickup/send-email", { asnRequestId, labelInputs: inputs })
-        : await postAppsScript({
-            action: "sendAsnPickupEmail",
-            asnRequestId,
-            labelInputs: inputs,
-          });
-      if (!json.success) throw new Error(json.error || json.emailError || "ASN Pickup email failed to send.");
-      applyAsnPickupSentLocally(asnRequestId, inputs, {
-        emailSent: json.emailSent,
-        emailError: json.emailError ?? "",
-      });
-      if (!json.emailSent) {
-        showIndicator(`ASN Pickup email not sent: ${json.emailError || "Unknown error"}`, "error");
-        return;
-      }
+    const json = await postApi("/api/requests/asn-pickup/send-email", { asnRequestId, labelInputs: inputs });
+    if (!json.success) throw new Error(json.error || json.emailError || "ASN Pickup email failed to send.");
+    applyAsnPickupSentLocally(asnRequestId, inputs, {
+      emailSent: json.emailSent,
+      emailError: json.emailError ?? "",
+    });
+    if (!json.emailSent) {
+      showIndicator(`ASN Pickup email not sent: ${json.emailError || "Unknown error"}`, "error");
+      return;
     }
     showIndicator(`ASN Pickup email sent ${CHECK_MARK}`, "success");
   } catch (err) {

@@ -103,9 +103,7 @@ async function importSalesOrderDocuments(documents) {
     setAppSaving(true, `Importing sales orders… batch ${batchIndex}/${batchCount}`);
 
     const batch = documents.slice(i, i + SO_IMPORT_BATCH_SIZE);
-    const json = (typeof isApiMode === "function" && isApiMode())
-      ? await postApi("/api/sales-orders/bulk-upsert", { rows: batch })
-      : { success: false, error: "Sales Order import requires API mode." };
+    const json = await postApi("/api/sales-orders/bulk-upsert", { rows: batch });
     if (!json.success) throw new Error(json.error || "Import batch failed");
     inserted += json.inserted || 0;
     updated += json.updated || 0;
@@ -161,16 +159,6 @@ function showSalesOrderImportSummary(result, skippedInFile = 0) {
 async function handleSalesOrderCsvImportFile(file) {
   if (!file) return;
   if (isAppSaving()) return;
-
-  if (isDemoMode()) {
-    showIndicator("CSV import is not available in demo mode", "error");
-    return;
-  }
-
-  if (typeof isApiMode !== "function" || !isApiMode()) {
-    showIndicator("Sales Order import requires API mode.", "error");
-    return;
-  }
 
   closeHeaderMenu();
   setAppSaving(true, "Importing sales orders…");

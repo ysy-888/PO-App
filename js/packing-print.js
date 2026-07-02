@@ -131,8 +131,12 @@ async function printPackingListAsync({
     .filter(Boolean);
   if (numbers.length === 0) return;
 
-  if (isDemoMode()) {
-    printPackingListLocal({
+  if (typeof showIndicator === "function") {
+    showIndicator("Preparing packing list…", "");
+  }
+
+  try {
+    const html = buildPackingListPrintHtmlLocal({
       poNumbers: numbers,
       mode,
       includeTitlePage,
@@ -142,49 +146,10 @@ async function printPackingListAsync({
       requestDate,
       requestId,
     });
-    return;
-  }
-
-  if (typeof showIndicator === "function") {
-    showIndicator("Preparing packing list…", "");
-  }
-
-  try {
-    if (typeof isApiMode === "function" && isApiMode()) {
-      const html = buildPackingListPrintHtmlLocal({
-        poNumbers: numbers,
-        mode,
-        includeTitlePage,
-        titleLabel,
-        titlePageType,
-        typeDate,
-        requestDate,
-        requestId,
-      });
-      if (!html || /<p>(?:No POs found|PO not found)\.<\/p>/.test(html)) {
-        throw new Error("Failed to load packing list");
-      }
-      printPackingListHtmlDocument(html);
-      if (typeof showIndicator === "function") {
-        showIndicator("Packing list ready", "success");
-      }
-      return;
+    if (!html || /<p>(?:No POs found|PO not found)\.<\/p>/.test(html)) {
+      throw new Error("Failed to load packing list");
     }
-
-    const json = await postAppsScript({
-      action: "getPackingListPrintHtml",
-      poNumbers: numbers,
-      includeTitlePage: Boolean(includeTitlePage),
-      titleLabel: String(titleLabel ?? "").trim(),
-      titlePageType: String(titlePageType ?? "").trim(),
-      typeDate: typeDate ?? "",
-      requestDate: requestDate ?? "",
-      requestId: requestId ?? "",
-    });
-    if (!json.success || !json.html) {
-      throw new Error(json.error || "Failed to load packing list");
-    }
-    printPackingListHtmlDocument(json.html);
+    printPackingListHtmlDocument(html);
     if (typeof showIndicator === "function") {
       showIndicator("Packing list ready", "success");
     }

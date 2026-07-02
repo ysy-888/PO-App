@@ -11,10 +11,7 @@
  *   SUPABASE_URL              — your Supabase project URL
  *   SUPABASE_SERVICE_ROLE_KEY — service-role key (never the anon key)
  *   TENANT_ID                 — UUID of the tenant row in Supabase
- *   APPS_SCRIPT_URL           — (Option A) live Apps Script /exec URL to fetch current data
- *   CSV_FILE                  — (Option B) path to a N41 CSV export file
- *
- * Priority: APPS_SCRIPT_URL is used if set; CSV_FILE is the fallback.
+ *   CSV_FILE                  — path to a N41 CSV export file
  *
  * The script upserts on (tenant_id, po_number) so it is safe to run more
  * than once — existing rows are updated, new rows are inserted.
@@ -42,7 +39,6 @@ const {
   SUPABASE_URL,
   SUPABASE_SERVICE_ROLE_KEY,
   TENANT_ID,
-  APPS_SCRIPT_URL,
   CSV_FILE,
 } = process.env;
 
@@ -54,8 +50,8 @@ if (!TENANT_ID) {
   console.error("ERROR: TENANT_ID must be set (UUID of the tenant row in Supabase).");
   process.exit(1);
 }
-if (!APPS_SCRIPT_URL && !CSV_FILE) {
-  console.error("ERROR: Set APPS_SCRIPT_URL (preferred) or CSV_FILE.");
+if (!CSV_FILE) {
+  console.error("ERROR: CSV_FILE must be set.");
   process.exit(1);
 }
 
@@ -90,19 +86,7 @@ for (let i = 1; i <= 15; i++) {
   CSV_TO_SHEET_MAP[`value${i}`] = `PO Unit ${i}`;
 }
 
-// ── Source A: fetch from Apps Script ────────────────────────
-async function fetchFromAppsScript(url) {
-  console.log("Fetching from Apps Script:", url);
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new Error(`Apps Script returned HTTP ${res.status}`);
-  const json = await res.json();
-  if (!json.success) throw new Error(`Apps Script error: ${json.error}`);
-  const rows = json.data || [];
-  console.log(`  → ${rows.length} PO rows received`);
-  return rows;
-}
-
-// ── Source B: parse N41 CSV file ────────────────────────────
+// ── Parse N41 CSV file ──────────────────────────────────────
 function parseCSV(text) {
   const lines = text.split(/\r?\n/).filter(Boolean);
   if (lines.length < 2) return [];
@@ -175,16 +159,11 @@ async function main() {
   console.log("\n=== PO Import ===");
   console.log("Tenant ID:", TENANT_ID);
 
-  let rows;
-  if (APPS_SCRIPT_URL) {
-    rows = await fetchFromAppsScript(APPS_SCRIPT_URL);
-  } else {
-    const csvPath = resolve(process.cwd(), CSV_FILE);
-    console.log("Reading CSV:", csvPath);
-    const text = readFileSync(csvPath, "utf8");
-    rows = parseCSV(text);
-    console.log(`  → ${rows.length} PO rows parsed`);
-  }
+  const csvPath = resolve(process.cwd(), CSV_FILE);
+  console.log("Reading CSV:", csvPath);
+  const text = readFileSync(csvPath, "utf8");
+  const rows = parseCSV(text);
+  console.log(`  → ${rows.length} PO rows parsed`);
 
   if (rows.length === 0) {
     console.log("No rows to import. Exiting.");

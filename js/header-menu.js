@@ -36,10 +36,6 @@ let cxlCountdownEnabled = false;
 let splitViewEnabled = true;
 
 function loadSplitViewPreference() {
-  if (typeof isApiMode === "function" && isApiMode()) {
-    applySplitViewPreference(true);
-    return;
-  }
   try {
     const stored = localStorage.getItem(scopedStorageKey(SPLIT_VIEW_STORAGE_BASE));
     applySplitViewPreference(stored === null ? true : stored === "1");
@@ -85,10 +81,6 @@ function isSplitViewEnabled() {
 }
 
 function loadCxlCountdownPreference() {
-  if (typeof isApiMode === "function" && isApiMode()) {
-    applyCxlCountdownPreference(false);
-    return;
-  }
   try {
     applyCxlCountdownPreference(localStorage.getItem(scopedStorageKey(CXL_COUNTDOWN_STORAGE_BASE)) === "1");
   } catch {
@@ -252,51 +244,6 @@ function initToolbarKeyboard() {
 
 function updateHeaderMenuChecks() {
   if (typeof updateSettingsUi === "function") updateSettingsUi();
-  updateAppModeMenuLabel();
-  updateTestModeBanner();
-}
-
-function updateAppModeMenuLabel() {
-  const label = document.getElementById("headerMenuAppModeLabel");
-  const icon = document.getElementById("headerMenuAppModeIcon");
-  if (label) label.textContent = isTestMode() ? "Live Mode" : "Test Mode";
-  if (icon) {
-    icon.innerHTML = isTestMode()
-      ? '<circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>'
-      : '<path d="M9 3h6v7.5l4 3.5-4 3.5V21H9v-4.5l-4-3.5 4-3.5V3z"/><path d="M9 3v5.5"/><path d="M15 3v5.5"/>';
-  }
-}
-
-function updateTestModeBanner() {
-  const banner = document.getElementById("testModeBanner");
-  const active = isTestMode();
-  if (banner) banner.hidden = !active;
-  document.body.classList.toggle("test-mode-active", active);
-}
-
-function toggleAppMode() {
-  if (typeof isAppSaving === "function" && isAppSaving()) return;
-
-  if (!isTestMode()) {
-    if (!isTestUrlConfigured()) {
-      showIndicator("Test server URL not configured in js/config.js", "error");
-      return;
-    }
-    if (!confirm("Switch to Test Mode? You will leave production data and use the test database.")) {
-      return;
-    }
-  } else if (!confirm("Switch to Live Mode? You will return to production data.")) {
-    return;
-  }
-
-  closeHeaderMenu();
-  try {
-    localStorage.setItem(APP_MODE_STORAGE_KEY, isTestMode() ? "live" : "test");
-  } catch {
-    showIndicator("Could not save mode preference", "error");
-    return;
-  }
-  location.reload();
 }
 
 function closeHeaderMenu() {
@@ -392,11 +339,6 @@ function initHeaderMenu() {
     e.stopPropagation();
     closeHeaderMenu();
     if (typeof openSettingsModal === "function") openSettingsModal("general");
-  });
-
-  document.getElementById("headerMenuToggleAppMode")?.addEventListener("click", e => {
-    e.stopPropagation();
-    toggleAppMode();
   });
 
   document.addEventListener("click", e => {

@@ -70,11 +70,6 @@ body {
   z-index: 100;
 }
 
-body.test-mode-active .app-header {
-  border-bottom-color: #f59e0b;
-  box-shadow: inset 0 -2px 0 #fbbf24;
-}
-
 .app-title-nav {
   display: flex;
   align-items: stretch;
@@ -5696,7 +5691,7 @@ td.n41-status-mismatch,
   color: #1a1a18;
 }
 
-/* Email-style dark header (mirrors templates/email-exf.html) */
+/* Email-style dark header */
 .shipment-modal-card .modal-header.email-header-request {
   background-color: #2d2d29;
   color: #ffffff;
@@ -5997,7 +5992,7 @@ td.n41-status-mismatch,
   gap: 0;
 }
 
-/* ── Email-template form styles (mirrors templates/email-styles.html) ── */
+/* ── Email-style form styles ── */
 /* Form area: email colors/typeface; meta + notes stack in the left column */
 .shipment-modal-left .email-info-row {
   flex-direction: column;
@@ -7128,6 +7123,46 @@ td.n41-status-mismatch,
 .settings-date-format-select {
   min-width: 148px;
   font-family: var(--font-mono);
+}
+
+.settings-asn-default-email-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 980px;
+}
+
+.settings-asn-default-email-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(300px, 1.6fr) minmax(300px, 1.6fr);
+  gap: 14px;
+  align-items: end;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.settings-asn-default-email-buyer {
+  padding-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.settings-email-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.settings-email-input {
+  min-height: 58px;
+  width: 100%;
+  line-height: 1.35;
+  resize: vertical;
 }
 
 .settings-round-switch {

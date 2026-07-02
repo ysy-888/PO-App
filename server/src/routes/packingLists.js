@@ -2,7 +2,6 @@
  * POST /api/packing-list/save   — upsert packing list + cartons + sync PO fields
  * POST /api/packing-list/delete — delete packing list + cartons
  *
- * Mirrors savePackingListCore_ / handleDeletePackingList in apps-script.gs.
  * Print/PDF is generated on the API server (packingListPrint module).
  */
 

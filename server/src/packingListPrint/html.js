@@ -157,28 +157,34 @@ export function createPackingHtmlBuilder(ctx) {
     return toQtyNumber(row["Actual Qty"]);
   }
 
-  function buildPlPrintPoDetailsHtml(row, activeCartons) {
+  function buildPlPrintPoDetailsHtml(row, activeCartons, { showInternalPoFields = true } = {}) {
     const actQty = plPrintActQtyTotal(row, activeCartons);
     const ctnQty = activeCartons.length || toQtyNumber(row["Ctn Qty"]);
+    const identityDetails = [
+      [showInternalPoFields ? "Buyer PO #" : "Buyer PO", plPrintVal(row["Buyer PO #"])],
+      ["Buyer", plPrintVal(row["Buyer"])],
+    ];
+    if (showInternalPoFields) {
+      identityDetails.unshift(["PO #", plPrintVal(row["PO #"])]);
+      identityDetails.push(["Vendor", plPrintVal(row["Vendor"])]);
+    }
+    const dateDetails = [
+      ["PO Date", plPrintDate(row["PO Date"])],
+      ["EXF Date", plPrintDate(row["EXF Date"] || row["EXF Request Date"] || row["EXF"])],
+      ["Shipment ID", plPrintVal(row["Shipment ID"])],
+    ];
+    if (showInternalPoFields) {
+      dateDetails.splice(2, 0, ["Ship Method", plPrintVal(row["Ship Method"])]);
+    }
     return `<div class="pl-details-block"><p class="pl-section-title">PO Details</p>${plPrintSummaryGridFromColumns([
-      [
-        ["PO #", plPrintVal(row["PO #"])],
-        ["Buyer PO #", plPrintVal(row["Buyer PO #"])],
-        ["Buyer", plPrintVal(row["Buyer"])],
-        ["Vendor", plPrintVal(row["Vendor"])],
-      ],
+      identityDetails,
       [
         ["Style #", plPrintVal(row["Style #"])],
         ["Color", plPrintVal(row["Color"])],
         ["Act Qty", plPrintEsc(String(actQty))],
         ["Ctn Qty", plPrintEsc(String(ctnQty))],
       ],
-      [
-        ["PO Date", plPrintDate(row["PO Date"])],
-        ["EXF Date", plPrintDate(row["EXF Date"] || row["EXF Request Date"] || row["EXF"])],
-        ["Ship Method", plPrintVal(row["Ship Method"])],
-        ["Shipment ID", plPrintVal(row["Shipment ID"])],
-      ],
+      dateDetails,
     ])}</div>`;
   }
 
@@ -252,7 +258,7 @@ ${notesHtml}
 </div>`;
   }
 
-  function buildPlPrintPoSectionHtml(row) {
+  function buildPlPrintPoSectionHtml(row, { showInternalPoFields = true } = {}) {
     const poNum = plPrintVal(row["PO #"]);
     const style = plPrintVal(row["Style #"]);
     const color = plPrintVal(row["Color"]);
@@ -270,13 +276,13 @@ ${notesHtml}
         <div class="pl-header-title">Packing List</div>
       </td>
       <td align="right">
-        <div class="pl-header-po">PO #${poNum}</div>
+        ${showInternalPoFields ? `<div class="pl-header-po">PO #${poNum}</div>` : ""}
         ${styleSubtitle}
       </td>
     </tr>
   </table>
   <div class="pl-body">
-    ${buildPlPrintPoDetailsHtml(row, activeCartons)}
+    ${buildPlPrintPoDetailsHtml(row, activeCartons, { showInternalPoFields })}
     ${buildPlPrintPackingListHtml(row)}
   </div>
 </div>`;
@@ -306,6 +312,7 @@ ${notesHtml}
     typeDate = "",
     requestDate = "",
     requestId = "",
+    showInternalPoFields = true,
   } = {}) {
     const label = String(titleLabel ?? "").trim() || "Packing List";
     const typeDateLabel = plPrintTitleTypeDateLabel(titlePageType);
@@ -320,7 +327,7 @@ ${notesHtml}
     const totalWeight = rows.reduce((sum, row) => sum + plPrintWeightForPo(row), 0);
 
     const isAsnTitlePage = titlePageType === "ASN";
-    const labelColspan = isAsnTitlePage ? 6 : 5;
+    const labelColspan = (isAsnTitlePage ? 6 : 5) - (showInternalPoFields ? 0 : 1);
 
     const tableRows = rows.map((row, i) => {
       const ctnQty = plPrintCtnQtyForPo(row);
@@ -328,9 +335,12 @@ ${notesHtml}
       const buyerPoCell = isAsnTitlePage
         ? `<td class="pl-center">${plPrintVal(row["Buyer PO #"])}</td>`
         : "";
+      const poCell = showInternalPoFields
+        ? `<td class="pl-center">${plPrintVal(row["PO #"])}</td>`
+        : "";
       return `<tr>
       <td class="pl-center">${i + 1}</td>
-      <td class="pl-center">${plPrintVal(row["PO #"])}</td>
+      ${poCell}
       ${buyerPoCell}
       <td class="pl-center">${plPrintVal(row["Style #"])}</td>
       <td class="pl-center">${plPrintVal(row["Color"])}</td>
@@ -377,8 +387,8 @@ ${notesHtml}
       <thead>
         <tr>
           <th class="pl-center">#</th>
-          <th class="pl-center">PO #</th>
-          ${isAsnTitlePage ? '<th class="pl-center">Buyer PO #</th>' : ""}
+          ${showInternalPoFields ? '<th class="pl-center">PO #</th>' : ""}
+          ${isAsnTitlePage ? `<th class="pl-center">${showInternalPoFields ? "Buyer PO #" : "Buyer PO"}</th>` : ""}
           <th class="pl-center">Style #</th>
           <th class="pl-center">Color</th>
           <th class="pl-center">Buyer</th>
@@ -460,15 +470,16 @@ ${notesHtml}
       typeDate = "",
       requestDate = "",
       requestId = "",
+      showInternalPoFields = true,
     } = {}) {
       const rows = poNumbers
         .map(po => ctx.getPoRow(po))
         .filter(Boolean);
       if (rows.length === 0) return "<p>No POs found.</p>";
       const titlePage = includeTitlePage
-        ? buildPlPrintTitlePageHtml(rows, { titleLabel, titlePageType, typeDate, requestDate, requestId })
+        ? buildPlPrintTitlePageHtml(rows, { titleLabel, titlePageType, typeDate, requestDate, requestId, showInternalPoFields })
         : "";
-      return plPrintPageStyles() + titlePage + rows.map(row => buildPlPrintPoSectionHtml(row)).join("\n");
+      return plPrintPageStyles() + titlePage + rows.map(row => buildPlPrintPoSectionHtml(row, { showInternalPoFields })).join("\n");
     },
 
     buildCartonLabelsPrintHtml(poNumbers, labelInputs) {

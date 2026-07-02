@@ -314,35 +314,19 @@ async function resendExfRequestEmail(requestId) {
   exfRequestOpInProgress = true;
   showIndicator(`Resending EXF email${ELLIPSIS}`, "");
   try {
-    if (isDemoMode()) {
-      const request = allExfRequests.find(r => getExfRequestRecordId(r) === requestId);
-      if (request) {
-        request["Email Status"] = "Sent";
-        request["Email Error"] = "";
-        request["Email Sent At"] = formatDateToYmd(new Date());
-        request["Last Email Attempt At"] = formatDateToYmd(new Date());
-      }
+    const json = await postApi("/api/requests/exf/resend-email", { exfRequestId: requestId });
+    if (!json.success) throw new Error(json.error);
+    const request = allExfRequests.find(r => getExfRequestRecordId(r) === requestId);
+    if (request) {
+      request["Email Status"] = json.emailSent ? "Sent" : "Failed";
+      request["Email Error"] = json.emailError ?? "";
+      if (json.emailSent) request["Email Sent At"] = formatDateToYmd(new Date());
+      request["Last Email Attempt At"] = formatDateToYmd(new Date());
       applyExfRequestFilters();
-    } else {
-      const json = (typeof isApiMode === "function" && isApiMode())
-        ? await postApi("/api/requests/exf/resend-email", { exfRequestId: requestId })
-        : await postAppsScript({
-            action: "resendExfRequestEmail",
-            exfRequestId: requestId,
-          });
-      if (!json.success) throw new Error(json.error);
-      const request = allExfRequests.find(r => getExfRequestRecordId(r) === requestId);
-      if (request) {
-        request["Email Status"] = json.emailSent ? "Sent" : "Failed";
-        request["Email Error"] = json.emailError ?? "";
-        if (json.emailSent) request["Email Sent At"] = formatDateToYmd(new Date());
-        request["Last Email Attempt At"] = formatDateToYmd(new Date());
-        applyExfRequestFilters();
-      }
-      if (!json.emailSent) {
-        showIndicator(`EXF email not sent: ${json.emailError || "Missing vendor email"}`, "error");
-        return;
-      }
+    }
+    if (!json.emailSent) {
+      showIndicator(`EXF email not sent: ${json.emailError || "Missing vendor email"}`, "error");
+      return;
     }
     showIndicator(`EXF email sent ${CHECK_MARK}`, "success");
   } catch (err) {
@@ -1020,45 +1004,27 @@ async function submitExfRequest() {
   let emailWarning = "";
 
   try {
-    if (isDemoMode()) {
-      applyExfRequestCreatedLocally(
-        generateDemoExfRequestId(),
-        poNumbers,
-        exfDate,
-        memos,
-        shipMethods,
-        data["Vendor Email"],
-        { cc: data[EXF_REQ_CC_FIELD], exfReqNotes, vendor }
-      );
-    } else {
-      const json = (typeof isApiMode === "function" && isApiMode())
-        ? await postApi("/api/requests/exf/create", {
-            poNumbers, exfDate, exfReqNotes,
-            vendorEmail: data["Vendor Email"], vendorCc: data[EXF_REQ_CC_FIELD],
-            memos, shipMethods,
-          })
-        : await postAppsScript({
-            action: "exfRequest", poNumbers, exfDate, exfReqNotes,
-            vendorEmail: data["Vendor Email"], vendorCc: data[EXF_REQ_CC_FIELD],
-            memos, shipMethods,
-          });
-      if (!json.success) throw new Error(json.error || json.emailError || "EXF request failed");
-      applyExfRequestCreatedLocally(
-        json.exfRequestId,
-        poNumbers,
-        exfDate,
-        memos,
-        shipMethods,
-        data["Vendor Email"],
-        { cc: data[EXF_REQ_CC_FIELD], exfReqNotes, vendor }
-      );
-      if (json.request) {
-        const request = allExfRequests.find(r => getExfRequestRecordId(r) === json.exfRequestId);
-        if (request) Object.assign(request, json.request);
-        applyExfRequestFilters();
-      }
-      if (json.emailSent === false) emailWarning = json.emailError || "Unknown email error";
+    const json = await postApi("/api/requests/exf/create", {
+      poNumbers, exfDate, exfReqNotes,
+      vendorEmail: data["Vendor Email"], vendorCc: data[EXF_REQ_CC_FIELD],
+      memos, shipMethods,
+    });
+    if (!json.success) throw new Error(json.error || json.emailError || "EXF request failed");
+    applyExfRequestCreatedLocally(
+      json.exfRequestId,
+      poNumbers,
+      exfDate,
+      memos,
+      shipMethods,
+      data["Vendor Email"],
+      { cc: data[EXF_REQ_CC_FIELD], exfReqNotes, vendor }
+    );
+    if (json.request) {
+      const request = allExfRequests.find(r => getExfRequestRecordId(r) === json.exfRequestId);
+      if (request) Object.assign(request, json.request);
+      applyExfRequestFilters();
     }
+    if (json.emailSent === false) emailWarning = json.emailError || "Unknown email error";
     showIndicator(
       emailWarning ? `EXF requested, but email not sent: ${emailWarning}` : `EXF requested and email sent ${CHECK_MARK}`,
       emailWarning ? "error" : "success"
@@ -1069,10 +1035,6 @@ async function submitExfRequest() {
     exfRequestOpInProgress = false;
     endToolbarCreatePending();
   }
-}
-
-function generateDemoExfRequestId() {
-  return `EXF-${String(allExfRequests.length + 1).padStart(4, "0")}`;
 }
 
 function applyExfRequestCreatedLocally(
@@ -1123,21 +1085,6 @@ function applyExfRequestCreatedLocally(
   applyFilters();
   applyExfRequestFilters();
   updateExfRequestButton();
-}
-
-function demoExfRequest(poNumbers, exfDate, memos, shipMethods, vendorEmail = "demo@example.com", { cc = "", exfReqNotes = "" } = {}) {
-  const rows = poNumbers
-    .map(poNumber => allRows.find(r => String(r["PO #"]) === String(poNumber)))
-    .filter(Boolean);
-  applyExfRequestCreatedLocally(
-    generateDemoExfRequestId(),
-    poNumbers,
-    exfDate,
-    memos,
-    shipMethods,
-    vendorEmail,
-    { cc, exfReqNotes, vendor: getExfRequestVendorForRows(rows) }
-  );
 }
 
 function openCreateShipmentFromExfRequest() {

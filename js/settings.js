@@ -1,7 +1,121 @@
 /** Settings modal: General preferences and vendor portal links. */
 
 let settingsSectionId = "general";
-const vendorPortalLinkCache = new Map();
+const ASN_DEFAULT_EMAIL_STORAGE_BASE = "asnDefaultEmailAddresses";
+const ASN_DEFAULT_EMAIL_BUYERS = [
+  {
+    key: "lulusFashionLounge",
+    name: "Lulu's Fashion Lounge",
+    aliases: ["lulu's fashion lounge", "lulus fashion lounge", "lulus"],
+  },
+  {
+    key: "12thTribe",
+    name: "12th Tribe",
+    aliases: ["12th tribe"],
+  },
+];
+let asnDefaultEmailAddresses = normalizeAsnDefaultEmailAddresses();
+
+function createEmptyAsnDefaultEmailAddresses() {
+  return ASN_DEFAULT_EMAIL_BUYERS.reduce((acc, buyer) => {
+    acc[buyer.key] = { email: "", cc: "" };
+    return acc;
+  }, {});
+}
+
+function normalizeAsnDefaultEmailAddresses(value = {}) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const normalized = createEmptyAsnDefaultEmailAddresses();
+  ASN_DEFAULT_EMAIL_BUYERS.forEach(buyer => {
+    const entry = source[buyer.key] && typeof source[buyer.key] === "object" ? source[buyer.key] : {};
+    normalized[buyer.key] = {
+      email: String(entry.email ?? "").trim(),
+      cc: String(entry.cc ?? "").trim(),
+    };
+  });
+  return normalized;
+}
+
+function loadAsnDefaultEmailAddressesPreference() {
+  try {
+    const raw = localStorage.getItem(scopedStorageKey(ASN_DEFAULT_EMAIL_STORAGE_BASE));
+    applyAsnDefaultEmailAddressesPreference(raw ? JSON.parse(raw) : {});
+  } catch {
+    applyAsnDefaultEmailAddressesPreference();
+  }
+}
+
+function applyAsnDefaultEmailAddressesPreference(value = {}) {
+  asnDefaultEmailAddresses = normalizeAsnDefaultEmailAddresses(value);
+  updateSettingsAsnDefaultEmailsUi();
+  return getAsnDefaultEmailAddresses();
+}
+
+function saveAsnDefaultEmailAddressesPreference() {
+  const payload = getAsnDefaultEmailAddresses();
+  try {
+    localStorage.setItem(scopedStorageKey(ASN_DEFAULT_EMAIL_STORAGE_BASE), JSON.stringify(payload));
+  } catch {
+    /* ignore storage failures */
+  }
+  if (typeof persistUserPreferencePatch === "function") {
+    persistUserPreferencePatch({ asnDefaultEmailAddresses: payload });
+  }
+}
+
+function getAsnDefaultEmailAddresses() {
+  return normalizeAsnDefaultEmailAddresses(asnDefaultEmailAddresses);
+}
+
+function normalizeAsnBuyerName(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\u2019/g, "'")
+    .replace(/\s+/g, " ");
+}
+
+function getAsnDefaultEmailAddressForBuyer(buyerName) {
+  const buyerKey = normalizeAsnBuyerName(buyerName);
+  if (!buyerKey) return { email: "", cc: "" };
+
+  const match = ASN_DEFAULT_EMAIL_BUYERS.find(buyer => {
+    const names = [buyer.name, ...buyer.aliases].map(normalizeAsnBuyerName);
+    return names.includes(buyerKey);
+  });
+  if (!match) return { email: "", cc: "" };
+
+  return { ...getAsnDefaultEmailAddresses()[match.key] };
+}
+
+function updateSettingsAsnDefaultEmailsUi() {
+  const values = getAsnDefaultEmailAddresses();
+  document.querySelectorAll("[data-asn-default-email-buyer]").forEach(row => {
+    const key = row.dataset.asnDefaultEmailBuyer;
+    const entry = values[key] ?? { email: "", cc: "" };
+    row.querySelectorAll("[data-asn-default-email-field]").forEach(input => {
+      const field = input.dataset.asnDefaultEmailField;
+      input.value = entry[field] ?? "";
+    });
+  });
+}
+
+function initSettingsAsnDefaultEmails() {
+  document.querySelectorAll("[data-asn-default-email-buyer]").forEach(row => {
+    const key = row.dataset.asnDefaultEmailBuyer;
+    row.querySelectorAll("[data-asn-default-email-field]").forEach(input => {
+      input.addEventListener("change", () => {
+        const field = input.dataset.asnDefaultEmailField;
+        if (field !== "email" && field !== "cc") return;
+        const next = getAsnDefaultEmailAddresses();
+        if (!next[key]) return;
+        next[key][field] = String(input.value ?? "").trim();
+        applyAsnDefaultEmailAddressesPreference(next);
+        saveAsnDefaultEmailAddressesPreference();
+      });
+    });
+  });
+}
 
 function getDistinctVendorsFromRows() {
   return [...new Set(
@@ -33,6 +147,7 @@ function updateSettingsUi() {
   updateSettingsCountdownUi();
   updateSettingsSplitViewUi();
   updateSettingsDateFormatUi();
+  updateSettingsAsnDefaultEmailsUi();
   if (typeof updateVendorSubmitModeCheck === "function") updateVendorSubmitModeCheck();
   if (typeof updateSettingsVendorSubmissionsVisibility === "function") {
     updateSettingsVendorSubmissionsVisibility();
@@ -90,112 +205,6 @@ function selectSettingsSection(sectionId) {
   if (soCancel) soCancel.hidden = !isSoEdit;
   if (sectionId === "edit-table" && typeof prepareEditTableDraft === "function") prepareEditTableDraft();
   if (sectionId === "edit-so-table" && typeof prepareSoEditTableDraft === "function") prepareSoEditTableDraft();
-  if (sectionId === "vendor-portal") renderVendorPortalLinksList();
-}
-
-function renderVendorPortalLinksList() {
-  const list = document.getElementById("settingsVendorLinksList");
-  if (!list) return;
-
-  if (isDemoMode()) {
-    list.innerHTML = '<p class="settings-empty">Vendor links are not available in demo mode.</p>';
-    return;
-  }
-
-  const vendors = getDistinctVendorsFromRows();
-  if (vendors.length === 0) {
-    list.innerHTML = '<p class="settings-empty">No vendors found. Refresh PO data to load vendors from your sheet.</p>';
-    return;
-  }
-
-  list.innerHTML = vendors.map(vendor => {
-    const cachedUrl = vendorPortalLinkCache.get(vendor) ?? "";
-    const hasUrl = Boolean(cachedUrl);
-    return (
-      `<div class="settings-vendor-row" data-vendor="${escapeHtml(vendor)}">` +
-      `<div class="settings-vendor-row-main">` +
-      `<span class="settings-vendor-name">${escapeHtml(vendor)}</span>` +
-      `<div class="settings-vendor-actions">` +
-      `<button type="button" class="btn btn-secondary settings-vendor-generate-btn">Generate link</button>` +
-      `<button type="button" class="btn btn-secondary settings-vendor-copy-btn"${hasUrl ? "" : " hidden"}>Copy link</button>` +
-      `</div>` +
-      `</div>` +
-      `<input type="text" class="settings-vendor-url" readonly${hasUrl ? "" : " hidden"} value="${escapeHtml(cachedUrl)}" aria-label="Portal link for ${escapeHtml(vendor)}" />` +
-      `</div>`
-    );
-  }).join("");
-
-  list.querySelectorAll(".settings-vendor-row").forEach(row => {
-    const vendor = row.dataset.vendor;
-    row.querySelector(".settings-vendor-generate-btn")?.addEventListener("click", () => {
-      generateVendorPortalLinkForVendor(vendor, row);
-    });
-    row.querySelector(".settings-vendor-copy-btn")?.addEventListener("click", () => {
-      copyVendorPortalLink(row, vendor);
-    });
-  });
-}
-
-async function copyVendorPortalLink(row, vendor) {
-  const input = row.querySelector(".settings-vendor-url");
-  const url = String(input?.value ?? vendorPortalLinkCache.get(vendor) ?? "").trim();
-  if (!url) {
-    showIndicator("Generate a link first", "error");
-    return;
-  }
-  try {
-    await navigator.clipboard.writeText(url);
-    showIndicator(`Link copied for ${vendor} ${CHECK_MARK}`, "success");
-  } catch {
-    input?.focus();
-    input?.select();
-    showIndicator("Copy the link from the field below", "");
-  }
-}
-
-function showVendorLinkInRow(row, vendor, url) {
-  vendorPortalLinkCache.set(vendor, url);
-  const input = row.querySelector(".settings-vendor-url");
-  const copyBtn = row.querySelector(".settings-vendor-copy-btn");
-  if (input) {
-    input.value = url;
-    input.hidden = false;
-  }
-  if (copyBtn) copyBtn.hidden = false;
-}
-
-async function generateVendorPortalLinkForVendor(vendor, row) {
-  if (isDemoMode()) {
-    showIndicator("Vendor links are not available in demo mode", "error");
-    return;
-  }
-
-  const generateBtn = row.querySelector(".settings-vendor-generate-btn");
-  if (generateBtn) {
-    generateBtn.disabled = true;
-    generateBtn.textContent = `Generating${ELLIPSIS}`;
-  }
-
-  showIndicator(`Generating link for ${vendor}${ELLIPSIS}`, "");
-  try {
-    const json = await postAppsScript({ action: "createVendorPortalLink", vendor, webAppUrl: getAppsScriptUrl() });
-    if (!json.success) throw new Error(json.error);
-    const url = json.url;
-    showVendorLinkInRow(row, vendor, url);
-    try {
-      await navigator.clipboard.writeText(url);
-      showIndicator(`Link copied for ${json.vendor} ${CHECK_MARK}`, "success");
-    } catch {
-      showIndicator(`Link generated for ${json.vendor} ${CHECK_MARK}`, "success");
-    }
-  } catch (err) {
-    showIndicator("Failed to generate link: " + err.message, "error");
-  } finally {
-    if (generateBtn) {
-      generateBtn.disabled = false;
-      generateBtn.textContent = "Generate link";
-    }
-  }
 }
 
 function openSettingsModal(sectionId = "general") {
@@ -219,6 +228,7 @@ function closeSettingsModal() {
 function initSettings() {
   buildSettingsDateFormatSelect();
   initSettingsVendorSubmitMode();
+  initSettingsAsnDefaultEmails();
 
   document.getElementById("settingsCloseBtn")?.addEventListener("click", closeSettingsModal);
 

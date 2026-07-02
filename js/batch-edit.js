@@ -129,7 +129,7 @@ function buildBatchEditItems(rows, requested) {
       }
     }
 
-    const sheetUpdates = filterAppsScriptPoUpdates(updates);
+    const sheetUpdates = filterPoUpdatePayload(updates);
     if (Object.keys(sheetUpdates).length > 0) {
       localUpdates.push({ row, updates: sheetUpdates });
     }
@@ -186,15 +186,8 @@ async function submitBatchEdit() {
 
   try {
     setAppSaving(true, `Updating ${items.length} POs...`);
-    if (!isDemoMode()) {
-      let json;
-      if (typeof isApiMode === "function" && isApiMode()) {
-        json = await postApi("/api/po/batch-update", { items });
-      } else {
-        json = await postAppsScript({ action: "batchUpdatePos", items });
-      }
-      if (!json.success) throw new Error(json.error || "Batch edit failed");
-    }
+    const json = await postApi("/api/po/batch-update", { items });
+    if (!json.success) throw new Error(json.error || "Batch edit failed");
 
     applyBatchEditUpdatesLocally(localUpdates);
     resetLocalSelectedState(allRows);
@@ -203,10 +196,7 @@ async function submitBatchEdit() {
     applyFilters();
     if (typeof updateToolbarRequestButtons === "function") updateToolbarRequestButtons();
     setAppSaving(false);
-    const message = isDemoMode()
-      ? "Demo mode - changes not saved to sheet."
-      : getBatchEditSuccessMessage(items.length, skippedEdits);
-    showIndicator(message, isDemoMode() ? "" : "success");
+    showIndicator(getBatchEditSuccessMessage(items.length, skippedEdits), "success");
   } catch (err) {
     setBatchEditFooterMessage("Batch edit failed: " + err.message, "error");
   } finally {

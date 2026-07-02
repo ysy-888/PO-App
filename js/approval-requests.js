@@ -613,34 +613,22 @@ async function submitApproval() {
   let emailWarning = "";
 
   try {
-    if (isDemoMode()) {
-      if (isEdit) {
-        applyApprovalUpdatedLocally(savedRow[APPROVAL_ID_FIELD_FE], data, poNumber);
-      } else {
-        applyApprovalCreatedLocally(generateDemoApprovalId(), poNumber, data);
-      }
+    if (isEdit) {
+      const newStatus = String(data[APPROVAL_STATUS_FIELD_FE] ?? "").trim();
+      const json = await postApi("/api/requests/approval/update", { approvalId: savedRow[APPROVAL_ID_FIELD_FE], status: newStatus });
+      if (!json.success) throw new Error(json.error || "Failed to update approval.");
+      applyApprovalUpdatedLocally(savedRow[APPROVAL_ID_FIELD_FE], { ...data, [APPROVAL_STATUS_FIELD_FE]: newStatus }, poNumber, json.poUpdates);
     } else {
-      if (isEdit) {
-        const newStatus = String(data[APPROVAL_STATUS_FIELD_FE] ?? "").trim();
-        const json = (typeof isApiMode === "function" && isApiMode())
-          ? await postApi("/api/requests/approval/update", { approvalId: savedRow[APPROVAL_ID_FIELD_FE], status: newStatus })
-          : await postAppsScript({ action: "updateApproval", approvalId: savedRow[APPROVAL_ID_FIELD_FE], status: newStatus });
-        if (!json.success) throw new Error(json.error || "Failed to update approval.");
-        applyApprovalUpdatedLocally(savedRow[APPROVAL_ID_FIELD_FE], { ...data, [APPROVAL_STATUS_FIELD_FE]: newStatus }, poNumber, json.poUpdates);
-      } else {
-        data["Request Date"] = formatDateToYmd(new Date());
-        const json = (typeof isApiMode === "function" && isApiMode())
-          ? await postApi("/api/requests/approval/create", { poNumber, approval: data })
-          : await postAppsScript({ action: "createApproval", poNumber, approval: data });
-        if (!json.success) throw new Error(json.error || "Approval request failed.");
-        applyApprovalCreatedLocally(json.approvalId, poNumber, data);
-        if (json.request) {
-          const approval = getApprovalById(json.approvalId);
-          if (approval) Object.assign(approval, json.request);
-          applyApprovalFilters();
-        }
-        if (json.emailSent === false) emailWarning = json.emailError || "Unknown email error";
+      data["Request Date"] = formatDateToYmd(new Date());
+      const json = await postApi("/api/requests/approval/create", { poNumber, approval: data });
+      if (!json.success) throw new Error(json.error || "Approval request failed.");
+      applyApprovalCreatedLocally(json.approvalId, poNumber, data);
+      if (json.request) {
+        const approval = getApprovalById(json.approvalId);
+        if (approval) Object.assign(approval, json.request);
+        applyApprovalFilters();
       }
+      if (json.emailSent === false) emailWarning = json.emailError || "Unknown email error";
     }
     showIndicator(
       isEdit
@@ -654,15 +642,6 @@ async function submitApproval() {
     approvalOpInProgress = false;
     if (!isEdit) endToolbarCreatePending();
   }
-}
-
-function generateDemoApprovalId() {
-  let max = 0;
-  allApprovals.forEach(a => {
-    const m = /^APR-(\d+)$/.exec(String(a[APPROVAL_ID_FIELD_FE] ?? ""));
-    if (m) max = Math.max(max, Number(m[1]));
-  });
-  return `APR-${String(max + 1).padStart(4, "0")}`;
 }
 
 function applyApprovalCreatedLocally(approvalId, poNumber, data) {
@@ -703,20 +682,6 @@ function applyApprovalUpdatedLocally(approvalId, data, poNumber, poUpdates) {
         Object.assign(poRow, poUpdates);
         if (typeof syncQtyTotalsForRow === "function") syncQtyTotalsForRow(poRow);
         if (typeof applyFilters === "function") applyFilters();
-      } else if (poRow && isDemoMode()) {
-        // Demo: apply directly from existing approval data
-        const type = String(existing[APPROVAL_TYPE_FIELD_FE] ?? "").trim();
-        if (type === "Extension") {
-          const extDate = String(existing[EXT_CXL_DATE_FIELD_FE] ?? "").trim();
-          if (extDate) poRow["CXL Date"] = extDate;
-        } else if (type === "Shortage" || type === "Overage") {
-          for (let i = 1; i <= 15; i++) {
-            poRow[`PO Unit ${i}`] = toQtyNumber(existing[`Approval Unit ${i}`]) || "";
-          }
-          poRow["PO Qty"] = computePoQtyFromUnits(poRow);
-          if (typeof syncQtyTotalsForRow === "function") syncQtyTotalsForRow(poRow);
-        }
-        if (typeof applyFilters === "function") applyFilters();
       }
     }
   }
@@ -731,12 +696,7 @@ async function resendApprovalRequestEmail(approvalId) {
 
   showIndicator(`Resending${ELLIPSIS}`, "");
   try {
-    if (isDemoMode()) {
-      throw new Error("Not available in demo mode");
-    }
-    const json = (typeof isApiMode === "function" && isApiMode())
-      ? await postApi("/api/requests/approval/resend-email", { approvalId })
-      : await postAppsScript({ action: "resendApprovalRequestEmail", approvalId });
+    const json = await postApi("/api/requests/approval/resend-email", { approvalId });
     if (!json.success) throw new Error(json.error || "Resend failed.");
     approval["Email Status"] = json.emailSent ? "Sent" : "Failed";
     if (json.emailSent) approval["Email Sent At"] = formatDateToYmd(new Date());

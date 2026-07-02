@@ -2,6 +2,7 @@
 
 let chargebacksEnabled = true;
 let vendorSubmissionsEnabled = true;
+let featureSettingsSaveQueue = Promise.resolve();
 
 function isChargebacksFeatureEnabled() {
   return chargebacksEnabled !== false;
@@ -81,15 +82,15 @@ async function saveTenantFeatureSettingsDirectly(patch) {
   }
 
   const client = getSupabaseClient();
-  const { data: settingsRows, error: settingsErr } = await client
+  const tenantId = await getTenantIdForDirectFeatureSave(client);
+  const { data: currentRow, error: settingsErr } = await client
     .from("tenant_settings")
     .select("tenant_id, settings")
-    .limit(1);
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
 
   if (settingsErr) throw settingsErr;
 
-  const currentRow = settingsRows?.[0] || null;
-  const tenantId = await getTenantIdForDirectFeatureSave(client, currentRow);
   const currentSettings = currentRow?.settings || {};
   const mergedSettings = { ...currentSettings, ...patch };
 
@@ -105,12 +106,10 @@ async function saveTenantFeatureSettingsDirectly(patch) {
 }
 
 async function saveTenantFeatureSettings(patch) {
-  if (typeof isApiMode !== "function" || !isApiMode()) {
-    throw new Error("Feature settings require API mode.");
-  }
-
   try {
-    return await postApi("/api/settings/features", patch);
+    const json = await postApi("/api/settings/features", patch);
+    if (!json.success) throw new Error(json.error || "Failed to save feature settings.");
+    return json;
   } catch (apiErr) {
     console.warn("Feature settings API unavailable; saving directly to Supabase.", apiErr);
     try {
@@ -119,6 +118,14 @@ async function saveTenantFeatureSettings(patch) {
       throw new Error(fallbackErr.message || apiErr.message || "Failed to save feature settings.");
     }
   }
+}
+
+function queueTenantFeatureSettingsSave(patch) {
+  const run = featureSettingsSaveQueue
+    .catch(() => {})
+    .then(() => saveTenantFeatureSettings(patch));
+  featureSettingsSaveQueue = run.catch(() => {});
+  return run;
 }
 
 async function setTenantFeatureEnabled(key, enabled) {
@@ -137,7 +144,7 @@ async function setTenantFeatureEnabled(key, enabled) {
   updateFeatureTogglesUi();
 
   try {
-    const json = await saveTenantFeatureSettings({ [key]: enabled });
+    const json = await queueTenantFeatureSettingsSave({ [key]: enabled });
     if (!json.success) throw new Error(json.error);
     const label = key === "chargebacksEnabled" ? "Chargebacks" : "Vendor Submissions";
     showIndicator(`${label}: ${enabled ? "enabled" : "disabled"} ${CHECK_MARK}`, "success");

@@ -166,7 +166,6 @@ router.post("/bulk-upsert", requireAuth, async (req, res) => {
  *
  * Applies multiple field updates across multiple POs in one call.
  * Body: { items: [{ poNumber, updates }, ...] }
- * Mirrors handleBatchUpdatePos in apps-script.gs.
  */
 router.post("/batch-update", requireAuth, async (req, res) => {
   const items = req.body?.items;

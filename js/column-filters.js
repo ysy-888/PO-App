@@ -31,6 +31,9 @@ function getColumnFilterRawValue(col, row) {
     }
     return row[col];
   }
+  if (col === "SO CXL Date" && typeof getSoCxlDateForPo === "function") {
+    return getSoCxlDateForPo(row);
+  }
   return row[col];
 }
 
@@ -747,7 +750,7 @@ const STATUS_BADGE = {
 };
 
 const DATE_FIELDS = new Set([
-  "PO Date","Shipped","ETD","ETA","IHD","EST EXF","EST IHD","CXL Date","Assign Date",
+  "PO Date","Shipped","ETD","ETA","IHD","EST EXF","EST IHD","CXL Date","SO CXL Date","Assign Date",
   "EXF Date",
   "ASN Date","ASN Req Date",
   "Delivery Date","Delivery Req Date",
@@ -763,6 +766,7 @@ const CXL_PROXIMITY_COLS = new Set(["IHD", "EST IHD"]);
 function getDateFieldValue(col, row) {
   if (col === "EST IHD") return calculateEstIhd(row["Ship Method"], row["EST EXF"]);
   if (col === "EXF Date") return row["EXF Date"] ?? row["EXF Request Date"] ?? "";
+  if (col === "SO CXL Date" && typeof getSoCxlDateForPo === "function") return getSoCxlDateForPo(row);
   return row[col] ?? "";
 }
 
@@ -784,10 +788,11 @@ function daysFromToday(ymd) {
 
 function getCxlProximityLevel(ihdYmd, cxlYmd) {
   if (isEmptyValue(ihdYmd) || isEmptyValue(cxlYmd)) return null;
-  const daysUntilCxl = diffCalendarDays(normalizeToYmd(ihdYmd), normalizeToYmd(cxlYmd));
+  const ihd = normalizeToYmd(ihdYmd);
+  const cxl = normalizeToYmd(cxlYmd);
+  const daysUntilCxl = diffCalendarDays(ihd, cxl);
   if (daysUntilCxl == null) return null;
-  if (daysUntilCxl < 0 || daysUntilCxl <= 3) return "danger";
-  if (daysUntilCxl <= 7) return "warning";
+  if (daysUntilCxl < 0) return "danger";
   return null;
 }
 
@@ -835,8 +840,11 @@ function applyDateCellDisplay(el, col, row, { context = "table" } = {}) {
 
   const ymd = normalizeToYmd(rawVal);
   const display = formatDateForDisplay(rawVal);
+  const cxlForProximity = typeof getSoCxlDateForPo === "function"
+    ? getSoCxlDateForPo(row)
+    : "";
   const proximity = CXL_PROXIMITY_COLS.has(col)
-    ? getCxlProximityLevel(ymd, row["CXL Date"])
+    ? getCxlProximityLevel(ymd, cxlForProximity)
     : null;
 
   if (context === "modal") {

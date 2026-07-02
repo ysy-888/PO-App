@@ -5,8 +5,7 @@
  * POST /api/pending-packing-lists/reject   — reject a submission
  *
  * When a submission is approved (and skipCartonSave is false) the cartons JSON
- * in the submission is parsed and saved to packing_lists + packing_cartons,
- * mirroring handleApprovePendingPackingList in apps-script.gs.
+ * in the submission is parsed and saved to packing_lists + packing_cartons.
  */
 
 import { Router } from "express";

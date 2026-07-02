@@ -48,7 +48,7 @@ const SHIPMENT_LINKED_PO_COL_CLASSES = [
 /** Linked PO table column widths (px); Notes column is flexible (null). */
 const SHIPMENT_LINKED_PO_COLUMN_WIDTHS = [52, 72, 120, 88, 120, 120, 58, 58, 58, 92, null];
 
-/** PO fields synced from / cleared with a shipment (matches apps-script.gs SHIPMENT_PO_SYNC_FIELDS). */
+/** PO fields synced from / cleared with a shipment. */
 const SHIPMENT_PO_CLEAR_FIELDS = [
   "Ship Method", "Vessel", "House #", "EXF", "Shipped", "ETD", "ETA", "IHD"
 ];

@@ -146,30 +146,18 @@ async function resendPickupRequestEmail(requestId) {
   pickupRequestOpInProgress = true;
   showIndicator(`Resending pickup email${ELLIPSIS}`, "");
   try {
-    if (isDemoMode()) {
-      const request = allPickupRequests.find(r => String(r[PICKUP_REQUEST_ID_FIELD] ?? "").trim() === requestId);
-      if (request) {
-        request["Email Status"] = "Sent";
-        request["Email Error"] = "";
-        request["Email Sent At"] = formatDateToYmd(new Date());
-      }
+    const json = await postApi("/api/requests/pickup/resend-email", { pickupRequestId: requestId });
+    if (!json.success) throw new Error(json.error);
+    const request = allPickupRequests.find(r => String(r[PICKUP_REQUEST_ID_FIELD] ?? "").trim() === requestId);
+    if (request) {
+      request["Email Status"] = json.emailSent ? "Sent" : "Failed";
+      request["Email Error"] = json.emailError ?? "";
+      if (json.emailSent) request["Email Sent At"] = formatDateToYmd(new Date());
       applyPickupRequestFilters();
-    } else {
-      const json = (typeof isApiMode === "function" && isApiMode())
-        ? await postApi("/api/requests/pickup/resend-email", { pickupRequestId: requestId })
-        : await postAppsScript({ action: "resendPickupRequestEmail", pickupRequestId: requestId });
-      if (!json.success) throw new Error(json.error);
-      const request = allPickupRequests.find(r => String(r[PICKUP_REQUEST_ID_FIELD] ?? "").trim() === requestId);
-      if (request) {
-        request["Email Status"] = json.emailSent ? "Sent" : "Failed";
-        request["Email Error"] = json.emailError ?? "";
-        if (json.emailSent) request["Email Sent At"] = formatDateToYmd(new Date());
-        applyPickupRequestFilters();
-      }
-      if (!json.emailSent) {
-        showIndicator(`Pickup email not sent: ${json.emailError || "Missing email"}`, "error");
-        return;
-      }
+    }
+    if (!json.emailSent) {
+      showIndicator(`Pickup email not sent: ${json.emailError || "Missing email"}`, "error");
+      return;
     }
     showIndicator(`Pickup email sent ${CHECK_MARK}`, "success");
   } catch (err) {
@@ -623,37 +611,20 @@ async function submitPickupRequest() {
   let emailWarning = "";
 
   try {
-    if (isDemoMode()) {
-      if (isEdit) {
-        applyPickupRequestUpdatedLocally(savedRow[PICKUP_REQUEST_ID_FIELD], data);
-      } else {
-        applyPickupRequestCreatedLocally(generateDemoPickupRequestId(), poNumbers, data);
-      }
+    const json = isEdit
+      ? await postApi("/api/requests/pickup/update", { pickupRequestId: savedRow[PICKUP_REQUEST_ID_FIELD], request: data })
+      : await postApi("/api/requests/pickup/create", { poNumbers, request: data });
+    if (!json.success) throw new Error(json.error || "Pickup request failed");
+    if (isEdit) {
+      applyPickupRequestUpdatedLocally(savedRow[PICKUP_REQUEST_ID_FIELD], data);
     } else {
-      let json;
-      if (typeof isApiMode === "function" && isApiMode()) {
-        json = isEdit
-          ? await postApi("/api/requests/pickup/update", { pickupRequestId: savedRow[PICKUP_REQUEST_ID_FIELD], request: data })
-          : await postApi("/api/requests/pickup/create", { poNumbers, request: data });
-      } else {
-        json = await postAppsScript(
-          isEdit
-            ? { action: "updatePickupRequest", pickupRequestId: savedRow[PICKUP_REQUEST_ID_FIELD], request: data }
-            : { action: "createPickupRequest", poNumbers, request: data }
-        );
+      applyPickupRequestCreatedLocally(json.pickupRequestId, poNumbers, data);
+      if (json.request) {
+        const request = allPickupRequests.find(r => String(r[PICKUP_REQUEST_ID_FIELD] ?? "").trim() === json.pickupRequestId);
+        if (request) Object.assign(request, json.request);
+        applyPickupRequestFilters();
       }
-      if (!json.success) throw new Error(json.error || "Pickup request failed");
-      if (isEdit) {
-        applyPickupRequestUpdatedLocally(savedRow[PICKUP_REQUEST_ID_FIELD], data);
-      } else {
-        applyPickupRequestCreatedLocally(json.pickupRequestId, poNumbers, data);
-        if (json.request) {
-          const request = allPickupRequests.find(r => String(r[PICKUP_REQUEST_ID_FIELD] ?? "").trim() === json.pickupRequestId);
-          if (request) Object.assign(request, json.request);
-          applyPickupRequestFilters();
-        }
-        if (json.emailSent === false) emailWarning = json.emailError || "Unknown email error";
-      }
+      if (json.emailSent === false) emailWarning = json.emailError || "Unknown email error";
     }
     showIndicator(
       isEdit
@@ -667,15 +638,6 @@ async function submitPickupRequest() {
     pickupRequestOpInProgress = false;
     if (!isEdit) endToolbarCreatePending();
   }
-}
-
-function generateDemoPickupRequestId() {
-  let max = 0;
-  allPickupRequests.forEach(r => {
-    const m = /^PR-(\d+)$/.exec(String(r[PICKUP_REQUEST_ID_FIELD] ?? ""));
-    if (m) max = Math.max(max, Number(m[1]));
-  });
-  return `PR-${String(max + 1).padStart(4, "0")}`;
 }
 
 function applyPickupRequestCreatedLocally(requestId, poNumbers, data) {
@@ -722,14 +684,6 @@ function applyPickupRequestUpdatedLocally(requestId, data) {
   const existing = getPickupRequestById(requestId);
   if (existing) Object.assign(existing, data);
   applyPickupRequestFilters();
-}
-
-function demoCreateOrUpdatePickupRequest(poNumbers, data, existing) {
-  if (existing?.[PICKUP_REQUEST_ID_FIELD]) {
-    applyPickupRequestUpdatedLocally(existing[PICKUP_REQUEST_ID_FIELD], data);
-  } else {
-    applyPickupRequestCreatedLocally(generateDemoPickupRequestId(), poNumbers, data);
-  }
 }
 
 function renderAssignDateCell(td, row) {

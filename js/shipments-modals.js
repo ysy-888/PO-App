@@ -416,16 +416,10 @@ async function addPosToShipment(poNumbers, { keepPanelOpen = false } = {}) {
   showIndicator(`Adding POs${ELLIPSIS}`, "");
 
   try {
-    if (isDemoMode()) {
-      demoAddPosToShipment(shipmentId, poNumbers, shipmentModalRow);
-    } else {
-      const json = (typeof isApiMode === "function" && isApiMode())
-        ? await postApi("/api/shipments/add-pos", { shipmentId, poNumbers })
-        : await postAppsScript({ action: "addPosToShipment", shipmentId, poNumbers });
-      if (!json.success) throw new Error(json.error);
-      applyPosAddedToShipmentLocally(shipmentId, poNumbers, shipmentModalRow);
-      shipmentModalRow = getShipmentById(shipmentId) ?? shipmentModalRow;
-    }
+    const json = await postApi("/api/shipments/add-pos", { shipmentId, poNumbers });
+    if (!json.success) throw new Error(json.error);
+    applyPosAddedToShipmentLocally(shipmentId, poNumbers, shipmentModalRow);
+    shipmentModalRow = getShipmentById(shipmentId) ?? shipmentModalRow;
     if (keepPanelOpen) {
       shipmentAddPoPanelOpen = true;
       rerenderOpenShipmentModalBody();
@@ -467,30 +461,16 @@ async function removePosFromShipment() {
   showIndicator(`Removing POs${ELLIPSIS}`, "");
 
   try {
-    if (isDemoMode()) {
-      demoRemovePosFromShipment(shipmentId, poNumbers);
-    } else {
-      const json = (typeof isApiMode === "function" && isApiMode())
-        ? await postApi("/api/shipments/remove-pos", { shipmentId, poNumbers })
-        : await postAppsScript({ action: "removePosFromShipment", shipmentId, poNumbers });
-      if (!json.success) throw new Error(json.error);
-      applyPosRemovedFromShipmentLocally(shipmentId, poNumbers);
-      openShipmentDetail(shipmentId);
-    }
+    const json = await postApi("/api/shipments/remove-pos", { shipmentId, poNumbers });
+    if (!json.success) throw new Error(json.error);
+    applyPosRemovedFromShipmentLocally(shipmentId, poNumbers);
+    openShipmentDetail(shipmentId);
     showIndicator(`POs removed ${CHECK_MARK}`, "success");
   } catch (err) {
     showIndicator("Remove failed: " + err.message, "error");
   } finally {
     shipmentOpInProgress = false;
   }
-}
-
-function demoAddPosToShipment(shipmentId, poNumbers, shipment) {
-  applyPosAddedToShipmentLocally(shipmentId, poNumbers, shipment);
-}
-
-function demoRemovePosFromShipment(shipmentId, poNumbers) {
-  applyPosRemovedFromShipmentLocally(shipmentId, poNumbers);
 }
 
 function readShipmentForm(container) {
@@ -629,15 +609,9 @@ async function submitCreateShipment() {
   showIndicator(`Creating shipment${ELLIPSIS}`, "");
 
   try {
-    if (isDemoMode()) {
-      await demoCreateShipment(poNumbers, shipment);
-    } else {
-      const json = (typeof isApiMode === "function" && isApiMode())
-        ? await postApi("/api/shipments/create", { poNumbers, shipment })
-        : await postAppsScript({ action: "createShipment", poNumbers, shipment });
-      if (!json.success) throw new Error(json.error);
-      applyShipmentCreatedLocally(json.shipmentId, poNumbers, shipment);
-    }
+    const json = await postApi("/api/shipments/create", { poNumbers, shipment });
+    if (!json.success) throw new Error(json.error);
+    applyShipmentCreatedLocally(json.shipmentId, poNumbers, shipment);
     showIndicator(`Shipment created ${CHECK_MARK}`, "success");
   } catch (err) {
     showIndicator("Create failed: " + err.message, "error");
@@ -662,14 +636,6 @@ function parseShipmentIdSequence(id) {
 
 function formatShipmentId(sequence) {
   return `SHP-${String(sequence).padStart(4, "0")}`;
-}
-
-function generateDemoShipmentId() {
-  let max = 0;
-  allShipments.forEach(shipment => {
-    max = Math.max(max, parseShipmentIdSequence(shipment[SHIPMENT_ID_FIELD]));
-  });
-  return formatShipmentId(max + 1);
 }
 
 // Serializes shipment write operations so overlapping optimistic updates can't
@@ -754,17 +720,6 @@ function applyShipmentsDeletedLocally(shipmentIds) {
   refreshExfRequestTableIfNeeded();
 }
 
-async function demoCreateShipment(poNumbers, shipment) {
-  const blocked = poNumbers.filter(po => {
-    const row = allRows.find(r => String(r["PO #"]) === String(po));
-    return row && poHasShipment(row);
-  });
-  if (blocked.length > 0) {
-    throw new Error(`${blocked.length} PO(s) already assigned to a shipment`);
-  }
-  applyShipmentCreatedLocally(generateDemoShipmentId(), poNumbers, shipment);
-}
-
 function formatShipmentLinkedPoCell(col, row) {
   let val = row[col];
   if (col === "Actual Qty" && typeof getPackingActualQtyForRow === "function") {
@@ -772,6 +727,10 @@ function formatShipmentLinkedPoCell(col, row) {
   }
   if (col === "Ctn Qty" && typeof getPackingCtnQtyForRow === "function") {
     val = getPackingCtnQtyForRow(row);
+  }
+  if (col === "Weight" && typeof getPackingWeightForPo === "function") {
+    const weight = getPackingWeightForPo(row["PO #"]);
+    return weight > 0 ? `${formatShipmentLinkedPoTotal(weight)} lbs` : EMPTY_DISPLAY;
   }
   if (col === "CXL Date") {
     if (isEmptyValue(val)) return EMPTY_DISPLAY;
@@ -1008,12 +967,8 @@ async function saveShipmentModal() {
   showIndicator(`Saving${ELLIPSIS}`, "");
 
   try {
-    if (!isDemoMode()) {
-      const json = (typeof isApiMode === "function" && isApiMode())
-        ? await postApi("/api/shipments/update", { shipmentId, shipment })
-        : await postAppsScript({ action: "updateShipment", shipmentId, shipment });
-      if (!json.success) throw new Error(json.error);
-    }
+    const json = await postApi("/api/shipments/update", { shipmentId, shipment });
+    if (!json.success) throw new Error(json.error);
     applyShipmentUpdatedLocally(shipmentId, shipment);
     showIndicator(`Saved ${CHECK_MARK}`, "success");
   } catch (err) {
@@ -1041,12 +996,8 @@ async function deleteSelectedShipments() {
   showIndicator(`Deleting${ELLIPSIS}`, "");
 
   try {
-    if (!isDemoMode()) {
-      const json = (typeof isApiMode === "function" && isApiMode())
-        ? await postApi("/api/shipments/delete", { shipmentIds })
-        : await postAppsScript({ action: "deleteShipment", shipmentIds });
-      if (!json.success) throw new Error(json.error);
-    }
+    const json = await postApi("/api/shipments/delete", { shipmentIds });
+    if (!json.success) throw new Error(json.error);
     applyShipmentsDeletedLocally(shipmentIds);
 
     if (openId && shipmentIds.some(id => String(id) === String(openId))) {
@@ -1077,27 +1028,14 @@ async function deleteSelectedChargebacks() {
   showIndicator(`Deleting${ELLIPSIS}`, "");
 
   try {
-    if (isDemoMode()) {
-      demoDeleteChargebacks(chargebackIds);
-    } else {
-      const json = (typeof isApiMode === "function" && isApiMode())
-        ? await postApi("/api/chargebacks/delete", { chargebackIds })
-        : await postAppsScript({ action: "deleteChargeback", chargebackIds });
-      if (!json.success) throw new Error(json.error);
-      await loadData();
-    }
+    const json = await postApi("/api/chargebacks/delete", { chargebackIds });
+    if (!json.success) throw new Error(json.error);
+    await loadData();
 
     showIndicator(`Deleted ${CHECK_MARK}`, "success");
   } catch (err) {
     showIndicator("Delete failed: " + err.message, "error");
   }
-}
-
-function demoDeleteChargebacks(chargebackIds) {
-  const idSet = new Set(chargebackIds.map(id => String(id).trim()));
-  allChargebacks = allChargebacks.filter(chargeback => !idSet.has(getChargebackId(chargeback)));
-  applyChargebackFilters();
-  updateModalIfOpen();
 }
 
 function openCreateShipmentFromSelection() {

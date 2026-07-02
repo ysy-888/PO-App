@@ -348,11 +348,6 @@ async function submitCustomerEmail() {
     return;
   }
 
-  if (isDemoMode()) {
-    showIndicator("Email send is not available in demo mode", "error");
-    return;
-  }
-
   customerEmailOpInProgress = true;
   renderCustomersTable();
   updateCustomerSelectionUi();
@@ -376,15 +371,7 @@ async function submitCustomerEmail() {
   setAppSaving(true, "Sending email…");
 
   try {
-    const json = (typeof isApiMode === "function" && isApiMode())
-      ? await postApi("/api/customers/send-email", { to, subject, body, customer: customerKey })
-      : await postAppsScript({
-          action: "sendCustomerEmail",
-          to,
-          subject,
-          body,
-          customer: customerKey,
-        });
+    const json = await postApi("/api/customers/send-email", { to, subject, body, customer: customerKey });
     if (!json.success) throw new Error(json.error || "Send failed");
     if (json.sentAt) updateLocalCustomerEmailSent(customerKey, json.sentAt);
     closeCustomerEmailModal();
@@ -411,14 +398,7 @@ async function submitCustomerBatchEmail(subject, body) {
   setAppSaving(true, `Sending ${customerKeys.length} emails${ELLIPSIS}`);
 
   try {
-    const json = (typeof isApiMode === "function" && isApiMode())
-      ? await postApi("/api/customers/batch-send-email", { customers: customerKeys, subject, body })
-      : await postAppsScript({
-          action: "batchSendCustomerEmail",
-          customers: customerKeys,
-          subject,
-          body,
-        });
+    const json = await postApi("/api/customers/batch-send-email", { customers: customerKeys, subject, body });
     if (!json.success) throw new Error(json.error || "Batch send failed");
 
     const sentAtByCustomer = json.sentAtByCustomer ?? {};

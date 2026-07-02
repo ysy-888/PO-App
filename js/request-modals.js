@@ -415,19 +415,18 @@ const DELIVERY_PICKUP_LINKED_PO_COLUMNS = [
   { col: "PO #", label: "PO #", cellClass: "shipment-po-cell-id" },
   { col: "Status", label: "Status", cellClass: "shipment-po-cell-status" },
   { col: "Style #", label: "Style #", cellClass: "shipment-po-cell-wrap" },
-  { col: "Vendor", label: "Vendor", cellClass: "shipment-po-cell-vendor" },
   { col: "Buyer", label: "Buyer", cellClass: "shipment-po-cell-buyer" },
-  { col: "Buyer PO #", label: "Buyer PO #", cellClass: "shipment-po-cell-buyer-po" },
+  { col: "Buyer PO #", label: "Buyer PO", cellClass: "shipment-po-cell-buyer-po" },
   { col: "Color", label: "Color", cellClass: "shipment-po-cell-wrap" },
-  { col: "House #", label: "House #", cellClass: "shipment-po-cell-wrap" },
   { col: "PO Qty", label: "Order Qty", cellClass: "shipment-po-cell-qty" },
   { col: "Actual Qty", label: "Actual Qty", cellClass: "shipment-po-cell-qty" },
   { col: "Ctn Qty", label: "Ctn Qty", cellClass: "shipment-po-cell-qty" },
+  { col: "Weight", label: "Weight", cellClass: "shipment-po-cell-qty" },
 ];
 
 /** Select col + linked PO cols for ASN / pickup / delivery request modals. */
 const DELIVERY_PICKUP_LINKED_PO_COLUMN_WIDTHS = [
-  52, 52, 100, 96, 80, 72, 108, 72, 72, 64, 64, 64,
+  52, 52, 100, 80, 72, 108, 72, 64, 64, 64, 76,
 ];
 
 function appendDeliveryPickupLinkedPoColgroup(table) {
@@ -476,6 +475,9 @@ function appendEmailPoTableFooter(table, pos, colDefs, { hasSelectCol = false, q
     } else if (col === "Ctn Qty") {
       td.className = "email-po-footer-cell email-num";
       td.textContent = formatShipmentLinkedPoTotal(totals.ctnQty);
+    } else if (col === "Weight") {
+      td.className = "email-po-footer-cell email-num";
+      td.textContent = totals.totalWeight > 0 ? `${formatShipmentLinkedPoTotal(totals.totalWeight)} lbs` : EMPTY_DISPLAY;
     } else {
       td.className = "email-po-footer-cell";
     }

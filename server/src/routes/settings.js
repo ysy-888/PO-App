@@ -18,6 +18,7 @@ const USER_PREFERENCE_KEYS = new Set([
   "cxlCountdownEnabled",
   "splitViewEnabled",
   "dateFormatId",
+  "asnDefaultEmailAddresses",
   "pageSize",
   "columnLayout",
 ]);
@@ -110,7 +111,7 @@ router.post("/save-column", requireAuth, async (req, res) => {
 
 /**
  * POST /api/settings/user-preferences
- * Body: { cxlCountdownEnabled?, splitViewEnabled?, dateFormatId?, pageSize?, columnLayout? }
+ * Body: { cxlCountdownEnabled?, splitViewEnabled?, dateFormatId?, asnDefaultEmailAddresses?, pageSize?, columnLayout? }
  */
 router.post("/user-preferences", requireAuth, async (req, res) => {
   try {
@@ -130,7 +131,6 @@ router.post("/user-preferences", requireAuth, async (req, res) => {
 /**
  * POST /api/settings/vendor-submit-mode
  * Body: { mode: "review" | "direct" }
- * Mirrors handleSetVendorSubmitMode in apps-script.gs.
  */
 router.post("/vendor-submit-mode", requireAuth, async (req, res) => {
   const mode = String(req.body?.mode ?? "").trim();

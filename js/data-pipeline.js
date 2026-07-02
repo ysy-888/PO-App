@@ -12,6 +12,9 @@ function applyUserSettingsFromServer(settings) {
     if (settings.dateFormatId !== undefined && typeof applyDateFormatPreference === "function") {
       applyDateFormatPreference(settings.dateFormatId);
     }
+    if (settings.asnDefaultEmailAddresses !== undefined && typeof applyAsnDefaultEmailAddressesPreference === "function") {
+      applyAsnDefaultEmailAddressesPreference(settings.asnDefaultEmailAddresses);
+    }
     if (settings.pageSize !== undefined) {
       applyPageSize(settings.pageSize);
     }
@@ -27,118 +30,35 @@ function applyUserSettingsFromServer(settings) {
 async function loadData() {
   showIndicator(`Refreshing${ELLIPSIS}`, "");
   try {
-    if (isDemoMode()) {
-      allRows = DEMO_DATA.map(row => ({ ...row }));
-      allChargebacks = DEMO_CHARGEBACKS.map(normalizeChargeback);
-      allAsnRequests = [];
-      allPackingLists = DEMO_PACKING_LISTS.map(normalizePackingList);
-      allPackingCartons = DEMO_PACKING_CARTONS.map(normalizePackingCarton);
-      allContactRows = typeof DEMO_CONTACTS !== "undefined" ? DEMO_CONTACTS.map(r => ({ ...r })) : [];
-      allVendorEmailRows = allContactRows;
-      allLocationRows = typeof DEMO_LOCATIONS !== "undefined" ? DEMO_LOCATIONS.map(r => ({ ...r })) : [];
-      window.__pendingShipments = DEMO_SHIPMENTS;
-      window.__pendingExfRequests = [];
-      window.__pendingAsnRequests = [];
-      if (typeof onShipmentsDataLoaded === "function") {
-        onShipmentsDataLoaded(DEMO_SHIPMENTS);
-        window.__pendingShipments = null;
-      }
-      if (typeof onExfRequestsDataLoaded === "function") {
-        onExfRequestsDataLoaded([]);
-        window.__pendingExfRequests = null;
-      }
-      if (typeof onDeliveryPickupDataLoaded === "function") {
-        onDeliveryPickupDataLoaded([], []);
-      }
-      if (typeof onAsnRequestsDataLoaded === "function") {
-        onAsnRequestsDataLoaded([]);
-        window.__pendingAsnRequests = null;
-      }
-      if (typeof onPendingPackingListsDataLoaded === "function") {
-        onPendingPackingListsDataLoaded([], "review");
-      }
-      if (typeof onCustomersDataLoaded === "function") {
-        onCustomersDataLoaded(
-          typeof DEMO_CUSTOMERS !== "undefined" ? DEMO_CUSTOMERS.map(r => ({ ...r })) : []
-        );
-      }
-      if (typeof onStylesDataLoaded === "function") {
-        onStylesDataLoaded([]);
-      }
-      if (typeof onSalesOrdersDataLoaded === "function") {
-        onSalesOrdersDataLoaded([]);
-      }
-      buildStylePhotoIndex(DEMO_STYLE_PHOTOS);
-      applyDefaultStatusFilter(STATUS_FILTER_OPEN);
-    } else if (typeof isApiMode === "function" && isApiMode()) {
-      // ── SaaS API path (Supabase backend) ──────────────────
-      const token = typeof getAccessToken === "function" ? getAccessToken() : null;
-      if (!token) {
-        // initAuth() will call loadData() again once the user signs in.
-        showIndicator("Waiting for sign-in…", "");
-        return;
-      }
-      let json;
-      try {
-        const res = await fetch(`${getApiBaseUrl()}/api/app-state`, {
-          headers: { Authorization: `Bearer ${token}` },
-          cache: "no-store",
-        });
-        try {
-          json = await res.json();
-        } catch {
-          throw new Error(res.ok ? "Invalid server response." : `Server error (${res.status}).`);
-        }
-        if (!json.success) throw new Error(json.error || `Server error (${res.status}).`);
-      } catch (err) {
-        if (typeof fetchSupabaseAppState === "function" && shouldFallbackToSupabaseAppState(err.message)) {
-          console.warn("API app-state unavailable; loading via Supabase fallback.", err.message);
-          json = await fetchSupabaseAppState();
-        } else {
-          throw err;
-        }
-      }
-      applyAppStatePayload(json);
-    } else {
-      // ── Apps Script path (original) ───────────────────────
-      const url = new URL(getAppsScriptUrl());
-      url.searchParams.set("_", String(Date.now()));
-      const res = await fetch(url.toString(), { cache: "no-store" });
-      const json = await res.json();
-      if (!json.success) throw new Error(json.error);
-      allRows = json.data.map(normalizeRow);
-      allChargebacks = (json.chargebacks ?? []).map(normalizeChargeback);
-      allAsnRequests = (json.asnRequests ?? []).map(row => ({ ...row }));
-      allPackingLists = (json.packingLists ?? []).map(normalizePackingList);
-      allPackingCartons = (json.packingCartons ?? []).map(normalizePackingCarton);
-      allContactRows = json.contacts ?? json.vendors ?? [];
-      allVendorEmailRows = allContactRows;
-      allLocationRows = json.locations ?? [];
-      buildStylePhotoIndex(json.stylePhotos ?? []);
-      if (typeof onPendingPackingListsDataLoaded === "function") {
-        onPendingPackingListsDataLoaded(json.pendingPackingLists ?? [], json.vendorSubmitMode);
-      }
-      if (typeof onCustomersDataLoaded === "function") {
-        onCustomersDataLoaded(json.customers ?? []);
-      }
-      window.__pendingShipments = json.shipments ?? [];
-      window.__pendingExfRequests = json.exfRequests ?? [];
-      window.__pendingAsnRequests = json.asnRequests ?? [];
-      window.__pendingDeliveryRequests = json.deliveryRequests ?? [];
-      window.__pendingPickupRequests = json.pickupRequests ?? [];
-      window.__pendingApprovals = json.approvals ?? [];
-      if (typeof onShipmentsDataLoaded === "function") {
-        onShipmentsDataLoaded(window.__pendingShipments);
-        window.__pendingShipments = null;
-      }
-      if (typeof onExfRequestsDataLoaded === "function") {
-        onExfRequestsDataLoaded(window.__pendingExfRequests);
-        window.__pendingExfRequests = null;
-      }
-      if (json.defaultColumns) applyDefaultColumnsFromServer(json.defaultColumns);
-      applyDefaultStatusFilterFromServer(json.defaultStatusFilter);
-      saveProgramColumnDefaultToStorage();
+    const token = typeof getAccessTokenAsync === "function"
+      ? await getAccessTokenAsync()
+      : (typeof getAccessToken === "function" ? getAccessToken() : null);
+    if (!token) {
+      // initAuth() will call loadData() again once the user signs in.
+      showIndicator("Waiting for sign-in…", "");
+      return;
     }
+    let json;
+    try {
+      const res = await fetch(`${getApiBaseUrl()}/api/app-state`, {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
+      });
+      try {
+        json = await res.json();
+      } catch {
+        throw new Error(res.ok ? "Invalid server response." : `Server error (${res.status}).`);
+      }
+      if (!json.success) throw new Error(json.error || `Server error (${res.status}).`);
+    } catch (err) {
+      if (typeof fetchSupabaseAppState === "function" && shouldFallbackToSupabaseAppState(err.message)) {
+        console.warn("API app-state unavailable; loading via Supabase fallback.", err.message);
+        json = await fetchSupabaseAppState();
+      } else {
+        throw err;
+      }
+    }
+    applyAppStatePayload(json);
     invalidatePackingIndex();
     migrateAllRows(allRows);
     resetLocalSelectedState(allRows);
@@ -150,18 +70,18 @@ async function loadData() {
     }
     if (typeof onDeliveryPickupDataLoaded === "function") {
       onDeliveryPickupDataLoaded(
-        isDemoMode() ? [] : (window.__pendingDeliveryRequests ?? []),
-        isDemoMode() ? [] : (window.__pendingPickupRequests ?? [])
+        window.__pendingDeliveryRequests ?? [],
+        window.__pendingPickupRequests ?? []
       );
       window.__pendingDeliveryRequests = null;
       window.__pendingPickupRequests = null;
     }
     if (typeof onAsnRequestsDataLoaded === "function") {
-      onAsnRequestsDataLoaded(isDemoMode() ? [] : (window.__pendingAsnRequests ?? []));
+      onAsnRequestsDataLoaded(window.__pendingAsnRequests ?? []);
       window.__pendingAsnRequests = null;
     }
     if (typeof onApprovalsDataLoaded === "function") {
-      onApprovalsDataLoaded(isDemoMode() ? [] : (window.__pendingApprovals ?? []));
+      onApprovalsDataLoaded(window.__pendingApprovals ?? []);
       window.__pendingApprovals = null;
     }
     if (typeof onExfRequestsDataLoaded === "function" && window.__pendingExfRequests) {
@@ -198,7 +118,9 @@ function compareTextFieldValues(aVal, bVal) {
 
 function compareRowsByColumn(col, a, b) {
   if (col === "Status") return statusSortIndex(getRowWorkflowStatus(a)) - statusSortIndex(getRowWorkflowStatus(b));
-  if (DATE_FIELDS.has(col)) return compareDateFieldValues(a[col], b[col]);
+  if (DATE_FIELDS.has(col)) {
+    return compareDateFieldValues(getColumnFilterRawValue(col, a), getColumnFilterRawValue(col, b));
+  }
   if (col === "Actual Qty") {
     const aQty = getPackingActualQtyForRow(a);
     const bQty = getPackingActualQtyForRow(b);
@@ -365,9 +287,6 @@ function normalizePageSizeValue(value) {
 }
 
 function loadPageSizePreference() {
-  if (typeof isApiMode === "function" && isApiMode()) {
-    return DEFAULT_PAGE_SIZE;
-  }
   try {
     const stored = localStorage.getItem(scopedStorageKey(PAGE_SIZE_STORAGE_BASE));
     if (stored == null) return DEFAULT_PAGE_SIZE;
@@ -491,10 +410,6 @@ function getDateFormatOption(id = dateFormatId) {
 }
 
 function loadDateFormatPreference() {
-  if (typeof isApiMode === "function" && isApiMode()) {
-    applyDateFormatPreference(DEFAULT_DATE_FORMAT_ID);
-    return;
-  }
   try {
     const stored = localStorage.getItem(scopedStorageKey(DATE_FORMAT_STORAGE_BASE));
     applyDateFormatPreference(stored ?? DEFAULT_DATE_FORMAT_ID);

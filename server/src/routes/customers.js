@@ -1,7 +1,7 @@
 /**
  * POST /api/customers/bulk-upsert
  *
- * Import/update customer rows.  Mirrors handleBulkUpsertCustomers in apps-script.gs.
+ * Import/update customer rows.
  * Body: { rows: [{ Customer, Address, ... }, ...] }
  */
 

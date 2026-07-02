@@ -1,18 +1,15 @@
 /**
- * js/auth.js — Supabase Auth for the SaaS backend path.
- *
- * Only active when BACKEND === "api" (set in js/config.js).
- * When BACKEND === "appsscript" this file is a no-op: getAccessToken()
- * returns null and the rest of the app uses Apps Script as before.
+ * js/auth.js — Supabase Auth for the API backend path.
  *
  * Loaded as a <script> tag in index.html BEFORE js/data-pipeline.js.
  * Requires the Supabase JS CDN script to be loaded first (see index.html).
  */
 
-/* global supabase, SUPABASE_URL, SUPABASE_ANON_KEY, BACKEND */
+/* global supabase, SUPABASE_URL, SUPABASE_ANON_KEY */
 
 let _supabaseClient = null;
 let _session = null;
+let _authListenerReady = false;
 
 function _getSupabaseClient() {
   if (_supabaseClient) return _supabaseClient;
@@ -25,9 +22,16 @@ function _getSupabaseClient() {
 
 /**
  * Returns the current access token (JWT) for authenticated API calls,
- * or null when not in API mode or not logged in.
+ * or null when not logged in.
  */
 function getAccessToken() {
+  return _session?.access_token ?? null;
+}
+
+async function getAccessTokenAsync() {
+  const client = _getSupabaseClient();
+  const { data: { session } } = await client.auth.getSession();
+  _session = session;
   return _session?.access_token ?? null;
 }
 
@@ -41,6 +45,18 @@ function getAuthSession() {
 /** Exposed for direct Supabase reads (e.g. app-state fallback). */
 function getSupabaseClient() {
   return _getSupabaseClient();
+}
+
+function initAuthStateListener(client) {
+  if (_authListenerReady) return;
+  _authListenerReady = true;
+  client.auth.onAuthStateChange((event, newSession) => {
+    _session = newSession;
+    if (event !== "SIGNED_IN") return;
+    const overlay = document.getElementById("authLoginOverlay");
+    if (overlay) overlay.remove();
+    if (typeof loadData === "function") loadData();
+  });
 }
 
 // ── Login UI ─────────────────────────────────────────────────
@@ -130,17 +146,16 @@ function _showLoginUI() {
 
 /**
  * Called once at app startup (from main.js or DOMContentLoaded).
- * In appsscript mode this is a no-op.
- * In api mode, restores an existing session or shows the login UI.
+ * Restores an existing session or shows the login UI.
  */
 async function initAuth() {
-  if (typeof BACKEND === "undefined" || BACKEND !== "api") return;
   if (!SUPABASE_URL || SUPABASE_URL === "YOUR_SUPABASE_PROJECT_URL_HERE") {
     console.warn("auth.js: SUPABASE_URL not configured. Set it in js/config.js.");
     return;
   }
 
   const client = _getSupabaseClient();
+  initAuthStateListener(client);
 
   // Try to restore an existing session from localStorage.
   const { data: { session } } = await client.auth.getSession();
@@ -152,14 +167,4 @@ async function initAuth() {
 
   // No session — block the UI and show the login form.
   _showLoginUI();
-
-  // Listen for sign-in events (e.g. magic link, OAuth redirect).
-  client.auth.onAuthStateChange((_event, newSession) => {
-    if (newSession) {
-      _session = newSession;
-      const overlay = document.getElementById("authLoginOverlay");
-      if (overlay) overlay.remove();
-      if (typeof loadData === "function") loadData();
-    }
-  });
 }

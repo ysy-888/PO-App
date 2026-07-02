@@ -29,7 +29,7 @@ import {
   buildAsnPickupEmailAttachments,
   buildRequestEmailAttachments,
 } from "../packingListPrint/index.js";
-import { is12thTribeBuyer, normalizeLabelInputsByPo } from "../packingListPrint/helpers.js";
+import { getCartonWeightLbs, is12thTribeBuyer, normalizeLabelInputsByPo } from "../packingListPrint/helpers.js";
 
 const router = Router();
 
@@ -84,7 +84,46 @@ async function fetchPoRows(tenantId, poNumbers) {
     .in("po_number", normalized.map(String));
   if (error) throw error;
   const byPo = new Map((data || []).map(row => [String(row.po_number), row.data || {}]));
-  return normalized.map(po => byPo.get(String(po))).filter(Boolean);
+  const orderedRows = normalized.map(po => byPo.get(String(po))).filter(Boolean);
+  if (orderedRows.length === 0) return [];
+
+  const { data: listData, error: listErr } = await supabase
+    .from("packing_lists")
+    .select("entity_id, data")
+    .eq("tenant_id", tenantId);
+  if (listErr) throw listErr;
+
+  const listIdToPo = new Map();
+  for (const row of listData || []) {
+    const po = String(row.data?.["PO #"] ?? "").trim();
+    if (!po || !normalized.includes(po)) continue;
+    const listId = String(row.data?.["Packing List ID"] ?? row.entity_id ?? "").trim();
+    if (listId) listIdToPo.set(listId, po);
+  }
+
+  const weightsByPo = new Map();
+  const listIds = [...listIdToPo.keys()];
+  if (listIds.length > 0) {
+    const { data: cartonData, error: cartonErr } = await supabase
+      .from("packing_cartons")
+      .select("packing_list_entity_id, data")
+      .eq("tenant_id", tenantId)
+      .in("packing_list_entity_id", listIds);
+    if (cartonErr) throw cartonErr;
+
+    for (const row of cartonData || []) {
+      const listId = String(row.packing_list_entity_id ?? "").trim();
+      const po = listIdToPo.get(listId);
+      if (!po) continue;
+      weightsByPo.set(po, (weightsByPo.get(po) || 0) + getCartonWeightLbs(row.data || {}));
+    }
+  }
+
+  return orderedRows.map(row => {
+    const po = String(row["PO #"] ?? "").trim();
+    const weight = weightsByPo.get(po) || 0;
+    return { ...row, Weight: weight > 0 ? weight : "" };
+  });
 }
 
 function emailFieldsFromResult(result, hasRecipient, now = todayYmd()) {

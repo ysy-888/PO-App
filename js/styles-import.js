@@ -91,9 +91,7 @@ async function importStyleCsvRowsToSheet(rows) {
     setAppSaving(true, `Importing styles… batch ${batchIndex}/${batchCount}`);
 
     const batch = rows.slice(i, i + CSV_IMPORT_BATCH_SIZE);
-    const json = (typeof isApiMode === "function" && isApiMode())
-      ? await postApi("/api/styles/bulk-upsert", { rows: batch })
-      : { success: false, error: "Style import requires API mode." };
+    const json = await postApi("/api/styles/bulk-upsert", { rows: batch });
     if (!json.success) throw new Error(json.error || "Import batch failed");
     inserted += json.inserted || 0;
     updated += json.updated || 0;
@@ -170,16 +168,6 @@ function showStyleImportSummary(result, skippedInFile = 0) {
 async function handleStyleCsvImportFile(file) {
   if (!file) return;
   if (isAppSaving()) return;
-
-  if (isDemoMode()) {
-    showIndicator("CSV import is not available in demo mode", "error");
-    return;
-  }
-
-  if (typeof isApiMode !== "function" || !isApiMode()) {
-    showIndicator("Style import requires API mode.", "error");
-    return;
-  }
 
   closeHeaderMenu();
   setAppSaving(true, "Importing styles…");

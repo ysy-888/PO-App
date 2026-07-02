@@ -1,6 +1,5 @@
 /**
- * Shipment routes — mirrors handleCreate/UpdateShipment and add/removePosFromShipment
- * in apps-script.gs.
+ * Shipment routes.
  *
  * POST /api/shipments/create      — new shipment + link POs
  * POST /api/shipments/update      — edit shipment fields (syncs to linked POs)

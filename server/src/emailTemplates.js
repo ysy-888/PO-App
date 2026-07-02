@@ -60,11 +60,12 @@ const EMAIL_PO_TD_ROW_NUM_STYLE = EMAIL_PO_TD_STYLE + "text-align:center;color:#
 const EMAIL_PO_FOOTER_TD_STYLE = "padding:10px 12px;font-weight:600;background-color:#eef0f3;color:#1a1a18;border-bottom:none;font-size:13px;";
 
 const REQUEST_EMAIL_TABLE_COLUMNS = [
-  "_num", "PO #", "Style #", "Vendor", "Buyer", "Buyer PO #", "Color", "House #", "Actual Qty", "Ctn Qty",
+  "_num", "PO #", "Style #", "Buyer", "Buyer PO #", "Color", "Actual Qty", "Ctn Qty", "Weight",
 ];
 
 const REQUEST_EMAIL_TABLE_LABELS = {
   "Actual Qty": "Unit Qty",
+  "Buyer PO #": "Buyer PO",
 };
 
 const EXF_EMAIL_TABLE_COLUMNS = [
@@ -110,6 +111,16 @@ function formatQtyCell(value) {
   const raw = String(value ?? "").trim();
   if (!raw) return "";
   return formatQty(value);
+}
+
+function formatWeight(value) {
+  const n = toQtyNumber(value);
+  if (n <= 0) return "";
+  const rounded = Math.round(n * 100) / 100;
+  const formatted = Number.isInteger(rounded)
+    ? rounded.toLocaleString()
+    : rounded.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  return `${formatted} lbs`;
 }
 
 function getNote(data, fields) {
@@ -255,6 +266,7 @@ function emailPoThExtraStyle(col, isExf = false) {
   if (col === "_num") return "width:36px;min-width:36px;max-width:36px;text-align:center;";
   if (col === "PO #") return "width:68px;min-width:68px;max-width:76px;";
   if (col === "House #") return "width:84px;min-width:84px;";
+  if (col === "Weight") return "width:76px;min-width:76px;max-width:88px;";
   if (!isExf) return "";
   if (col === "Style #") return "width:72px;min-width:72px;max-width:88px;";
   if (col === "Buyer") return "width:80px;min-width:80px;max-width:96px;";
@@ -268,14 +280,14 @@ function emailPoThExtraStyle(col, isExf = false) {
 function emailPoCellClass(col, isExf = false) {
   if (isExf && col === "EXF Memo") return " class=\"email-memo-cell\"";
   if (col === "_num") return " class=\"email-row-num\"";
-  if (["Actual Qty", "Ctn Qty", "PO Qty"].includes(col)) return " class=\"email-num\"";
+  if (["Actual Qty", "Ctn Qty", "PO Qty", "Weight"].includes(col)) return " class=\"email-num\"";
   return "";
 }
 
 function emailPoCellStyle(col, isExf = false) {
   if (isExf && col === "EXF Memo") return EMAIL_PO_TD_STYLE + "min-width:160px;word-break:break-word;white-space:normal;";
   if (col === "_num") return EMAIL_PO_TD_ROW_NUM_STYLE;
-  if (["Actual Qty", "Ctn Qty", "PO Qty"].includes(col)) return EMAIL_PO_TD_NUM_STYLE;
+  if (["Actual Qty", "Ctn Qty", "PO Qty", "Weight"].includes(col)) return EMAIL_PO_TD_NUM_STYLE;
   return EMAIL_PO_TD_STYLE;
 }
 
@@ -283,6 +295,7 @@ function getPoCellValue(row, col, rowIndex) {
   if (col === "_num") return String(rowIndex + 1);
   if (col.includes("Date")) return formatDate(row[col]);
   if (["Actual Qty", "Ctn Qty", "PO Qty"].includes(col)) return formatQtyCell(row[col]);
+  if (col === "Weight") return formatWeight(row[col]);
   return String(row[col] ?? "");
 }
 
@@ -291,8 +304,9 @@ function computeTotals(rows) {
     totals.unitQty += toQtyNumber(row["Actual Qty"]);
     totals.orderQty += toQtyNumber(row["PO Qty"]);
     totals.ctnQty += toQtyNumber(row["Ctn Qty"]);
+    totals.weight += toQtyNumber(row.Weight);
     return totals;
-  }, { unitQty: 0, orderQty: 0, ctnQty: 0 });
+  }, { unitQty: 0, orderQty: 0, ctnQty: 0, weight: 0 });
 }
 
 function getFooterLabelCol(columns, qtyFooterCol) {
@@ -316,6 +330,9 @@ function buildPoTableFooterRowHtml(columns, totals, { hasCtnQty = true, qtyFoote
     }
     if (col === "Ctn Qty" && hasCtnQty) {
       return `<td class="email-num" style="${base}text-align:right;">${escapeHtml(formatQty(totals.ctnQty))}</td>`;
+    }
+    if (col === "Weight") {
+      return `<td class="email-num" style="${base}text-align:right;">${escapeHtml(formatWeight(totals.weight) || "0 lbs")}</td>`;
     }
     return `<td style="${base}"></td>`;
   }).join("")}</tr>`;
@@ -356,6 +373,7 @@ function buildPoText(rows, columns, labels, { qtyFooterCol = "Actual Qty", hasCt
   const totals = computeTotals(rows);
   const parts = [`${qtyFooterCol === "PO Qty" ? "Order Qty" : "Unit Qty"}: ${formatQty(qtyFooterCol === "PO Qty" ? totals.orderQty : totals.unitQty)}`];
   if (hasCtnQty) parts.push(`Ctn Qty: ${formatQty(totals.ctnQty)}`);
+  if (textColumns.includes("Weight")) parts.push(`Weight: ${formatWeight(totals.weight) || "0 lbs"}`);
   lines.push("");
   lines.push(`Total | ${parts.join(" | ")}`);
   return lines.join("\n");

@@ -4,6 +4,7 @@ applyTwoLineTableHeaders();
 loadCxlCountdownPreference();
 loadSplitViewPreference();
 loadDateFormatPreference();
+loadAsnDefaultEmailAddressesPreference();
 initDivisionFilters();
 initStatusFilters();
 applyDefaultStatusFilter(defaultStatusFilter);
@@ -28,12 +29,9 @@ updateColumnFilterHeaderStates();
 updateFlagFilterHeaderState();
 applyColumnOrder();
 applyColumnVisibility();
-// In API mode, initAuth() handles the first loadData() call after sign-in.
-// In appsscript/demo mode, loadData() runs immediately as before.
+// initAuth() handles the first loadData() call after sign-in.
 if (typeof initAuth === "function") {
-  initAuth().then(() => {
-    if (typeof isApiMode !== "function" || !isApiMode()) loadData();
-  });
+  initAuth();
 } else {
   loadData();
 }

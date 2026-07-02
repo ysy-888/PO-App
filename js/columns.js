@@ -74,7 +74,7 @@ function isEmptyValue(v) {
 
 const COLUMNS = [
   "Flag","Selected",
-  "Status","N41 Status","Division","Vendor","Buyer","Buyer PO #","SO #","PO Date","PO #",
+  "Status","N41 Status","Division","Vendor","Buyer","Buyer PO #","SO #","SO CXL Date","PO Date","PO #",
   "Old PO #","Style #","Color","Style Category","PO Qty","Actual Qty","Ctn Qty","Received Qty","FOB Cost","PO Total Cost",
   "Vessel","House #","Shipped","ETD",
   "EST EXF","EST IHD","Ship Method","Shipment ID","Packing List",
@@ -110,7 +110,7 @@ const COLUMN_WIDTH_TIER_S = new Set([
   "PO Date", "Shipped", "ETD", "EST EXF", "EST IHD",
   "EXF Date", "ASN Date", "ASN Req Date",
   "Delivery Date", "Delivery Req Date", "Pickup Date", "Pickup Req Date",
-  "ETA", "IHD", "CXL Date", "Assign Date",
+  "ETA", "IHD", "CXL Date", "SO CXL Date", "Assign Date",
   "PO #", "Old PO #", "SO #", "FOB Cost", "PO Total Cost",
   "N41 Status",
   "EXF Requested", "ASN Requested", "Delivery Requested", "Pickup Requested",
@@ -653,9 +653,7 @@ function loadProgramColumnDefaultFromStorage() {
 }
 
 function loadColumnVisibility() {
-  const databaseSettingsMode = typeof isApiMode === "function" && isApiMode();
-  if (!databaseSettingsMode) loadProgramColumnDefaultFromStorage();
-  if (!databaseSettingsMode && loadColumnLayoutPreference()) {
+  if (loadColumnLayoutPreference()) {
     migrateVisibleColumnsForNewFields();
     return;
   }
@@ -682,6 +680,16 @@ function migrateVisibleColumnsForNewFields() {
   }
   if (visibleColumns.has("Ship Method") && !visibleColumns.has("Shipment ID")) {
     visibleColumns.add("Shipment ID");
+    changed = true;
+  }
+  if (!visibleColumns.has("SO CXL Date") && visibleColumns.has("SO #")) {
+    visibleColumns.add("SO CXL Date");
+    changed = true;
+  }
+  if (!columnOrder.includes("SO CXL Date")) {
+    const idx = columnOrder.indexOf("SO #");
+    if (idx !== -1) columnOrder.splice(idx + 1, 0, "SO CXL Date");
+    else columnOrder = normalizeColumnOrder([...columnOrder, "SO CXL Date"]);
     changed = true;
   }
   ["EXF", "EXF Req Date", "EXF Request Date"].forEach(legacyCol => {
@@ -714,8 +722,7 @@ function applyDefaultColumnsFromServer(data) {
     return false;
   }
 
-  const databaseSettingsMode = typeof isApiMode === "function" && isApiMode();
-  if (databaseSettingsMode || !hasStoredColumnLayout()) {
+  if (!hasStoredColumnLayout()) {
     columnOrder = normalizeColumnOrder([...DEFAULT_COLUMN_ORDER]);
     visibleColumns = getDefaultVisibleColumnsSet();
     applyColumnOrder();
@@ -735,11 +742,6 @@ async function saveDefaultColumnVisibility() {
   setProgramDefaultStatusFilter(resolveStatusFilterForProgramDefault());
   saveProgramColumnDefaultToStorage();
 
-  if (isDemoMode()) {
-    setEditTableFooterMessage("Default view saved", "success");
-    return;
-  }
-
   try {
     setEditTableFooterMessage(`Saving default${ELLIPSIS}`, "");
     const payload = {
@@ -748,16 +750,7 @@ async function saveDefaultColumnVisibility() {
       statusFilter: defaultStatusFilter,
       columnLayout: getColumnLayoutPreferencePayload(),
     };
-    let json;
-    if (typeof isApiMode === "function" && isApiMode()) {
-      json = await postApi("/api/settings/save-column", payload);
-    } else {
-      const res = await fetch(getAppsScriptUrl(), {
-        method: "POST",
-        body: JSON.stringify({ action: "saveColumnDefault", ...payload }),
-      });
-      json = await res.json();
-    }
+    const json = await postApi("/api/settings/save-column", payload);
     if (!json.success) throw new Error(json.error);
     setEditTableFooterMessage("Default view saved", "success");
   } catch (err) {
