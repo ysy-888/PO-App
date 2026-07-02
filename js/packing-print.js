@@ -332,9 +332,10 @@ function plPrintPageStyles() {
     .pl-carton-table--compact th.pl-size-first,.pl-carton-table--compact td.pl-size-first{padding-left:10px;}
     .pl-carton-table--compact th.pl-total-col,.pl-carton-table--compact td.pl-total-col{padding-left:8px;padding-right:8px;}
     .pl-carton-table--compact th.pl-wt-col,.pl-carton-table--compact td.pl-wt-col{padding:6px 10px;}
-    .pl-packing-block .pl-carton-table tbody td{border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;}
-    .pl-packing-block .pl-carton-table tbody tr:first-child td{border-top:none;}
-    .pl-carton-table tbody tr:last-child td{border-bottom:1px solid #e5e7eb;}
+    .pl-packing-block .pl-carton-table tbody tr{border-top:1px solid #cbd5e1;border-bottom:1px solid #cbd5e1;}
+    .pl-packing-block .pl-carton-table tbody td{border-top:1px solid #cbd5e1!important;border-bottom:1px solid #cbd5e1!important;}
+    .pl-packing-block .pl-carton-table tbody tr:first-child td{border-top:none!important;}
+    .pl-carton-table tbody tr:last-child td{border-bottom:1px solid #cbd5e1!important;}
     .pl-carton-table tfoot td{padding:3px 4px;font-size:9px;font-weight:600;background:#eef0f3;border-top:1px solid #e5e7eb;border-bottom:none;}
     .pl-num{text-align:right;font-variant-numeric:tabular-nums;}
     .pl-center{text-align:center;font-variant-numeric:tabular-nums;color:#6b7280;}
@@ -571,7 +572,6 @@ function buildPlPrintTitlePageHtml(rows, {
           ["PO Count", plPrintEsc(String(rows.length))],
           ["Total Qty", plPrintEsc(String(totalActQty))],
           ["Ctn Qty", plPrintEsc(String(totalCtnQty))],
-          ["Total Weight", totalWeight > 0 ? plPrintEsc(plPrintFmtWeight(totalWeight)) : "—"],
         ],
       ], { twoCol: true })}
     </div>
