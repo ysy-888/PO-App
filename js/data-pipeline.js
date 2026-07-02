@@ -15,6 +15,9 @@ function applyUserSettingsFromServer(settings) {
     if (settings.asnDefaultEmailAddresses !== undefined && typeof applyAsnDefaultEmailAddressesPreference === "function") {
       applyAsnDefaultEmailAddressesPreference(settings.asnDefaultEmailAddresses);
     }
+    if ((settings.asnCarriers !== undefined || settings.asnDefaultCarrierByBuyer !== undefined) && typeof applyAsnCarriersPreference === "function") {
+      applyAsnCarriersPreference(settings.asnCarriers ?? [], settings.asnDefaultCarrierByBuyer ?? {});
+    }
     if (settings.pageSize !== undefined) {
       applyPageSize(settings.pageSize);
     }

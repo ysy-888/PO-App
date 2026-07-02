@@ -33,14 +33,6 @@
           <span class="app-title-tab-dropdown-check" aria-hidden="true">✓</span>
           <span>ASN</span>
         </button>
-        <button type="button" class="app-title-tab-dropdown-item" data-request-type="delivery" role="menuitem">
-          <span class="app-title-tab-dropdown-check" aria-hidden="true">✓</span>
-          <span>Delivery</span>
-        </button>
-        <button type="button" class="app-title-tab-dropdown-item" data-request-type="pickup" role="menuitem">
-          <span class="app-title-tab-dropdown-check" aria-hidden="true">✓</span>
-          <span>Pickup</span>
-        </button>
       </div>
     </div>
     <button type="button" class="app-title-tab" id="navTabChargebacks" role="tab" aria-selected="false">Chargebacks</button>
@@ -165,17 +157,9 @@
       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h5"/></svg>
       EXF Request
     </button>
-    <button type="button" class="btn btn-secondary" id="deliveryRequestBtn" hidden>
-      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v10H3z"/><path d="M14 10h4l3 3v4h-7z"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>
-      Delivery Request
-    </button>
     <button type="button" class="btn btn-secondary" id="asnRequestBtn" hidden>
       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
       ASN Request
-    </button>
-    <button type="button" class="btn btn-secondary" id="pickupRequestBtn" hidden>
-      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10v10H4z"/><path d="M14 11h3l3 3v3h-6z"/><path d="M7 7V5h4v2"/><circle cx="8" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>
-      Pickup Request
     </button>
     <button type="button" class="btn btn-secondary" id="createShipmentBtn" hidden>
       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v10H3z"/><path d="M14 10h4l3 3v4h-7z"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/><path d="M12 4v6M9 7h6"/></svg>
@@ -194,8 +178,6 @@
 <input type="search" id="approvalRequestSearchInput" style="display:none" aria-hidden="true" />
 <input type="search" id="exfRequestSearchInput" style="display:none" aria-hidden="true" />
 <input type="search" id="asnRequestSearchInput" style="display:none" aria-hidden="true" />
-<input type="search" id="deliveryRequestSearchInput" style="display:none" aria-hidden="true" />
-<input type="search" id="pickupRequestSearchInput" style="display:none" aria-hidden="true" />
 
 <div id="chargebackToolbar" class="toolbar" hidden>
   <div class="toolbar-end">
@@ -540,89 +522,6 @@
   </table>
   </div>
 
-  <!-- Delivery Requests sub-table -->
-  <div id="deliveryRequestTableWrap" class="table-scroll-x" hidden>
-  <table id="deliveryRequestTable">
-    <colgroup>
-      <col class="col-exf-request-id" />
-      <col class="col-date" />
-      <col class="col-date" />
-      <col class="col-vendor" />
-      <col class="col-vendor" />
-      <col class="col-email" />
-      <col class="col-email" />
-      <col class="col-notes" />
-      <col class="col-po-count" />
-      <col class="col-status" />
-      <col class="col-date" />
-      <col class="col-notes" />
-      <col class="col-actions" />
-    </colgroup>
-    <thead>
-      <tr>
-        <th>Request ID</th>
-        <th>Delivery Date</th>
-        <th>Request Date</th>
-        <th>From</th>
-        <th>To</th>
-        <th>Email</th>
-        <th>CC</th>
-        <th>Notes</th>
-        <th>PO Count</th>
-        <th>Email Status</th>
-        <th>Email Sent</th>
-        <th>Last Attempt</th>
-        <th>Email Error</th>
-        <th>Action</th>
-      </tr>
-    </thead>
-    <tbody id="deliveryRequestTableBody">
-      <tr class="state-row"><td colspan="13">Loading delivery requests…</td></tr>
-    </tbody>
-  </table>
-  </div>
-
-  <!-- Pickup Requests sub-table -->
-  <div id="pickupRequestTableWrap" class="table-scroll-x" hidden>
-  <table id="pickupRequestTable">
-    <colgroup>
-      <col class="col-exf-request-id" />
-      <col class="col-date" />
-      <col class="col-date" />
-      <col class="col-vendor" />
-      <col class="col-vendor" />
-      <col class="col-email" />
-      <col class="col-email" />
-      <col class="col-notes" />
-      <col class="col-po-count" />
-      <col class="col-status" />
-      <col class="col-date" />
-      <col class="col-notes" />
-      <col class="col-actions" />
-    </colgroup>
-    <thead>
-      <tr>
-        <th>Request ID</th>
-        <th>Pickup Date</th>
-        <th>Request Date</th>
-        <th>From</th>
-        <th>To</th>
-        <th>Email</th>
-        <th>CC</th>
-        <th>Notes</th>
-        <th>PO Count</th>
-        <th>Email Status</th>
-        <th>Email Sent</th>
-        <th>Last Attempt</th>
-        <th>Email Error</th>
-        <th>Action</th>
-      </tr>
-    </thead>
-    <tbody id="pickupRequestTableBody">
-      <tr class="state-row"><td colspan="13">Loading pickup requests…</td></tr>
-    </tbody>
-  </table>
-  </div>
 
 </div>
 
@@ -1106,8 +1005,7 @@
             <button type="button" class="btn btn-secondary" id="asnRequestAddSelectedPosBtn" hidden>Add</button>
             <button type="button" class="btn btn-secondary" id="asnRequestAddPoDoneBtn" hidden>Done</button>
             <button type="button" class="btn btn-secondary packing-list-print-btn" id="asnRequestPrintBtn" hidden title="Print packing list for linked POs">Print Packing List</button>
-            <button type="button" class="btn btn-secondary" id="asnPickupBtn" hidden>ASN Pickup</button>
-            <button type="button" class="btn btn-secondary" id="asnPickupResendBtn" hidden>Resend ASN Pickup</button>
+            <button type="button" class="btn btn-secondary" id="asnCartonLabelBtn" hidden>Carton Label</button>
             <button type="button" class="btn-close" id="asnRequestCancelBtn" aria-label="Close">✕</button>
           </div>
         </div>
@@ -1131,8 +1029,8 @@
     <div class="modal-header email-header email-header-request">
       <div class="email-header-inner">
         <div class="email-header-titles">
-          <h1 class="email-heading">Carton Label Info</h1>
-          <p class="email-subheading" id="asnPickupLabelModalSubtitle">ASN Pickup</p>
+          <h1 class="email-heading">Carton Labels</h1>
+          <p class="email-subheading" id="asnPickupLabelModalSubtitle">ASN Request</p>
         </div>
         <div class="modal-header-actions">
           <button type="button" class="btn-close" id="asnPickupLabelCancelBtn" aria-label="Close">✕</button>
@@ -1142,7 +1040,7 @@
     <div class="modal-body" id="asnPickupLabelBody"></div>
     <div class="modal-footer">
       <div id="asnPickupLabelFooterMessage" class="modal-footer-message shipment-footer-message" role="status" aria-live="polite" hidden></div>
-      <button type="button" class="btn btn-primary" id="asnPickupLabelSubmitBtn">Send ASN Pickup</button>
+      <button type="button" class="btn btn-primary" id="asnPickupLabelSubmitBtn">Generate &amp; Print</button>
       <button type="button" class="btn" id="asnPickupLabelDismissBtn">Cancel</button>
     </div>
   </div>
@@ -1176,91 +1074,6 @@
   </div>
 </div>
 
-<div id="deliveryRequestOverlay" class="modal-backdrop">
-  <div class="modal-card shipment-modal-card" onclick="event.stopPropagation()">
-    <div class="modal-header email-header email-header-request">
-      <div class="email-header-inner">
-        <div class="email-header-titles">
-          <h1 class="email-heading">Delivery Request</h1>
-          <p class="email-subheading" id="deliveryRequestModalTitle">New</p>
-        </div>
-        <div class="email-header-meta">
-          <div class="email-header-id-block">
-            <div class="email-request-id" id="deliveryRequestModalId">New</div>
-            <div class="email-request-date" id="deliveryRequestModalDate"></div>
-          </div>
-          <div class="modal-header-actions">
-            <span id="deliveryRequestPoCount" class="shipment-modal-po-count"></span>
-            <button type="button" class="btn btn-secondary" id="deliveryRequestAddPosBtn">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-              Add POs
-            </button>
-            <button type="button" class="btn btn-secondary" id="deliveryRequestRemovePosBtn" hidden>
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>
-              Remove POs
-            </button>
-            <button type="button" class="btn btn-secondary" id="deliveryRequestAddSelectedPosBtn" hidden>Add</button>
-            <button type="button" class="btn btn-secondary" id="deliveryRequestAddPoDoneBtn" hidden>Done</button>
-            <button type="button" class="btn btn-secondary packing-list-print-btn" id="deliveryRequestPrintBtn" hidden title="Print packing list for linked POs">Print Packing List</button>
-            <button type="button" class="btn-close" id="deliveryRequestCancelBtn" aria-label="Close">✕</button>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="modal-body" id="deliveryRequestBody"></div>
-    <div class="modal-footer">
-      <div id="deliveryRequestFooterMessage" class="modal-footer-message shipment-footer-message" role="status" aria-live="polite" hidden></div>
-      <button type="button" class="btn btn-primary" id="deliveryRequestSubmitBtn">
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v10H3z"/><path d="M14 10h4l3 3v4h-7z"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>
-        Create
-      </button>
-      <button type="button" class="btn" data-dismiss="delivery-request">Cancel</button>
-    </div>
-  </div>
-</div>
-
-<div id="pickupRequestOverlay" class="modal-backdrop">
-  <div class="modal-card shipment-modal-card" onclick="event.stopPropagation()">
-    <div class="modal-header email-header email-header-request">
-      <div class="email-header-inner">
-        <div class="email-header-titles">
-          <h1 class="email-heading">Pickup Request</h1>
-          <p class="email-subheading" id="pickupRequestModalTitle">New</p>
-        </div>
-        <div class="email-header-meta">
-          <div class="email-header-id-block">
-            <div class="email-request-id" id="pickupRequestModalId">New</div>
-            <div class="email-request-date" id="pickupRequestModalDate"></div>
-          </div>
-          <div class="modal-header-actions">
-            <span id="pickupRequestPoCount" class="shipment-modal-po-count"></span>
-            <button type="button" class="btn btn-secondary" id="pickupRequestAddPosBtn">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-              Add POs
-            </button>
-            <button type="button" class="btn btn-secondary" id="pickupRequestRemovePosBtn" hidden>
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>
-              Remove POs
-            </button>
-            <button type="button" class="btn btn-secondary" id="pickupRequestAddSelectedPosBtn" hidden>Add</button>
-            <button type="button" class="btn btn-secondary" id="pickupRequestAddPoDoneBtn" hidden>Done</button>
-            <button type="button" class="btn btn-secondary packing-list-print-btn" id="pickupRequestPrintBtn" hidden title="Print packing list for linked POs">Print Packing List</button>
-            <button type="button" class="btn-close" id="pickupRequestCancelBtn" aria-label="Close">✕</button>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="modal-body" id="pickupRequestBody"></div>
-    <div class="modal-footer">
-      <div id="pickupRequestFooterMessage" class="modal-footer-message shipment-footer-message" role="status" aria-live="polite" hidden></div>
-      <button type="button" class="btn btn-primary" id="pickupRequestSubmitBtn">
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10v10H4z"/><path d="M14 11h3l3 3v3h-6z"/><path d="M7 7V5h4v2"/><circle cx="8" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>
-        Create
-      </button>
-      <button type="button" class="btn" data-dismiss="pickup-request">Cancel</button>
-    </div>
-  </div>
-</div>
 
 <div id="customerEmailOverlay" class="modal-backdrop">
   <div class="modal-card customer-email-modal-card" onclick="event.stopPropagation()">
@@ -1347,7 +1160,7 @@
     <div class="settings-modal-body">
       <nav class="settings-nav" id="settingsNav" aria-label="Settings sections">
         <button type="button" class="settings-nav-item is-active" data-settings-section="general">General</button>
-        <button type="button" class="settings-nav-item" data-settings-section="asn-defaults">ASN Defaults</button>
+        <button type="button" class="settings-nav-item" data-settings-section="asn-defaults">ASN</button>
         <button type="button" class="settings-nav-item" data-settings-section="edit-table">Edit PO table</button>
         <button type="button" class="settings-nav-item" data-settings-section="edit-so-table">Edit Sales Order table</button>
         <button type="button" class="settings-nav-item" data-settings-section="vendor-portal">Vendor Submissions</button>
@@ -1382,9 +1195,9 @@
           </div>
         </section>
         <section class="settings-section" id="settingsSectionAsnDefaults" data-settings-section="asn-defaults" hidden>
-          <h4 class="settings-section-title">ASN Defaults</h4>
+          <h4 class="settings-section-title">ASN</h4>
           <div class="settings-group">
-            <div class="settings-group-label">ASN Request Defaults</div>
+            <div class="settings-group-label">ASN Request Email Defaults</div>
             <p class="settings-hint settings-hint--block">Default Buyer Email and CC values for new ASN Requests. Enter multiple addresses separated by commas.</p>
             <div class="settings-asn-default-email-list">
               <div class="settings-asn-default-email-row" data-asn-default-email-buyer="lulusFashionLounge">
@@ -1410,6 +1223,17 @@
                 </label>
               </div>
             </div>
+          </div>
+          <div class="settings-group">
+            <div class="settings-group-label">Carriers</div>
+            <p class="settings-hint settings-hint--block">Manage carriers for ASN logistics emails.</p>
+            <div class="settings-carrier-list" id="settingsCarrierList"></div>
+            <button type="button" class="btn btn-secondary settings-carrier-add-btn" id="settingsCarrierAddBtn">+ Add Carrier</button>
+          </div>
+          <div class="settings-group">
+            <div class="settings-group-label">Default Carrier per Buyer</div>
+            <p class="settings-hint settings-hint--block">Carrier automatically selected when creating a new ASN request for each buyer.</p>
+            <div class="settings-asn-default-carrier-list" id="settingsAsnDefaultCarrierList"></div>
           </div>
         </section>
         <section class="settings-section settings-section--edit-table" id="settingsSectionEditTable" data-settings-section="edit-table" hidden>
@@ -1562,8 +1386,6 @@
 <script src="js/request-modals.js?v=20260605-10"></script>
 <script src="js/exf-request.js?v=20260627-1"></script>
 <script src="js/asn-requests.js?v=20260605-8"></script>
-<script src="js/delivery-requests.js?v=20260605-8"></script>
-<script src="js/pickup-requests.js?v=20260605-8"></script>
 <script src="js/approval-requests.js"></script>
 <script src="js/packing-reviews.js"></script>
 <script src="js/customers-import.js"></script>

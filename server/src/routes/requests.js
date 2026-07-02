@@ -29,7 +29,7 @@ import {
   buildAsnPickupEmailAttachments,
   buildRequestEmailAttachments,
 } from "../packingListPrint/index.js";
-import { getCartonWeightLbs, is12thTribeBuyer, normalizeLabelInputsByPo } from "../packingListPrint/helpers.js";
+import { getCartonWeightLbs } from "../packingListPrint/helpers.js";
 
 const router = Router();
 
@@ -182,6 +182,46 @@ async function sendAndStoreRequestEmail({ tenantId, tableName, entityId, type, r
   return { ...result, data: updatedData };
 }
 
+async function sendAndStoreAsnCarrierEmail({ tenantId, requestId, requestData, poRows }) {
+  const carrierEmail = String(requestData["Carrier Email"] ?? "").trim();
+  const carrierCc = String(requestData["Carrier CC"] ?? "").trim();
+  const pickupRequestId = `ASN Pickup ${requestId}`;
+  const pickupData = {
+    "Pickup Date": requestData["ASN Date"] ?? "",
+    "Request Date": todayYmd(),
+    From: requestData["Carrier"] ?? "",
+    To: requestData["Buyer"] ?? "",
+    "Email To": carrierEmail,
+    "Email CC": carrierCc,
+    "Pickup Req Notes": `ASN pickup for ${requestId}`,
+  };
+
+  const message = buildDeliveryPickupEmail("Pickup", pickupRequestId, pickupData, poRows);
+  // Override to/cc with stored carrier fields
+  message.to = carrierEmail;
+  message.cc = carrierCc;
+  const hasRecipient = Boolean(carrierEmail);
+
+  const attachments = await buildAsnPickupEmailAttachments(supabase, tenantId, {
+    asnRequestId: requestId,
+    asnData: requestData,
+    poRows,
+    labelInputs: [],
+  });
+
+  const result = await sendEmail({ ...message, attachments });
+  const now = todayYmd();
+  const fields = {
+    "ASN Pickup Email Status": result.emailSent ? "Sent" : (hasRecipient ? "Failed" : "Not Sent"),
+    "ASN Pickup Email Sent At": result.emailSent ? now : "",
+    "ASN Pickup Email Error": result.emailError || "",
+    "Updated At": now,
+  };
+  const updatedData = { ...requestData, ...fields };
+  await updateRequestData("asn_requests", tenantId, requestId, updatedData);
+  return { emailSent: result.emailSent, emailError: result.emailError, data: updatedData };
+}
+
 async function resendStoredRequestEmail({ tenantId, tableName, entityId, type }) {
   const row = await getRequestRow(tableName, tenantId, entityId);
   if (!row) return { notFound: true };
@@ -300,7 +340,7 @@ router.post("/exf/create", requireAuth, async (req, res) => {
 // ── ASN REQUEST ───────────────────────────────────────────────────────────────
 
 router.post("/asn/create", requireAuth, async (req, res) => {
-  const { poNumbers, request } = req.body || {};
+  const { poNumbers, request, sendBuyer = true, sendCarrier = true } = req.body || {};
   if (!Array.isArray(poNumbers) || poNumbers.length === 0) {
     return res.status(400).json({ success: false, error: "poNumbers are required." });
   }
@@ -317,6 +357,9 @@ router.post("/asn/create", requireAuth, async (req, res) => {
       "Email Status": "Not Sent",
       "Email Sent At": "",
       "Email Error": "",
+      "ASN Pickup Email Status": "Not Sent",
+      "ASN Pickup Email Sent At": "",
+      "ASN Pickup Email Error": "",
       "Created At": now,
       "Updated At": now,
     });
@@ -327,14 +370,51 @@ router.post("/asn/create", requireAuth, async (req, res) => {
     if (insertErr) throw insertErr;
 
     const poRows = await fetchPoRows(req.tenantId, poNumbers);
-    const emailResult = await sendAndStoreRequestEmail({
-      tenantId: req.tenantId,
-      tableName: "asn_requests",
-      entityId: requestId,
-      type: "asn",
-      requestData,
-      poRows,
-    });
+
+    // Send buyer ASN email
+    let buyerEmailResult = { emailSent: false, emailError: "Skipped", data: requestData };
+    if (sendBuyer) {
+      buyerEmailResult = await sendAndStoreRequestEmail({
+        tenantId: req.tenantId,
+        tableName: "asn_requests",
+        entityId: requestId,
+        type: "asn",
+        requestData,
+        poRows,
+      });
+    }
+
+    // Send carrier pickup email
+    let carrierEmailResult = { emailSent: false, emailError: "Skipped" };
+    if (sendCarrier) {
+      const latestData = buyerEmailResult.data || requestData;
+      carrierEmailResult = await sendAndStoreAsnCarrierEmail({
+        tenantId: req.tenantId,
+        requestId,
+        requestData: latestData,
+        poRows,
+      });
+    }
+
+    // Merge final status into one update if carrier was skipped
+    if (!sendBuyer || !sendCarrier) {
+      const merged = {
+        ...(buyerEmailResult.data || requestData),
+        ...(!sendBuyer ? {
+          "Email Status": "",
+          "Email Sent At": "",
+          "Email Error": "",
+        } : {}),
+        ...(!sendCarrier ? {
+          "ASN Pickup Email Status": "",
+          "ASN Pickup Email Sent At": "",
+          "ASN Pickup Email Error": "",
+        } : {}),
+        "Updated At": now,
+      };
+      await updateRequestData("asn_requests", req.tenantId, requestId, merged);
+      buyerEmailResult.data = merged;
+    }
 
     await updatePoFields(req.tenantId, poNumbers, {
       "ASN Request ID": requestId,
@@ -346,9 +426,11 @@ router.post("/asn/create", requireAuth, async (req, res) => {
     return res.json({
       success: true,
       asnRequestId: requestId,
-      emailSent: emailResult.emailSent,
-      emailError: emailResult.emailError,
-      request: emailResult.data,
+      emailSent: buyerEmailResult.emailSent,
+      emailError: buyerEmailResult.emailError,
+      carrierEmailSent: carrierEmailResult.emailSent,
+      carrierEmailError: carrierEmailResult.emailError,
+      request: buyerEmailResult.data,
     });
   } catch (err) {
     console.error("asn create failed:", err);
@@ -723,70 +805,33 @@ router.post("/approval/resend-email", requireAuth, async (req, res) => {
 });
 
 router.post("/asn-pickup/send-email", requireAuth, async (req, res) => {
-  const { asnRequestId, labelInputs } = req.body || {};
+  const { asnRequestId } = req.body || {};
   if (!asnRequestId) return res.status(400).json({ success: false, error: "asnRequestId is required." });
 
   try {
     const row = await getRequestRow("asn_requests", req.tenantId, asnRequestId);
     if (!row) return res.status(404).json({ success: false, error: "ASN request not found." });
     const asnData = row.data || {};
-    if (String(asnData["Email Status"] ?? "").trim() !== "Sent") {
-      return res.status(400).json({ success: false, error: "ASN request must be completed before sending ASN Pickup." });
-    }
 
-    const logistics = await getContactEmailInfo(req.tenantId, "FORERUNNER LOGISTICS");
-    const pickupRequestId = `ASN Pickup ${asnRequestId}`;
-    const pickupData = {
-      "Pickup Date": asnData["ASN Date"] ?? "",
-      "Request Date": todayYmd(),
-      From: "FORERUNNER LOGISTICS",
-      To: asnData.Buyer ?? "",
-      "Email To": logistics.email,
-      "Email CC": logistics.cc,
-      "Pickup Req Notes": `ASN pickup for ${asnRequestId}`,
-    };
     const poNumbers = splitPoNumbers(asnData["PO Numbers"]);
-    if (is12thTribeBuyer(asnData.Buyer)) {
-      const inputs = Array.isArray(labelInputs) ? labelInputs : [];
-      const byPo = normalizeLabelInputsByPo(inputs);
-      for (const po of poNumbers) {
-        const info = byPo[po];
-        if (!info?.shipNotice || !info?.colorCode) {
-          return res.status(400).json({
-            success: false,
-            error: "Ship Notice # and Color Code are required for every PO.",
-          });
-        }
-      }
-    }
-
     const poRows = await fetchPoRows(req.tenantId, poNumbers);
-    const message = buildDeliveryPickupEmail("Pickup", pickupRequestId, pickupData, poRows);
-    const hasRecipient = Boolean(String(message.to ?? "").trim());
-    const attachments = await buildAsnPickupEmailAttachments(supabase, req.tenantId, {
-      asnRequestId,
-      asnData,
-      poRows,
-      labelInputs: Array.isArray(labelInputs) ? labelInputs : [],
-    });
-    const result = await sendEmail({ ...message, attachments });
-    const now = todayYmd();
-    const updated = {
-      ...asnData,
-      "ASN Pickup Email Status": result.emailSent ? "Sent" : (hasRecipient ? "Failed" : "Not Sent"),
-      "ASN Pickup Email Sent At": result.emailSent ? now : (asnData["ASN Pickup Email Sent At"] ?? ""),
-      "ASN Pickup Email Error": result.emailError || "",
-      "ASN Pickup Label Data": Array.isArray(labelInputs) && labelInputs.length > 0
-        ? JSON.stringify(labelInputs)
-        : (asnData["ASN Pickup Label Data"] ?? ""),
-      "Updated At": now,
-    };
-    await updateRequestData("asn_requests", req.tenantId, asnRequestId, updated);
 
-    return res.json({ success: true, emailSent: result.emailSent, emailError: result.emailError, request: updated });
+    const carrierResult = await sendAndStoreAsnCarrierEmail({
+      tenantId: req.tenantId,
+      requestId: asnRequestId,
+      requestData: asnData,
+      poRows,
+    });
+
+    return res.json({
+      success: true,
+      emailSent: carrierResult.emailSent,
+      emailError: carrierResult.emailError,
+      request: carrierResult.data,
+    });
   } catch (err) {
-    console.error("asn pickup email failed:", err);
-    return res.status(500).json({ success: false, error: err.message || "Failed to send ASN Pickup email." });
+    console.error("asn carrier resend failed:", err);
+    return res.status(500).json({ success: false, error: err.message || "Failed to resend carrier email." });
   }
 });
 

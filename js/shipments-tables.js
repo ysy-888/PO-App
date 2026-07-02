@@ -304,10 +304,10 @@ function renderShipmentIdCell(td, row) {
   td.appendChild(btn);
 }
 
-/** @type {null | "approval" | "exf" | "asn" | "delivery" | "pickup"} */
+/** @type {null | "approval" | "exf" | "asn"} */
 let currentRequestType = null;
 
-const ALL_REQUEST_TYPES = ["approval", "exf", "asn", "delivery", "pickup"];
+const ALL_REQUEST_TYPES = ["approval", "exf", "asn"];
 
 function clearRequestTypeSelection() {
   currentRequestType = null;
@@ -340,12 +340,6 @@ function switchRequestType(type) {
   } else if (type === "asn" && typeof applyAsnRequestFilters === "function") {
     document.getElementById("asnRequestSearchInput").value = q;
     applyAsnRequestFilters();
-  } else if (type === "delivery" && typeof applyDeliveryRequestFilters === "function") {
-    document.getElementById("deliveryRequestSearchInput").value = q;
-    applyDeliveryRequestFilters();
-  } else if (type === "pickup" && typeof applyPickupRequestFilters === "function") {
-    document.getElementById("pickupRequestSearchInput").value = q;
-    applyPickupRequestFilters();
   }
 
   updateRequestsRowCounter();
@@ -369,12 +363,6 @@ function updateRequestsRowCounter() {
   } else if (currentRequestType === "asn") {
     count = typeof filteredAsnRequests !== "undefined" ? filteredAsnRequests.length : 0;
     label = count === 1 ? "ASN request" : "ASN requests";
-  } else if (currentRequestType === "delivery") {
-    count = typeof filteredDeliveryRequests !== "undefined" ? filteredDeliveryRequests.length : 0;
-    label = count === 1 ? "delivery request" : "delivery requests";
-  } else if (currentRequestType === "pickup") {
-    count = typeof filteredPickupRequests !== "undefined" ? filteredPickupRequests.length : 0;
-    label = count === 1 ? "pickup request" : "pickup requests";
   }
   counterEl.textContent = `${count} ${label}`;
 }
@@ -726,8 +714,6 @@ function isCreateShipmentModalOpen() {
 function isCreateRequestModalOpen() {
   if (document.getElementById("exfRequestOverlay")?.classList.contains("open") && !exfRequestModalRow) return true;
   if (document.getElementById("asnRequestOverlay")?.classList.contains("open") && !asnRequestModalRow) return true;
-  if (document.getElementById("deliveryRequestOverlay")?.classList.contains("open") && !deliveryRequestModalRow) return true;
-  if (document.getElementById("pickupRequestOverlay")?.classList.contains("open") && !pickupRequestModalRow) return true;
   return false;
 }
 
@@ -738,7 +724,7 @@ function isToolbarCreateActionBlocked() {
 }
 
 function hideToolbarCreateButtons() {
-  ["batchEditBtn", "exfRequestBtn", "asnRequestBtn", "deliveryRequestBtn", "pickupRequestBtn", "createShipmentBtn"].forEach(id => {
+  ["batchEditBtn", "exfRequestBtn", "asnRequestBtn", "createShipmentBtn"].forEach(id => {
     const btn = document.getElementById(id);
     if (btn) btn.hidden = true;
   });
@@ -761,8 +747,6 @@ function updateToolbarRequestButtons() {
   }
   if (typeof updateExfRequestButton === "function") updateExfRequestButton();
   if (typeof updateAsnRequestButton === "function") updateAsnRequestButton();
-  if (typeof updateDeliveryRequestButton === "function") updateDeliveryRequestButton();
-  if (typeof updatePickupRequestButton === "function") updatePickupRequestButton();
   updateCreateShipmentButton();
   if (typeof updateBatchEditButton === "function") updateBatchEditButton();
 }

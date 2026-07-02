@@ -7165,6 +7165,99 @@ td.n41-status-mismatch,
   resize: vertical;
 }
 
+.settings-carrier-add-btn {
+  margin-top: 8px;
+}
+
+.settings-carrier-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 860px;
+}
+
+.settings-carrier-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(200px, 1.4fr) minmax(160px, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.settings-carrier-row--edit {
+  background: var(--bg);
+}
+
+.settings-carrier-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.settings-carrier-email {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.settings-carrier-cc {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.settings-carrier-input {
+  width: 100%;
+}
+
+.settings-carrier-action-btn {
+  white-space: nowrap;
+}
+
+.settings-asn-default-carrier-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 600px;
+}
+
+.settings-asn-default-carrier-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(220px, 1fr);
+  gap: 14px;
+  align-items: end;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.settings-carrier-select {
+  width: 100%;
+}
+
+.asn-send-checkbox-td {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+}
+
+.asn-send-checkbox {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.asn-send-checkbox-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
 .settings-round-switch {
   position: relative;
   flex-shrink: 0;

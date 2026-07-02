@@ -2,6 +2,8 @@
 
 let settingsSectionId = "general";
 const ASN_DEFAULT_EMAIL_STORAGE_BASE = "asnDefaultEmailAddresses";
+const ASN_CARRIERS_STORAGE_KEY = "asnCarriers";
+const ASN_DEFAULT_CARRIER_STORAGE_KEY = "asnDefaultCarrierByBuyer";
 const ASN_DEFAULT_EMAIL_BUYERS = [
   {
     key: "lulusFashionLounge",
@@ -117,6 +119,305 @@ function initSettingsAsnDefaultEmails() {
   });
 }
 
+// ── Carrier management ────────────────────────────────────────────────────────
+
+let asnCarriers = [];
+let asnDefaultCarrierByBuyer = {};
+
+function getAsnCarriers() {
+  return [...asnCarriers];
+}
+
+function getAsnDefaultCarrierForBuyer(buyerName) {
+  const key = normalizeAsnBuyerName(buyerName);
+  if (!key) return null;
+  const match = ASN_DEFAULT_EMAIL_BUYERS.find(buyer => {
+    const names = [buyer.name, ...buyer.aliases].map(normalizeAsnBuyerName);
+    return names.includes(key);
+  });
+  if (!match) return null;
+  const carrierName = asnDefaultCarrierByBuyer[match.key];
+  if (!carrierName) return null;
+  return asnCarriers.find(c => c.name === carrierName) ?? null;
+}
+
+function normalizeAsnCarriersArray(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map(c => ({
+      name: String(c?.name ?? "").trim(),
+      email: String(c?.email ?? "").trim(),
+      cc: String(c?.cc ?? "").trim(),
+    }))
+    .filter(c => c.name);
+}
+
+function loadAsnCarriersPreference() {
+  try {
+    const carriersRaw = localStorage.getItem(scopedStorageKey(ASN_CARRIERS_STORAGE_KEY));
+    const defaultsRaw = localStorage.getItem(scopedStorageKey(ASN_DEFAULT_CARRIER_STORAGE_KEY));
+    applyAsnCarriersPreference(
+      carriersRaw ? JSON.parse(carriersRaw) : [],
+      defaultsRaw ? JSON.parse(defaultsRaw) : {}
+    );
+  } catch {
+    applyAsnCarriersPreference([], {});
+  }
+}
+
+function applyAsnCarriersPreference(carriers, defaultsByBuyer) {
+  asnCarriers = normalizeAsnCarriersArray(carriers);
+  asnDefaultCarrierByBuyer = (defaultsByBuyer && typeof defaultsByBuyer === "object" && !Array.isArray(defaultsByBuyer))
+    ? { ...defaultsByBuyer }
+    : {};
+  renderSettingsCarrierList();
+  renderSettingsAsnDefaultCarrierList();
+}
+
+function saveAsnCarriersPreference() {
+  try {
+    localStorage.setItem(scopedStorageKey(ASN_CARRIERS_STORAGE_KEY), JSON.stringify(asnCarriers));
+    localStorage.setItem(scopedStorageKey(ASN_DEFAULT_CARRIER_STORAGE_KEY), JSON.stringify(asnDefaultCarrierByBuyer));
+  } catch { /* ignore */ }
+  if (typeof persistUserPreferencePatch === "function") {
+    persistUserPreferencePatch({ asnCarriers, asnDefaultCarrierByBuyer });
+  }
+}
+
+// Carrier list rendering
+
+let _carrierEditIndex = -1;
+
+function renderSettingsCarrierList() {
+  const container = document.getElementById("settingsCarrierList");
+  if (!container) return;
+  container.innerHTML = "";
+
+  if (asnCarriers.length === 0 && _carrierEditIndex !== -2) {
+    const empty = document.createElement("p");
+    empty.className = "settings-hint";
+    empty.textContent = "No carriers yet. Click + Add Carrier to create one.";
+    container.appendChild(empty);
+  }
+
+  asnCarriers.forEach((carrier, idx) => {
+    const row = document.createElement("div");
+    row.className = "settings-carrier-row";
+
+    if (_carrierEditIndex === idx) {
+      // Editable row
+      row.classList.add("settings-carrier-row--edit");
+      const nameInput = document.createElement("input");
+      nameInput.type = "text";
+      nameInput.className = "shipment-form-input settings-carrier-input";
+      nameInput.placeholder = "Carrier name";
+      nameInput.value = carrier.name;
+      nameInput.dataset.field = "name";
+
+      const emailInput = document.createElement("input");
+      emailInput.type = "text";
+      emailInput.className = "shipment-form-input settings-carrier-input";
+      emailInput.placeholder = "Email";
+      emailInput.value = carrier.email;
+      emailInput.dataset.field = "email";
+
+      const ccInput = document.createElement("input");
+      ccInput.type = "text";
+      ccInput.className = "shipment-form-input settings-carrier-input";
+      ccInput.placeholder = "CC (optional)";
+      ccInput.value = carrier.cc;
+      ccInput.dataset.field = "cc";
+
+      const saveBtn = document.createElement("button");
+      saveBtn.type = "button";
+      saveBtn.className = "btn btn-primary btn-sm settings-carrier-action-btn";
+      saveBtn.textContent = "Save";
+      saveBtn.addEventListener("click", () => {
+        const name = nameInput.value.trim();
+        if (!name) { nameInput.focus(); return; }
+        asnCarriers[idx] = { name, email: emailInput.value.trim(), cc: ccInput.value.trim() };
+        _carrierEditIndex = -1;
+        saveAsnCarriersPreference();
+        renderSettingsCarrierList();
+        renderSettingsAsnDefaultCarrierList();
+      });
+
+      const cancelBtn = document.createElement("button");
+      cancelBtn.type = "button";
+      cancelBtn.className = "btn btn-sm settings-carrier-action-btn";
+      cancelBtn.textContent = "Cancel";
+      cancelBtn.addEventListener("click", () => {
+        _carrierEditIndex = -1;
+        renderSettingsCarrierList();
+      });
+
+      row.appendChild(nameInput);
+      row.appendChild(emailInput);
+      row.appendChild(ccInput);
+      row.appendChild(saveBtn);
+      row.appendChild(cancelBtn);
+    } else {
+      // Read-only row
+      const nameEl = document.createElement("span");
+      nameEl.className = "settings-carrier-name";
+      nameEl.textContent = carrier.name;
+
+      const emailEl = document.createElement("span");
+      emailEl.className = "settings-carrier-email";
+      emailEl.textContent = carrier.email || "—";
+
+      const ccEl = document.createElement("span");
+      ccEl.className = "settings-carrier-cc";
+      ccEl.textContent = carrier.cc ? `CC: ${carrier.cc}` : "";
+
+      const editBtn = document.createElement("button");
+      editBtn.type = "button";
+      editBtn.className = "btn btn-sm settings-carrier-action-btn";
+      editBtn.textContent = "Edit";
+      editBtn.addEventListener("click", () => {
+        _carrierEditIndex = idx;
+        renderSettingsCarrierList();
+      });
+
+      const deleteBtn = document.createElement("button");
+      deleteBtn.type = "button";
+      deleteBtn.className = "btn btn-sm btn-danger settings-carrier-action-btn";
+      deleteBtn.textContent = "Delete";
+      deleteBtn.addEventListener("click", () => {
+        if (!window.confirm(`Delete carrier "${carrier.name}"?`)) return;
+        // Clear any defaults that reference this carrier
+        Object.keys(asnDefaultCarrierByBuyer).forEach(key => {
+          if (asnDefaultCarrierByBuyer[key] === carrier.name) delete asnDefaultCarrierByBuyer[key];
+        });
+        asnCarriers.splice(idx, 1);
+        saveAsnCarriersPreference();
+        renderSettingsCarrierList();
+        renderSettingsAsnDefaultCarrierList();
+      });
+
+      row.appendChild(nameEl);
+      row.appendChild(emailEl);
+      row.appendChild(ccEl);
+      row.appendChild(editBtn);
+      row.appendChild(deleteBtn);
+    }
+    container.appendChild(row);
+  });
+
+  // New carrier form at bottom when adding
+  if (_carrierEditIndex === -2) {
+    const row = document.createElement("div");
+    row.className = "settings-carrier-row settings-carrier-row--edit";
+
+    const nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.className = "shipment-form-input settings-carrier-input";
+    nameInput.placeholder = "Carrier name";
+    nameInput.dataset.field = "name";
+
+    const emailInput = document.createElement("input");
+    emailInput.type = "text";
+    emailInput.className = "shipment-form-input settings-carrier-input";
+    emailInput.placeholder = "Email";
+    emailInput.dataset.field = "email";
+
+    const ccInput = document.createElement("input");
+    ccInput.type = "text";
+    ccInput.className = "shipment-form-input settings-carrier-input";
+    ccInput.placeholder = "CC (optional)";
+    ccInput.dataset.field = "cc";
+
+    const saveBtn = document.createElement("button");
+    saveBtn.type = "button";
+    saveBtn.className = "btn btn-primary btn-sm settings-carrier-action-btn";
+    saveBtn.textContent = "Add";
+    saveBtn.addEventListener("click", () => {
+      const name = nameInput.value.trim();
+      if (!name) { nameInput.focus(); return; }
+      asnCarriers.push({ name, email: emailInput.value.trim(), cc: ccInput.value.trim() });
+      _carrierEditIndex = -1;
+      saveAsnCarriersPreference();
+      renderSettingsCarrierList();
+      renderSettingsAsnDefaultCarrierList();
+    });
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.className = "btn btn-sm settings-carrier-action-btn";
+    cancelBtn.textContent = "Cancel";
+    cancelBtn.addEventListener("click", () => {
+      _carrierEditIndex = -1;
+      renderSettingsCarrierList();
+    });
+
+    row.appendChild(nameInput);
+    row.appendChild(emailInput);
+    row.appendChild(ccInput);
+    row.appendChild(saveBtn);
+    row.appendChild(cancelBtn);
+    container.appendChild(row);
+    requestAnimationFrame(() => nameInput.focus());
+  }
+}
+
+function renderSettingsAsnDefaultCarrierList() {
+  const container = document.getElementById("settingsAsnDefaultCarrierList");
+  if (!container) return;
+  container.innerHTML = "";
+
+  ASN_DEFAULT_EMAIL_BUYERS.forEach(buyer => {
+    const row = document.createElement("div");
+    row.className = "settings-asn-default-carrier-row";
+
+    const label = document.createElement("div");
+    label.className = "settings-asn-default-email-buyer";
+    label.textContent = buyer.name;
+
+    const selectWrap = document.createElement("label");
+    selectWrap.className = "settings-email-field";
+
+    const selectLabel = document.createElement("span");
+    selectLabel.textContent = "Default Carrier";
+
+    const select = document.createElement("select");
+    select.className = "shipment-form-input filter-select settings-carrier-select";
+
+    const blankOpt = document.createElement("option");
+    blankOpt.value = "";
+    blankOpt.textContent = "— None —";
+    select.appendChild(blankOpt);
+
+    asnCarriers.forEach(c => {
+      const opt = document.createElement("option");
+      opt.value = c.name;
+      opt.textContent = c.name;
+      if (asnDefaultCarrierByBuyer[buyer.key] === c.name) opt.selected = true;
+      select.appendChild(opt);
+    });
+
+    select.addEventListener("change", () => {
+      if (select.value) asnDefaultCarrierByBuyer[buyer.key] = select.value;
+      else delete asnDefaultCarrierByBuyer[buyer.key];
+      saveAsnCarriersPreference();
+    });
+
+    selectWrap.appendChild(selectLabel);
+    selectWrap.appendChild(select);
+    row.appendChild(label);
+    row.appendChild(selectWrap);
+    container.appendChild(row);
+  });
+}
+
+function initSettingsCarriers() {
+  document.getElementById("settingsCarrierAddBtn")?.addEventListener("click", () => {
+    _carrierEditIndex = -2;
+    renderSettingsCarrierList();
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 function getDistinctVendorsFromRows() {
   return [...new Set(
     (allRows ?? [])
@@ -148,6 +449,8 @@ function updateSettingsUi() {
   updateSettingsSplitViewUi();
   updateSettingsDateFormatUi();
   updateSettingsAsnDefaultEmailsUi();
+  renderSettingsCarrierList();
+  renderSettingsAsnDefaultCarrierList();
   if (typeof updateVendorSubmitModeCheck === "function") updateVendorSubmitModeCheck();
   if (typeof updateSettingsVendorSubmissionsVisibility === "function") {
     updateSettingsVendorSubmissionsVisibility();
@@ -229,6 +532,8 @@ function initSettings() {
   buildSettingsDateFormatSelect();
   initSettingsVendorSubmitMode();
   initSettingsAsnDefaultEmails();
+  loadAsnCarriersPreference();
+  initSettingsCarriers();
 
   document.getElementById("settingsCloseBtn")?.addEventListener("click", closeSettingsModal);
 

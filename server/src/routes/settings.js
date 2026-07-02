@@ -19,6 +19,8 @@ const USER_PREFERENCE_KEYS = new Set([
   "splitViewEnabled",
   "dateFormatId",
   "asnDefaultEmailAddresses",
+  "asnCarriers",
+  "asnDefaultCarrierByBuyer",
   "pageSize",
   "columnLayout",
 ]);

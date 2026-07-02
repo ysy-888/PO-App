@@ -39,6 +39,11 @@ let asnRequestDraftEmail = {};
 let asnRequestDraftAsnDate = "";
 let asnRequestDraftNotes = "";
 let asnRequestBuyer = "";
+let asnRequestDraftCarrier = "";
+let asnRequestDraftCarrierEmail = "";
+let asnRequestDraftCarrierCc = "";
+let asnRequestSendBuyer = true;
+let asnRequestSendCarrier = true;
 let asnRequestModalRow = null;
 let asnRequestOpInProgress = false;
 let asnPickupPendingRequestId = "";
@@ -47,6 +52,81 @@ let filteredAsnRequests = [];
 
 function isAsnRequestEligibleForPickup(request) {
   return Boolean(request) && isRequestEmailSent(request);
+}
+
+function getAsnDefaultCarrierInfoForBuyer(buyer) {
+  const carrier = typeof getAsnDefaultCarrierForBuyer === "function" ? getAsnDefaultCarrierForBuyer(buyer) : null;
+  return {
+    name: carrier?.name ?? "",
+    email: carrier?.email ?? "",
+    cc: carrier?.cc ?? "",
+  };
+}
+
+function getAsnCarrierInfoByName(name) {
+  if (!name) return { name: "", email: "", cc: "" };
+  const carriers = typeof getAsnCarriers === "function" ? getAsnCarriers() : [];
+  const c = carriers.find(c => c.name === name);
+  return c ? { ...c } : { name, email: "", cc: "" };
+}
+
+function createAsnCarrierSelectMetaRow(selectedCarrierName, { readOnly = false } = {}) {
+  const tr = document.createElement("tr");
+  const labelTd = document.createElement("td");
+  labelTd.className = "email-meta-label";
+  labelTd.textContent = "Carrier";
+  const valueTd = document.createElement("td");
+  valueTd.className = "email-meta-value";
+
+  const carriers = typeof getAsnCarriers === "function" ? getAsnCarriers() : [];
+  const select = document.createElement("select");
+  select.className = "shipment-form-input email-meta-input";
+  select.dataset.field = "Carrier";
+
+  const blankOpt = document.createElement("option");
+  blankOpt.value = "";
+  blankOpt.textContent = "— No carrier —";
+  select.appendChild(blankOpt);
+
+  carriers.forEach(c => {
+    const opt = document.createElement("option");
+    opt.value = c.name;
+    opt.textContent = c.name;
+    if (c.name === selectedCarrierName) opt.selected = true;
+    select.appendChild(opt);
+  });
+
+  if (readOnly) select.disabled = true;
+  valueTd.appendChild(select);
+  tr.appendChild(labelTd);
+  tr.appendChild(valueTd);
+  return { tr, selectEl: select };
+}
+
+function createAsnSendCheckboxMetaRow(labelText, cbId, defaultChecked, { readOnly = false } = {}) {
+  const tr = document.createElement("tr");
+  const labelTd = document.createElement("td");
+  labelTd.className = "email-meta-label";
+  const valueTd = document.createElement("td");
+  valueTd.className = "email-meta-value asn-send-checkbox-td";
+
+  const cb = document.createElement("input");
+  cb.type = "checkbox";
+  cb.id = cbId;
+  cb.className = "asn-send-checkbox";
+  cb.checked = defaultChecked;
+  if (readOnly) cb.disabled = true;
+
+  const lbl = document.createElement("label");
+  lbl.htmlFor = cbId;
+  lbl.className = "asn-send-checkbox-label";
+  lbl.textContent = labelText;
+
+  valueTd.appendChild(cb);
+  valueTd.appendChild(lbl);
+  tr.appendChild(labelTd);
+  tr.appendChild(valueTd);
+  return { tr, checkbox: cb };
 }
 
 function is12thTribeAsnBuyer(buyer) {
@@ -114,6 +194,11 @@ function openAsnRequestDetail(id) {
   };
   asnRequestDraftAsnDate = request[ASN_DATE_FIELD] ?? "";
   asnRequestDraftNotes = request[ASN_REQ_NOTES_FIELD] ?? "";
+  asnRequestDraftCarrier = request["Carrier"] ?? "";
+  asnRequestDraftCarrierEmail = request["Carrier Email"] ?? "";
+  asnRequestDraftCarrierCc = request["Carrier CC"] ?? "";
+  asnRequestSendBuyer = true;
+  asnRequestSendCarrier = true;
   asnRequestAddPoPanelOpen = false;
   setAsnRequestFooterMessage("");
   renderAsnRequestModal(asnRequestPoNumbers, { request });
@@ -182,19 +267,32 @@ function renderAsnRequestActionCell(td, request) {
   });
   wrap.appendChild(resendBtn);
 
+  // Resend Carrier button
   if (isAsnRequestEligibleForPickup(request)) {
-    const pickupBtn = document.createElement("button");
-    pickupBtn.type = "button";
-    pickupBtn.className = "btn btn-secondary asn-request-pickup-btn";
-    pickupBtn.textContent = isAsnPickupEmailSent(request) ? "Resend Pickup" : "ASN Pickup";
-    pickupBtn.disabled = !requestId || isAppSaving();
-    pickupBtn.addEventListener("click", e => {
+    const resendCarrierBtn = document.createElement("button");
+    resendCarrierBtn.type = "button";
+    resendCarrierBtn.className = "btn btn-secondary asn-request-pickup-btn";
+    resendCarrierBtn.textContent = "Resend Carrier";
+    resendCarrierBtn.disabled = !requestId || isAppSaving();
+    resendCarrierBtn.addEventListener("click", e => {
       e.stopPropagation();
-      if (isAsnPickupEmailSent(request)) resendAsnPickupEmail(requestId);
-      else openAsnPickupFlow(requestId);
+      resendAsnCarrierEmail(requestId);
     });
-    wrap.appendChild(pickupBtn);
+    wrap.appendChild(resendCarrierBtn);
   }
+
+  // Carton Label button
+  const cartonLabelBtn = document.createElement("button");
+  cartonLabelBtn.type = "button";
+  cartonLabelBtn.className = "btn btn-secondary asn-request-carton-btn";
+  const hasLabelData = Boolean(request?.["ASN Pickup Label Data"]);
+  cartonLabelBtn.textContent = hasLabelData ? "Reprint Labels" : "Carton Label";
+  cartonLabelBtn.disabled = !requestId || isAppSaving();
+  cartonLabelBtn.addEventListener("click", e => {
+    e.stopPropagation();
+    openCartonLabelModal(requestId);
+  });
+  wrap.appendChild(cartonLabelBtn);
 
   td.appendChild(wrap);
 }
@@ -319,6 +417,11 @@ function openAsnRequestFromSelection() {
   asnRequestDraftEmail = {};
   asnRequestDraftAsnDate = "";
   asnRequestDraftNotes = "";
+  asnRequestDraftCarrier = "";
+  asnRequestDraftCarrierEmail = "";
+  asnRequestDraftCarrierCc = "";
+  asnRequestSendBuyer = true;
+  asnRequestSendCarrier = true;
   asnRequestAddPoPanelOpen = false;
   setAsnRequestFooterMessage("");
   clearMainTableSelection();
@@ -346,6 +449,13 @@ function captureAsnRequestDraft() {
   };
   asnRequestDraftAsnDate = formData[ASN_DATE_FIELD] ?? asnRequestDraftAsnDate ?? "";
   asnRequestDraftNotes = formData[ASN_REQ_NOTES_FIELD] ?? asnRequestDraftNotes ?? "";
+  asnRequestDraftCarrier = formData["Carrier"] ?? asnRequestDraftCarrier ?? "";
+  asnRequestDraftCarrierEmail = formData["Carrier Email"] ?? asnRequestDraftCarrierEmail ?? "";
+  asnRequestDraftCarrierCc = formData["Carrier CC"] ?? asnRequestDraftCarrierCc ?? "";
+  const sendBuyerCb = document.getElementById("asnSendToBuyerCb");
+  const sendCarrierCb = document.getElementById("asnSendToCarrierCb");
+  if (sendBuyerCb) asnRequestSendBuyer = sendBuyerCb.checked;
+  if (sendCarrierCb) asnRequestSendCarrier = sendCarrierCb.checked;
 }
 
 function setAsnRequestModalAddPanelClass(body, isOpen) {
@@ -380,6 +490,53 @@ function renderAsnRequestModal(poNumbers, { asnDate = formatDateToYmd(new Date()
   const outer = document.createElement("div");
   outer.className = "shipment-modal-outer";
 
+  // Resolve carrier info
+  const defaultCarrierInfo = !isExisting
+    ? getAsnDefaultCarrierInfoForBuyer(buyer)
+    : { name: "", email: "", cc: "" };
+  const resolvedCarrierName = isExisting
+    ? (request["Carrier"] ?? "")
+    : (asnRequestDraftCarrier || defaultCarrierInfo.name);
+  const resolvedCarrierEmail = isExisting
+    ? (request["Carrier Email"] ?? "")
+    : (asnRequestDraftCarrierEmail || defaultCarrierInfo.email);
+  const resolvedCarrierCc = isExisting
+    ? (request["Carrier CC"] ?? "")
+    : (asnRequestDraftCarrierCc || defaultCarrierInfo.cc);
+
+  // Build carrier select row + carrier email/cc rows
+  const carrierSelectRow = createAsnCarrierSelectMetaRow(resolvedCarrierName, { readOnly: isView });
+  const carrierEmailRow = createRequestFormMetaRow(
+    "Carrier Email", "Carrier Email", resolvedCarrierEmail, { readOnly: isView }
+  );
+  const carrierCcRow = createRequestFormMetaRow(
+    "Carrier CC", "Carrier CC", resolvedCarrierCc, { readOnly: isView }
+  );
+
+  // Wire carrier select → auto-fill email/cc
+  if (!isView) {
+    carrierSelectRow.selectEl.addEventListener("change", () => {
+      const info = getAsnCarrierInfoByName(carrierSelectRow.selectEl.value);
+      if (info.email) carrierEmailRow.input.value = info.email;
+      if (info.cc !== undefined) carrierCcRow.input.value = info.cc;
+    });
+  }
+
+  // Build send checkboxes (only on new/edit, not on view)
+  const sendBuyerRow = !isView
+    ? createAsnSendCheckboxMetaRow("Send to Buyer", "asnSendToBuyerCb", asnRequestSendBuyer)
+    : null;
+  const sendCarrierRow = !isView
+    ? createAsnSendCheckboxMetaRow("Send to Carrier", "asnSendToCarrierCb", asnRequestSendCarrier)
+    : null;
+
+  if (!isView && sendBuyerRow) {
+    sendBuyerRow.checkbox.addEventListener("change", () => { asnRequestSendBuyer = sendBuyerRow.checkbox.checked; });
+  }
+  if (!isView && sendCarrierRow) {
+    sendCarrierRow.checkbox.addEventListener("change", () => { asnRequestSendCarrier = sendCarrierRow.checkbox.checked; });
+  }
+
   const metaRows = [
     createRequestFormMetaRow(
       "ASN Date",
@@ -400,12 +557,17 @@ function renderAsnRequestModal(poNumbers, { asnDate = formatDateToYmd(new Date()
       isExisting ? (request["Buyer Email"] ?? "") : (asnRequestDraftEmail.email ?? buyerEmailInfo.email),
       { readOnly: isView }
     ).tr,
+    ...(sendBuyerRow ? [sendBuyerRow.tr] : []),
     createRequestFormMetaRow(
       "CC",
       "CC",
       isExisting ? (request["CC"] ?? "") : (asnRequestDraftEmail.cc ?? buyerEmailInfo.cc),
       { readOnly: isView }
     ).tr,
+    carrierSelectRow.tr,
+    carrierEmailRow.tr,
+    carrierCcRow.tr,
+    ...(sendCarrierRow ? [sendCarrierRow.tr] : []),
   ];
   outer.appendChild(buildShipmentModalSplitLayout(
     buildEmailStyleForm({
@@ -610,22 +772,12 @@ function updateAsnRequestActionButtons() {
   const isView = submitBtn?.hidden === true;
   const saveDateBtn = document.getElementById("asnRequestSaveDateBtn");
   if (saveDateBtn) saveDateBtn.hidden = !isView;
-  const pickupBtn = document.getElementById("asnPickupBtn");
-  const pickupResendBtn = document.getElementById("asnPickupResendBtn");
+  const cartonLabelBtn = document.getElementById("asnCartonLabelBtn");
   const printBtn = document.getElementById("asnRequestPrintBtn");
   if (printBtn) printBtn.hidden = !isView || asnRequestPoNumbers.length === 0;
-  if (pickupBtn || pickupResendBtn) {
-    const request = asnRequestModalRow;
-    const eligible = isView && isAsnRequestEligibleForPickup(request);
-    const sent = eligible && isAsnPickupEmailSent(request);
-    if (pickupBtn) {
-      pickupBtn.hidden = !eligible || sent;
-      pickupBtn.disabled = asnRequestOpInProgress || isAppSaving();
-    }
-    if (pickupResendBtn) {
-      pickupResendBtn.hidden = !sent;
-      pickupResendBtn.disabled = asnRequestOpInProgress || isAppSaving();
-    }
+  if (cartonLabelBtn) {
+    cartonLabelBtn.hidden = !isView;
+    cartonLabelBtn.disabled = asnRequestOpInProgress || isAppSaving();
   }
   if (isView) {
     if (addBtn) addBtn.hidden = true;
@@ -719,16 +871,19 @@ function closeAsnRequestModal() {
   asnRequestDraftAsnDate = "";
   asnRequestDraftNotes = "";
   asnRequestBuyer = "";
+  asnRequestDraftCarrier = "";
+  asnRequestDraftCarrierEmail = "";
+  asnRequestDraftCarrierCc = "";
+  asnRequestSendBuyer = true;
+  asnRequestSendCarrier = true;
   asnRequestModalRow = null;
   clearAsnFormSelection();
   const printBtn = document.getElementById("asnRequestPrintBtn");
   if (printBtn) printBtn.hidden = true;
   const saveDateBtn = document.getElementById("asnRequestSaveDateBtn");
   if (saveDateBtn) saveDateBtn.hidden = true;
-  const pickupBtn = document.getElementById("asnPickupBtn");
-  const pickupResendBtn = document.getElementById("asnPickupResendBtn");
-  if (pickupBtn) pickupBtn.hidden = true;
-  if (pickupResendBtn) pickupResendBtn.hidden = true;
+  const cartonLabelBtnEl = document.getElementById("asnCartonLabelBtn");
+  if (cartonLabelBtnEl) cartonLabelBtnEl.hidden = true;
   setAsnRequestFooterMessage("");
   document.getElementById("asnRequestOverlay")?.classList.remove("open");
   setAsnRequestModalAddPanelClass(document.getElementById("asnRequestBody"), false);
@@ -741,6 +896,13 @@ async function submitAsnRequest() {
 
   const form = document.getElementById("asnRequestForm");
   const data = readRequestForm(form);
+
+  // Read checkbox states
+  const sendBuyerCb = document.getElementById("asnSendToBuyerCb");
+  const sendCarrierCb = document.getElementById("asnSendToCarrierCb");
+  const sendBuyer = sendBuyerCb ? sendBuyerCb.checked : asnRequestSendBuyer;
+  const sendCarrier = sendCarrierCb ? sendCarrierCb.checked : asnRequestSendCarrier;
+
   if (isEmptyValue(data[ASN_DATE_FIELD])) {
     setAsnRequestFooterMessage("ASN Date is required");
     return;
@@ -749,8 +911,12 @@ async function submitAsnRequest() {
     setAsnRequestFooterMessage("Request Date is required");
     return;
   }
-  if (isEmptyValue(data["Buyer Email"])) {
-    setAsnRequestFooterMessage("Buyer Email is required to send the ASN request");
+  if (sendBuyer && isEmptyValue(data["Buyer Email"])) {
+    setAsnRequestFooterMessage("Buyer Email is required when Send to Buyer is checked");
+    return;
+  }
+  if (sendCarrier && isEmptyValue(data["Carrier Email"])) {
+    setAsnRequestFooterMessage("Carrier Email is required when Send to Carrier is checked");
     return;
   }
 
@@ -758,32 +924,38 @@ async function submitAsnRequest() {
   beginToolbarCreatePending();
   closeAsnRequestModal();
   asnRequestOpInProgress = true;
-  showIndicator(`Sending ASN email${ELLIPSIS}`, "");
-  let emailWarning = "";
+  showIndicator(`Sending ASN${ELLIPSIS}`, "");
 
   try {
-    const json = await postApi("/api/requests/asn/create", { poNumbers, request: data });
+    const json = await postApi("/api/requests/asn/create", {
+      poNumbers,
+      request: data,
+      sendBuyer,
+      sendCarrier,
+    });
     if (!json.success) throw new Error(json.error || json.emailError || "ASN request failed");
-    applyAsnRequestCreatedLocally(json.asnRequestId, poNumbers, data);
+    applyAsnRequestCreatedLocally(json.asnRequestId, poNumbers, data, { sendBuyer, sendCarrier });
     if (json.request) {
       const request = allAsnRequests.find(r => getAsnRequestRecordId(r) === json.asnRequestId);
       if (request) Object.assign(request, json.request);
       applyAsnRequestFilters();
     }
-    if (json.emailSent === false) emailWarning = json.emailError || "Unknown email error";
+    const warnings = [];
+    if (sendBuyer && json.emailSent === false) warnings.push(`Buyer email: ${json.emailError || "unknown error"}`);
+    if (sendCarrier && json.carrierEmailSent === false) warnings.push(`Carrier email: ${json.carrierEmailError || "unknown error"}`);
     showIndicator(
-      emailWarning ? `ASN requested, but email not sent: ${emailWarning}` : `ASN requested and email sent ${CHECK_MARK}`,
-      emailWarning ? "error" : "success"
+      warnings.length ? `ASN requested, email issues: ${warnings.join("; ")}` : `ASN requested and email(s) sent ${CHECK_MARK}`,
+      warnings.length ? "error" : "success"
     );
   } catch (err) {
-    showIndicator("ASN email not sent: " + err.message, "error");
+    showIndicator("ASN request failed: " + err.message, "error");
   } finally {
     asnRequestOpInProgress = false;
     endToolbarCreatePending();
   }
 }
 
-function applyAsnRequestCreatedLocally(requestId, poNumbers, data) {
+function applyAsnRequestCreatedLocally(requestId, poNumbers, data, { sendBuyer = true, sendCarrier = true } = {}) {
   const now = formatDateToYmd(new Date());
   allAsnRequests.push({
     [ASN_REQUEST_ID_FIELD]: requestId,
@@ -792,13 +964,20 @@ function applyAsnRequestCreatedLocally(requestId, poNumbers, data) {
     "Buyer": data["Buyer"] ?? "",
     "Buyer Email": data["Buyer Email"] ?? "",
     "CC": data["CC"] ?? "",
+    "Carrier": data["Carrier"] ?? "",
+    "Carrier Email": data["Carrier Email"] ?? "",
+    "Carrier CC": data["Carrier CC"] ?? "",
     [ASN_REQ_NOTES_FIELD]: data[ASN_REQ_NOTES_FIELD] ?? "",
     "PO Numbers": poNumbers.join(", "),
     "PO Count": poNumbers.length,
-    "Email Status": "Sent",
-    "Email Sent At": now,
+    "Email Status": sendBuyer ? "Sent" : "",
+    "Email Sent At": sendBuyer ? now : "",
     "Last Email Attempt At": now,
     "Email Error": "",
+    "ASN Pickup Email Status": sendCarrier ? "Sent" : "",
+    "ASN Pickup Email Sent At": sendCarrier ? now : "",
+    "ASN Pickup Email Error": "",
+    "ASN Pickup Label Data": "",
     "Created At": now,
     "Updated At": now,
   });
@@ -817,20 +996,12 @@ function applyAsnRequestCreatedLocally(requestId, poNumbers, data) {
   if (typeof updateToolbarRequestButtons === "function") updateToolbarRequestButtons();
 }
 
-function openAsnPickupFlow(asnRequestId) {
+function openCartonLabelModal(asnRequestId) {
   if (asnRequestOpInProgress || !asnRequestId) return;
   const request = getAsnRequestById(asnRequestId);
-  if (!isAsnRequestEligibleForPickup(request)) {
-    showIndicator("ASN request must be completed before sending ASN Pickup", "error");
-    return;
-  }
-  if (is12thTribeAsnBuyer(request["Buyer"])) {
-    asnPickupPendingRequestId = asnRequestId;
-    renderAsnPickupLabelModal(request);
-    return;
-  }
-  if (!window.confirm("Send ASN Pickup email to FORERUNNER LOGISTICS?")) return;
-  sendAsnPickupEmail(asnRequestId, []);
+  if (!request) return;
+  asnPickupPendingRequestId = asnRequestId;
+  renderAsnPickupLabelModal(request);
 }
 
 function closeAsnPickupLabelModal() {
@@ -845,7 +1016,7 @@ function renderAsnPickupLabelModal(request) {
   if (!body) return;
 
   const requestId = getAsnRequestRecordId(request);
-  if (subtitle) subtitle.textContent = requestId ? `ASN Pickup · ${requestId}` : "ASN Pickup";
+  if (subtitle) subtitle.textContent = requestId ? `ASN · ${requestId}` : "ASN Request";
 
   const poNumbers = getRequestPoNumbers(request, ASN_REQUEST_ID_FIELD);
   const pos = poNumbers
@@ -857,7 +1028,7 @@ function renderAsnPickupLabelModal(request) {
   body.innerHTML = "";
   const intro = document.createElement("p");
   intro.className = "asn-pickup-label-intro";
-  intro.textContent = "Enter Ship Notice # and Color Code for each PO. These will be used on the carton labels attached to the ASN Pickup email.";
+  intro.textContent = "Enter Ship Notice # and Color Code for each PO. Click Generate & Print to create the carton label PDF.";
   body.appendChild(intro);
 
   const wrap = document.createElement("div");
@@ -950,9 +1121,6 @@ function applyAsnPickupSentLocally(asnRequestId, labelInputs, { emailSent = true
   request[ASN_PICKUP_EMAIL_STATUS_FIELD] = emailSent ? "Sent" : "Failed";
   request[ASN_PICKUP_EMAIL_SENT_AT_FIELD] = emailSent ? now : (request[ASN_PICKUP_EMAIL_SENT_AT_FIELD] ?? "");
   request[ASN_PICKUP_EMAIL_ERROR_FIELD] = emailError;
-  if (is12thTribeAsnBuyer(request["Buyer"]) && labelInputs.length > 0) {
-    request[ASN_PICKUP_LABEL_DATA_FIELD] = JSON.stringify(labelInputs);
-  }
   request["Updated At"] = now;
   applyAsnRequestFilters();
   if (asnRequestModalRow && getAsnRequestRecordId(asnRequestModalRow) === asnRequestId) {
@@ -960,68 +1128,38 @@ function applyAsnPickupSentLocally(asnRequestId, labelInputs, { emailSent = true
   }
 }
 
-async function sendAsnPickupEmail(asnRequestId, labelInputs) {
+async function resendAsnCarrierEmail(asnRequestId) {
   if (asnRequestOpInProgress || !asnRequestId) return;
   const request = getAsnRequestById(asnRequestId);
-  if (!isAsnRequestEligibleForPickup(request)) {
-    showIndicator("ASN request must be completed before sending ASN Pickup", "error");
-    return;
-  }
+  if (!isAsnRequestEligibleForPickup(request)) return;
 
-  const inputs = Array.isArray(labelInputs) ? labelInputs : [];
-  if (is12thTribeAsnBuyer(request["Buyer"])) {
-    const validationError = validateAsnPickupLabelInputs(inputs);
-    if (validationError) {
-      setAsnPickupLabelFooterMessage(validationError);
-      return;
-    }
-  }
+  const carrierEmail = request["Carrier Email"] || "";
+  if (!window.confirm(`Resend carrier email${carrierEmail ? ` to ${carrierEmail}` : ""}?`)) return;
 
   asnRequestOpInProgress = true;
-  closeAsnPickupLabelModal();
-  showIndicator(`Sending ASN Pickup email${ELLIPSIS}`, "");
+  showIndicator(`Resending carrier email${ELLIPSIS}`, "");
 
   try {
-    const json = await postApi("/api/requests/asn-pickup/send-email", { asnRequestId, labelInputs: inputs });
-    if (!json.success) throw new Error(json.error || json.emailError || "ASN Pickup email failed to send.");
-    applyAsnPickupSentLocally(asnRequestId, inputs, {
+    const json = await postApi("/api/requests/asn-pickup/send-email", { asnRequestId });
+    if (!json.success) throw new Error(json.error || json.emailError || "Carrier email failed to send.");
+    applyAsnPickupSentLocally(asnRequestId, [], {
       emailSent: json.emailSent,
       emailError: json.emailError ?? "",
     });
     if (!json.emailSent) {
-      showIndicator(`ASN Pickup email not sent: ${json.emailError || "Unknown error"}`, "error");
+      showIndicator(`Carrier email not sent: ${json.emailError || "Unknown error"}`, "error");
       return;
     }
-    showIndicator(`ASN Pickup email sent ${CHECK_MARK}`, "success");
+    showIndicator(`Carrier email sent ${CHECK_MARK}`, "success");
   } catch (err) {
-    applyAsnPickupSentLocally(asnRequestId, inputs, { emailSent: false, emailError: err.message });
-    showIndicator("ASN Pickup failed: " + err.message, "error");
+    applyAsnPickupSentLocally(asnRequestId, [], { emailSent: false, emailError: err.message });
+    showIndicator("Carrier resend failed: " + err.message, "error");
   } finally {
     asnRequestOpInProgress = false;
   }
 }
 
-async function resendAsnPickupEmail(asnRequestId) {
-  if (asnRequestOpInProgress || !asnRequestId) return;
-  const request = getAsnRequestById(asnRequestId);
-  if (!isAsnRequestEligibleForPickup(request)) return;
-
-  if (is12thTribeAsnBuyer(request["Buyer"])) {
-    const stored = parseAsnPickupLabelData(request);
-    if (stored.length === 0) {
-      openAsnPickupFlow(asnRequestId);
-      return;
-    }
-    if (!window.confirm("Resend ASN Pickup email to FORERUNNER LOGISTICS?")) return;
-    await sendAsnPickupEmail(asnRequestId, stored);
-    return;
-  }
-
-  if (!window.confirm("Resend ASN Pickup email to FORERUNNER LOGISTICS?")) return;
-  await sendAsnPickupEmail(asnRequestId, []);
-}
-
-function submitAsnPickupLabelModal() {
+async function submitAsnPickupLabelModal() {
   if (!asnPickupPendingRequestId) return;
   const labelInputs = readAsnPickupLabelInputs();
   const validationError = validateAsnPickupLabelInputs(labelInputs);
@@ -1029,7 +1167,36 @@ function submitAsnPickupLabelModal() {
     setAsnPickupLabelFooterMessage(validationError);
     return;
   }
-  sendAsnPickupEmail(asnPickupPendingRequestId, labelInputs);
+
+  // Persist label data via /asn/update
+  try {
+    const request = getAsnRequestById(asnPickupPendingRequestId);
+    if (request) {
+      const updatedData = {
+        ...(request || {}),
+        "ASN Pickup Label Data": JSON.stringify(labelInputs),
+      };
+      await postApi("/api/requests/asn/update", {
+        asnRequestId: asnPickupPendingRequestId,
+        request: { "ASN Pickup Label Data": JSON.stringify(labelInputs) },
+      });
+      request["ASN Pickup Label Data"] = JSON.stringify(labelInputs);
+    }
+  } catch (err) {
+    console.warn("Could not persist carton label data:", err);
+  }
+
+  // Generate and print PDF client-side
+  const request = getAsnRequestById(asnPickupPendingRequestId);
+  const poNumbers = request ? getRequestPoNumbers(request, ASN_REQUEST_ID_FIELD) : [];
+  if (poNumbers.length > 0 && typeof buildCartonLabelsPrintHtml === "function") {
+    const html = buildCartonLabelsPrintHtml(poNumbers, labelInputs);
+    if (typeof printPackingListHtmlDocument === "function") {
+      printPackingListHtmlDocument(html);
+    }
+  }
+
+  closeAsnPickupLabelModal();
 }
 
 function initAsnRequests() {
@@ -1041,13 +1208,9 @@ function initAsnRequests() {
   document.getElementById("asnRequestAddSelectedPosBtn")?.addEventListener("click", addSelectedPosToAsnRequest);
   document.getElementById("asnRequestCancelBtn")?.addEventListener("click", closeAsnRequestModal);
   document.getElementById("asnRequestSaveDateBtn")?.addEventListener("click", updateAsnRequestDate);
-  document.getElementById("asnPickupBtn")?.addEventListener("click", () => {
+  document.getElementById("asnCartonLabelBtn")?.addEventListener("click", () => {
     const requestId = getAsnRequestRecordId(asnRequestModalRow);
-    if (requestId) openAsnPickupFlow(requestId);
-  });
-  document.getElementById("asnPickupResendBtn")?.addEventListener("click", () => {
-    const requestId = getAsnRequestRecordId(asnRequestModalRow);
-    if (requestId) resendAsnPickupEmail(requestId);
+    if (requestId) openCartonLabelModal(requestId);
   });
   document.getElementById("asnPickupLabelSubmitBtn")?.addEventListener("click", submitAsnPickupLabelModal);
   document.getElementById("asnPickupLabelCancelBtn")?.addEventListener("click", closeAsnPickupLabelModal);

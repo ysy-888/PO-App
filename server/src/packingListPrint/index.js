@@ -1,7 +1,7 @@
 import { PackingPrintContext } from "./data.js";
 import { createPackingHtmlBuilder } from "./html.js";
 import { htmlToPdfAttachment } from "./pdf.js";
-import { getPackingListPdfOptions, is12thTribeBuyer } from "./helpers.js";
+import { getPackingListPdfOptions } from "./helpers.js";
 
 function splitPoNumbers(value) {
   if (Array.isArray(value)) return value.map(String).map(s => s.trim()).filter(Boolean);
@@ -54,14 +54,12 @@ export async function buildAsnPickupEmailAttachments(supabase, tenantId, {
   asnRequestId,
   asnData,
   poRows,
-  labelInputs,
 }) {
   const poNumbers = resolveAttachmentPoNumbers(poRows, asnData);
   if (poNumbers.length === 0) return [];
 
   const today = new Date().toISOString().slice(0, 10);
   const pickupRequestId = `ASN Pickup ${asnRequestId}`;
-  const attachments = [];
 
   const packingAttachment = await buildGroupPackingListPdfAttachment(
     supabase,
@@ -78,24 +76,8 @@ export async function buildAsnPickupEmailAttachments(supabase, tenantId, {
       showInternalPoFields: false,
     }
   );
-  attachments.push(packingAttachment);
 
-  if (is12thTribeBuyer(asnData?.["Buyer"])) {
-    try {
-      const labelAttachment = await buildCartonLabelsPdfAttachment(
-        supabase,
-        tenantId,
-        poNumbers,
-        labelInputs,
-        `${asnRequestId}_CartonLabels.pdf`
-      );
-      attachments.push(labelAttachment);
-    } catch (err) {
-      console.error(`Failed to build carton label PDF for ${asnRequestId}:`, err);
-    }
-  }
-
-  return attachments;
+  return [packingAttachment];
 }
 
 export { PackingPrintContext } from "./data.js";
