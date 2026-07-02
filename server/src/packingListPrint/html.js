@@ -84,7 +84,7 @@ export function createPackingHtmlBuilder(ctx) {
 
   function plPrintColgroup(sizeColCount, compact = false) {
     const contentWidth = 720;
-    const ctnWidth = compact ? 34 : 44;
+    const ctnWidth = compact ? 48 : 54;
     const totalWidth = compact ? 34 : 40;
     const wtWidth = compact ? 56 : 64;
     const sizeWidth = compact ? 30 : null;
@@ -95,6 +95,23 @@ export function createPackingHtmlBuilder(ctx) {
     for (let i = 0; i < sizeColCount; i++) cols += `<col width="${resolvedSizeWidth}">`;
     cols += `<col width="${totalWidth}"><col width="${wtWidth}"></colgroup>`;
     return cols;
+  }
+
+  function plPrintTitleColgroup({ showInternalPoFields = true, isAsnTitlePage = false } = {}) {
+    const cols = [
+      32,
+      ...(showInternalPoFields ? [64] : []),
+      ...(isAsnTitlePage ? [82] : []),
+      74,
+      72,
+      150,
+      70,
+      62,
+      78,
+    ];
+    return `<colgroup>${cols.map((width, index) =>
+      `<col width="${width}"${index === cols.length - 4 ? ' class="pl-title-buyer-col"' : ""}>`
+    ).join("")}</colgroup>`;
   }
 
   function plPrintPageStyles() {
@@ -116,15 +133,16 @@ export function createPackingHtmlBuilder(ctx) {
     .pl-summary-grid-cell{width:33.33%;vertical-align:top;}
     .pl-summary-grid--2col .pl-summary-grid-cell{width:50%;}
     .pl-title-table th,.pl-title-table td{text-align:center;}
+    .pl-title-table th.pl-title-buyer-col,.pl-title-table td.pl-title-buyer-col{text-align:left;white-space:normal;}
     .pl-summary-col{width:100%;border-collapse:collapse;border:1px solid #e5e7eb;table-layout:fixed;font-size:9px;}
     .pl-summary-col td{padding:4px 8px;border-bottom:1px solid #e5e7eb;vertical-align:middle;}
     .pl-summary-col tr:last-child td{border-bottom:none;}
     .pl-summary-label{width:58px;max-width:58px;font-size:8px;font-weight:600;color:#374151;background:#f7f7f8;white-space:nowrap;}
     .pl-summary-value{font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
     .pl-carton-table{width:100%;border-collapse:collapse;border:1px solid #e5e7eb;table-layout:fixed;font-size:9px;}
-    .pl-carton-table th{padding:6px 8px;font-size:8px;font-weight:600;text-transform:uppercase;color:#374151;background:#f7f7f8;border-bottom:1px solid #e5e7eb;}
+    .pl-carton-table th{padding:6px 8px;font-size:8px;font-weight:600;text-transform:uppercase;color:#374151;background:#f7f7f8;border-bottom:1px solid #d1d5db;}
     .pl-carton-table td{padding:6px 8px;border-bottom:1px solid #e5e7eb;font-size:9px;vertical-align:middle;}
-    .pl-carton-table th.pl-ctn-col,.pl-carton-table td.pl-ctn-col{padding-right:14px;text-align:center;}
+    .pl-carton-table th.pl-ctn-col,.pl-carton-table td.pl-ctn-col{padding-right:14px;text-align:center;white-space:nowrap;}
     .pl-carton-table tbody td.pl-ctn-col{font-weight:700;}
     .pl-carton-table th.pl-size-col,.pl-carton-table td.pl-size-col{padding:6px 8px;text-align:center;}
     .pl-carton-table th.pl-size-first,.pl-carton-table td.pl-size-first{padding-left:12px;}
@@ -133,11 +151,13 @@ export function createPackingHtmlBuilder(ctx) {
     .pl-carton-table-wrap{text-align:center;}
     .pl-carton-table--compact{width:auto;display:inline-table;margin:0 auto;}
     .pl-carton-table--compact th,.pl-carton-table--compact td{padding:6px 5px;}
-    .pl-carton-table--compact th.pl-ctn-col,.pl-carton-table--compact td.pl-ctn-col{padding-right:12px;}
+    .pl-carton-table--compact th.pl-ctn-col,.pl-carton-table--compact td.pl-ctn-col{padding-left:8px;padding-right:12px;}
     .pl-carton-table--compact th.pl-size-first,.pl-carton-table--compact td.pl-size-first{padding-left:10px;}
     .pl-carton-table--compact th.pl-total-col,.pl-carton-table--compact td.pl-total-col{padding-left:8px;padding-right:8px;}
     .pl-carton-table--compact th.pl-wt-col,.pl-carton-table--compact td.pl-wt-col{padding:6px 10px;}
-    .pl-carton-table tbody tr:last-child td{border-bottom:none;}
+    .pl-packing-block .pl-carton-table tbody td{border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;}
+    .pl-packing-block .pl-carton-table tbody tr:first-child td{border-top:none;}
+    .pl-carton-table tbody tr:last-child td{border-bottom:1px solid #e5e7eb;}
     .pl-carton-table tfoot td{padding:3px 4px;font-size:9px;font-weight:600;background:#eef0f3;border-top:1px solid #e5e7eb;border-bottom:none;}
     .pl-num{text-align:right;font-variant-numeric:tabular-nums;}
     .pl-center{text-align:center;font-variant-numeric:tabular-nums;color:#6b7280;}
@@ -163,6 +183,7 @@ export function createPackingHtmlBuilder(ctx) {
     const identityDetails = [
       [showInternalPoFields ? "Buyer PO #" : "Buyer PO", plPrintVal(row["Buyer PO #"])],
       ["Buyer", plPrintVal(row["Buyer"])],
+      ["Ctn Qty", plPrintEsc(String(ctnQty))],
     ];
     if (showInternalPoFields) {
       identityDetails.unshift(["PO #", plPrintVal(row["PO #"])]);
@@ -182,7 +203,6 @@ export function createPackingHtmlBuilder(ctx) {
         ["Style #", plPrintVal(row["Style #"])],
         ["Color", plPrintVal(row["Color"])],
         ["Act Qty", plPrintEsc(String(actQty))],
-        ["Ctn Qty", plPrintEsc(String(ctnQty))],
       ],
       dateDetails,
     ])}</div>`;
@@ -344,7 +364,7 @@ ${notesHtml}
       ${buyerPoCell}
       <td class="pl-center">${plPrintVal(row["Style #"])}</td>
       <td class="pl-center">${plPrintVal(row["Color"])}</td>
-      <td class="pl-center">${plPrintVal(row["Buyer"])}</td>
+      <td class="pl-center pl-title-buyer-col">${plPrintVal(row["Buyer"])}</td>
       <td class="pl-center">${plPrintNum(row["Actual Qty"])}</td>
       <td class="pl-center">${plPrintEsc(String(ctnQty))}</td>
       <td class="pl-center">${weight > 0 ? plPrintEsc(plPrintFmtWeight(weight)) : "—"}</td>
@@ -384,6 +404,7 @@ ${notesHtml}
     </div>
     <p class="pl-section-title">Included POs</p>
     <table class="pl-carton-table pl-title-table" cellpadding="0" cellspacing="0">
+      ${plPrintTitleColgroup({ showInternalPoFields, isAsnTitlePage })}
       <thead>
         <tr>
           <th class="pl-center">#</th>
@@ -391,7 +412,7 @@ ${notesHtml}
           ${isAsnTitlePage ? `<th class="pl-center">${showInternalPoFields ? "Buyer PO #" : "Buyer PO"}</th>` : ""}
           <th class="pl-center">Style #</th>
           <th class="pl-center">Color</th>
-          <th class="pl-center">Buyer</th>
+          <th class="pl-center pl-title-buyer-col">Buyer</th>
           <th class="pl-center">Actual Qty</th>
           <th class="pl-center">Ctn Qty</th>
           <th class="pl-center">Weight</th>

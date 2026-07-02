@@ -414,8 +414,8 @@ const REQUEST_LINKED_PO_COLUMNS = [
 const DELIVERY_PICKUP_LINKED_PO_COLUMNS = [
   { col: "PO #", label: "PO #", cellClass: "shipment-po-cell-id" },
   { col: "Status", label: "Status", cellClass: "shipment-po-cell-status" },
-  { col: "Style #", label: "Style #", cellClass: "shipment-po-cell-wrap" },
   { col: "Buyer", label: "Buyer", cellClass: "shipment-po-cell-buyer" },
+  { col: "Style #", label: "Style #", cellClass: "shipment-po-cell-wrap" },
   { col: "Buyer PO #", label: "Buyer PO", cellClass: "shipment-po-cell-buyer-po" },
   { col: "Color", label: "Color", cellClass: "shipment-po-cell-wrap" },
   { col: "PO Qty", label: "Order Qty", cellClass: "shipment-po-cell-qty" },
@@ -426,7 +426,7 @@ const DELIVERY_PICKUP_LINKED_PO_COLUMNS = [
 
 /** Select col + linked PO cols for ASN / pickup / delivery request modals. */
 const DELIVERY_PICKUP_LINKED_PO_COLUMN_WIDTHS = [
-  52, 52, 100, 80, 72, 108, 72, 64, 64, 64, 76,
+  52, 52, 170, 100, 72, 108, 72, 64, 64, 64, 76,
 ];
 
 function appendDeliveryPickupLinkedPoColgroup(table) {

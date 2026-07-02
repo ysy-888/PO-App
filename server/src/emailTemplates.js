@@ -60,7 +60,7 @@ const EMAIL_PO_TD_ROW_NUM_STYLE = EMAIL_PO_TD_STYLE + "text-align:center;color:#
 const EMAIL_PO_FOOTER_TD_STYLE = "padding:10px 12px;font-weight:600;background-color:#eef0f3;color:#1a1a18;border-bottom:none;font-size:13px;";
 
 const REQUEST_EMAIL_TABLE_COLUMNS = [
-  "_num", "PO #", "Style #", "Buyer", "Buyer PO #", "Color", "Actual Qty", "Ctn Qty", "Weight",
+  "_num", "PO #", "Buyer", "Style #", "Buyer PO #", "Color", "Actual Qty", "Ctn Qty", "Weight",
 ];
 
 const REQUEST_EMAIL_TABLE_LABELS = {
@@ -267,6 +267,7 @@ function emailPoThExtraStyle(col, isExf = false) {
   if (col === "PO #") return "width:68px;min-width:68px;max-width:76px;";
   if (col === "House #") return "width:84px;min-width:84px;";
   if (col === "Weight") return "width:76px;min-width:76px;max-width:88px;";
+  if (!isExf && col === "Buyer") return "width:170px;min-width:170px;max-width:220px;";
   if (!isExf) return "";
   if (col === "Style #") return "width:72px;min-width:72px;max-width:88px;";
   if (col === "Buyer") return "width:80px;min-width:80px;max-width:96px;";

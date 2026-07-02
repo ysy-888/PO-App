@@ -3,6 +3,17 @@ import { createPackingHtmlBuilder } from "./html.js";
 import { htmlToPdfAttachment } from "./pdf.js";
 import { getPackingListPdfOptions, is12thTribeBuyer } from "./helpers.js";
 
+function splitPoNumbers(value) {
+  if (Array.isArray(value)) return value.map(String).map(s => s.trim()).filter(Boolean);
+  return String(value ?? "").split(",").map(s => s.trim()).filter(Boolean);
+}
+
+function resolveAttachmentPoNumbers(poRows, requestData) {
+  const fromRows = (poRows || []).map(row => row["PO #"]).filter(Boolean);
+  if (fromRows.length > 0) return fromRows;
+  return splitPoNumbers(requestData?.["PO Numbers"] || requestData?.["PO #"]);
+}
+
 export async function buildGroupPackingListPdfAttachment(supabase, tenantId, poNumbers, pdfOptions) {
   const ctx = await PackingPrintContext.load(supabase, tenantId, poNumbers);
   const builder = createPackingHtmlBuilder(ctx);
@@ -23,25 +34,20 @@ export async function buildRequestEmailAttachments(supabase, tenantId, {
   requestData,
   poRows,
 }) {
-  const poNumbers = (poRows || []).map(row => row["PO #"]).filter(Boolean);
+  const poNumbers = resolveAttachmentPoNumbers(poRows, requestData);
   if (poNumbers.length === 0) return [];
 
   const pdfOptions = getPackingListPdfOptions(type, entityId, requestData);
   if (!pdfOptions) return [];
   pdfOptions.showInternalPoFields = false;
 
-  try {
-    const attachment = await buildGroupPackingListPdfAttachment(
-      supabase,
-      tenantId,
-      poNumbers,
-      pdfOptions
-    );
-    return [attachment];
-  } catch (err) {
-    console.error(`Failed to build packing list PDF for ${type} ${entityId}:`, err);
-    return [];
-  }
+  const attachment = await buildGroupPackingListPdfAttachment(
+    supabase,
+    tenantId,
+    poNumbers,
+    pdfOptions
+  );
+  return [attachment];
 }
 
 export async function buildAsnPickupEmailAttachments(supabase, tenantId, {
@@ -50,33 +56,29 @@ export async function buildAsnPickupEmailAttachments(supabase, tenantId, {
   poRows,
   labelInputs,
 }) {
-  const poNumbers = (poRows || []).map(row => row["PO #"]).filter(Boolean);
+  const poNumbers = resolveAttachmentPoNumbers(poRows, asnData);
   if (poNumbers.length === 0) return [];
 
   const today = new Date().toISOString().slice(0, 10);
   const pickupRequestId = `ASN Pickup ${asnRequestId}`;
   const attachments = [];
 
-  try {
-    const packingAttachment = await buildGroupPackingListPdfAttachment(
-      supabase,
-      tenantId,
-      poNumbers,
-      {
-        filename: `${asnRequestId}_PackingList.pdf`,
-        includeTitlePage: true,
-        titleLabel: pickupRequestId,
-        titlePageType: "Pickup",
-        typeDate: asnData?.["ASN Date"] ?? "",
-        requestDate: today,
-        requestId: pickupRequestId,
-        showInternalPoFields: false,
-      }
-    );
-    attachments.push(packingAttachment);
-  } catch (err) {
-    console.error(`Failed to build ASN pickup packing list PDF for ${asnRequestId}:`, err);
-  }
+  const packingAttachment = await buildGroupPackingListPdfAttachment(
+    supabase,
+    tenantId,
+    poNumbers,
+    {
+      filename: `${asnRequestId}_PackingList.pdf`,
+      includeTitlePage: true,
+      titleLabel: pickupRequestId,
+      titlePageType: "Pickup",
+      typeDate: asnData?.["ASN Date"] ?? "",
+      requestDate: today,
+      requestId: pickupRequestId,
+      showInternalPoFields: false,
+    }
+  );
+  attachments.push(packingAttachment);
 
   if (is12thTribeBuyer(asnData?.["Buyer"])) {
     try {
