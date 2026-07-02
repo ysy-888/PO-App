@@ -164,7 +164,7 @@ function getEffectiveFilterSelection(col) {
 }
 
 function updateColumnFilterHeaderStates() {
-  document.querySelectorAll("th.th-filterable").forEach(th => {
+  document.querySelectorAll("#poTable th.th-filterable").forEach(th => {
     const col = th.dataset.col;
     if (col === "Status") {
       th.classList.toggle("filter-active", isStatusHeaderFilterActive());
@@ -683,7 +683,7 @@ function applyColumnFilterFromPopover() {
 }
 
 function initColumnFilterHeaders() {
-  document.querySelectorAll("th.th-filterable").forEach(th => {
+  document.querySelectorAll("#poTable th.th-filterable").forEach(th => {
     const col = th.dataset.col;
     if (col !== "Status" && !COLUMN_FILTER_COLS.includes(col)) return;
 
@@ -723,7 +723,7 @@ function initColumnFilterHeaders() {
   document.addEventListener("click", e => {
     const pop = document.getElementById("columnFilterPopover");
     if (!pop || pop.hidden) return;
-    if (pop.contains(e.target) || e.target.closest("th.th-filterable")) return;
+    if (pop.contains(e.target) || e.target.closest("#poTable th.th-filterable")) return;
     closeColumnFilterPopover();
   });
 
@@ -733,7 +733,7 @@ function initColumnFilterHeaders() {
 
   window.addEventListener("resize", () => {
     if (openFilterCol) {
-      const th = document.querySelector(`th.th-filterable[data-col="${CSS.escape(openFilterCol)}"]`);
+      const th = document.querySelector(`#poTable th.th-filterable[data-col="${CSS.escape(openFilterCol)}"]`);
       if (th) positionColumnFilterPopover(th);
     }
   });

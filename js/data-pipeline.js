@@ -308,6 +308,10 @@ function updateRowCounter() {
 }
 
 function updatePaginationUI() {
+  if (typeof currentAppView !== "undefined" && currentAppView === "sales" && typeof updateSoPaginationUI === "function") {
+    updateSoPaginationUI();
+    return;
+  }
   const nav = document.getElementById("paginationNav");
   if (!nav) return;
 
@@ -338,6 +342,10 @@ function scrollTableToTop() {
 }
 
 function goToPage(page) {
+  if (typeof currentAppView !== "undefined" && currentAppView === "sales" && typeof goToSoPage === "function") {
+    goToSoPage(page);
+    return;
+  }
   const totalPages = getTotalPages();
   const nextPage = Math.min(Math.max(1, page), totalPages);
   if (nextPage === currentPage) return;
@@ -401,16 +409,34 @@ function setPageSize(value) {
 function initPagination() {
   applyPageSize(loadPageSizePreference());
   const select = document.getElementById("pageSizeSelect");
-  select?.addEventListener("change", () => setPageSize(select.value));
+  select?.addEventListener("change", () => {
+    if (typeof currentAppView !== "undefined" && currentAppView === "sales" && typeof setSoPageSize === "function") {
+      setSoPageSize(select.value);
+    } else {
+      setPageSize(select.value);
+    }
+  });
 
   document.getElementById("pageFirst")?.addEventListener("click", () => goToPage(1));
-  document.getElementById("pagePrev")?.addEventListener("click", () => goToPage(currentPage - 1));
-  document.getElementById("pageNext")?.addEventListener("click", () => goToPage(currentPage + 1));
-  document.getElementById("pageLast")?.addEventListener("click", () => goToPage(getTotalPages()));
+  document.getElementById("pagePrev")?.addEventListener("click", () => {
+    if (typeof currentAppView !== "undefined" && currentAppView === "sales") goToPage(soCurrentPage - 1);
+    else goToPage(currentPage - 1);
+  });
+  document.getElementById("pageNext")?.addEventListener("click", () => {
+    if (typeof currentAppView !== "undefined" && currentAppView === "sales") goToPage(soCurrentPage + 1);
+    else goToPage(currentPage + 1);
+  });
+  document.getElementById("pageLast")?.addEventListener("click", () => {
+    if (typeof currentAppView !== "undefined" && currentAppView === "sales" && typeof getSoTotalPages === "function") {
+      goToPage(getSoTotalPages());
+    } else {
+      goToPage(getTotalPages());
+    }
+  });
 }
 
 function updateSortHeaders() {
-  document.querySelectorAll("thead th[data-col]").forEach(th => {
+  document.querySelectorAll("#poTable thead th[data-col]").forEach(th => {
     th.classList.remove("sorted-asc", "sorted-desc");
     if (sortCol && th.dataset.col === sortCol) {
       th.classList.add(sortDir === 1 ? "sorted-asc" : "sorted-desc");

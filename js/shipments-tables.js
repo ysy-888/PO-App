@@ -77,7 +77,7 @@ let shipmentModalRow = null;
 let createShipmentPoNumbers = [];
 /** @type {{ exfRequestId: string, lockExfDate: boolean } | null} */
 let createShipmentContext = null;
-let currentAppView = "po";
+let currentAppView = "sales";
 let shipmentAddPoPanelOpen = false;
 
 function normalizeShipment(row) {
@@ -410,6 +410,7 @@ function switchAppView(view) {
   currentAppView = view;
   const splitView = isSplitViewLayoutEnabled();
   const splitActive = splitView && isSplitViewTab(view);
+  const salesOrderToolbar = document.getElementById("salesOrderToolbar");
   const poToolbar = document.getElementById("poToolbar");
   const poHeaderMeta = document.getElementById("poHeaderMeta");
   const shipmentHeaderMeta = document.getElementById("shipmentHeaderMeta");
@@ -441,6 +442,7 @@ function switchAppView(view) {
   if (appMain) appMain.classList.toggle("is-split-active", splitActive);
 
   if (poToolbar) poToolbar.hidden = view !== "po";
+  if (salesOrderToolbar) salesOrderToolbar.hidden = view !== "sales";
   if (poHeaderMeta) poHeaderMeta.hidden = view !== "po" && !splitActive;
   if (shipmentHeaderMeta) shipmentHeaderMeta.hidden = view !== "shipments";
   if (requestsHeaderMeta) requestsHeaderMeta.hidden = view !== "requests";
@@ -470,7 +472,12 @@ function switchAppView(view) {
   if (stylesTableWrap) stylesTableWrap.hidden = view !== "styles";
   if (salesOrderTableWrap) salesOrderTableWrap.hidden = view !== "sales";
   const poFooterEnd = document.getElementById("poFooterEnd");
-  if (poFooterEnd) poFooterEnd.hidden = view !== "po" && !splitActive;
+  if (poFooterEnd) poFooterEnd.hidden = view !== "po" && view !== "sales" && !splitActive;
+  if (view === "sales" && typeof syncPaginationFooterForSales === "function") {
+    syncPaginationFooterForSales();
+  } else if (view === "po" && typeof syncPaginationFooterForPo === "function") {
+    syncPaginationFooterForPo();
+  }
   poTab?.classList.toggle("is-active", view === "po");
   poTab?.setAttribute("aria-selected", view === "po" ? "true" : "false");
   requestsTab?.classList.toggle("is-active", view === "requests");

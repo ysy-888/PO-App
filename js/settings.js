@@ -76,8 +76,19 @@ function selectSettingsSection(sectionId) {
     panel.hidden = panel.dataset.settingsSection !== sectionId;
   });
   const editTableFooter = document.getElementById("settingsEditTableFooter");
-  if (editTableFooter) editTableFooter.hidden = sectionId !== "edit-table";
+  const isPoEdit = sectionId === "edit-table";
+  const isSoEdit = sectionId === "edit-so-table";
+  if (editTableFooter) editTableFooter.hidden = !isPoEdit && !isSoEdit;
+  const editOk = document.getElementById("editTableOk");
+  const editCancel = document.getElementById("editTableCancel");
+  const soOk = document.getElementById("soEditTableOk");
+  const soCancel = document.getElementById("soEditTableCancel");
+  if (editOk) editOk.hidden = !isPoEdit;
+  if (editCancel) editCancel.hidden = !isPoEdit;
+  if (soOk) soOk.hidden = !isSoEdit;
+  if (soCancel) soCancel.hidden = !isSoEdit;
   if (sectionId === "edit-table" && typeof prepareEditTableDraft === "function") prepareEditTableDraft();
+  if (sectionId === "edit-so-table" && typeof prepareSoEditTableDraft === "function") prepareSoEditTableDraft();
   if (sectionId === "vendor-portal") renderVendorPortalLinksList();
 }
 

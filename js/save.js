@@ -102,9 +102,23 @@ function getModalFooterMessageEl(overlay) {
 
 function clearModalFooterMessageEl(el) {
   if (!el) return;
+  el.querySelector(".message-dismiss-btn")?.remove();
   el.textContent = "";
   el.hidden = true;
-  el.classList.remove("success", "error");
+  el.classList.remove("success", "error", "is-persistent");
+}
+
+function clearIndicator() {
+  const el = document.getElementById("saveIndicator");
+  const wrap = document.getElementById("saveIndicatorWrap");
+  const dismiss = document.getElementById("saveIndicatorDismiss");
+  clearTimeout(indicatorTimer);
+  if (!el) return;
+  el.textContent = "";
+  el.className = "save-indicator";
+  if (wrap) wrap.hidden = true;
+  else el.hidden = true;
+  if (dismiss) dismiss.hidden = true;
 }
 
 function clearModalFooterMessageForOverlay(overlayOrId) {
@@ -119,12 +133,37 @@ function setModalFooterMessage(msg, type = "", options = {}) {
   const el = getModalFooterMessageEl(overlay);
   if (!el) return false;
 
+  clearTimeout(modalFooterTimer);
+  el.querySelector(".message-dismiss-btn")?.remove();
+  el.classList.remove("success", "error", "is-persistent");
+
+  if (!msg) {
+    clearModalFooterMessageEl(el);
+    return true;
+  }
+
+  if (type === "error") {
+    el.replaceChildren();
+    const text = document.createElement("span");
+    text.className = "modal-footer-message-text";
+    text.textContent = msg;
+    const dismiss = document.createElement("button");
+    dismiss.type = "button";
+    dismiss.className = "message-dismiss-btn";
+    dismiss.setAttribute("aria-label", "Dismiss message");
+    dismiss.textContent = "✕";
+    dismiss.addEventListener("click", () => clearModalFooterMessageEl(el));
+    el.appendChild(text);
+    el.appendChild(dismiss);
+    el.hidden = false;
+    el.classList.add("error", "is-persistent");
+    return true;
+  }
+
   el.textContent = msg;
-  el.hidden = !msg;
-  el.classList.remove("success", "error");
+  el.hidden = false;
   if (type) el.classList.add(type);
 
-  clearTimeout(modalFooterTimer);
   if (msg && type && !options.persist) {
     modalFooterTimer = setTimeout(() => clearModalFooterMessageEl(el), 2500);
   }
@@ -141,17 +180,27 @@ function showIndicator(msg, type) {
   if (setModalFooterMessage(msg, type)) return;
 
   const el = document.getElementById("saveIndicator");
+  const wrap = document.getElementById("saveIndicatorWrap");
+  const dismiss = document.getElementById("saveIndicatorDismiss");
   if (!el) return;
+
   el.textContent = msg;
-  el.hidden = false;
+  if (wrap) wrap.hidden = false;
+  else el.hidden = false;
   el.className = "save-indicator visible" + (type ? ` ${type}` : "");
   clearTimeout(indicatorTimer);
-  // In-progress messages (no type) stay visible until replaced by success/error.
-  if (type) {
-    indicatorTimer = setTimeout(() => {
-      el.classList.remove("visible", "success", "error");
-      el.hidden = true;
-      el.textContent = "";
-    }, 2500);
+
+  const isError = type === "error";
+  if (dismiss) dismiss.hidden = !isError;
+
+  // Success auto-dismisses; errors stay until the user clicks X.
+  if (type === "success") {
+    indicatorTimer = setTimeout(() => clearIndicator(), 2500);
   }
 }
+
+function initSaveIndicator() {
+  document.getElementById("saveIndicatorDismiss")?.addEventListener("click", clearIndicator);
+}
+
+initSaveIndicator();

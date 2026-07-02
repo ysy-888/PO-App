@@ -12,7 +12,8 @@
 <header class="app-header">
   <nav class="app-title-nav" role="tablist" aria-label="Main views">
     <span class="app-logo-text">Elevator Disco</span>
-    <button type="button" class="app-title-tab is-active" id="navTabPo" role="tab" aria-selected="true">Purchase Orders</button>
+    <button type="button" class="app-title-tab is-active" id="navTabSalesOrders" role="tab" aria-selected="true">Sales Orders</button>
+    <button type="button" class="app-title-tab" id="navTabPo" role="tab" aria-selected="false">Purchase Orders</button>
     <button type="button" class="app-title-tab" id="navTabShipments" role="tab" aria-selected="false">Shipments</button>
     <div class="app-title-tab-dropdown-wrap" id="navTabRequestsWrap">
       <button type="button" class="app-title-tab app-title-tab--dropdown-trigger" id="navTabRequests" role="tab" aria-selected="false" aria-haspopup="menu">
@@ -44,12 +45,11 @@
     </div>
     <button type="button" class="app-title-tab" id="navTabChargebacks" role="tab" aria-selected="false">Chargebacks</button>
     <button type="button" class="app-title-tab" id="navTabCustomers" role="tab" aria-selected="false">Customers</button>
-    <button type="button" class="app-title-tab" id="navTabStyles" role="tab" aria-selected="false">Styles</button>
-    <button type="button" class="app-title-tab" id="navTabPackingReviews" role="tab" aria-selected="false">Vendor Submissions</button>
-    <button type="button" class="app-title-tab" id="navTabSalesOrders" role="tab" aria-selected="false">Sales Orders</button>
+    <button type="button" class="app-title-tab" id="navTabStyles" role="tab" aria-selected="false" hidden>Styles</button>
+    <button type="button" class="app-title-tab" id="navTabPackingReviews" role="tab" aria-selected="false" hidden>Vendor Submissions</button>
   </nav>
   <div class="header-right">
-    <div class="header-view-meta" id="poHeaderMeta">
+    <div class="header-view-meta" id="poHeaderMeta" hidden>
       <div class="counter" id="rowCounter">— rows</div>
       <div class="search-wrap header-search-wrap">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
@@ -99,7 +99,7 @@
         <input type="search" id="packingReviewSearchInput" placeholder="Search" />
       </div>
     </div>
-    <div class="header-view-meta" id="salesOrderHeaderMeta" hidden>
+    <div class="header-view-meta" id="salesOrderHeaderMeta">
       <div class="counter" id="salesOrderRowCounter">— sales orders</div>
       <div class="search-wrap header-search-wrap">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
@@ -136,8 +136,16 @@
 </header>
 
 <input type="file" id="csvImportInput" accept=".csv,text/csv" hidden />
+<div id="salesOrderToolbar" class="toolbar" hidden>
+  <div class="toolbar-end">
+    <button type="button" class="btn btn-secondary" id="soClearAllColumnFiltersBtn" hidden>
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M7 12h10"/><path d="M10 18h4"/><path d="m14 4-4 16"/></svg>
+      Clear all filters
+    </button>
+  </div>
+</div>
 
-<div id="poToolbar" class="toolbar">
+<div id="poToolbar" class="toolbar" hidden>
   <div class="toolbar-filter-cluster">
     <div class="toolbar-filter-section">
       <div class="filter-btn-group" id="divisionFilters" role="group" aria-label="Division"></div>
@@ -212,8 +220,8 @@
 </div>
 
 <div id="appMain" class="app-main">
-<div id="poViewContent" class="po-view-content">
-<div id="poTableWrap" class="table-scroll-y po-list-pane">
+<div id="poViewContent" class="po-view-content" hidden>
+<div id="poTableWrap" class="table-scroll-y po-list-pane" hidden>
   <div class="table-scroll-x">
   <table id="poTable">
     <colgroup>
@@ -743,39 +751,39 @@
   </div>
 </div>
 
-<div id="salesOrderTableWrap" class="table-scroll-y" hidden>
+<div id="salesOrderTableWrap" class="table-scroll-y">
   <div class="table-scroll-x">
   <table id="salesOrderTable">
     <colgroup>
-      <col class="col-so" />
-      <col class="col-buyer" />
-      <col class="col-buyer-po" />
-      <col class="col-date" />
-      <col class="col-date" />
-      <col class="col-cxl" />
-      <col class="col-vendor" />
-      <col class="col-n41-status" />
-      <col class="col-order-type" />
-      <col class="col-cust-type" />
-      <col class="col-so-styles" />
-      <col class="col-so-units" />
-      <col class="col-so-price" />
+      <col class="col-so" data-col="SO #" />
+      <col class="col-buyer" data-col="Customer" />
+      <col class="col-buyer-po" data-col="Customer PO #" />
+      <col class="col-date" data-col="Order Date" />
+      <col class="col-date" data-col="Ship Date" />
+      <col class="col-cxl" data-col="CXL Date" />
+      <col class="col-vendor" data-col="Store" />
+      <col class="col-n41-status" data-col="N41 Status" />
+      <col class="col-order-type" data-col="Order Type" />
+      <col class="col-cust-type" data-col="Customer Type" />
+      <col class="col-so-styles" data-col="Styles" />
+      <col class="col-so-units" data-col="Total Units" />
+      <col class="col-so-price" data-col="Total Price" />
     </colgroup>
     <thead>
       <tr>
-        <th>SO #</th>
-        <th>Customer</th>
-        <th>Customer PO #</th>
-        <th>Order Date</th>
-        <th>Ship Date</th>
-        <th>CXL Date</th>
-        <th>Store</th>
-        <th>N41 Status</th>
-        <th>Order Type</th>
-        <th>Customer Type</th>
-        <th>Styles</th>
-        <th>Total Units</th>
-        <th>Total Price</th>
+        <th data-col="SO #"><span class="th-label">SO #</span></th>
+        <th class="th-filterable" data-col="Customer"><span class="th-label">Customer</span></th>
+        <th class="th-filterable" data-col="Customer PO #"><span class="th-label">Customer PO #</span></th>
+        <th class="th-filterable" data-col="Order Date"><span class="th-label">Order Date</span></th>
+        <th class="th-filterable" data-col="Ship Date"><span class="th-label">Ship Date</span></th>
+        <th class="th-filterable" data-col="CXL Date"><span class="th-label">CXL Date</span></th>
+        <th class="th-filterable" data-col="Store"><span class="th-label">Store</span></th>
+        <th class="th-filterable" data-col="N41 Status"><span class="th-label">N41 Status</span></th>
+        <th class="th-filterable" data-col="Order Type"><span class="th-label">Order Type</span></th>
+        <th class="th-filterable" data-col="Customer Type"><span class="th-label">Customer Type</span></th>
+        <th data-col="Styles"><span class="th-label">Styles</span></th>
+        <th data-col="Total Units"><span class="th-label">Total Units</span></th>
+        <th data-col="Total Price"><span class="th-label">Total Price</span></th>
       </tr>
     </thead>
     <tbody id="salesOrderTableBody">
@@ -850,7 +858,10 @@
     <div id="testModeBanner" class="test-mode-status" hidden role="status" aria-live="polite">
       Test Mode
     </div>
-    <div class="save-indicator" id="saveIndicator" role="status" aria-live="polite" hidden></div>
+    <div class="save-indicator-wrap" id="saveIndicatorWrap" hidden>
+      <div class="save-indicator" id="saveIndicator" role="alert" aria-live="polite"></div>
+      <button type="button" class="message-dismiss-btn save-indicator-dismiss" id="saveIndicatorDismiss" aria-label="Dismiss message" hidden>✕</button>
+    </div>
   </div>
   <div id="poFooterEnd" class="app-footer-end">
     <div class="pagination-block">
@@ -884,6 +895,19 @@
   <div class="column-filter-footer">
     <button type="button" class="btn btn-primary column-filter-ok" id="columnFilterOk">OK</button>
     <button type="button" class="btn column-filter-cancel" id="columnFilterCancel">Cancel</button>
+  </div>
+</div>
+
+<div id="soColumnFilterPopover" class="column-filter-popover" hidden>
+  <div class="column-filter-toolbar" id="soColumnFilterToolbar">
+    <button type="button" class="column-filter-link" id="soColumnFilterSelectAll">Select all</button>
+    <span class="column-filter-sep" id="soColumnFilterSelectSep">|</span>
+    <button type="button" class="column-filter-link" id="soColumnFilterClearAll">Clear all</button>
+  </div>
+  <div class="column-filter-list" id="soColumnFilterList"></div>
+  <div class="column-filter-footer">
+    <button type="button" class="btn btn-primary column-filter-ok" id="soColumnFilterOk">OK</button>
+    <button type="button" class="btn column-filter-cancel" id="soColumnFilterCancel">Cancel</button>
   </div>
 </div>
 
@@ -1328,7 +1352,8 @@
     <div class="settings-modal-body">
       <nav class="settings-nav" id="settingsNav" aria-label="Settings sections">
         <button type="button" class="settings-nav-item is-active" data-settings-section="general">General</button>
-        <button type="button" class="settings-nav-item" data-settings-section="edit-table">Edit table</button>
+        <button type="button" class="settings-nav-item" data-settings-section="edit-table">Edit PO table</button>
+        <button type="button" class="settings-nav-item" data-settings-section="edit-so-table">Edit Sales Order table</button>
         <button type="button" class="settings-nav-item" data-settings-section="vendor-portal">Vendor Portal Links</button>
       </nav>
       <div class="settings-panel-wrap">
@@ -1380,6 +1405,23 @@
             <button type="button" class="btn edit-table-default-btn" id="editTableResetDefault">Reset to default</button>
           </div>
         </section>
+        <section class="settings-section settings-section--edit-table" id="settingsSectionEditSoTable" data-settings-section="edit-so-table" hidden>
+          <h4 class="settings-section-title">Edit Sales Order table</h4>
+          <p class="edit-table-subtitle">Choose columns on the left. Drag the list on the right to set display order.</p>
+          <div class="edit-table-toolbar-links">
+            <button type="button" class="column-filter-link" id="soEditTableSelectAll">Select all</button>
+            <span class="column-filter-sep">|</span>
+            <button type="button" class="column-filter-link" id="soEditTableClearAll">Clear all</button>
+          </div>
+          <div class="edit-table-panels">
+            <div class="edit-table-panel edit-table-panel-picker">
+              <div class="edit-table-picker-list" id="soEditTableColumnPicker"></div>
+            </div>
+            <div class="edit-table-panel edit-table-panel-order">
+              <div class="edit-table-order-list" id="soEditTableColumnOrder"></div>
+            </div>
+          </div>
+        </section>
         <section class="settings-section" id="settingsSectionVendorPortal" data-settings-section="vendor-portal" hidden>
           <h4 class="settings-section-title">Vendor Portal Links</h4>
           <div class="settings-group" id="settingsVendorSubmissionsGroup">
@@ -1405,6 +1447,8 @@
       <div id="editTableFooterMessage" class="modal-footer-message" role="status" aria-live="polite" hidden></div>
       <button type="button" class="btn btn-primary" id="editTableOk">OK</button>
       <button type="button" class="btn" id="editTableCancel">Cancel</button>
+      <button type="button" class="btn btn-primary" id="soEditTableOk" hidden>OK</button>
+      <button type="button" class="btn" id="soEditTableCancel" hidden>Cancel</button>
     </div>
   </div>
 </div>
@@ -1478,6 +1522,8 @@
 <script src="js/styles-import.js?v=20260627-1"></script>
 <script src="js/styles.js?v=20260627-1"></script>
 <script src="js/export-csv.js"></script>
+<script src="js/sales-orders-columns.js"></script>
+<script src="js/sales-orders-filters.js"></script>
 <script src="js/sales-orders.js"></script>
 <script src="js/sales-orders-import.js"></script>
 <script src="js/shipments-init.js"></script>

@@ -16,6 +16,10 @@ let sortCol = "CXL Date";
 let sortDir = 1;
 let pageSize = 60;
 let currentPage = 1;
+let soSortCol = "SO #";
+let soSortDir = 1;
+let soPageSize = 60;
+let soCurrentPage = 1;
 
 const DEMO_CONTACTS = [
   { Name: "Blue Fabrics", Type: "Vendor", Email: "demo@example.com", CC: "" },

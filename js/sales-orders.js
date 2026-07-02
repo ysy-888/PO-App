@@ -1,21 +1,5 @@
 /** Sales Orders list view and detail modal. */
 
-const SO_TABLE_COLUMNS = [
-  "SO #",
-  "Customer",
-  "Customer PO #",
-  "Order Date",
-  "Ship Date",
-  "CXL Date",
-  "Store",
-  "N41 Status",
-  "Order Type",
-  "Customer Type",
-  "Styles",
-  "Total Units",
-  "Total Price",
-];
-
 const SO_SEARCH_COLUMNS = [
   "SO #",
   "Customer",
@@ -25,6 +9,9 @@ const SO_SEARCH_COLUMNS = [
   "Order Type",
   "Customer Type",
 ];
+
+const SO_DEFAULT_SORT_COLUMNS = ["SO #", "Order Date"];
+const SO_PAGE_SIZE_STORAGE_BASE = "soPageSize";
 
 let filteredSalesOrders = [];
 
@@ -67,37 +54,217 @@ function onSalesOrdersDataLoaded(rows) {
   applySalesOrderFilters();
 }
 
+function getSoSortValue(order, col) {
+  if (col === "Styles") return (order.Lines ?? []).length;
+  if (col === "Total Units") return soTotalUnits(order);
+  if (col === "Total Price") return soTotalPrice(order);
+  return order[col];
+}
+
+function compareSoOrdersByColumn(col, a, b) {
+  if (SO_DATE_FILTER_COLUMNS.has(col)) {
+    return compareDateFieldValues(a[col], b[col]);
+  }
+  if (col === "Styles" || col === "Total Units" || col === "Total Price") {
+    return compareTextFieldValues(getSoSortValue(a, col), getSoSortValue(b, col));
+  }
+  if (col === "SO #") {
+    const an = Number(String(a["SO #"] ?? ""));
+    const bn = Number(String(b["SO #"] ?? ""));
+    if (Number.isFinite(an) && Number.isFinite(bn)) return an - bn;
+  }
+  return compareTextFieldValues(a[col], b[col]);
+}
+
+function compareSoOrdersForSort(a, b) {
+  if (soSortCol) {
+    const primary = compareSoOrdersByColumn(soSortCol, a, b) * soSortDir;
+    if (primary !== 0) return primary;
+    for (const col of SO_DEFAULT_SORT_COLUMNS) {
+      if (col === soSortCol) continue;
+      const cmp = compareSoOrdersByColumn(col, a, b);
+      if (cmp !== 0) return cmp;
+    }
+    return 0;
+  }
+  for (const col of SO_DEFAULT_SORT_COLUMNS) {
+    const cmp = compareSoOrdersByColumn(col, a, b);
+    if (cmp !== 0) return cmp;
+  }
+  return 0;
+}
+
 function applySalesOrderFilters() {
-  const q = (document.getElementById("salesOrderSearchInput")?.value ?? "").toLowerCase();
+  const q = (document.getElementById("salesOrderSearchInput")?.value ?? "").trim().toLowerCase();
   filteredSalesOrders = (allSalesOrders ?? []).filter(order => {
+    if (typeof rowPassesSoColumnFilters === "function" && !rowPassesSoColumnFilters(order)) return false;
     if (!q) return true;
     const haystack = SO_SEARCH_COLUMNS
       .map(col => String(order[col] ?? ""))
       .join(" ")
       .toLowerCase();
     if (haystack.includes(q)) return true;
-    // Also search style numbers/descriptions in Lines
     const lineHaystack = (order.Lines ?? [])
       .map(l => [l["Style #"], l.Color, l["Style Description"]].join(" "))
       .join(" ")
       .toLowerCase();
     return lineHaystack.includes(q);
   });
-  filteredSalesOrders.sort((a, b) => {
-    const an = Number(String(a["SO #"] ?? ""));
-    const bn = Number(String(b["SO #"] ?? ""));
-    if (Number.isFinite(an) && Number.isFinite(bn)) return an - bn;
-    return String(a["SO #"] ?? "").localeCompare(String(b["SO #"] ?? ""), undefined, { numeric: true });
-  });
+
+  filteredSalesOrders.sort(compareSoOrdersForSort);
+  soCurrentPage = 1;
   renderSalesOrdersTable();
   updateSalesOrderRowCounter();
+  updateSoClearAllFiltersButton();
+  if (typeof updateSoPaginationUI === "function") updateSoPaginationUI();
+}
+
+function sortBySo(col) {
+  if (soSortCol === col) {
+    if (soSortDir === 1) soSortDir = -1;
+    else {
+      soSortCol = null;
+      soSortDir = 1;
+    }
+  } else {
+    soSortCol = col;
+    soSortDir = 1;
+  }
+  updateSoSortHeaders();
+  applySalesOrderFilters();
+}
+
+function updateSoSortHeaders() {
+  document.querySelectorAll("#salesOrderTable thead th[data-col]").forEach(th => {
+    th.classList.remove("sorted-asc", "sorted-desc");
+    if (soSortCol && th.dataset.col === soSortCol) {
+      th.classList.add(soSortDir === 1 ? "sorted-asc" : "sorted-desc");
+    }
+  });
+}
+
+function isSoPageSizeAll() {
+  return !Number.isFinite(soPageSize);
+}
+
+function getSoTotalPages() {
+  if (isSoPageSizeAll() || filteredSalesOrders.length === 0) return 1;
+  return Math.ceil(filteredSalesOrders.length / soPageSize);
+}
+
+function getPagedSalesOrders() {
+  if (isSoPageSizeAll()) return filteredSalesOrders;
+  const totalPages = getSoTotalPages();
+  soCurrentPage = Math.min(Math.max(1, soCurrentPage), totalPages);
+  const start = (soCurrentPage - 1) * soPageSize;
+  return filteredSalesOrders.slice(start, start + soPageSize);
+}
+
+function getSalesOrderRowCounterText() {
+  const total = filteredSalesOrders.length;
+  if (total === 0) return "0 sales orders";
+  if (isSoPageSizeAll()) {
+    return total === 1 ? "1 sales order" : `${total} sales orders`;
+  }
+  const start = (soCurrentPage - 1) * soPageSize + 1;
+  const end = Math.min(soCurrentPage * soPageSize, total);
+  return `${start}${EN_DASH}${end} of ${total}`;
 }
 
 function updateSalesOrderRowCounter() {
   const el = document.getElementById("salesOrderRowCounter");
   if (!el) return;
-  const total = filteredSalesOrders.length;
-  el.textContent = total === 1 ? "1 sales order" : `${total} sales orders`;
+  el.textContent = getSalesOrderRowCounterText();
+}
+
+function updateSoPaginationUI() {
+  const nav = document.getElementById("paginationNav");
+  if (!nav) return;
+
+  const totalPages = getSoTotalPages();
+  const showPagination = !isSoPageSizeAll() && filteredSalesOrders.length > soPageSize;
+  nav.hidden = !showPagination;
+  if (!showPagination) return;
+
+  const indicator = document.getElementById("pageIndicator");
+  if (indicator) indicator.textContent = `${soCurrentPage} / ${totalPages}`;
+
+  const first = document.getElementById("pageFirst");
+  const prev = document.getElementById("pagePrev");
+  const next = document.getElementById("pageNext");
+  const last = document.getElementById("pageLast");
+  const onFirst = soCurrentPage <= 1;
+  const onLast = soCurrentPage >= totalPages;
+
+  if (first) first.disabled = onFirst;
+  if (prev) prev.disabled = onFirst;
+  if (next) next.disabled = onLast;
+  if (last) last.disabled = onLast;
+}
+
+function scrollSalesOrderTableToTop() {
+  document.getElementById("salesOrderTableWrap")?.scrollTo({ top: 0 });
+}
+
+function goToSoPage(page) {
+  const totalPages = getSoTotalPages();
+  const nextPage = Math.min(Math.max(1, page), totalPages);
+  if (nextPage === soCurrentPage) return;
+  soCurrentPage = nextPage;
+  renderSalesOrdersTable();
+  updateSalesOrderRowCounter();
+  updateSoPaginationUI();
+  scrollSalesOrderTableToTop();
+}
+
+function loadSoPageSizePreference() {
+  if (typeof isApiMode === "function" && isApiMode()) return DEFAULT_PAGE_SIZE;
+  try {
+    const stored = localStorage.getItem(scopedStorageKey(SO_PAGE_SIZE_STORAGE_BASE));
+    if (stored == null) return DEFAULT_PAGE_SIZE;
+    return normalizePageSizeValue(stored);
+  } catch {
+    return DEFAULT_PAGE_SIZE;
+  }
+}
+
+function saveSoPageSizePreference(value) {
+  const normalized = normalizePageSizeValue(value);
+  try {
+    localStorage.setItem(scopedStorageKey(SO_PAGE_SIZE_STORAGE_BASE), normalized);
+  } catch {
+    /* ignore */
+  }
+}
+
+function applySoPageSize(value) {
+  const normalized = normalizePageSizeValue(value);
+  soPageSize = normalized === "all" ? Infinity : Number(normalized);
+  soCurrentPage = 1;
+  const select = document.getElementById("pageSizeSelect");
+  if (select) select.value = normalized;
+}
+
+function setSoPageSize(value) {
+  const normalized = normalizePageSizeValue(value);
+  saveSoPageSizePreference(normalized);
+  soPageSize = normalized === "all" ? Infinity : Number(normalized);
+  soCurrentPage = 1;
+  renderSalesOrdersTable();
+  updateSalesOrderRowCounter();
+  updateSoPaginationUI();
+}
+
+function syncPaginationFooterForSales() {
+  applySoPageSize(loadSoPageSizePreference());
+  updateSoPaginationUI();
+  updateSalesOrderRowCounter();
+}
+
+function syncPaginationFooterForPo() {
+  if (typeof applyPageSize === "function") applyPageSize(loadPageSizePreference());
+  if (typeof updatePaginationUI === "function") updatePaginationUI();
+  if (typeof updateRowCounter === "function") updateRowCounter();
 }
 
 // ── Table render ─────────────────────────────────────────────────────────────
@@ -106,22 +273,32 @@ function renderSalesOrdersTable() {
   const tbody = document.getElementById("salesOrderTableBody");
   if (!tbody) return;
 
+  const visibleColCount = typeof getSoVisibleColumns === "function"
+    ? getSoColumnOrder().filter(col => isSoColumnVisible(col)).length
+    : SO_COLUMNS.length;
+
   if (filteredSalesOrders.length === 0) {
     const msg = (allSalesOrders ?? []).length === 0
       ? "No sales orders yet. Import a Sales Order Details CSV to get started."
-      : "No sales orders match the current search.";
-    tbody.innerHTML = `<tr class="state-row"><td colspan="${SO_TABLE_COLUMNS.length}">${msg}</td></tr>`;
+      : "No sales orders match the current filters.";
+    tbody.innerHTML = `<tr class="state-row"><td colspan="${visibleColCount || 1}">${msg}</td></tr>`;
     return;
   }
 
+  const pageOrders = getPagedSalesOrders();
   tbody.replaceChildren();
-  filteredSalesOrders.forEach(order => {
+  pageOrders.forEach(order => {
     const tr = document.createElement("tr");
     tr.className = "clickable-row";
     tr.dataset.so = String(order["SO #"] ?? "");
 
-    SO_TABLE_COLUMNS.forEach(col => {
+    const columnOrder = typeof getSoColumnOrder === "function" ? getSoColumnOrder() : SO_COLUMNS;
+    columnOrder.forEach(col => {
+      if (typeof isSoColumnVisible === "function" && !isSoColumnVisible(col)) return;
+
       const td = document.createElement("td");
+      td.dataset.col = col;
+
       if (col === "Styles") {
         td.textContent = String((order.Lines ?? []).length);
         td.className = "td-num";
@@ -136,9 +313,7 @@ function renderSalesOrdersTable() {
       } else if (col === "N41 Status") {
         const status = String(order[col] ?? "").trim();
         td.textContent = status || "—";
-        if (status) {
-          td.dataset.status = status.toLowerCase();
-        }
+        if (status) td.dataset.status = status.toLowerCase();
       } else {
         td.textContent = String(order[col] ?? "") || "—";
       }
@@ -397,6 +572,18 @@ function escSo(str) {
 }
 
 function initSalesOrdersView() {
+  loadSoColumnVisibility();
+  indexSoTableColumns();
+  applySoColumnOrder();
+  applySoColumnVisibility();
+  applySoPageSize(loadSoPageSizePreference());
+  initSoColumnFilterHeaders();
+  initSoEditTable();
+
+  document.querySelectorAll("#salesOrderTable thead th[data-col]:not(.th-filterable)").forEach(th => {
+    th.addEventListener("click", () => sortBySo(th.dataset.col));
+  });
+
   document.getElementById("salesOrderSearchInput")?.addEventListener("input", applySalesOrderFilters);
 
   document.getElementById("navTabSalesOrders")?.addEventListener("click", () => {
@@ -441,6 +628,8 @@ function initSalesOrdersView() {
   });
 
   initSoLinkFromPoTable();
+  updateSoSortHeaders();
+  updateSoColumnFilterHeaderStates();
 }
 
 initSalesOrdersView();

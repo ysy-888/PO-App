@@ -128,7 +128,19 @@ function isPoTableViewActive() {
   return Boolean(wrap && !wrap.hidden);
 }
 
+function isSalesOrdersViewActive() {
+  const wrap = document.getElementById("salesOrderTableWrap");
+  return Boolean(wrap && !wrap.hidden);
+}
+
 function isPaginationKeyboardEnabled() {
+  if (isSalesOrdersViewActive()) {
+    if (typeof isSoPageSizeAll === "function" && isSoPageSizeAll()) return false;
+    if (typeof filteredSalesOrders !== "undefined" && typeof soPageSize !== "undefined") {
+      return filteredSalesOrders.length > soPageSize;
+    }
+    return false;
+  }
   if (!isPoTableViewActive()) return false;
   if (isPageSizeAll()) return false;
   if (filteredRows.length <= pageSize) return false;
@@ -145,6 +157,11 @@ function initPaginationKeyboard() {
     if (!isPaginationKeyboardEnabled()) return;
 
     e.preventDefault();
+    if (isSalesOrdersViewActive() && typeof goToSoPage === "function") {
+      if (e.key === "ArrowLeft") goToSoPage(soCurrentPage - 1);
+      else goToSoPage(soCurrentPage + 1);
+      return;
+    }
     if (e.key === "ArrowLeft") goToPage(currentPage - 1);
     else goToPage(currentPage + 1);
   });

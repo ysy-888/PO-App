@@ -78,7 +78,7 @@ function initShipments() {
   bindDirectBackdropDismiss(document.getElementById("createShipmentOverlay"), closeCreateShipmentModal);
 
   initShipmentSelection();
-  switchAppView("po");
+  switchAppView("sales");
   if (typeof refreshSplitViewLayoutIfReady === "function") refreshSplitViewLayoutIfReady();
 }
 
