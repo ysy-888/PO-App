@@ -3,6 +3,7 @@
 const INV_SEARCH_COLUMNS = [
   "Invoice #",
   "Status",
+  "Division",
   "Customer",
   "Pick #",
   "Tracking #",
@@ -162,7 +163,10 @@ function initInvSelectionAndFlagControls() {
 // ── State ────────────────────────────────────────────────────────────────────
 
 function onInvoicesDataLoaded(rows) {
-  allInvoices = (rows ?? []).map(row => ({ ...row }));
+  allInvoices = (rows ?? []).map(row => ({
+    ...row,
+    Division: typeof normalizeDivision === "function" ? normalizeDivision(row.Division) : String(row.Division ?? "").trim(),
+  }));
   applyInvoiceFilters();
   if (typeof applySalesOrderFilters === "function") applySalesOrderFilters();
 }
@@ -213,6 +217,7 @@ function applyInvoiceFilters() {
   const q = (document.getElementById("invoiceSearchInput")?.value ?? "").trim().toLowerCase();
   filteredInvoices = (allInvoices ?? []).filter(inv => {
     if (invFlagFilterActive && !isTruthy(inv.Flag)) return false;
+    if (typeof rowPassesInvToolbarFilters === "function" && !rowPassesInvToolbarFilters(inv)) return false;
     if (typeof rowPassesInvColumnFilters === "function" && !rowPassesInvColumnFilters(inv)) return false;
     if (!q) return true;
     const haystack = INV_SEARCH_COLUMNS
@@ -473,6 +478,7 @@ function openInvoiceModal(inv) {
   bodyEl.innerHTML = `
 <div class="so-header-fields">
   <div class="so-field"><span class="so-field-label">INV DATE</span><span class="so-field-value">${formatInvDate(inv["INV DATE"])}</span></div>
+  <div class="so-field"><span class="so-field-label">Division</span><span class="so-field-value">${escInv(typeof getInvDivisionValue === "function" ? getInvDivisionValue(inv) || "—" : inv.Division || "—")}</span></div>
   <div class="so-field"><span class="so-field-label">SO #</span><span class="so-field-value" data-inv-so-link></span></div>
   <div class="so-field"><span class="so-field-label">Pick #</span><span class="so-field-value">${escInv(inv["Pick #"] ?? "—")}</span></div>
   <div class="so-field"><span class="so-field-label">Tracking #</span><span class="so-field-value">${escInv(inv["Tracking #"] ?? "—")}</span></div>
@@ -553,6 +559,7 @@ function initInvoicesView() {
   applyInvColumnOrder();
   applySoInvColumnVisibility();
   applyInvPageSize(loadInvPageSizePreference());
+  initInvToolbarFilters();
   initInvColumnFilterHeaders();
 
   initInvSelectionAndFlagControls();

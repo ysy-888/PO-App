@@ -6,8 +6,10 @@ const SO_COLUMNS = [
   "SO #",
   "Customer",
   "Customer PO #",
+  "Division",
   "INVOICE #",
   "INVOICE UNIT QTY",
+  "Subtotal",
   "TOTAL",
   "INVOICE STATUS",
   "Order Date",
@@ -30,6 +32,7 @@ const SO_NON_TOGGLEABLE_COLUMNS = new Set(SO_FIXED_LEADING_COLUMNS);
 const SO_FILTERABLE_COLUMNS = new Set([
   "Customer",
   "Customer PO #",
+  "Division",
   "INVOICE STATUS",
   "Store",
   "N41 Status",

@@ -7,6 +7,13 @@ export function salesOrderEntityId(orderNo) {
   return id;
 }
 
+function normalizeDivision(value) {
+  const s = String(value ?? "").trim();
+  if (/^elevator\s*disco$/i.test(s)) return "Elevator Disco";
+  if (/^freesia$/i.test(s)) return "Freesia";
+  return s;
+}
+
 /**
  * Build the JSONB data object for a Sales Order document.
  * raw.Lines is an array of style line objects; all other fields are header-level.
@@ -16,6 +23,7 @@ export function buildSalesOrderData(raw) {
     "SO #": soNum,
     Customer,
     "Customer PO #": customerPo,
+    Division,
     "Order Date": orderDate,
     "Ship Date": shipDate,
     "CXL Date": cxlDate,
@@ -30,6 +38,7 @@ export function buildSalesOrderData(raw) {
     "SO #": String(soNum ?? "").trim(),
     Customer: String(Customer ?? "").trim(),
     "Customer PO #": String(customerPo ?? "").trim(),
+    Division: normalizeDivision(Division),
     "Order Date": String(orderDate ?? "").trim(),
     "Ship Date": String(shipDate ?? "").trim(),
     "CXL Date": String(cxlDate ?? "").trim(),
@@ -42,7 +51,7 @@ export function buildSalesOrderData(raw) {
 }
 
 const HEADER_FIELDS = [
-  "SO #", "Customer", "Customer PO #", "Order Date", "Ship Date",
+  "SO #", "Customer", "Customer PO #", "Division", "Order Date", "Ship Date",
   "CXL Date", "Store", "N41 Status", "Order Type", "Customer Type",
 ];
 

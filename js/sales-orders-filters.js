@@ -1,8 +1,21 @@
 /** Sales Order table column filters. */
 
+const SO_STATUS_FILTER_ALL = "";
+const SO_STATUS_FILTER_OPEN = typeof STATUS_FILTER_OPEN !== "undefined" ? STATUS_FILTER_OPEN : "__open__";
+const SO_STATUS_FILTER_BUTTONS = [
+  { label: "All", value: SO_STATUS_FILTER_ALL },
+  { label: "Closed", value: "Closed" },
+  { divider: true },
+  { label: "Open", value: SO_STATUS_FILTER_OPEN },
+];
+
+let soActiveDivision = "";
+let soActiveStatusFilter = SO_STATUS_FILTER_OPEN;
+
 const SO_COLUMN_FILTER_COLS = [
   "Customer",
   "Customer PO #",
+  "Division",
   "INVOICE STATUS",
   "Store",
   "N41 Status",
@@ -21,6 +34,104 @@ const soDateColumnRangeFilters = Object.fromEntries(
 let soOpenFilterCol = null;
 let soFilterDraft = new Set();
 let soDateRangeDraft = { from: null, to: null };
+
+function getSoDivisionFilterValues() {
+  return typeof DIVISIONS !== "undefined" ? DIVISIONS : ["Elevator Disco", "Freesia"];
+}
+
+function getSoDivisionValue(order) {
+  const value = String(order?.Division ?? "").trim();
+  return typeof normalizeDivision === "function" ? normalizeDivision(value) : value;
+}
+
+function getSoToolbarStatusValue(order) {
+  return String(order?.["N41 Status"] ?? "").trim();
+}
+
+function rowMatchesSoToolbarStatusFilter(order) {
+  if (soActiveStatusFilter === SO_STATUS_FILTER_ALL) return true;
+
+  const status = getSoToolbarStatusValue(order);
+  if (soActiveStatusFilter === SO_STATUS_FILTER_OPEN) {
+    const normalized = status.toLowerCase();
+    return normalized !== "closed" && normalized !== "cxl";
+  }
+
+  return status.toLowerCase() === String(soActiveStatusFilter).toLowerCase();
+}
+
+function rowPassesSoToolbarFilters(order) {
+  if (soActiveDivision && getSoDivisionValue(order) !== soActiveDivision) return false;
+  return rowMatchesSoToolbarStatusFilter(order);
+}
+
+function syncSoDivisionFilterToolbar() {
+  document.querySelectorAll("#soDivisionFilters .filter-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.division === soActiveDivision);
+  });
+}
+
+function syncSoStatusFilterToolbar() {
+  document.querySelectorAll("#soStatusFilters .filter-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.status === soActiveStatusFilter);
+  });
+}
+
+function setSoDivisionFilter(division) {
+  soActiveDivision = typeof normalizeDivision === "function" ? normalizeDivision(division) : String(division ?? "").trim();
+  syncSoDivisionFilterToolbar();
+  applySalesOrderFilters();
+}
+
+function setSoStatusFilter(status) {
+  soActiveStatusFilter = status;
+  syncSoStatusFilterToolbar();
+  applySalesOrderFilters();
+}
+
+function initSoToolbarFilters() {
+  const divisionGroup = document.getElementById("soDivisionFilters");
+  if (divisionGroup) {
+    const makeDivisionBtn = (label, value) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "filter-btn";
+      btn.dataset.division = value;
+      btn.textContent = label;
+      btn.addEventListener("click", () => setSoDivisionFilter(value));
+      return btn;
+    };
+
+    divisionGroup.replaceChildren(
+      makeDivisionBtn("All", ""),
+      ...getSoDivisionFilterValues().map(division => makeDivisionBtn(division, division))
+    );
+    syncSoDivisionFilterToolbar();
+  }
+
+  const statusGroup = document.getElementById("soStatusFilters");
+  if (statusGroup) {
+    statusGroup.replaceChildren();
+    SO_STATUS_FILTER_BUTTONS.forEach(item => {
+      if (item.divider) {
+        const divider = document.createElement("div");
+        divider.className = "filter-btn-group-divider";
+        divider.setAttribute("aria-hidden", "true");
+        statusGroup.appendChild(divider);
+        return;
+      }
+
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "filter-btn";
+      btn.dataset.status = item.value;
+      btn.textContent = item.label;
+      btn.addEventListener("click", () => setSoStatusFilter(item.value));
+      statusGroup.appendChild(btn);
+    });
+    syncSoStatusFilterToolbar();
+  }
+}
 
 function normalizeSoFilterValue(val) {
   const s = String(val ?? "").trim();
@@ -68,7 +179,10 @@ function isSoColumnFilterActive(col) {
 }
 
 function hasActiveSoColumnFilters() {
-  return soFlagFilterActive || SO_COLUMN_FILTER_COLS.some(col => isSoColumnFilterActive(col));
+  return soFlagFilterActive ||
+    soActiveDivision !== "" ||
+    soActiveStatusFilter !== SO_STATUS_FILTER_ALL ||
+    SO_COLUMN_FILTER_COLS.some(col => isSoColumnFilterActive(col));
 }
 
 function updateSoClearAllFiltersButton() {
@@ -78,9 +192,13 @@ function updateSoClearAllFiltersButton() {
 
 function clearAllSoColumnFilters() {
   soFlagFilterActive = false;
+  soActiveDivision = "";
+  soActiveStatusFilter = SO_STATUS_FILTER_OPEN;
   SO_COLUMN_FILTER_COLS.forEach(col => { soColumnFilters[col] = null; });
   [...SO_DATE_FILTER_COLUMNS].forEach(col => { soDateColumnRangeFilters[col] = null; });
   closeSoColumnFilterPopover();
+  syncSoDivisionFilterToolbar();
+  syncSoStatusFilterToolbar();
   updateSoColumnFilterHeaderStates();
   updateSoFlagFilterHeaderState();
   applySalesOrderFilters();

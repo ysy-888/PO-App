@@ -511,37 +511,37 @@ select.filter-select:focus { border-color: var(--accent); }
   min-width: 0;
 }
 
-#statusFilters .filter-btn[data-status="__open__"] {
+.status-filters .filter-btn[data-status="__open__"] {
   --status-filter-bg: #eef0f3;
   --status-filter-fg: #4b5563;
   --status-filter-border: #d8dce2;
 }
 
-#statusFilters .filter-btn[data-status="WIP"] {
+.status-filters .filter-btn[data-status="WIP"] {
   --status-filter-bg: #faeeda;
   --status-filter-fg: #633806;
   --status-filter-border: #e8d4b8;
 }
 
-#statusFilters .filter-btn[data-status="__exf_req__"] {
+.status-filters .filter-btn[data-status="__exf_req__"] {
   --status-filter-bg: #fbeaf0;
   --status-filter-fg: #993556;
   --status-filter-border: #f0d0dc;
 }
 
-#statusFilters .filter-btn[data-status="OTW"] {
+.status-filters .filter-btn[data-status="OTW"] {
   --status-filter-bg: #e1f5ee;
   --status-filter-fg: #0f6e56;
   --status-filter-border: #c5e8dc;
 }
 
-#statusFilters .filter-btn[data-status="In Warehouse"] {
+.status-filters .filter-btn[data-status="In Warehouse"] {
   --status-filter-bg: #eaf3de;
   --status-filter-fg: #3b6d11;
   --status-filter-border: #d4e8c0;
 }
 
-#statusFilters .filter-btn .filter-btn-count {
+.status-filters .filter-btn .filter-btn-count {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -593,30 +593,30 @@ select.filter-select:focus { border-color: var(--accent); }
   filter: brightness(1.08);
 }
 
-#statusFilters .filter-btn[data-status]:not([data-status=""]):not([data-status="Closed"]) {
+.status-filters .filter-btn[data-status]:not([data-status=""]):not([data-status="Closed"]) {
   background: var(--status-filter-bg);
   color: var(--status-filter-fg);
   border-color: var(--status-filter-border);
 }
 
-#statusFilters .filter-btn[data-status]:not([data-status=""]):not([data-status="Closed"]):hover {
+.status-filters .filter-btn[data-status]:not([data-status=""]):not([data-status="Closed"]):hover {
   background: var(--status-filter-bg);
   filter: brightness(0.97);
 }
 
-#statusFilters .filter-btn[data-status]:not([data-status=""]):not([data-status="Closed"]).active,
-#statusFilters .filter-btn[data-status]:not([data-status=""]):not([data-status="Closed"]).active:hover {
+.status-filters .filter-btn[data-status]:not([data-status=""]):not([data-status="Closed"]).active,
+.status-filters .filter-btn[data-status]:not([data-status=""]):not([data-status="Closed"]).active:hover {
   background: var(--status-filter-fg);
   color: var(--status-filter-bg);
   border-color: var(--status-filter-fg);
   font-weight: 600;
 }
 
-#statusFilters .filter-btn[data-status]:not([data-status=""]):not([data-status="Closed"]).active:hover {
+.status-filters .filter-btn[data-status]:not([data-status=""]):not([data-status="Closed"]).active:hover {
   filter: brightness(1.08);
 }
 
-#statusFilters .filter-btn.active .filter-btn-count {
+.status-filters .filter-btn.active .filter-btn-count {
   background: rgba(255, 255, 255, 0.18);
   border-color: rgba(255, 255, 255, 0.28);
   color: inherit;
@@ -676,6 +676,8 @@ select.filter-select:focus { border-color: var(--accent); }
 }
 
 #poToolbar[hidden],
+#salesOrderToolbar[hidden],
+#invoiceToolbar[hidden],
 #shipmentToolbar[hidden],
 #chargebackToolbar[hidden],
 #packingReviewToolbar[hidden],
@@ -8746,12 +8748,13 @@ td.has-pending-approval .pending-approval-value {
   padding-left: 8px;
   box-sizing: border-box;
 }
-#salesOrderTable { min-width: 1700px; }
+#salesOrderTable { min-width: 1888px; }
 #salesOrderTable .col-flag       { width: 58px;  max-width: 58px; }
 #salesOrderTable .col-select     { width: 44px;  max-width: 44px; }
 #salesOrderTable .col-so         { width: 70px;  max-width: 70px; }
 #salesOrderTable .col-buyer      { width: 180px; min-width: 160px; }
 #salesOrderTable .col-buyer-po   { width: 150px; min-width: 130px; }
+#salesOrderTable .col-division   { width: 104px; max-width: 104px; }
 #salesOrderTable .col-date       { width: 76px;  max-width: 76px; }
 #salesOrderTable .col-cxl        { width: 76px;  max-width: 76px; }
 #salesOrderTable .col-vendor     { width: 104px; max-width: 104px; }

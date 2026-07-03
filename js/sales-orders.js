@@ -4,6 +4,7 @@ const SO_SEARCH_COLUMNS = [
   "SO #",
   "Customer",
   "Customer PO #",
+  "Division",
   "INVOICE #",
   "INVOICE STATUS",
   "Store",
@@ -67,6 +68,10 @@ function getInvoiceUnitQtyForSalesOrder(order) {
   return getLinkedInvoicesForSalesOrder(order).reduce((sum, inv) => sum + toInvNumberForSo(inv["Unit Qty"]), 0);
 }
 
+function getInvoiceSubtotalForSalesOrder(order) {
+  return getLinkedInvoicesForSalesOrder(order).reduce((sum, inv) => sum + toInvNumberForSo(inv.Subtotal), 0);
+}
+
 function getInvoiceTotalForSalesOrder(order) {
   return getLinkedInvoicesForSalesOrder(order).reduce((sum, inv) => sum + toInvNumberForSo(inv.Total), 0);
 }
@@ -97,6 +102,7 @@ function getSoComputedColumnValue(col, order) {
       .join(", ");
   }
   if (col === "INVOICE UNIT QTY") return getInvoiceUnitQtyForSalesOrder(order);
+  if (col === "Subtotal") return getInvoiceSubtotalForSalesOrder(order);
   if (col === "TOTAL") return getInvoiceTotalForSalesOrder(order);
   if (col === "INVOICE STATUS") return getInvoiceStatusesForSalesOrder(order).join(", ");
   return undefined;
@@ -345,8 +351,12 @@ function initSoSelectionAndFlagControls() {
 // ── State ────────────────────────────────────────────────────────────────────
 
 function onSalesOrdersDataLoaded(rows) {
-  allSalesOrders = (rows ?? []).map(row => ({ ...row }));
+  allSalesOrders = (rows ?? []).map(row => ({
+    ...row,
+    Division: typeof normalizeDivision === "function" ? normalizeDivision(row.Division) : String(row.Division ?? "").trim(),
+  }));
   applySalesOrderFilters();
+  if (typeof applyInvoiceFilters === "function") applyInvoiceFilters();
   if (
     (allRows ?? []).length > 0
     && typeof currentAppView !== "undefined"
@@ -377,6 +387,7 @@ function compareSoOrdersByColumn(col, a, b) {
     || col === "Total Units"
     || col === "Total Price"
     || col === "INVOICE UNIT QTY"
+    || col === "Subtotal"
     || col === "TOTAL"
   ) {
     return compareTextFieldValues(getSoSortValue(a, col), getSoSortValue(b, col));
@@ -411,6 +422,7 @@ function applySalesOrderFilters() {
   const q = (document.getElementById("salesOrderSearchInput")?.value ?? "").trim().toLowerCase();
   filteredSalesOrders = (allSalesOrders ?? []).filter(order => {
     if (soFlagFilterActive && !isTruthy(order.Flag)) return false;
+    if (typeof rowPassesSoToolbarFilters === "function" && !rowPassesSoToolbarFilters(order)) return false;
     if (typeof rowPassesSoColumnFilters === "function" && !rowPassesSoColumnFilters(order)) return false;
     if (!q) return true;
     const haystack = SO_SEARCH_COLUMNS
@@ -627,6 +639,10 @@ function renderSalesOrdersTable() {
       } else if (col === "INVOICE UNIT QTY") {
         const qty = getInvoiceUnitQtyForSalesOrder(order);
         td.textContent = qty > 0 ? qty.toLocaleString() : "—";
+        td.className = "td-num";
+      } else if (col === "Subtotal") {
+        const subtotal = getInvoiceSubtotalForSalesOrder(order);
+        td.textContent = subtotal > 0 ? formatSoPrice(subtotal) : "—";
         td.className = "td-num";
       } else if (col === "TOTAL") {
         const total = getInvoiceTotalForSalesOrder(order);
@@ -865,6 +881,7 @@ function openSalesOrderModal(order) {
   bodyEl.innerHTML = `
 <div class="so-header-fields">
   <div class="so-field"><span class="so-field-label">Customer PO #</span><span class="so-field-value">${escSo(order["Customer PO #"] ?? "—")}</span></div>
+  <div class="so-field"><span class="so-field-label">Division</span><span class="so-field-value">${escSo(order.Division ?? "—")}</span></div>
   <div class="so-field"><span class="so-field-label">Order Date</span><span class="so-field-value">${formatSoDate(order["Order Date"])}</span></div>
   <div class="so-field"><span class="so-field-label">Ship Date</span><span class="so-field-value">${formatSoDate(order["Ship Date"])}</span></div>
   <div class="so-field"><span class="so-field-label">CXL Date</span><span class="so-field-value">${formatSoDate(order["CXL Date"])}</span></div>
@@ -1000,6 +1017,7 @@ function initSalesOrdersView() {
   applySoColumnOrder();
   applySoColumnVisibility();
   applySoPageSize(loadSoPageSizePreference());
+  initSoToolbarFilters();
   initSoColumnFilterHeaders();
   initSoEditTable();
 

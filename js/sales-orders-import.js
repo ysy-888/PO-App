@@ -5,6 +5,7 @@ const SO_CSV_HEADER_MAP = {
   orderNo:    "SO #",
   custName:   "Customer",
   po:         "Customer PO #",
+  division:   "Division",
   orderDate:  "Order Date",
   shipDate:   "Ship Date",
   cancelDate: "CXL Date",
@@ -73,7 +74,10 @@ function groupSoCsvRowsIntoDocuments(csvObjects) {
       Object.entries(SO_CSV_HEADER_MAP).forEach(([csvField, docField]) => {
         if (csvField === "orderNo") return;
         const raw = String(csvRow[csvField] ?? "").trim();
-        if (raw) doc[docField] = raw;
+        if (!raw) return;
+        doc[docField] = docField === "Division" && typeof normalizeDivision === "function"
+          ? normalizeDivision(raw)
+          : raw;
       });
       byOrderNo.set(orderNo, doc);
     }

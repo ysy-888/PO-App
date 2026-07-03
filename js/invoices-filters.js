@@ -1,6 +1,17 @@
 /** Invoice table column filters. */
 
 let invFlagFilterActive = false;
+const INV_STATUS_FILTER_ALL = "";
+const INV_STATUS_FILTER_OPEN = typeof STATUS_FILTER_OPEN !== "undefined" ? STATUS_FILTER_OPEN : "__open__";
+const INV_STATUS_FILTER_BUTTONS = [
+  { label: "All", value: INV_STATUS_FILTER_ALL },
+  { label: "Closed", value: "Closed" },
+  { divider: true },
+  { label: "Open", value: INV_STATUS_FILTER_OPEN },
+];
+
+let invActiveDivision = "";
+let invActiveStatusFilter = INV_STATUS_FILTER_OPEN;
 
 const INV_COLUMN_FILTER_COLS = [
   "Status",
@@ -16,6 +27,110 @@ const invDateColumnRangeFilters = Object.fromEntries(
 let invOpenFilterCol = null;
 let invFilterDraft = new Set();
 let invDateRangeDraft = { from: null, to: null };
+
+function getInvDivisionFilterValues() {
+  return typeof DIVISIONS !== "undefined" ? DIVISIONS : ["Elevator Disco", "Freesia"];
+}
+
+function getInvDivisionValue(inv) {
+  const stored = String(inv?.Division ?? "").trim();
+  if (stored) return typeof normalizeDivision === "function" ? normalizeDivision(stored) : stored;
+
+  const linkedOrder = typeof findSalesOrderByNumber === "function"
+    ? findSalesOrderByNumber(inv?.["SO #"])
+    : null;
+  const linked = String(linkedOrder?.Division ?? "").trim();
+  return typeof normalizeDivision === "function" ? normalizeDivision(linked) : linked;
+}
+
+function getInvToolbarStatusValue(inv) {
+  return String(inv?.Status ?? "").trim();
+}
+
+function rowMatchesInvToolbarStatusFilter(inv) {
+  if (invActiveStatusFilter === INV_STATUS_FILTER_ALL) return true;
+
+  const status = getInvToolbarStatusValue(inv);
+  if (invActiveStatusFilter === INV_STATUS_FILTER_OPEN) {
+    const normalized = status.toLowerCase();
+    return normalized !== "closed" && normalized !== "cxl";
+  }
+
+  return status.toLowerCase() === String(invActiveStatusFilter).toLowerCase();
+}
+
+function rowPassesInvToolbarFilters(inv) {
+  if (invActiveDivision && getInvDivisionValue(inv) !== invActiveDivision) return false;
+  return rowMatchesInvToolbarStatusFilter(inv);
+}
+
+function syncInvDivisionFilterToolbar() {
+  document.querySelectorAll("#invDivisionFilters .filter-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.division === invActiveDivision);
+  });
+}
+
+function syncInvStatusFilterToolbar() {
+  document.querySelectorAll("#invStatusFilters .filter-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.status === invActiveStatusFilter);
+  });
+}
+
+function setInvDivisionFilter(division) {
+  invActiveDivision = typeof normalizeDivision === "function" ? normalizeDivision(division) : String(division ?? "").trim();
+  syncInvDivisionFilterToolbar();
+  applyInvoiceFilters();
+}
+
+function setInvStatusFilter(status) {
+  invActiveStatusFilter = status;
+  syncInvStatusFilterToolbar();
+  applyInvoiceFilters();
+}
+
+function initInvToolbarFilters() {
+  const divisionGroup = document.getElementById("invDivisionFilters");
+  if (divisionGroup) {
+    const makeDivisionBtn = (label, value) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "filter-btn";
+      btn.dataset.division = value;
+      btn.textContent = label;
+      btn.addEventListener("click", () => setInvDivisionFilter(value));
+      return btn;
+    };
+
+    divisionGroup.replaceChildren(
+      makeDivisionBtn("All", ""),
+      ...getInvDivisionFilterValues().map(division => makeDivisionBtn(division, division))
+    );
+    syncInvDivisionFilterToolbar();
+  }
+
+  const statusGroup = document.getElementById("invStatusFilters");
+  if (statusGroup) {
+    statusGroup.replaceChildren();
+    INV_STATUS_FILTER_BUTTONS.forEach(item => {
+      if (item.divider) {
+        const divider = document.createElement("div");
+        divider.className = "filter-btn-group-divider";
+        divider.setAttribute("aria-hidden", "true");
+        statusGroup.appendChild(divider);
+        return;
+      }
+
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "filter-btn";
+      btn.dataset.status = item.value;
+      btn.textContent = item.label;
+      btn.addEventListener("click", () => setInvStatusFilter(item.value));
+      statusGroup.appendChild(btn);
+    });
+    syncInvStatusFilterToolbar();
+  }
+}
 
 function normalizeInvFilterValue(val) {
   const s = String(val ?? "").trim();
@@ -59,7 +174,10 @@ function isInvColumnFilterActive(col) {
 }
 
 function hasActiveInvColumnFilters() {
-  return invFlagFilterActive || INV_COLUMN_FILTER_COLS.some(col => isInvColumnFilterActive(col));
+  return invFlagFilterActive ||
+    invActiveDivision !== "" ||
+    invActiveStatusFilter !== INV_STATUS_FILTER_ALL ||
+    INV_COLUMN_FILTER_COLS.some(col => isInvColumnFilterActive(col));
 }
 
 function updateInvClearAllFiltersButton() {
@@ -69,9 +187,13 @@ function updateInvClearAllFiltersButton() {
 
 function clearAllInvColumnFilters() {
   invFlagFilterActive = false;
+  invActiveDivision = "";
+  invActiveStatusFilter = INV_STATUS_FILTER_OPEN;
   INV_COLUMN_FILTER_COLS.forEach(col => { invColumnFilters[col] = null; });
   [...INV_DATE_FILTER_COLUMNS].forEach(col => { invDateColumnRangeFilters[col] = null; });
   closeInvColumnFilterPopover();
+  syncInvDivisionFilterToolbar();
+  syncInvStatusFilterToolbar();
   updateInvColumnFilterHeaderStates();
   updateInvFlagFilterHeaderState();
   applyInvoiceFilters();

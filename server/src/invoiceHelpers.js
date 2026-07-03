@@ -6,11 +6,19 @@ export function invoiceEntityId(invoiceNo) {
   return String(invoiceNo ?? "").trim();
 }
 
+function normalizeDivision(value) {
+  const s = String(value ?? "").trim();
+  if (/^elevator\s*disco$/i.test(s)) return "Elevator Disco";
+  if (/^freesia$/i.test(s)) return "Freesia";
+  return s;
+}
+
 const INVOICE_FIELDS = [
   "Invoice #",
   "Status",
   "INV DATE",
   "Customer",
+  "Division",
   "Subtotal",
   "Discount",
   "Freight",
@@ -32,7 +40,9 @@ const INVOICE_FIELDS = [
 export function buildInvoiceData(raw) {
   const result = {};
   INVOICE_FIELDS.forEach(field => {
-    result[field] = String(raw?.[field] ?? "").trim();
+    result[field] = field === "Division"
+      ? normalizeDivision(raw?.[field])
+      : String(raw?.[field] ?? "").trim();
   });
   return result;
 }

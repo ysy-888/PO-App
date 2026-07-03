@@ -5,6 +5,7 @@ const INV_CSV_HEADER_MAP = {
   status:       "Status",
   invoiceDate:  "INV DATE",
   customer:     "Customer",
+  division:     "Division",
   subtotal:     "Subtotal",
   discount:     "Discount",
   freight:      "Freight",
@@ -35,6 +36,8 @@ function parseInvCsvRowToDoc(csvRow) {
     if (INV_NUMERIC_IMPORT_FIELDS.has(docField)) {
       const n = Number(raw);
       doc[docField] = Number.isFinite(n) ? String(n) : raw;
+    } else if (docField === "Division" && typeof normalizeDivision === "function") {
+      doc[docField] = normalizeDivision(raw);
     } else {
       doc[docField] = raw;
     }

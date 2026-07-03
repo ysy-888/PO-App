@@ -133,6 +133,16 @@
 
 <input type="file" id="csvImportInput" accept=".csv,text/csv" hidden />
 <div id="salesOrderToolbar" class="toolbar" hidden>
+  <div class="toolbar-filter-cluster">
+    <div class="toolbar-filter-section">
+      <div class="filter-btn-group" id="soDivisionFilters" role="group" aria-label="Sales order division"></div>
+    </div>
+    <div class="toolbar-filter-divider" aria-hidden="true"></div>
+    <div class="toolbar-filter-section">
+      <div class="filter-btn-group status-filters" id="soStatusFilters" role="group" aria-label="Sales order status"></div>
+    </div>
+  </div>
+
   <div class="toolbar-end">
     <button type="button" class="btn btn-secondary" id="soClearAllColumnFiltersBtn" hidden>
       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M7 12h10"/><path d="M10 18h4"/><path d="m14 4-4 16"/></svg>
@@ -142,6 +152,16 @@
 </div>
 
 <div id="invoiceToolbar" class="toolbar" hidden>
+  <div class="toolbar-filter-cluster">
+    <div class="toolbar-filter-section">
+      <div class="filter-btn-group" id="invDivisionFilters" role="group" aria-label="Invoice division"></div>
+    </div>
+    <div class="toolbar-filter-divider" aria-hidden="true"></div>
+    <div class="toolbar-filter-section">
+      <div class="filter-btn-group status-filters" id="invStatusFilters" role="group" aria-label="Invoice status"></div>
+    </div>
+  </div>
+
   <div class="toolbar-end">
     <button type="button" class="btn btn-secondary" id="invClearAllColumnFiltersBtn" hidden>
       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M7 12h10"/><path d="M10 18h4"/><path d="m14 4-4 16"/></svg>
@@ -673,8 +693,10 @@
       <col class="col-so" data-col="SO #" />
       <col class="col-buyer" data-col="Customer" />
       <col class="col-buyer-po" data-col="Customer PO #" />
+      <col class="col-division" data-col="Division" />
       <col class="col-so" data-col="INVOICE #" />
       <col class="col-so-units" data-col="INVOICE UNIT QTY" />
+      <col class="col-so-price" data-col="Subtotal" />
       <col class="col-so-price" data-col="TOTAL" />
       <col class="col-status" data-col="INVOICE STATUS" />
       <col class="col-date" data-col="Order Date" />
@@ -703,8 +725,10 @@
         <th data-col="SO #"><span class="th-label">SO #</span></th>
         <th class="th-filterable" data-col="Customer"><span class="th-label">Customer</span></th>
         <th class="th-filterable" data-col="Customer PO #"><span class="th-label">Customer PO #</span></th>
+        <th class="th-filterable" data-col="Division"><span class="th-label">Division</span></th>
         <th data-col="INVOICE #"><span class="th-label">INVOICE #</span></th>
         <th data-col="INVOICE UNIT QTY"><span class="th-label">INVOICE UNIT QTY</span></th>
+        <th data-col="Subtotal"><span class="th-label">Subtotal</span></th>
         <th data-col="TOTAL"><span class="th-label">TOTAL</span></th>
         <th class="th-filterable" data-col="INVOICE STATUS"><span class="th-label">INVOICE STATUS</span></th>
         <th class="th-filterable" data-col="Order Date"><span class="th-label">Order Date</span></th>
@@ -722,7 +746,7 @@
       </tr>
     </thead>
     <tbody id="salesOrderTableBody">
-      <tr class="state-row"><td colspan="21">Loading sales orders…</td></tr>
+      <tr class="state-row"><td colspan="23">Loading sales orders…</td></tr>
     </tbody>
   </table>
   </div>
