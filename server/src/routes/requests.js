@@ -31,6 +31,7 @@ import {
   buildRequestEmailAttachments,
 } from "../packingListPrint/index.js";
 import { getCartonWeightLbs } from "../packingListPrint/helpers.js";
+import { archiveAttachmentsToDrive } from "../google.js";
 
 const router = Router();
 
@@ -177,6 +178,7 @@ async function sendAndStoreRequestEmail({ tenantId, tableName, entityId, type, r
     });
   }
   const result = await sendEmail({ ...message, attachments });
+  archiveAttachmentsToDrive(attachments);
   const fields = emailFieldsFromResult(result, hasRecipient);
   const updatedData = { ...(requestData || {}), ...fields };
   await updateRequestData(tableName, tenantId, entityId, updatedData);
@@ -211,6 +213,7 @@ async function sendAndStoreAsnCarrierEmail({ tenantId, requestId, requestData, p
   });
 
   const result = await sendEmail({ ...message, attachments });
+  archiveAttachmentsToDrive(attachments);
   const now = todayYmd();
   const fields = {
     "ASN Pickup Email Status": result.emailSent ? "Sent" : (hasRecipient ? "Failed" : "Not Sent"),

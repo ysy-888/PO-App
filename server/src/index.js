@@ -14,7 +14,10 @@ import chargebacksRouter from "./routes/chargebacks.js";
 import pendingPackingListsRouter from "./routes/pendingPackingLists.js";
 import salesOrdersRouter from "./routes/salesOrders.js";
 import invoicesRouter from "./routes/invoices.js";
+import googleRouter from "./routes/google.js";
 import { getEmailServiceStatus } from "./email.js";
+import { getGoogleStatus } from "./google.js";
+import { scheduleCalendarSync } from "./calendarSync.js";
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -56,6 +59,7 @@ app.get("/health", (_req, res) => {
       tokenConfigured: email.tokenConfigured,
       deploymentIdSuffix: email.deploymentId ? email.deploymentId.slice(-8) : "",
     },
+    google: getGoogleStatus(),
   });
 });
 
@@ -72,6 +76,7 @@ app.use("/api/chargebacks", chargebacksRouter);
 app.use("/api/pending-packing-lists", pendingPackingListsRouter);
 app.use("/api/sales-orders", salesOrdersRouter);
 app.use("/api/invoices", invoicesRouter);
+app.use("/api/google", googleRouter);
 
 // ── Error handler ───────────────────────────────────────────
 app.use((err, _req, res, _next) => {
@@ -82,6 +87,9 @@ app.use((err, _req, res, _next) => {
 app.listen(PORT, () => {
   console.log(`PO App API running on port ${PORT}`);
 });
+
+// Google Calendar sync (no-op unless GOOGLE_* env vars are configured).
+scheduleCalendarSync();
 
 // ── Keep-alive (Render free tier) ───────────────────────────
 // The free plan spins the service down after ~15 min without inbound

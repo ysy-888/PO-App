@@ -23,3 +23,9 @@ services:
         value: https://script.google.com/macros/s/AKfycbwj21tDgZBM19ALLOPpHMlMCnf9-VY4prU6l0m3K3E5O7S5PxTtXJFGxtQHFLGAEb0/exec
       - key: APPS_SCRIPT_EMAIL_TOKEN
         sync: false
+      - key: GOOGLE_SERVICE_ACCOUNT_KEY
+        sync: false
+      - key: GOOGLE_CALENDAR_ID
+        sync: false
+      - key: GOOGLE_DRIVE_FOLDER_ID
+        sync: false
