@@ -245,7 +245,7 @@ function renderCustomersTable() {
       } else if (col === CUSTOMER_EMAIL_SENT_AT_FIELD) {
         renderCustomerEmailSentCell(td, row);
       } else {
-        setDisplayText(td, formatCustomerCell(col, row));
+        mountSearchHighlightedText(td, formatCustomerCell(col, row), row[col]);
       }
       tr.appendChild(td);
     });

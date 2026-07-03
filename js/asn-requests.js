@@ -53,6 +53,7 @@ const asnRequestAvailablePoSelection = createAvailablePoPickerSelection();
 let asnRequestDraftByPo = {};
 let asnRequestDraftEmail = {};
 let asnRequestDraftAsnDate = "";
+let asnRequestSavedAsnDate = "";
 let asnRequestDraftNotes = "";
 let asnRequestBuyer = "";
 let asnRequestDraftCarrier = "";
@@ -209,6 +210,7 @@ function openAsnRequestDetail(id) {
     cc: request["CC"] ?? "",
   };
   asnRequestDraftAsnDate = request[ASN_DATE_FIELD] ?? "";
+  asnRequestSavedAsnDate = normalizeToYmd(request[ASN_DATE_FIELD] ?? "");
   asnRequestDraftNotes = request[ASN_REQ_NOTES_FIELD] ?? "";
   asnRequestDraftCarrier = request["Carrier"] ?? "";
   asnRequestDraftCarrierEmail = request["Carrier Email"] ?? "";
@@ -338,7 +340,10 @@ function renderAsnRequestTable() {
       } else {
         const text = formatAsnRequestTableCell(col, request);
         if (text === EMPTY_DISPLAY) setDisplayText(td, EMPTY_DISPLAY);
-        else { td.textContent = text; td.title = text; }
+        else {
+          mountSearchHighlightedText(td, text, request[col]);
+          td.title = text;
+        }
       }
       tr.appendChild(td);
     });
@@ -432,6 +437,7 @@ function openAsnRequestFromSelection() {
   asnRequestDraftByPo = {};
   asnRequestDraftEmail = {};
   asnRequestDraftAsnDate = "";
+  asnRequestSavedAsnDate = "";
   asnRequestDraftNotes = "";
   asnRequestDraftCarrier = "";
   asnRequestDraftCarrierEmail = "";
@@ -453,6 +459,10 @@ function getAsnRequestRows(poNumbers = asnRequestPoNumbers) {
 function getAsnRequestAsnDateValue() {
   const form = document.getElementById("asnRequestForm");
   return form ? readRequestForm(form)[ASN_DATE_FIELD] : formatDateToYmd(new Date());
+}
+
+function isAsnRequestAsnDateDirty() {
+  return normalizeToYmd(getAsnRequestAsnDateValue()) !== normalizeToYmd(asnRequestSavedAsnDate);
 }
 
 function captureAsnRequestDraft() {
@@ -599,7 +609,7 @@ function renderAsnRequestModal(poNumbers, { asnDate = formatDateToYmd(new Date()
     renderAsnRequestLinkedPoSection(pos, isView)
   ));
 
-  if (!isView && asnRequestAddPoPanelOpen) {
+  if (asnRequestAddPoPanelOpen) {
     appendAvailablePoPanelToModalRight(outer, renderAvailablePoLinkedSection(getAvailableAsnRequestPanelRows(), {
       sectionId: "asnRequestAddPoPanel",
       columns: ASN_REQUEST_LINKED_PO_COLUMNS,
@@ -621,6 +631,12 @@ function renderAsnRequestModal(poNumbers, { asnDate = formatDateToYmd(new Date()
   const requestId = titleLabel !== "ASN Request" && titleLabel !== "New" ? titleLabel : "";
   const asnForm = document.getElementById("asnRequestForm");
   const asnFormData = asnForm ? readRequestForm(asnForm) : {};
+  if (isView) {
+    const asnDateInput = asnForm?.querySelector(`[data-field="${ASN_DATE_FIELD}"]`);
+    const onAsnDateChange = () => updateAsnRequestActionButtons();
+    asnDateInput?.addEventListener("input", onAsnDateChange);
+    asnDateInput?.addEventListener("change", onAsnDateChange);
+  }
   if (typeof wirePackingListPrintButton === "function") {
     wirePackingListPrintButton("asnRequestPrintBtn", {
       poNumbers: poNumbers.slice(),
@@ -640,7 +656,10 @@ function renderAsnRequestModal(poNumbers, { asnDate = formatDateToYmd(new Date()
 
 function getAvailableAsnRequestPanelRows() {
   const linked = new Set(asnRequestPoNumbers.map(String));
-  return allRows.filter(row => !linked.has(String(row["PO #"] ?? "")));
+  return allRows.filter(row =>
+    isPoEligibleForAsnRequest(row) &&
+    !linked.has(String(row["PO #"] ?? ""))
+  );
 }
 
 function getAsnRequestModalRenderOptions(extra = {}) {
@@ -666,7 +685,7 @@ function closeAsnRequestAddPoPanel() {
   renderAsnRequestModal(asnRequestPoNumbers, getAsnRequestModalRenderOptions());
 }
 
-function addSelectedPosToAsnRequest() {
+async function addSelectedPosToAsnRequest() {
   const selected = asnRequestAvailablePoSelection.getAll();
   if (selected.length === 0) return;
   captureAsnRequestDraft();
@@ -674,18 +693,74 @@ function addSelectedPosToAsnRequest() {
   const toAdd = selected.filter(po => !existing.has(po));
   if (toAdd.length === 0) return;
   asnRequestAvailablePoSelection.clear();
-  asnRequestPoNumbers = [...asnRequestPoNumbers, ...toAdd];
-  asnRequestAddPoPanelOpen = true;
-  renderAsnRequestModal(asnRequestPoNumbers, getAsnRequestModalRenderOptions());
+  await addPosToAsnRequest(toAdd, { keepPanelOpen: true });
 }
 
-function addPoToAsnRequest(poNumber) {
+async function addPoToAsnRequest(poNumber) {
   captureAsnRequestDraft();
   const po = String(poNumber ?? "").trim();
   if (!po || asnRequestPoNumbers.map(String).includes(po)) return;
-  asnRequestPoNumbers = [...asnRequestPoNumbers, po];
-  asnRequestAddPoPanelOpen = true;
-  renderAsnRequestModal(asnRequestPoNumbers, getAsnRequestModalRenderOptions());
+  await addPosToAsnRequest([po], { keepPanelOpen: true });
+}
+
+async function addPosToAsnRequest(poNumbers, { keepPanelOpen = false } = {}) {
+  const toAdd = [...new Set((poNumbers ?? []).map(po => String(po ?? "").trim()).filter(Boolean))]
+    .filter(po => !asnRequestPoNumbers.map(String).includes(po));
+  if (toAdd.length === 0) return;
+
+  const requestId = getAsnRequestRecordId(asnRequestModalRow);
+  if (!requestId) {
+    asnRequestPoNumbers = [...asnRequestPoNumbers, ...toAdd];
+    asnRequestAddPoPanelOpen = keepPanelOpen;
+    renderAsnRequestModal(asnRequestPoNumbers, getAsnRequestModalRenderOptions());
+    return;
+  }
+
+  if (asnRequestOpInProgress) return;
+  asnRequestOpInProgress = true;
+  setAsnRequestFooterMessage("");
+  showIndicator(`Adding POs${ELLIPSIS}`, "");
+
+  const nextPoNumbers = [...asnRequestPoNumbers, ...toAdd];
+  const form = document.getElementById("asnRequestForm");
+  const data = form ? readRequestForm(form) : {};
+  const patch = {
+    "PO Numbers": nextPoNumbers.join(", "),
+    "PO Count": nextPoNumbers.length,
+    [ASN_DATE_FIELD]: data[ASN_DATE_FIELD] ?? asnRequestModalRow?.[ASN_DATE_FIELD] ?? "",
+    [ASN_REQ_SUBMIT_DATE_FIELD]: data[ASN_REQ_SUBMIT_DATE_FIELD] ?? asnRequestModalRow?.[ASN_REQ_SUBMIT_DATE_FIELD] ?? "",
+  };
+
+  try {
+    const json = await postApi("/api/requests/asn/update", { asnRequestId: requestId, request: patch });
+    if (!json.success) throw new Error(json.error || "Failed to add POs.");
+
+    asnRequestPoNumbers = nextPoNumbers;
+    const request = allAsnRequests.find(r => getAsnRequestRecordId(r) === requestId);
+    const mergedRequest = json.request || { ...(asnRequestModalRow || {}), ...patch };
+    if (request) Object.assign(request, mergedRequest);
+    asnRequestModalRow = request || mergedRequest;
+
+    nextPoNumbers.forEach(poNumber => {
+      const row = allRows.find(r => String(r["PO #"]) === String(poNumber));
+      if (!row) return;
+      row[ASN_REQUEST_ID_FIELD] = requestId;
+      row["ASN Requested"] = true;
+      row[ASN_DATE_FIELD] = mergedRequest[ASN_DATE_FIELD] ?? "";
+      row["ASN Req Date"] = mergedRequest[ASN_REQ_SUBMIT_DATE_FIELD] ?? "";
+    });
+
+    asnRequestAddPoPanelOpen = keepPanelOpen;
+    applyAsnRequestFilters();
+    applyFilters();
+    renderAsnRequestModal(asnRequestPoNumbers, { request: asnRequestModalRow });
+    showIndicator(`POs added to ASN ${CHECK_MARK}`, "success");
+  } catch (err) {
+    setAsnRequestFooterMessage("Add POs failed: " + err.message);
+    showIndicator("Add POs failed: " + err.message, "error");
+  } finally {
+    asnRequestOpInProgress = false;
+  }
 }
 
 function removePosFromAsnRequest() {
@@ -790,7 +865,7 @@ function updateAsnRequestActionButtons() {
 
   const isView = submitBtn?.hidden === true;
   const saveDateBtn = document.getElementById("asnRequestSaveDateBtn");
-  if (saveDateBtn) saveDateBtn.hidden = !isView;
+  if (saveDateBtn) saveDateBtn.hidden = !isView || !isAsnRequestAsnDateDirty();
   const cartonLabelBtn = document.getElementById("asnCartonLabelBtn");
   const printBtn = document.getElementById("asnRequestPrintBtn");
   if (printBtn) printBtn.hidden = !isView || asnRequestPoNumbers.length === 0;
@@ -799,10 +874,11 @@ function updateAsnRequestActionButtons() {
     cartonLabelBtn.disabled = asnRequestOpInProgress || isAppSaving();
   }
   if (isView) {
-    if (addBtn) addBtn.hidden = true;
+    const hasAvailablePos = getAvailableAsnRequestPanelRows().length > 0;
+    if (addBtn) addBtn.hidden = asnRequestAddPoPanelOpen || !hasAvailablePos;
     if (removeBtn) removeBtn.hidden = true;
-    if (doneBtn) doneBtn.hidden = true;
-    if (addSelectedBtn) addSelectedBtn.hidden = true;
+    if (doneBtn) doneBtn.hidden = !asnRequestAddPoPanelOpen;
+    if (addSelectedBtn) addSelectedBtn.hidden = !asnRequestAddPoPanelOpen || asnRequestAvailablePoSelection.size === 0;
     return;
   }
 
@@ -862,6 +938,7 @@ async function updateAsnRequestDate() {
     const request = allAsnRequests.find(r => getAsnRequestRecordId(r) === requestId);
     if (request) request[ASN_DATE_FIELD] = newDate;
     if (asnRequestModalRow) asnRequestModalRow[ASN_DATE_FIELD] = newDate;
+    asnRequestSavedAsnDate = normalizeToYmd(newDate);
 
     // Mirror the new date to every linked PO row.
     const poNumbers = getRequestPoNumbers(asnRequestModalRow, ASN_REQUEST_ID_FIELD);
@@ -888,6 +965,7 @@ function closeAsnRequestModal() {
   asnRequestDraftByPo = {};
   asnRequestDraftEmail = {};
   asnRequestDraftAsnDate = "";
+  asnRequestSavedAsnDate = "";
   asnRequestDraftNotes = "";
   asnRequestBuyer = "";
   asnRequestDraftCarrier = "";

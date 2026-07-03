@@ -6,6 +6,7 @@
  *
  * POST /api/requests/exf/create
  * POST /api/requests/asn/create
+ * POST /api/requests/asn/update
  * POST /api/requests/delivery/create
  * POST /api/requests/delivery/update
  * POST /api/requests/pickup/create
@@ -453,15 +454,20 @@ router.post("/asn/update", requireAuth, async (req, res) => {
     const { error } = await supabase.from("asn_requests").update({ data: merged }).eq("id", existing.id).eq("tenant_id", req.tenantId);
     if (error) throw error;
 
-    // Mirror ASN Date to all linked POs when it was updated.
-    if (request?.["ASN Date"] !== undefined) {
+    // Mirror ASN request fields to all linked POs when linked POs or ASN Date change.
+    if (request?.["PO Numbers"] !== undefined || request?.["ASN Date"] !== undefined) {
       const poNumbers = splitPoNumbers(merged["PO Numbers"] || "");
       if (poNumbers.length > 0) {
-        await updatePoFields(req.tenantId, poNumbers, { "ASN Date": request["ASN Date"] });
+        await updatePoFields(req.tenantId, poNumbers, {
+          "ASN Request ID": asnRequestId,
+          "ASN Requested": true,
+          "ASN Date": merged["ASN Date"] ?? "",
+          "ASN Req Date": merged["Request Date"] ?? "",
+        });
       }
     }
 
-    return res.json({ success: true });
+    return res.json({ success: true, request: merged });
   } catch (err) {
     console.error("asn update failed:", err);
     return res.status(500).json({ success: false, error: err.message || "Failed to update ASN request." });

@@ -203,7 +203,7 @@ function renderApprovalRequestTable() {
         const text = formatApprovalRequestTableCell(col, approval);
         if (text === EMPTY_DISPLAY) setDisplayText(td, EMPTY_DISPLAY);
         else {
-          td.textContent = text;
+          mountSearchHighlightedText(td, text, approval[col]);
           td.title = text;
         }
       }

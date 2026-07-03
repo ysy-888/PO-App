@@ -225,7 +225,10 @@ function renderPackingReviewTable() {
       } else {
         const text = formatPackingReviewCell(col, row);
         if (text === EMPTY_DISPLAY) setDisplayText(td, EMPTY_DISPLAY);
-        else { td.textContent = text; td.title = text; }
+        else {
+          mountSearchHighlightedText(td, text, row[col]);
+          td.title = text;
+        }
       }
       tr.appendChild(td);
     });

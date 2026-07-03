@@ -40,6 +40,17 @@ function formatInvDate(val) {
   return s;
 }
 
+function setInvCellText(td, text, className = "") {
+  td.className = className;
+  const display = String(text ?? "").trim();
+  if (!display || display === "—" || display === EMPTY_DISPLAY) {
+    setDisplayText(td, EMPTY_DISPLAY);
+    return;
+  }
+  mountSearchHighlightedText(td, display, text);
+  td.classList.remove("empty-display");
+}
+
 function escInv(str) {
   return String(str ?? "")
     .replace(/&/g, "&amp;")
@@ -418,26 +429,24 @@ function renderInvoicesTable() {
       } else if (col === "Invoice #") {
         td.className = "readonly readonly-no-select";
         if (typeof mountInvoiceLinks === "function") mountInvoiceLinks(td, [inv]);
-        else td.textContent = String(inv[col] ?? "") || "—";
+        else setInvCellText(td, inv[col], "readonly readonly-no-select");
       } else if (INV_CURRENCY_COLUMNS.has(col)) {
         const n = toInvNumber(inv[col]);
-        td.textContent = n !== 0 ? formatInvCurrency(n) : "—";
-        td.className = "td-num";
+        setInvCellText(td, n !== 0 ? formatInvCurrency(n) : EMPTY_DISPLAY, "td-num");
       } else if (INV_NUMERIC_COLUMNS.has(col)) {
         const n = toInvNumber(inv[col]);
-        td.textContent = n !== 0 ? n.toLocaleString() : "—";
-        td.className = "td-num";
+        setInvCellText(td, n !== 0 ? n.toLocaleString() : EMPTY_DISPLAY, "td-num");
       } else if (col === "INV DATE") {
-        td.textContent = formatInvDate(inv[col]);
+        setInvCellText(td, formatInvDate(inv[col]));
       } else if (col === "Status") {
         const status = String(inv[col] ?? "").trim();
-        td.textContent = status || "—";
+        setInvCellText(td, status || EMPTY_DISPLAY);
         if (status) td.dataset.status = status.toLowerCase();
       } else if (col === "SO #" && typeof mountSalesOrderLink === "function") {
         td.className = "readonly readonly-no-select";
         mountSalesOrderLink(td, inv[col]);
       } else {
-        td.textContent = String(inv[col] ?? "") || "—";
+        setInvCellText(td, inv[col]);
       }
       tr.appendChild(td);
     });

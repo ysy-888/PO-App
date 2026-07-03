@@ -77,9 +77,10 @@ function renderStylesTable() {
     STYLE_TABLE_COLUMNS.forEach(col => {
       const td = document.createElement("td");
       if (col === "Size Run") {
-        td.textContent = getStyleSizeRunPreview(row) || "—";
+        const preview = getStyleSizeRunPreview(row);
+        mountSearchHighlightedText(td, preview || EMPTY_DISPLAY, preview);
       } else {
-        td.textContent = String(row[col] ?? "") || "—";
+        mountSearchHighlightedText(td, String(row[col] ?? "") || EMPTY_DISPLAY, row[col]);
       }
       tr.appendChild(td);
     });

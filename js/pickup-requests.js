@@ -128,7 +128,10 @@ function renderPickupRequestTable() {
       else {
         const text = formatPickupRequestTableCell(col, request);
         if (text === EMPTY_DISPLAY) setDisplayText(td, EMPTY_DISPLAY);
-        else { td.textContent = text; td.title = text; }
+        else {
+          mountSearchHighlightedText(td, text, request[col]);
+          td.title = text;
+        }
       }
       tr.appendChild(td);
     });

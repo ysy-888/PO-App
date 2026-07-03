@@ -101,7 +101,7 @@ function getSoComputedColumnValue(col, order) {
       .filter(Boolean)
       .join(", ");
   }
-  if (col === "INVOICE UNIT QTY") return getInvoiceUnitQtyForSalesOrder(order);
+  if (col === "INV QTY") return getInvoiceUnitQtyForSalesOrder(order);
   if (col === "Subtotal") return getInvoiceSubtotalForSalesOrder(order);
   if (col === "TOTAL") return getInvoiceTotalForSalesOrder(order);
   if (col === "INVOICE STATUS") return getInvoiceStatusesForSalesOrder(order).join(", ");
@@ -386,7 +386,7 @@ function compareSoOrdersByColumn(col, a, b) {
     || col === "Style #s"
     || col === "Total Units"
     || col === "Total Price"
-    || col === "INVOICE UNIT QTY"
+    || col === "INV QTY"
     || col === "Subtotal"
     || col === "TOTAL"
   ) {
@@ -636,30 +636,50 @@ function renderSalesOrdersTable() {
       } else if (col === "INVOICE #") {
         td.className = "readonly readonly-no-select";
         mountInvoiceLinks(td, getLinkedInvoicesForSalesOrder(order));
-      } else if (col === "INVOICE UNIT QTY") {
+      } else if (col === "INV QTY") {
         const qty = getInvoiceUnitQtyForSalesOrder(order);
-        td.textContent = qty > 0 ? qty.toLocaleString() : "—";
         td.className = "td-num";
+        if (qty > 0) {
+          td.textContent = qty.toLocaleString();
+          td.classList.remove("empty-display");
+        } else {
+          setDisplayText(td, EMPTY_DISPLAY);
+        }
       } else if (col === "Subtotal") {
         const subtotal = getInvoiceSubtotalForSalesOrder(order);
-        td.textContent = subtotal > 0 ? formatSoPrice(subtotal) : "—";
         td.className = "td-num";
+        if (subtotal > 0) {
+          td.textContent = formatSoPrice(subtotal);
+          td.classList.remove("empty-display");
+        } else {
+          setDisplayText(td, EMPTY_DISPLAY);
+        }
       } else if (col === "TOTAL") {
         const total = getInvoiceTotalForSalesOrder(order);
-        td.textContent = total > 0 ? formatSoPrice(total) : "—";
         td.className = "td-num";
+        if (total > 0) {
+          td.textContent = formatSoPrice(total);
+          td.classList.remove("empty-display");
+        } else {
+          setDisplayText(td, EMPTY_DISPLAY);
+        }
       } else if (col === "INVOICE STATUS") {
         const status = getInvoiceStatusesForSalesOrder(order).join(", ");
-        td.textContent = status || "—";
-        if (status) td.dataset.status = status.toLowerCase();
+        if (status) {
+          mountSearchHighlightedText(td, status, status);
+          td.dataset.status = status.toLowerCase();
+          td.classList.remove("empty-display");
+        } else {
+          setDisplayText(td, EMPTY_DISPLAY);
+        }
       } else if (col === "Styles") {
         td.textContent = String((order.Lines ?? []).length);
         td.className = "td-num";
       } else if (col === "Style #s") {
         const styleNums = (order.Lines ?? []).map(l => String(l["Style #"] ?? "").trim()).filter(Boolean);
-        td.textContent = styleNums.length ? styleNums.join(", ") : "—";
+        mountSearchHighlightedText(td, styleNums.length ? styleNums.join(", ") : EMPTY_DISPLAY, styleNums.join(", "));
       } else if (col === "Memo") {
-        td.textContent = String(order.Memo ?? "");
+        mountSearchHighlightedText(td, String(order.Memo ?? ""), order.Memo);
       } else if (col === "Total Units") {
         td.textContent = soTotalUnits(order).toLocaleString();
         td.className = "td-num";
@@ -667,13 +687,13 @@ function renderSalesOrdersTable() {
         td.textContent = formatSoPrice(soTotalPrice(order));
         td.className = "td-num";
       } else if (["Order Date", "Ship Date", "CXL Date"].includes(col)) {
-        td.textContent = formatSoDate(order[col]);
+        mountSearchHighlightedText(td, formatSoDate(order[col]), order[col]);
       } else if (col === "N41 Status") {
         const status = String(order[col] ?? "").trim();
-        td.textContent = status || "—";
+        mountSearchHighlightedText(td, status || EMPTY_DISPLAY, status);
         if (status) td.dataset.status = status.toLowerCase();
       } else {
-        td.textContent = String(order[col] ?? "") || "—";
+        mountSearchHighlightedText(td, String(order[col] ?? "") || EMPTY_DISPLAY, order[col]);
       }
       tr.appendChild(td);
     });

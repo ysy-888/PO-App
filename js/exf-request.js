@@ -296,7 +296,7 @@ function renderExfRequestTable() {
         const text = formatExfRequestTableCell(col, request);
         if (text === EMPTY_DISPLAY) setDisplayText(td, EMPTY_DISPLAY);
         else {
-          td.textContent = text;
+          mountSearchHighlightedText(td, text, request[col]);
           td.title = text;
         }
       }

@@ -582,7 +582,7 @@ function renderShipmentsTable() {
       if (text === EMPTY_DISPLAY) {
         setDisplayText(td, EMPTY_DISPLAY);
       } else {
-        td.textContent = text;
+        mountSearchHighlightedText(td, text, text);
       }
       tr.appendChild(td);
     });
@@ -685,7 +685,7 @@ function renderChargebacksTable() {
       if (text === EMPTY_DISPLAY) {
         setDisplayText(td, EMPTY_DISPLAY);
       } else {
-        td.textContent = text;
+        mountSearchHighlightedText(td, text, getChargebackTableValue(chargeback, col));
       }
       tr.appendChild(td);
     });

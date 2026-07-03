@@ -8,7 +8,7 @@ const SO_COLUMNS = [
   "Customer PO #",
   "Division",
   "INVOICE #",
-  "INVOICE UNIT QTY",
+  "INV QTY",
   "Subtotal",
   "TOTAL",
   "INVOICE STATUS",
@@ -109,15 +109,19 @@ function saveSoColumnLayoutPreference() {
   }
 }
 
+function migrateSoColumnName(col) {
+  return col === "INVOICE UNIT QTY" ? "INV QTY" : col;
+}
+
 function loadSoColumnLayoutPreference() {
   try {
     const raw = localStorage.getItem(scopedStorageKey(SO_COLUMN_LAYOUT_STORAGE_BASE));
     if (!raw) return false;
     const data = JSON.parse(raw);
     if (!data || !Array.isArray(data.order) || !Array.isArray(data.visible)) return false;
-    const storedOrder = data.order.filter(col => SO_COLUMNS.includes(col));
-    soColumnOrder = normalizeSoColumnOrder(data.order);
-    soVisibleColumns = ensureSoAlwaysVisibleColumns(new Set(data.visible.filter(col => SO_COLUMNS.includes(col))));
+    const storedOrder = data.order.map(migrateSoColumnName).filter(col => SO_COLUMNS.includes(col));
+    soColumnOrder = normalizeSoColumnOrder(data.order.map(migrateSoColumnName));
+    soVisibleColumns = ensureSoAlwaysVisibleColumns(new Set(data.visible.map(migrateSoColumnName).filter(col => SO_COLUMNS.includes(col))));
     SO_COLUMNS.forEach(col => {
       if (!storedOrder.includes(col)) soVisibleColumns.add(col);
     });

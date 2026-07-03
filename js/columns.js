@@ -25,9 +25,28 @@ function buildSearchHighlightedHtml(text, query) {
   return html;
 }
 
+function getActiveSearchHighlightQuery() {
+  const searchInputIds = {
+    sales: "salesOrderSearchInput",
+    po: "searchInput",
+    shipments: "shipmentSearchInput",
+    requests: "requestsSearchInput",
+    chargebacks: "chargebackSearchInput",
+    invoices: "invoiceSearchInput",
+    customers: "customersSearchInput",
+    styles: "stylesSearchInput",
+    packingReviews: "packingReviewSearchInput",
+  };
+  const view = typeof currentAppView !== "undefined" ? currentAppView : "";
+  const input = document.getElementById(searchInputIds[view])
+    || document.querySelector(".header-view-meta:not([hidden]) input[type='search']");
+  const query = String(input?.value ?? "").trim();
+  return query || String(activeSearchQuery ?? "").trim();
+}
+
 function getSearchHighlightedFragment(displayText, searchableText) {
   const display = String(displayText ?? "");
-  const q = (activeSearchQuery ?? "").trim();
+  const q = getActiveSearchHighlightQuery();
   if (!q) return escapeHtml(display);
 
   const hay = String(searchableText ?? display).toLowerCase();
@@ -41,7 +60,7 @@ function mountSearchHighlightedText(el, displayText, searchableText) {
     setDisplayText(el, EMPTY_DISPLAY);
     return;
   }
-  const q = (activeSearchQuery ?? "").trim();
+  const q = getActiveSearchHighlightQuery();
   if (!q) {
     setDisplayText(el, displayText);
     return;

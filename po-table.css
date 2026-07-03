@@ -454,8 +454,8 @@ mark.search-match {
   background: rgba(255, 200, 64, 0.65);
   color: inherit;
   font-weight: 600;
-  padding: 0 3px;
-  margin: 0 -1px;
+  padding: 0;
+  margin: 0;
   border-radius: 3px;
   box-shadow:
     0 0 5px rgba(255, 149, 0, 0.95),
@@ -2028,7 +2028,7 @@ tr.editing td { background: var(--edit-bg); }
 td.readonly { color: var(--text); }
 
 /* Qty values — semibold with a softer muted tone */
-:is(th, td)[data-col$=" Qty"]:not(.empty-display),
+td[data-col$=" Qty"]:not(.empty-display),
 .shipment-po-cell-qty:not(.empty-display),
 .modal-size-static:not(:empty),
 .modal-size-input:not(:placeholder-shown),
@@ -2053,11 +2053,6 @@ td.readonly { color: var(--text); }
   font-weight: 700;
   color: var(--qty-total-fg);
   font-variant-numeric: tabular-nums;
-}
-
-th[data-col$=" Qty"],
-th.shipment-po-cell-qty {
-  color: var(--qty-header-fg);
 }
 
 .modal-size-total--act.modal-size-total--match:not(:empty) {
@@ -2760,12 +2755,12 @@ td.n41-status-mismatch,
 }
 
 #poTable col[data-col="Buyer PO #"] {
-  width: 80px;
+  width: 100px;
 }
 
 #poTable :is(th, td)[data-col="Buyer PO #"].col-w-m {
-  min-width: 80px;
-  max-width: 80px;
+  min-width: 100px;
+  max-width: 100px;
 }
 
 /* Full-screen dark overlay */
@@ -5868,7 +5863,7 @@ td.n41-status-mismatch,
   display: flex;
   flex-direction: column;
   overflow-x: hidden;
-  overflow-y: auto;
+  overflow-y: hidden;
   padding: 24px;
 }
 
@@ -5967,14 +5962,19 @@ td.n41-status-mismatch,
   align-items: stretch;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
 }
 
 .shipment-modal-left {
   flex: 0 0 auto;
   width: auto;
   min-width: 0;
-  overflow: visible;
-  align-self: flex-start;
+  min-height: 0;
+  max-height: 100%;
+  overflow-y: auto;
+  overflow-x: visible;
+  align-self: stretch;
+  padding-right: 4px;
 }
 
 .shipment-modal-left .shipment-form-edit:not(.request-form-edit) .email-meta {
@@ -5986,14 +5986,13 @@ td.n41-status-mismatch,
   flex: 1 1 0;
   min-width: 0;
   min-height: 0;
-  align-self: flex-start;
+  align-self: stretch;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  position: sticky;
-  top: 0;
+  position: relative;
   width: 100%;
-  max-height: calc(100vh - 190px);
+  max-height: 100%;
 }
 
 .shipment-form-edit {
@@ -6334,7 +6333,8 @@ td.n41-status-mismatch,
   width: 100%;
   min-width: 0;
   max-width: none;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   table-layout: fixed;
   font-size: 13px;
   background: #fff;
@@ -6347,7 +6347,7 @@ td.n41-status-mismatch,
 .shipment-modal-card .shipment-linked-po-table th {
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: 4;
   padding: 10px 12px;
   text-align: left;
   font-size: 11px;
@@ -6366,6 +6366,11 @@ td.n41-status-mismatch,
   text-overflow: ellipsis;
   white-space: nowrap;
   user-select: none;
+}
+
+.shipment-add-po-table-wrap .email-po-table th,
+.shipment-add-po-table-wrap .shipment-linked-po-table th {
+  z-index: 5;
 }
 
 .shipment-modal-card .email-po-table th.linked-po-sortable-header,
@@ -8749,8 +8754,10 @@ td.has-pending-approval .pending-approval-value {
   box-sizing: border-box;
 }
 #salesOrderTable { min-width: 1888px; }
-#salesOrderTable .col-flag       { width: 58px;  max-width: 58px; }
-#salesOrderTable .col-select     { width: 44px;  max-width: 44px; }
+#salesOrderTable .col-flag,
+#invoiceTable .col-flag          { width: 34px;  max-width: 34px; }
+#salesOrderTable .col-select,
+#invoiceTable .col-select        { width: 30px;  max-width: 30px; }
 #salesOrderTable .col-so         { width: 70px;  max-width: 70px; }
 #salesOrderTable .col-buyer      { width: 180px; min-width: 160px; }
 #salesOrderTable .col-buyer-po   { width: 150px; min-width: 130px; }
@@ -8767,13 +8774,18 @@ td.has-pending-approval .pending-approval-value {
 #salesOrderTable .col-so-memo    { min-width: 140px; }
 
 #salesOrderTable th.th-flag-col,
-#salesOrderTable td.td-flag-cell {
-  padding-left: 24px;
+#salesOrderTable td.td-flag-cell,
+#invoiceTable th.th-flag-col,
+#invoiceTable td.td-flag-cell {
+  padding-left: 4px;
+  padding-right: 0;
 }
 
 #salesOrderTable th.th-select-col,
-#salesOrderTable td.td-select-cell {
-  padding-left: 2px;
+#salesOrderTable td.td-select-cell,
+#invoiceTable th.th-select-col,
+#invoiceTable td.td-select-cell {
+  padding-left: 0;
   padding-right: 2px;
   text-align: center;
 }
@@ -8784,9 +8796,10 @@ td.has-pending-approval .pending-approval-value {
 #salesOrderTable .col-so-units,
 #salesOrderTable .col-so-price { text-align: right; }
 
-/* Styles + Total Units → center */
+/* Styles + Total Units + INV QTY → center */
 #salesOrderTable :is(th, td)[data-col="Styles"],
-#salesOrderTable :is(th, td)[data-col="Total Units"] { text-align: center; }
+#salesOrderTable :is(th, td)[data-col="Total Units"],
+#salesOrderTable :is(th, td)[data-col="INV QTY"] { text-align: center; }
 
 /* Store → left */
 #salesOrderTable :is(th, td)[data-col="Store"] { text-align: left; }

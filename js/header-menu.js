@@ -130,6 +130,64 @@ function isInvoicesViewActive() {
   return Boolean(wrap && !wrap.hidden);
 }
 
+function isGlobalShortcutBlocked(target) {
+  if (isTypingInField(target)) return true;
+  if (document.querySelector(".modal-backdrop.open")) return true;
+  if (typeof openCellSelect !== "undefined" && openCellSelect) return true;
+  return false;
+}
+
+function getCurrentViewSearchInput() {
+  const view = typeof currentAppView !== "undefined" ? currentAppView : "po";
+  const searchInputIds = {
+    sales: "salesOrderSearchInput",
+    po: "searchInput",
+    shipments: "shipmentSearchInput",
+    requests: "requestsSearchInput",
+    chargebacks: "chargebackSearchInput",
+    invoices: "invoiceSearchInput",
+    customers: "customersSearchInput",
+    styles: "stylesSearchInput",
+    packingReviews: "packingReviewSearchInput",
+  };
+  const input = document.getElementById(searchInputIds[view]);
+  if (input) return input;
+  return document.querySelector(".header-view-meta:not([hidden]) input[type='search']");
+}
+
+function focusCurrentViewSearch() {
+  const input = getCurrentViewSearchInput();
+  if (!input) return;
+  input.focus();
+  input.select();
+}
+
+function applyCurrentViewDivisionShortcut(division) {
+  const view = typeof currentAppView !== "undefined" ? currentAppView : "po";
+  if (view === "sales" && typeof setSoDivisionFilter === "function") {
+    setSoDivisionFilter(division);
+    return true;
+  }
+  if (view === "invoices" && typeof setInvDivisionFilter === "function") {
+    setInvDivisionFilter(division);
+    return true;
+  }
+  if ((view === "po" || isPoTableViewActive()) && typeof setDivisionFilter === "function") {
+    setDivisionFilter(division);
+    return true;
+  }
+  return false;
+}
+
+function switchAppViewFromShortcut(view) {
+  if (typeof switchAppView !== "function") return;
+  switchAppView(view);
+  const hasRequestType = typeof currentRequestType !== "undefined" && Boolean(currentRequestType);
+  if (view === "requests" && !hasRequestType && typeof switchRequestType === "function") {
+    switchRequestType("approval");
+  }
+}
+
 function isPaginationKeyboardEnabled() {
   if (isSalesOrdersViewActive()) {
     if (typeof isSoPageSizeAll === "function" && isSoPageSizeAll()) return false;
@@ -155,9 +213,7 @@ function initPaginationKeyboard() {
   document.addEventListener("keydown", e => {
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
     if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
-    if (isTypingInField(e.target)) return;
-    if (document.querySelector(".modal-backdrop.open")) return;
-    if (typeof openCellSelect !== "undefined" && openCellSelect) return;
+    if (isGlobalShortcutBlocked(e.target)) return;
     if (!isPaginationKeyboardEnabled()) return;
 
     e.preventDefault();
@@ -177,10 +233,7 @@ function initPaginationKeyboard() {
 }
 
 function focusPoSearch() {
-  const input = document.getElementById("searchInput");
-  if (!input) return;
-  input.focus();
-  input.select();
+  focusCurrentViewSearch();
 }
 
 function updateSearchInputVisualState() {
@@ -231,30 +284,39 @@ function initSearchInput() {
 
 function initToolbarKeyboard() {
   document.addEventListener("keydown", e => {
-    if (!isPoTableViewActive()) return;
-    if (document.querySelector(".modal-backdrop.open")) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
 
     if (e.key === " " || e.code === "Space") {
-      if (isTypingInField(e.target)) return;
-      if (miniSelectedIndices.size > 0) return;
+      if (isGlobalShortcutBlocked(e.target)) return;
+      if (typeof miniSelectedIndices !== "undefined" && miniSelectedIndices.size > 0) return;
       e.preventDefault();
-      focusPoSearch();
+      focusCurrentViewSearch();
       return;
     }
 
-    if (isTypingInField(e.target)) return;
+    if (isGlobalShortcutBlocked(e.target)) return;
+
+    const viewShortcuts = {
+      1: "sales",
+      2: "po",
+      3: "shipments",
+      4: "requests",
+      5: "invoices",
+      6: "customers",
+    };
+    if (Object.prototype.hasOwnProperty.call(viewShortcuts, e.key)) {
+      e.preventDefault();
+      switchAppViewFromShortcut(viewShortcuts[e.key]);
+      return;
+    }
 
     const key = e.key.toLowerCase();
     if (key === "a") {
-      e.preventDefault();
-      setDivisionFilter("");
+      if (applyCurrentViewDivisionShortcut("")) e.preventDefault();
     } else if (key === "e") {
-      e.preventDefault();
-      setDivisionFilter("Elevator Disco");
+      if (applyCurrentViewDivisionShortcut("Elevator Disco")) e.preventDefault();
     } else if (key === "f") {
-      e.preventDefault();
-      setDivisionFilter("Freesia");
+      if (applyCurrentViewDivisionShortcut("Freesia")) e.preventDefault();
     }
   });
 }
