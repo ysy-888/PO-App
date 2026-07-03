@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>PO Table</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-<link rel="stylesheet" href="po-table.css?v=20260703-1" />
+<link rel="stylesheet" href="po-table.css?v=20260703-2" />
 </head>
 <body>
 
@@ -494,7 +494,6 @@
       <col class="col-status" />
       <col class="col-date" />
       <col class="col-notes" />
-      <col class="col-actions" />
     </colgroup>
     <thead>
       <tr>
@@ -511,11 +510,10 @@
         <th>Email Status</th>
         <th>Email Sent</th>
         <th>Email Error</th>
-        <th>Action</th>
       </tr>
     </thead>
     <tbody id="approvalRequestTableBody">
-      <tr class="state-row"><td colspan="14">Loading approvals…</td></tr>
+      <tr class="state-row"><td colspan="13">Loading approvals…</td></tr>
     </tbody>
   </table>
   </div>
@@ -538,7 +536,6 @@
       <col class="col-date" />
       <col class="col-date" />
       <col class="col-notes" />
-      <col class="col-actions" />
     </colgroup>
     <thead>
       <tr>
@@ -556,11 +553,10 @@
         <th>Email Sent</th>
         <th>Last Attempt</th>
         <th>Email Error</th>
-        <th>Action</th>
       </tr>
     </thead>
     <tbody id="exfRequestTableBody">
-      <tr class="state-row"><td colspan="15">Loading EXF requests…</td></tr>
+      <tr class="state-row"><td colspan="14">Loading EXF requests…</td></tr>
     </tbody>
   </table>
   </div>
@@ -582,7 +578,6 @@
       <col class="col-date" />
       <col class="col-date" />
       <col class="col-notes" />
-      <col class="col-actions" />
     </colgroup>
     <thead>
       <tr>
@@ -599,11 +594,10 @@
         <th>Email Sent</th>
         <th>Last Attempt</th>
         <th>Email Error</th>
-        <th>Action</th>
       </tr>
     </thead>
     <tbody id="asnRequestTableBody">
-      <tr class="state-row"><td colspan="14">Loading ASN requests…</td></tr>
+      <tr class="state-row"><td colspan="13">Loading ASN requests…</td></tr>
     </tbody>
   </table>
   </div>
@@ -1089,18 +1083,21 @@
             <div class="email-request-date" id="shipmentModalDate" hidden></div>
           </div>
           <div class="modal-header-actions">
+            <span id="shipmentModalStatusBadge" class="badge" hidden></span>
             <span id="shipmentModalPoCount" class="shipment-modal-po-count"></span>
-            <button type="button" class="btn btn-secondary" id="shipmentDetailAddPosBtn">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-              Add POs
-            </button>
-            <button type="button" class="btn btn-secondary" id="shipmentDetailRemovePosBtn" hidden>
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>
-              Remove POs
-            </button>
             <button type="button" class="btn btn-secondary" id="shipmentDetailAddSelectedPosBtn" hidden>Add</button>
             <button type="button" class="btn btn-secondary" id="shipmentDetailAddPoDoneBtn" hidden>Done</button>
-            <button type="button" class="btn btn-secondary packing-list-print-btn" id="shipmentModalPrintBtn" hidden title="Print packing list for linked POs">Print Packing List</button>
+            <div class="header-menu-wrap modal-header-menu-wrap">
+              <button type="button" class="btn btn-icon" id="shipmentModalMenuBtn" aria-label="Shipment menu" aria-haspopup="menu" aria-expanded="false">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.75"/><circle cx="12" cy="12" r="1.75"/><circle cx="12" cy="19" r="1.75"/></svg>
+              </button>
+              <div id="shipmentModalMenuDropdown" class="header-menu-dropdown modal-header-menu-dropdown" hidden role="menu">
+                <button type="button" class="header-menu-item" id="shipmentDetailAddPosBtn" role="menuitem">Add POs</button>
+                <button type="button" class="header-menu-item" id="shipmentDetailRemovePosBtn" role="menuitem" hidden>Remove POs</button>
+                <button type="button" class="header-menu-item" id="shipmentModalPrintBtn" role="menuitem" hidden title="Print packing list for linked POs">Print Packing List</button>
+                <button type="button" class="header-menu-item" id="shipmentReceiveBtn" role="menuitem" hidden>Receive</button>
+              </div>
+            </div>
             <button type="button" class="btn-close" id="shipmentModalCloseBtn" aria-label="Close">✕</button>
           </div>
         </div>
@@ -1109,10 +1106,6 @@
     <div class="modal-body" id="shipmentModalBody"></div>
     <div class="modal-footer">
       <div id="shipmentModalFooterMessage" class="modal-footer-message shipment-footer-message" role="status" aria-live="polite" hidden></div>
-      <button type="button" class="btn btn-secondary" id="shipmentReceiveBtn" hidden>
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
-        Receive
-      </button>
       <button type="button" class="btn btn-primary" id="shipmentModalSaveBtn">
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
         Save
@@ -1137,16 +1130,18 @@
           </div>
           <div class="modal-header-actions">
             <span id="exfRequestPoCount" class="shipment-modal-po-count"></span>
-            <button type="button" class="btn btn-secondary" id="exfRequestAddPosBtn">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-              Add POs
-            </button>
-            <button type="button" class="btn btn-secondary" id="exfRequestRemovePosBtn" hidden>
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>
-              Remove POs
-            </button>
             <button type="button" class="btn btn-secondary" id="exfRequestAddSelectedPosBtn" hidden>Add</button>
             <button type="button" class="btn btn-secondary" id="exfRequestAddPoDoneBtn" hidden>Done</button>
+            <div class="header-menu-wrap modal-header-menu-wrap">
+              <button type="button" class="btn btn-icon" id="exfRequestMenuBtn" aria-label="EXF request menu" aria-haspopup="menu" aria-expanded="false">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.75"/><circle cx="12" cy="12" r="1.75"/><circle cx="12" cy="19" r="1.75"/></svg>
+              </button>
+              <div id="exfRequestMenuDropdown" class="header-menu-dropdown modal-header-menu-dropdown" hidden role="menu">
+                <button type="button" class="header-menu-item" id="exfRequestAddPosBtn" role="menuitem">Add POs</button>
+                <button type="button" class="header-menu-item" id="exfRequestRemovePosBtn" role="menuitem" hidden>Remove POs</button>
+                <button type="button" class="header-menu-item" id="exfRequestResendBtn" role="menuitem" hidden>Resend Email</button>
+              </div>
+            </div>
             <button type="button" class="btn-close" id="exfRequestCancelBtn" aria-label="Close">✕</button>
           </div>
         </div>
@@ -1182,19 +1177,24 @@
             <div class="email-request-date" id="asnRequestModalDate"></div>
           </div>
           <div class="modal-header-actions">
+            <span id="asnRequestStatusBadge" class="badge" hidden></span>
             <span id="asnRequestPoCount" class="shipment-modal-po-count"></span>
-            <button type="button" class="btn btn-secondary" id="asnRequestAddPosBtn">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-              Add POs
-            </button>
-            <button type="button" class="btn btn-secondary" id="asnRequestRemovePosBtn" hidden>
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>
-              Remove POs
-            </button>
             <button type="button" class="btn btn-secondary" id="asnRequestAddSelectedPosBtn" hidden>Add</button>
             <button type="button" class="btn btn-secondary" id="asnRequestAddPoDoneBtn" hidden>Done</button>
-            <button type="button" class="btn btn-secondary packing-list-print-btn" id="asnRequestPrintBtn" hidden title="Print packing list for linked POs">Print Packing List</button>
-            <button type="button" class="btn btn-secondary" id="asnCartonLabelBtn" hidden>Carton Label</button>
+            <div class="header-menu-wrap modal-header-menu-wrap">
+              <button type="button" class="btn btn-icon" id="asnRequestMenuBtn" aria-label="ASN request menu" aria-haspopup="menu" aria-expanded="false">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.75"/><circle cx="12" cy="12" r="1.75"/><circle cx="12" cy="19" r="1.75"/></svg>
+              </button>
+              <div id="asnRequestMenuDropdown" class="header-menu-dropdown modal-header-menu-dropdown" hidden role="menu">
+                <button type="button" class="header-menu-item" id="asnRequestAddPosBtn" role="menuitem">Add POs</button>
+                <button type="button" class="header-menu-item" id="asnRequestRemovePosBtn" role="menuitem" hidden>Remove POs</button>
+                <button type="button" class="header-menu-item" id="asnRequestPrintBtn" role="menuitem" hidden title="Print packing list for linked POs">Print Packing List</button>
+                <button type="button" class="header-menu-item" id="asnCartonLabelBtn" role="menuitem" hidden>Carton Label</button>
+                <button type="button" class="header-menu-item" id="asnResendEmailBtn" role="menuitem" hidden>Resend Email</button>
+                <button type="button" class="header-menu-item" id="asnResendCarrierBtn" role="menuitem" hidden>Resend Carrier</button>
+                <button type="button" class="header-menu-item" id="asnPickedUpBtn" role="menuitem" hidden>Picked Up</button>
+              </div>
+            </div>
             <button type="button" class="btn-close" id="asnRequestCancelBtn" aria-label="Close">✕</button>
           </div>
         </div>
@@ -1249,6 +1249,14 @@
             <div class="email-request-date" id="approvalRequestModalDate"></div>
           </div>
           <div class="modal-header-actions">
+            <div class="header-menu-wrap modal-header-menu-wrap">
+              <button type="button" class="btn btn-icon" id="approvalRequestMenuBtn" aria-label="Approval request menu" aria-haspopup="menu" aria-expanded="false">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.75"/><circle cx="12" cy="12" r="1.75"/><circle cx="12" cy="19" r="1.75"/></svg>
+              </button>
+              <div id="approvalRequestMenuDropdown" class="header-menu-dropdown modal-header-menu-dropdown" hidden role="menu">
+                <button type="button" class="header-menu-item" id="approvalResendBtn" role="menuitem" hidden>Resend Email</button>
+              </div>
+            </div>
             <button type="button" class="btn-close" id="approvalRequestCancelBtn" aria-label="Close">✕</button>
           </div>
         </div>
@@ -1612,12 +1620,12 @@
 <script src="js/save.js"></script>
 <script src="js/batch-edit.js"></script>
 <script src="js/main.js"></script>
-<script src="js/shipments-tables.js?v=20260703-1"></script>
-<script src="js/shipments-modals.js?v=20260703-1"></script>
+<script src="js/shipments-tables.js?v=20260703-2"></script>
+<script src="js/shipments-modals.js?v=20260703-2"></script>
 <script src="js/request-modals.js?v=20260605-10"></script>
-<script src="js/exf-request.js?v=20260627-1"></script>
-<script src="js/asn-requests.js?v=20260703-1"></script>
-<script src="js/approval-requests.js"></script>
+<script src="js/exf-request.js?v=20260703-1"></script>
+<script src="js/asn-requests.js?v=20260703-3"></script>
+<script src="js/approval-requests.js?v=20260703-1"></script>
 <script src="js/packing-reviews.js"></script>
 <script src="js/customers-import.js"></script>
 <script src="js/customers.js"></script>

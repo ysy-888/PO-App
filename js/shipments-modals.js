@@ -26,15 +26,58 @@ function openShipmentDetail(shipmentOrId) {
   bringModalToFront(document.getElementById("shipmentModalOverlay"));
 }
 
+/**
+ * Header ⋮ menu shared by the shipment and ASN detail modals: toggles on the
+ * button, closes on item click, outside pointerdown, or Escape.
+ */
+function bindModalHeaderMenu(btnId, dropdownId) {
+  const btn = document.getElementById(btnId);
+  const menu = document.getElementById(dropdownId);
+  if (!btn || !menu) return;
+
+  const close = () => {
+    menu.hidden = true;
+    btn.setAttribute("aria-expanded", "false");
+  };
+
+  btn.addEventListener("click", e => {
+    e.stopPropagation();
+    const willOpen = menu.hidden;
+    menu.hidden = !willOpen;
+    btn.setAttribute("aria-expanded", willOpen ? "true" : "false");
+  });
+  menu.addEventListener("click", e => {
+    if (e.target.closest(".header-menu-item")) close();
+  });
+  document.addEventListener("pointerdown", e => {
+    if (menu.hidden) return;
+    if (btn.parentElement?.contains(e.target)) return;
+    close();
+  }, true);
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && !menu.hidden) close();
+  });
+}
+
+/** Sync the shipment modal's status badge and Receive/Reopen menu item. */
 function updateShipmentReceiveButton() {
   const btn = document.getElementById("shipmentReceiveBtn");
-  if (!btn) return;
+  const badge = document.getElementById("shipmentModalStatusBadge");
   if (!shipmentModalRow) {
-    btn.hidden = true;
+    if (btn) btn.hidden = true;
+    if (badge) badge.hidden = true;
     return;
   }
-  btn.hidden = false;
-  btn.lastChild.textContent = isShipmentReceived(shipmentModalRow) ? " Reopen" : " Receive";
+  const received = isShipmentReceived(shipmentModalRow);
+  if (btn) {
+    btn.hidden = false;
+    btn.textContent = received ? "Reopen" : "Receive";
+  }
+  if (badge) {
+    badge.hidden = false;
+    badge.textContent = received ? SHIPMENT_STATUS_RECEIVED : SHIPMENT_STATUS_OPEN;
+    badge.className = "badge " + (received ? "badge-received" : "badge-otw");
+  }
 }
 
 /**

@@ -9482,3 +9482,13 @@ button.dash-kpi:hover { border-color: var(--border-strong); background: var(--ro
   color: var(--text);
   background: var(--accent-light);
 }
+
+.dashboard-wrap[hidden] { display: none !important; }
+
+.header-menu-item[hidden] { display: none !important; }
+
+/* Status badge in the shipment/ASN modal headers */
+#shipmentModalStatusBadge,
+#asnRequestStatusBadge {
+  flex-shrink: 0;
+}

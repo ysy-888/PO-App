@@ -68,6 +68,9 @@ function initShipments() {
     if (!shipmentModalRow) return;
     setShipmentReceived(shipmentModalRow[SHIPMENT_ID_FIELD], !isShipmentReceived(shipmentModalRow));
   });
+  if (typeof bindModalHeaderMenu === "function") {
+    bindModalHeaderMenu("shipmentModalMenuBtn", "shipmentModalMenuDropdown");
+  }
   document.getElementById("shipmentModalCloseBtn")?.addEventListener("click", closeShipmentModalForce);
   document.getElementById("shipmentModalBody")?.addEventListener("input", () => {
     clearShipmentFooterMessage("shipmentModalFooterMessage");

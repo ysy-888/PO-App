@@ -296,17 +296,34 @@ function initToolbarKeyboard() {
 
     if (isGlobalShortcutBlocked(e.target)) return;
 
+    // Digit keys follow the nav order: logo (Home) first, then the tabs.
     const viewShortcuts = {
-      1: "sales",
-      2: "po",
-      3: "shipments",
-      4: "requests",
-      5: "invoices",
-      6: "customers",
+      1: "dashboard",
+      2: "sales",
+      3: "po",
+      4: "shipments",
+      5: "requests",
+      6: "invoices",
+      7: "chargebacks",
+      8: "customers",
+    };
+    const viewShortcutTabs = {
+      dashboard: "navLogoDashboard",
+      sales: "navTabSalesOrders",
+      po: "navTabPo",
+      shipments: "navTabShipments",
+      requests: "navTabRequests",
+      invoices: "navTabInvoices",
+      chargebacks: "navTabChargebacks",
+      customers: "navTabCustomers",
     };
     if (Object.prototype.hasOwnProperty.call(viewShortcuts, e.key)) {
+      const view = viewShortcuts[e.key];
+      // Skip views whose tab is feature-hidden (e.g. Chargebacks turned off).
+      const tab = document.getElementById(viewShortcutTabs[view]);
+      if (tab && tab.hidden) return;
       e.preventDefault();
-      switchAppViewFromShortcut(viewShortcuts[e.key]);
+      switchAppViewFromShortcut(view);
       return;
     }
 

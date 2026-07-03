@@ -32,7 +32,6 @@ const EXF_REQUEST_TABLE_COLUMNS = [
   "Email Sent At",
   "Last Email Attempt At",
   "Email Error",
-  "Action",
 ];
 
 const EXF_REQUEST_LINKED_PO_COLUMNS = [
@@ -253,21 +252,6 @@ function renderExfRequestEmailStatusCell(td, request) {
   else td.textContent = status;
 }
 
-function renderExfRequestActionCell(td, request) {
-  const requestId = getExfRequestRecordId(request);
-  td.className = "readonly readonly-no-select exf-request-action-cell";
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = "btn btn-secondary exf-request-resend-btn";
-  btn.textContent = "Resend";
-  btn.disabled = !requestId || isAppSaving();
-  btn.addEventListener("click", e => {
-    e.stopPropagation();
-    resendExfRequestEmail(requestId);
-  });
-  td.appendChild(btn);
-}
-
 function renderExfRequestTable() {
   const tbody = document.getElementById("exfRequestTableBody");
   if (!tbody) return;
@@ -286,9 +270,7 @@ function renderExfRequestTable() {
     EXF_REQUEST_TABLE_COLUMNS.forEach(col => {
       const td = document.createElement("td");
       td.dataset.col = col;
-      if (col === "Action") {
-        renderExfRequestActionCell(td, request);
-      } else if (col === SHIPMENT_ID_FIELD) {
+      if (col === SHIPMENT_ID_FIELD) {
         renderExfRequestShipmentCell(td, request);
       } else if (col === "Email Status") {
         renderExfRequestEmailStatusCell(td, request);
@@ -704,6 +686,11 @@ function updateExfRequestModalActionButtons() {
   const submitBtn = document.getElementById("exfRequestSubmitBtn");
 
   const isView = submitBtn?.hidden === true;
+  const resendBtn = document.getElementById("exfRequestResendBtn");
+  if (resendBtn) {
+    resendBtn.hidden = !isView || !exfRequestModalRow;
+    resendBtn.disabled = exfRequestOpInProgress || isAppSaving();
+  }
   if (isView) {
     if (addBtn) addBtn.hidden = true;
     if (removeBtn) removeBtn.hidden = true;
@@ -1123,6 +1110,13 @@ function initExfRequest() {
   document.getElementById("exfRequestCreateShipmentBtn")?.addEventListener("click", openCreateShipmentFromExfRequest);
   document.getElementById("exfRequestAddPosBtn")?.addEventListener("click", openExfRequestAddPoPanel);
   document.getElementById("exfRequestRemovePosBtn")?.addEventListener("click", removePosFromExfRequest);
+  document.getElementById("exfRequestResendBtn")?.addEventListener("click", () => {
+    const requestId = getExfRequestRecordId(exfRequestModalRow);
+    if (requestId) resendExfRequestEmail(requestId);
+  });
+  if (typeof bindModalHeaderMenu === "function") {
+    bindModalHeaderMenu("exfRequestMenuBtn", "exfRequestMenuDropdown");
+  }
   document.getElementById("exfRequestAddPoDoneBtn")?.addEventListener("click", closeExfRequestAddPoPanel);
   document.getElementById("exfRequestAddSelectedPosBtn")?.addEventListener("click", addSelectedPosToExfRequest);
   document.getElementById("exfRequestCancelBtn")?.addEventListener("click", closeExfRequestModal);

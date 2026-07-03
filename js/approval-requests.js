@@ -25,7 +25,6 @@ const APPROVAL_REQUEST_TABLE_COLUMNS = [
   "Email Status",
   "Email Sent At",
   "Email Error",
-  "Action",
 ];
 
 let allApprovals = [];
@@ -160,21 +159,6 @@ function renderApprovalStatusCell(td, approval) {
   td.textContent = status || EMPTY_DISPLAY;
 }
 
-function renderApprovalActionCell(td, approval) {
-  const approvalId = String(approval[APPROVAL_ID_FIELD_FE] ?? "").trim();
-  td.className = "readonly readonly-no-select approval-request-action-cell";
-  const resendBtn = document.createElement("button");
-  resendBtn.type = "button";
-  resendBtn.className = "btn btn-secondary approval-request-resend-btn";
-  resendBtn.textContent = "Resend";
-  resendBtn.disabled = !approvalId || isAppSaving();
-  resendBtn.addEventListener("click", e => {
-    e.stopPropagation();
-    resendApprovalRequestEmail(approvalId);
-  });
-  td.appendChild(resendBtn);
-}
-
 function renderApprovalRequestTable() {
   const tbody = document.getElementById("approvalRequestTableBody");
   if (!tbody) return;
@@ -196,8 +180,6 @@ function renderApprovalRequestTable() {
         renderApprovalEmailStatusCell(td, approval);
       } else if (col === APPROVAL_STATUS_FIELD_FE) {
         renderApprovalStatusCell(td, approval);
-      } else if (col === "Action") {
-        renderApprovalActionCell(td, approval);
       } else {
         td.className = "readonly readonly-no-select";
         const text = formatApprovalRequestTableCell(col, approval);
@@ -246,6 +228,7 @@ function openNewApprovalFromPo(poRow) {
   approvalDraftExtCxlDate = "";
   approvalDraftUnits = {};
   renderApprovalModal(approvalModalPoRow, null);
+  updateApprovalModalMenu();
 }
 
 function openApprovalDetail(id) {
@@ -256,6 +239,19 @@ function openApprovalDetail(id) {
   const poNumber = String(approval["PO #"] ?? "").trim();
   approvalModalPoRow = allRows.find(r => String(r["PO #"]) === poNumber) ?? null;
   renderApprovalModal(approvalModalPoRow, approval);
+  updateApprovalModalMenu();
+}
+
+/** Resend only applies to saved approvals; the ⋮ menu hides on new ones. */
+function updateApprovalModalMenu() {
+  const resendBtn = document.getElementById("approvalResendBtn");
+  const menuWrap = document.getElementById("approvalRequestMenuBtn")?.parentElement;
+  const hasApproval = Boolean(String(approvalModalRow?.[APPROVAL_ID_FIELD_FE] ?? "").trim());
+  if (resendBtn) {
+    resendBtn.hidden = !hasApproval;
+    resendBtn.disabled = approvalOpInProgress || isAppSaving();
+  }
+  if (menuWrap) menuWrap.hidden = !hasApproval;
 }
 
 function captureApprovalDraft() {
@@ -722,6 +718,13 @@ function closeApprovalModal() {
 
 function initApprovals() {
   document.getElementById("approvalRequestSubmitBtn")?.addEventListener("click", submitApproval);
+  document.getElementById("approvalResendBtn")?.addEventListener("click", () => {
+    const approvalId = String(approvalModalRow?.[APPROVAL_ID_FIELD_FE] ?? "").trim();
+    if (approvalId) resendApprovalRequestEmail(approvalId);
+  });
+  if (typeof bindModalHeaderMenu === "function") {
+    bindModalHeaderMenu("approvalRequestMenuBtn", "approvalRequestMenuDropdown");
+  }
   document.getElementById("approvalRequestCancelBtn")?.addEventListener("click", closeApprovalModal);
   document.querySelector('[data-dismiss="approval-request"]')?.addEventListener("click", closeApprovalModal);
   bindDirectBackdropDismiss(document.getElementById("approvalRequestOverlay"), closeApprovalModal);

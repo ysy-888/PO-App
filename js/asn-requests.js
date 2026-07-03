@@ -29,7 +29,6 @@ const ASN_REQUEST_TABLE_COLUMNS = [
   "Email Sent At",
   "Last Email Attempt At",
   "Email Error",
-  "Action",
 ];
 
 const ASN_REQUEST_TABLE_COLUMN_LABELS = {
@@ -241,6 +240,7 @@ async function setAsnRequestPickedUp(requestId, pickedUp) {
     showIndicator(`${pickedUp ? "Pickup" : "Reopen"} failed: ` + err.message, "error");
   } finally {
     asnRequestOpInProgress = false;
+    if (asnRequestModalRow === request) updateAsnRequestActionButtons();
   }
 }
 
@@ -314,65 +314,6 @@ function normalizeAsnRequest(row) {
   return { ...row };
 }
 
-function renderAsnRequestActionCell(td, request) {
-  const requestId = getAsnRequestRecordId(request);
-  td.className = "readonly readonly-no-select asn-request-action-cell";
-  const wrap = document.createElement("div");
-  wrap.className = "asn-request-action-wrap";
-
-  const pickedUp = isAsnRequestPickedUp(request);
-  const pickupToggleBtn = document.createElement("button");
-  pickupToggleBtn.type = "button";
-  pickupToggleBtn.className = "btn btn-secondary asn-request-picked-up-btn";
-  pickupToggleBtn.textContent = pickedUp ? "Reopen" : "Picked Up";
-  pickupToggleBtn.disabled = !requestId || isAppSaving();
-  pickupToggleBtn.addEventListener("click", e => {
-    e.stopPropagation();
-    setAsnRequestPickedUp(requestId, !pickedUp);
-  });
-  wrap.appendChild(pickupToggleBtn);
-
-  const resendBtn = document.createElement("button");
-  resendBtn.type = "button";
-  resendBtn.className = "btn btn-secondary asn-request-resend-btn";
-  resendBtn.textContent = "Resend";
-  resendBtn.disabled = !requestId || isAppSaving();
-  resendBtn.addEventListener("click", e => {
-    e.stopPropagation();
-    resendAsnRequestEmail(requestId);
-  });
-  wrap.appendChild(resendBtn);
-
-  // Resend Carrier button
-  if (isAsnRequestEligibleForPickup(request)) {
-    const resendCarrierBtn = document.createElement("button");
-    resendCarrierBtn.type = "button";
-    resendCarrierBtn.className = "btn btn-secondary asn-request-pickup-btn";
-    resendCarrierBtn.textContent = "Resend Carrier";
-    resendCarrierBtn.disabled = !requestId || isAppSaving();
-    resendCarrierBtn.addEventListener("click", e => {
-      e.stopPropagation();
-      resendAsnCarrierEmail(requestId);
-    });
-    wrap.appendChild(resendCarrierBtn);
-  }
-
-  // Carton Label button
-  const cartonLabelBtn = document.createElement("button");
-  cartonLabelBtn.type = "button";
-  cartonLabelBtn.className = "btn btn-secondary asn-request-carton-btn";
-  const hasLabelData = Boolean(request?.["ASN Pickup Label Data"]);
-  cartonLabelBtn.textContent = hasLabelData ? "Reprint Labels" : "Carton Label";
-  cartonLabelBtn.disabled = !requestId || isAppSaving();
-  cartonLabelBtn.addEventListener("click", e => {
-    e.stopPropagation();
-    openCartonLabelModal(requestId);
-  });
-  wrap.appendChild(cartonLabelBtn);
-
-  td.appendChild(wrap);
-}
-
 function renderAsnRequestTable() {
   const tbody = document.getElementById("asnRequestTableBody");
   if (!tbody) return;
@@ -391,9 +332,7 @@ function renderAsnRequestTable() {
     ASN_REQUEST_TABLE_COLUMNS.forEach(col => {
       const td = document.createElement("td");
       td.dataset.col = col;
-      if (col === "Action") {
-        renderAsnRequestActionCell(td, request);
-      } else if (col === ASN_STATUS_FIELD) {
+      if (col === ASN_STATUS_FIELD) {
         const status = getAsnRequestStatus(request);
         const badge = document.createElement("span");
         badge.className = "badge " + (status === ASN_STATUS_PICKED_UP ? "badge-received" : "badge-otw");
@@ -937,6 +876,36 @@ function updateAsnRequestActionButtons() {
   if (cartonLabelBtn) {
     cartonLabelBtn.hidden = !isView;
     cartonLabelBtn.disabled = asnRequestOpInProgress || isAppSaving();
+    cartonLabelBtn.textContent = asnRequestModalRow?.[ASN_PICKUP_LABEL_DATA_FIELD]
+      ? "Reprint Labels"
+      : "Carton Label";
+  }
+  const resendEmailBtn = document.getElementById("asnResendEmailBtn");
+  if (resendEmailBtn) {
+    resendEmailBtn.hidden = !isView || !asnRequestModalRow;
+    resendEmailBtn.disabled = asnRequestOpInProgress || isAppSaving();
+  }
+  const resendCarrierBtn = document.getElementById("asnResendCarrierBtn");
+  if (resendCarrierBtn) {
+    resendCarrierBtn.hidden = !isView || !asnRequestModalRow || !isAsnRequestEligibleForPickup(asnRequestModalRow);
+    resendCarrierBtn.disabled = asnRequestOpInProgress || isAppSaving();
+  }
+
+  // Status badge + Picked Up/Reopen menu item (view mode only — new requests have no status yet).
+  const pickedUp = asnRequestModalRow ? isAsnRequestPickedUp(asnRequestModalRow) : false;
+  const pickedUpBtn = document.getElementById("asnPickedUpBtn");
+  if (pickedUpBtn) {
+    pickedUpBtn.hidden = !isView || !asnRequestModalRow;
+    pickedUpBtn.textContent = pickedUp ? "Reopen" : "Picked Up";
+    pickedUpBtn.disabled = asnRequestOpInProgress || isAppSaving();
+  }
+  const statusBadge = document.getElementById("asnRequestStatusBadge");
+  if (statusBadge) {
+    statusBadge.hidden = !isView || !asnRequestModalRow;
+    if (asnRequestModalRow) {
+      statusBadge.textContent = pickedUp ? ASN_STATUS_PICKED_UP : ASN_STATUS_OPEN;
+      statusBadge.className = "badge " + (pickedUp ? "badge-received" : "badge-otw");
+    }
   }
   if (isView) {
     const hasAvailablePos = getAvailableAsnRequestPanelRows().length > 0;
@@ -1374,6 +1343,21 @@ function initAsnRequests() {
     const requestId = getAsnRequestRecordId(asnRequestModalRow);
     if (requestId) openCartonLabelModal(requestId);
   });
+  document.getElementById("asnPickedUpBtn")?.addEventListener("click", () => {
+    if (!asnRequestModalRow) return;
+    setAsnRequestPickedUp(getAsnRequestRecordId(asnRequestModalRow), !isAsnRequestPickedUp(asnRequestModalRow));
+  });
+  document.getElementById("asnResendEmailBtn")?.addEventListener("click", () => {
+    const requestId = getAsnRequestRecordId(asnRequestModalRow);
+    if (requestId) resendAsnRequestEmail(requestId);
+  });
+  document.getElementById("asnResendCarrierBtn")?.addEventListener("click", () => {
+    const requestId = getAsnRequestRecordId(asnRequestModalRow);
+    if (requestId) resendAsnCarrierEmail(requestId);
+  });
+  if (typeof bindModalHeaderMenu === "function") {
+    bindModalHeaderMenu("asnRequestMenuBtn", "asnRequestMenuDropdown");
+  }
   document.getElementById("asnPickupLabelSubmitBtn")?.addEventListener("click", submitAsnPickupLabelModal);
   document.getElementById("asnPickupLabelCancelBtn")?.addEventListener("click", closeAsnPickupLabelModal);
   document.getElementById("asnPickupLabelDismissBtn")?.addEventListener("click", closeAsnPickupLabelModal);
