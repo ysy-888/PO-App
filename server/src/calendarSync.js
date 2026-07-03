@@ -15,6 +15,12 @@
 
 import supabase from "./supabase.js";
 import {
+  buildPoText,
+  REQUEST_EMAIL_TABLE_COLUMNS,
+  REQUEST_EMAIL_TABLE_LABELS,
+} from "./emailTemplates.js";
+import { getCartonWeightLbs } from "./packingListPrint/helpers.js";
+import {
   calendarConfigured,
   calendarEventId,
   eventBody,
@@ -32,8 +38,11 @@ const SO_COLOR_BY_ORDER_TYPE = {
   "PRIVATE LABEL": "3", // grape (purple)
   "SPECIALTY": "1",     // lavender (light purple)
 };
-const SHIPMENT_COLOR_ID = "4"; // flamingo (pink — closest event color to Cherry Blossom)
-const ASN_COLOR_ID = "11";     // tomato (red)
+const SHIPMENT_COLOR_ID = "11"; // tomato (red — same as ASN)
+const ASN_COLOR_ID = "11";      // tomato (red)
+
+// Google Calendar caps descriptions around 8k characters.
+const MAX_DESCRIPTION_LENGTH = 7500;
 
 const LOOKBACK_DAYS = 60;
 // Calendar API default quota is ~600 requests/min; pace mutations well under it.
@@ -65,6 +74,69 @@ function describe(lines) {
   return lines.filter(Boolean).join("\n");
 }
 
+function clampDescription(text) {
+  if (text.length <= MAX_DESCRIPTION_LENGTH) return text;
+  return `${text.slice(0, MAX_DESCRIPTION_LENGTH - 1)}…`;
+}
+
+/** Same table the request emails use, from the same builder. */
+function poTable(poRows) {
+  return buildPoText(poRows, REQUEST_EMAIL_TABLE_COLUMNS, REQUEST_EMAIL_TABLE_LABELS);
+}
+
+/**
+ * Loads PO rows enriched with packing Weight (lbs) — mirroring the
+ * enrichment the request emails apply — and returns lookups keyed by
+ * `${tenantId}|…` for use when building shipment/ASN descriptions.
+ */
+async function buildPoLookups() {
+  const [pos, packingLists, packingCartons] = await Promise.all([
+    fetchAll("purchase_orders"),
+    fetchAll("packing_lists"),
+    fetchAll("packing_cartons"),
+  ]);
+
+  // Packing list → PO, then sum carton weights per PO.
+  const listToPo = new Map();
+  for (const row of packingLists) {
+    const listId = String(row.data?.["Packing List ID"] ?? "").trim();
+    const po = String(row.data?.["PO #"] ?? "").trim();
+    if (listId && po) listToPo.set(`${row.tenant_id}|${listId}`, `${row.tenant_id}|${po}`);
+  }
+  const weightByPo = new Map();
+  for (const row of packingCartons) {
+    const listId = String(row.data?.["Packing List ID"] ?? "").trim();
+    const poKey = listToPo.get(`${row.tenant_id}|${listId}`);
+    if (!poKey) continue;
+    weightByPo.set(poKey, (weightByPo.get(poKey) || 0) + getCartonWeightLbs(row.data || {}));
+  }
+
+  const poByNumber = new Map();
+  const posByShipment = new Map();
+  for (const row of pos) {
+    const data = row.data || {};
+    const poNumber = String(data["PO #"] ?? "").trim();
+    if (!poNumber) continue;
+    const poKey = `${row.tenant_id}|${poNumber}`;
+    const enriched = { ...data, Weight: weightByPo.get(poKey) || "" };
+    poByNumber.set(poKey, enriched);
+
+    const shipmentId = String(data["Shipment ID"] ?? "").trim();
+    if (shipmentId) {
+      const shipKey = `${row.tenant_id}|${shipmentId}`;
+      if (!posByShipment.has(shipKey)) posByShipment.set(shipKey, []);
+      posByShipment.get(shipKey).push(enriched);
+    }
+  }
+  posByShipment.forEach((rows) =>
+    rows.sort((a, b) =>
+      String(a["PO #"]).localeCompare(String(b["PO #"]), undefined, { numeric: true })
+    )
+  );
+
+  return { poByNumber, posByShipment };
+}
+
 /** Build the desired event set from the database. Map(eventId → event spec). */
 async function buildDesiredEvents(cutoff) {
   const desired = new Map();
@@ -74,10 +146,11 @@ async function buildDesiredEvents(cutoff) {
     desired.set(calendarEventId(...idParts), { summary, description, dateYmd, colorId });
   };
 
-  const [salesOrders, shipments, asns] = await Promise.all([
+  const [salesOrders, shipments, asns, { poByNumber, posByShipment }] = await Promise.all([
     fetchAll("sales_orders"),
     fetchAll("shipments"),
     fetchAll("asn_requests"),
+    buildPoLookups(),
   ]);
 
   for (const row of salesOrders) {
@@ -115,16 +188,19 @@ async function buildDesiredEvents(cutoff) {
     const shipmentId = String(shipment["Shipment ID"] ?? "").trim();
     const date = toYmd(shipment["IHD"]);
     if (!shipmentId || !date) continue;
+    const poRows = posByShipment.get(`${row.tenant_id}|${shipmentId}`) || [];
     add(
       ["shipment-ihd", row.tenant_id, shipmentId],
       date,
-      `IHD: ${shipmentId}`,
-      describe([
-        shipment["Ship Method"] && `Ship Method: ${shipment["Ship Method"]}`,
-        shipment["Vessel"] && `Vessel: ${shipment["Vessel"]}`,
-        shipment["PO Count"] && `POs: ${shipment["PO Count"]}`,
-        shipment["ETA"] && `ETA: ${toYmd(shipment["ETA"])}`,
-      ]),
+      shipmentId,
+      clampDescription([
+        describe([
+          shipment["Ship Method"] && `Ship Method: ${shipment["Ship Method"]}`,
+          shipment["Vessel"] && `Vessel: ${shipment["Vessel"]}`,
+          shipment["ETA"] && `ETA: ${toYmd(shipment["ETA"])}`,
+        ]),
+        poTable(poRows),
+      ].filter(Boolean).join("\n\n")),
       SHIPMENT_COLOR_ID
     );
   }
@@ -134,14 +210,20 @@ async function buildDesiredEvents(cutoff) {
     const asnId = String(asn["ASN Request ID"] ?? "").trim();
     const date = toYmd(asn["ASN Date"]);
     if (!asnId || !date) continue;
+    const poRows = String(asn["PO Numbers"] ?? "")
+      .split(",")
+      .map((po) => poByNumber.get(`${row.tenant_id}|${po.trim()}`))
+      .filter(Boolean);
     add(
       ["asn", row.tenant_id, asnId],
       date,
-      `ASN: ${asnId}${asn["Buyer"] ? ` · ${asn["Buyer"]}` : ""}`,
-      describe([
-        asn["PO Numbers"] && `POs: ${asn["PO Numbers"]}`,
-        asn["Carrier"] && `Carrier: ${asn["Carrier"]}`,
-      ]),
+      `${asnId}${asn["Buyer"] ? ` · ${asn["Buyer"]}` : ""}`,
+      clampDescription([
+        describe([
+          asn["Carrier"] && `Carrier: ${asn["Carrier"]}`,
+        ]),
+        poTable(poRows),
+      ].filter(Boolean).join("\n\n")),
       ASN_COLOR_ID
     );
   }
