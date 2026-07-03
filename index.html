@@ -5,13 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>PO Table</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-<link rel="stylesheet" href="po-table.css?v=20260627-1" />
+<link rel="stylesheet" href="po-table.css?v=20260703-1" />
 </head>
 <body>
 
 <header class="app-header">
   <nav class="app-title-nav" role="tablist" aria-label="Main views">
-    <span class="app-logo-text">Elevator Disco</span>
+    <button type="button" class="app-logo-text" id="navLogoDashboard" title="Dashboard">Elevator Disco</button>
     <button type="button" class="app-title-tab is-active" id="navTabSalesOrders" role="tab" aria-selected="true">Sales Orders</button>
     <button type="button" class="app-title-tab" id="navTabPo" role="tab" aria-selected="false">Purchase Orders</button>
     <button type="button" class="app-title-tab" id="navTabShipments" role="tab" aria-selected="false">Shipments</button>
@@ -235,6 +235,51 @@
 </div>
 
 <div id="appMain" class="app-main">
+<div id="dashboardWrap" class="dashboard-wrap" hidden>
+  <div class="dashboard-kpis" id="dashboardKpis"></div>
+  <div class="dashboard-grid-top">
+    <section class="dashboard-panel dashboard-calendar-panel">
+      <div class="dashboard-panel-header dashboard-cal-header">
+        <span class="dashboard-cal-title" id="dashCalTitle">—</span>
+        <div class="dashboard-cal-nav">
+          <button type="button" class="btn btn-page" id="dashCalPrev" title="Previous month" aria-label="Previous month">‹</button>
+          <button type="button" class="btn" id="dashCalToday">Today</button>
+          <button type="button" class="btn btn-page" id="dashCalNext" title="Next month" aria-label="Next month">›</button>
+        </div>
+        <div class="dashboard-cal-legend" aria-hidden="true">
+          <span class="dash-legend-item"><i class="dash-dot dash-dot--so-major"></i>Major</span>
+          <span class="dash-legend-item"><i class="dash-dot dash-dot--so-private"></i>Private Label</span>
+          <span class="dash-legend-item"><i class="dash-dot dash-dot--so-specialty"></i>Specialty</span>
+          <span class="dash-legend-item"><i class="dash-dot dash-dot--shipment"></i>Shipments &amp; ASNs</span>
+        </div>
+      </div>
+      <div class="dashboard-cal" id="dashCalGrid"></div>
+    </section>
+    <section class="dashboard-panel dashboard-weeks-panel">
+      <div class="dashboard-panel-header">
+        <span class="dashboard-panel-title">Open Orders by Week</span>
+        <span class="dashboard-panel-count" id="dashWeeksCount"></span>
+      </div>
+      <div class="dashboard-panel-body" id="dashWeeksList"></div>
+    </section>
+  </div>
+  <div class="dashboard-grid-bottom">
+    <section class="dashboard-panel">
+      <div class="dashboard-panel-header">
+        <span class="dashboard-panel-title">Open Shipments</span>
+        <span class="dashboard-panel-count" id="dashShipmentsCount"></span>
+      </div>
+      <div class="dashboard-panel-body" id="dashShipmentsList"></div>
+    </section>
+    <section class="dashboard-panel">
+      <div class="dashboard-panel-header">
+        <span class="dashboard-panel-title">Open ASNs</span>
+        <span class="dashboard-panel-count" id="dashAsnCount"></span>
+      </div>
+      <div class="dashboard-panel-body" id="dashAsnList"></div>
+    </section>
+  </div>
+</div>
 <div id="poViewContent" class="po-view-content" hidden>
 <div id="poTableWrap" class="table-scroll-y po-list-pane" hidden>
   <div class="table-scroll-x">
@@ -390,6 +435,7 @@
     <colgroup>
       <col class="col-select" />
       <col class="col-shipment-id" />
+      <col class="col-status" />
       <col class="col-exf-request-id" />
       <col class="col-ship-method" />
       <col class="col-po-count" />
@@ -408,6 +454,7 @@
           <input type="checkbox" id="selectAllShipmentsCheckbox" aria-label="Select all filtered shipments" />
         </th>
         <th>Shipment ID</th>
+        <th>Status</th>
         <th>EXF Req ID</th>
         <th>Ship Method</th>
         <th>PO Count</th>
@@ -422,7 +469,7 @@
       </tr>
     </thead>
     <tbody id="shipmentTableBody">
-      <tr class="state-row"><td colspan="13">Loading shipments…</td></tr>
+      <tr class="state-row"><td colspan="14">Loading shipments…</td></tr>
     </tbody>
   </table>
   </div>
@@ -523,6 +570,7 @@
   <table id="asnRequestTable">
     <colgroup>
       <col class="col-exf-request-id" />
+      <col class="col-status" />
       <col class="col-date" />
       <col class="col-date" />
       <col class="col-buyer" />
@@ -539,6 +587,7 @@
     <thead>
       <tr>
         <th>Request ID</th>
+        <th>Status</th>
         <th>ASN Date</th>
         <th>Request Date</th>
         <th>Buyer</th>
@@ -554,7 +603,7 @@
       </tr>
     </thead>
     <tbody id="asnRequestTableBody">
-      <tr class="state-row"><td colspan="13">Loading ASN requests…</td></tr>
+      <tr class="state-row"><td colspan="14">Loading ASN requests…</td></tr>
     </tbody>
   </table>
   </div>
@@ -1060,6 +1109,10 @@
     <div class="modal-body" id="shipmentModalBody"></div>
     <div class="modal-footer">
       <div id="shipmentModalFooterMessage" class="modal-footer-message shipment-footer-message" role="status" aria-live="polite" hidden></div>
+      <button type="button" class="btn btn-secondary" id="shipmentReceiveBtn" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+        Receive
+      </button>
       <button type="button" class="btn btn-primary" id="shipmentModalSaveBtn">
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
         Save
@@ -1559,11 +1612,11 @@
 <script src="js/save.js"></script>
 <script src="js/batch-edit.js"></script>
 <script src="js/main.js"></script>
-<script src="js/shipments-tables.js?v=20260627-2"></script>
-<script src="js/shipments-modals.js?v=20260627-1"></script>
+<script src="js/shipments-tables.js?v=20260703-1"></script>
+<script src="js/shipments-modals.js?v=20260703-1"></script>
 <script src="js/request-modals.js?v=20260605-10"></script>
 <script src="js/exf-request.js?v=20260627-1"></script>
-<script src="js/asn-requests.js?v=20260605-8"></script>
+<script src="js/asn-requests.js?v=20260703-1"></script>
 <script src="js/approval-requests.js"></script>
 <script src="js/packing-reviews.js"></script>
 <script src="js/customers-import.js"></script>
@@ -1580,6 +1633,7 @@
 <script src="js/invoices.js"></script>
 <script src="js/invoices-import.js"></script>
 <script src="js/shipments-init.js"></script>
+<script src="js/dashboard.js?v=20260703-1"></script>
 <script src="js/packing-print.js"></script>
 <div id="packingPrintRoot" aria-hidden="true"></div>
 </body>

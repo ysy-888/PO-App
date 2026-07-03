@@ -95,6 +95,7 @@ async function loadData() {
     updateColumnFilterHeaderStates();
     applyFilters();
     if (typeof onPoSelectionChanged === "function") onPoSelectionChanged();
+    if (typeof refreshDashboardIfActive === "function") refreshDashboardIfActive();
     showIndicator("Loaded", "success");
   } catch (err) {
     showIndicator("Load failed: " + err.message, "error");

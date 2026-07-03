@@ -9,8 +9,15 @@ const ASN_PICKUP_EMAIL_ERROR_FIELD = "ASN Pickup Email Error";
 const ASN_PICKUP_LABEL_DATA_FIELD = "ASN Pickup Label Data";
 const ASN_PICKUP_BUYER_12TH_TRIBE = "12TH TRIBE";
 
+// ASN lifecycle: Open (default) until the cartons are picked up.
+const ASN_STATUS_FIELD = "Status";
+const ASN_PICKED_UP_DATE_FIELD = "Picked Up Date";
+const ASN_STATUS_PICKED_UP = "Picked Up";
+const ASN_STATUS_OPEN = "Open";
+
 const ASN_REQUEST_TABLE_COLUMNS = [
   ASN_REQUEST_ID_FIELD,
+  ASN_STATUS_FIELD,
   ASN_DATE_FIELD,
   ASN_REQ_SUBMIT_DATE_FIELD,
   "Buyer",
@@ -198,6 +205,45 @@ function getAsnRequestById(id) {
   return allAsnRequests.find(request => getAsnRequestRecordId(request) === key) ?? null;
 }
 
+function getAsnRequestStatus(request) {
+  const status = String(request?.[ASN_STATUS_FIELD] ?? "").trim();
+  return status === ASN_STATUS_PICKED_UP ? ASN_STATUS_PICKED_UP : ASN_STATUS_OPEN;
+}
+
+function isAsnRequestPickedUp(request) {
+  return getAsnRequestStatus(request) === ASN_STATUS_PICKED_UP;
+}
+
+/** Close (or reopen) an ASN request; picking up stamps Status/Picked Up Date. */
+async function setAsnRequestPickedUp(requestId, pickedUp) {
+  if (asnRequestOpInProgress || isAppSaving()) return;
+  const id = String(requestId ?? "").trim();
+  const request = getAsnRequestById(id);
+  if (!request) return;
+
+  const patch = pickedUp
+    ? {
+        [ASN_STATUS_FIELD]: ASN_STATUS_PICKED_UP,
+        [ASN_PICKED_UP_DATE_FIELD]: formatDateToYmd(new Date()),
+      }
+    : { [ASN_STATUS_FIELD]: "", [ASN_PICKED_UP_DATE_FIELD]: "" };
+
+  asnRequestOpInProgress = true;
+  showIndicator(`${pickedUp ? "Closing" : "Reopening"} ${id}${ELLIPSIS}`, "");
+  try {
+    const json = await postApi("/api/requests/asn/update", { asnRequestId: id, request: patch });
+    if (!json.success) throw new Error(json.error || "Failed to update ASN request.");
+    Object.assign(request, patch);
+    applyAsnRequestFilters();
+    if (typeof refreshDashboardIfActive === "function") refreshDashboardIfActive();
+    showIndicator(pickedUp ? `${id} picked up ${CHECK_MARK}` : `${id} reopened`, "success");
+  } catch (err) {
+    showIndicator(`${pickedUp ? "Pickup" : "Reopen"} failed: ` + err.message, "error");
+  } finally {
+    asnRequestOpInProgress = false;
+  }
+}
+
 function openAsnRequestDetail(id) {
   if (isAppSaving()) return;
   const request = getAsnRequestById(id);
@@ -274,6 +320,18 @@ function renderAsnRequestActionCell(td, request) {
   const wrap = document.createElement("div");
   wrap.className = "asn-request-action-wrap";
 
+  const pickedUp = isAsnRequestPickedUp(request);
+  const pickupToggleBtn = document.createElement("button");
+  pickupToggleBtn.type = "button";
+  pickupToggleBtn.className = "btn btn-secondary asn-request-picked-up-btn";
+  pickupToggleBtn.textContent = pickedUp ? "Reopen" : "Picked Up";
+  pickupToggleBtn.disabled = !requestId || isAppSaving();
+  pickupToggleBtn.addEventListener("click", e => {
+    e.stopPropagation();
+    setAsnRequestPickedUp(requestId, !pickedUp);
+  });
+  wrap.appendChild(pickupToggleBtn);
+
   const resendBtn = document.createElement("button");
   resendBtn.type = "button";
   resendBtn.className = "btn btn-secondary asn-request-resend-btn";
@@ -335,6 +393,13 @@ function renderAsnRequestTable() {
       td.dataset.col = col;
       if (col === "Action") {
         renderAsnRequestActionCell(td, request);
+      } else if (col === ASN_STATUS_FIELD) {
+        const status = getAsnRequestStatus(request);
+        const badge = document.createElement("span");
+        badge.className = "badge " + (status === ASN_STATUS_PICKED_UP ? "badge-received" : "badge-otw");
+        badge.textContent = status;
+        td.className = "readonly readonly-no-select";
+        td.appendChild(badge);
       } else if (col === "Email Status") {
         renderAsnRequestEmailStatusCell(td, request);
       } else {

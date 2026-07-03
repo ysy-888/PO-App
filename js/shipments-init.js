@@ -64,6 +64,10 @@ function initShipments() {
   document.getElementById("createShipmentAddPoDoneBtn")?.addEventListener("click", closeShipmentAddPoPanel);
   document.getElementById("createShipmentAddSelectedPosBtn")?.addEventListener("click", addSelectedPosToShipment);
   document.getElementById("shipmentModalSaveBtn")?.addEventListener("click", saveShipmentModal);
+  document.getElementById("shipmentReceiveBtn")?.addEventListener("click", () => {
+    if (!shipmentModalRow) return;
+    setShipmentReceived(shipmentModalRow[SHIPMENT_ID_FIELD], !isShipmentReceived(shipmentModalRow));
+  });
   document.getElementById("shipmentModalCloseBtn")?.addEventListener("click", closeShipmentModalForce);
   document.getElementById("shipmentModalBody")?.addEventListener("input", () => {
     clearShipmentFooterMessage("shipmentModalFooterMessage");

@@ -22,7 +22,65 @@ function openShipmentDetail(shipmentOrId) {
   clearShipmentFormSelection();
   shipmentModalRow = shipment;
   renderShipmentModalContent(shipment);
+  updateShipmentReceiveButton();
   bringModalToFront(document.getElementById("shipmentModalOverlay"));
+}
+
+function updateShipmentReceiveButton() {
+  const btn = document.getElementById("shipmentReceiveBtn");
+  if (!btn) return;
+  if (!shipmentModalRow) {
+    btn.hidden = true;
+    return;
+  }
+  btn.hidden = false;
+  btn.lastChild.textContent = isShipmentReceived(shipmentModalRow) ? " Reopen" : " Receive";
+}
+
+/**
+ * Close (or reopen) a shipment. Receiving stamps Status/Received Date on the
+ * shipment and moves its linked POs still marked OTW into the warehouse.
+ */
+async function setShipmentReceived(shipmentId, received) {
+  if (isAppSaving()) return;
+  const id = String(shipmentId ?? "").trim();
+  const shipment = getShipmentById(id);
+  if (!shipment) return;
+
+  const patch = received
+    ? {
+        [SHIPMENT_STATUS_FIELD]: SHIPMENT_STATUS_RECEIVED,
+        [SHIPMENT_RECEIVED_DATE_FIELD]: formatDateToYmd(new Date()),
+      }
+    : { [SHIPMENT_STATUS_FIELD]: "", [SHIPMENT_RECEIVED_DATE_FIELD]: "" };
+
+  showIndicator(`${received ? "Receiving" : "Reopening"} ${id}${ELLIPSIS}`, "");
+  try {
+    const json = await postApi("/api/shipments/update", { shipmentId: id, shipment: patch });
+    if (!json.success) throw new Error(json.error || "Failed to update shipment.");
+    Object.assign(shipment, patch);
+
+    if (received) {
+      const items = getPosForShipment(id)
+        .filter(row => getRowStatus(row) === "OTW")
+        .map(row => ({ poNumber: String(row["PO #"]), updates: { "Status": "In Warehouse" } }));
+      if (items.length > 0) {
+        const poJson = await postApi("/api/po/batch-update", { items });
+        if (!poJson.success) throw new Error(poJson.error || "Failed to update linked POs.");
+        getPosForShipment(id).forEach(row => {
+          if (getRowStatus(row) === "OTW") row["Status"] = "In Warehouse";
+        });
+        applyFilters();
+      }
+    }
+
+    applyShipmentFilters();
+    if (shipmentModalRow === shipment) updateShipmentReceiveButton();
+    if (typeof refreshDashboardIfActive === "function") refreshDashboardIfActive();
+    showIndicator(received ? `${id} received ${CHECK_MARK}` : `${id} reopened`, "success");
+  } catch (err) {
+    showIndicator(`${received ? "Receive" : "Reopen"} failed: ` + err.message, "error");
+  }
 }
 
 function closeShipmentModalForce() {

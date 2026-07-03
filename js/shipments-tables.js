@@ -4,8 +4,14 @@ const SHIPMENT_ID_FIELD = "Shipment ID";
 
 const SHIPMENT_EXF_REQUEST_ID_FIELD = "EXF Request ID";
 
+// Shipment lifecycle: Open (default) until "received" into the warehouse.
+const SHIPMENT_STATUS_FIELD = "Status";
+const SHIPMENT_RECEIVED_DATE_FIELD = "Received Date";
+const SHIPMENT_STATUS_RECEIVED = "Received";
+const SHIPMENT_STATUS_OPEN = "Open";
+
 const SHIPMENT_TABLE_COLUMNS = [
-  "Shipment ID", SHIPMENT_EXF_REQUEST_ID_FIELD, "Ship Method", "PO Count", "Vessel", "House #", "EXF",
+  "Shipment ID", SHIPMENT_STATUS_FIELD, SHIPMENT_EXF_REQUEST_ID_FIELD, "Ship Method", "PO Count", "Vessel", "House #", "EXF",
   "Shipped", "ETD", "ETA", "IHD", "Notes"
 ];
 
@@ -99,6 +105,15 @@ function getShipmentById(id) {
   const key = String(id ?? "").trim();
   if (!key) return null;
   return allShipments.find(s => String(s[SHIPMENT_ID_FIELD] ?? "").trim() === key) ?? null;
+}
+
+function getShipmentStatus(shipment) {
+  const status = String(shipment?.[SHIPMENT_STATUS_FIELD] ?? "").trim();
+  return status === SHIPMENT_STATUS_RECEIVED ? SHIPMENT_STATUS_RECEIVED : SHIPMENT_STATUS_OPEN;
+}
+
+function isShipmentReceived(shipment) {
+  return getShipmentStatus(shipment) === SHIPMENT_STATUS_RECEIVED;
 }
 
 function getPosForShipment(shipmentId) {
@@ -458,6 +473,10 @@ function switchAppView(view) {
     }
   }
 
+  const dashboardWrap = document.getElementById("dashboardWrap");
+  if (dashboardWrap) dashboardWrap.hidden = view !== "dashboard";
+  document.getElementById("navLogoDashboard")?.classList.toggle("is-active", view === "dashboard");
+
   if (shipmentTableWrap) shipmentTableWrap.hidden = view !== "shipments";
   if (requestsTableWrap) requestsTableWrap.hidden = view !== "requests";
   if (chargebackTableWrap) chargebackTableWrap.hidden = view !== "chargebacks";
@@ -500,6 +519,7 @@ function switchAppView(view) {
     switchRequestType(currentRequestType);
   }
 
+  if (view === "dashboard" && typeof renderDashboard === "function") renderDashboard();
   if (view === "shipments") applyShipmentFilters();
   if (view === "chargebacks") applyChargebackFilters();
   if (view === "packingReviews" && typeof applyPackingReviewFilters === "function") applyPackingReviewFilters();
@@ -543,6 +563,7 @@ function updateShipmentRowCounter() {
 
 function formatShipmentCell(col, shipment) {
   if (col === "PO Count") return String(countPosForShipment(shipment[SHIPMENT_ID_FIELD]));
+  if (col === SHIPMENT_STATUS_FIELD) return getShipmentStatus(shipment);
   const val = shipment[col] ?? "";
   if (SHIPMENT_DATE_FIELDS.has(col)) return formatDateForDisplay(val);
   if (isEmptyValue(val)) return EMPTY_DISPLAY;
@@ -578,6 +599,16 @@ function renderShipmentsTable() {
     SHIPMENT_TABLE_COLUMNS.forEach(col => {
       const td = document.createElement("td");
       td.dataset.col = col;
+      if (col === SHIPMENT_STATUS_FIELD) {
+        const status = getShipmentStatus(shipment);
+        const badge = document.createElement("span");
+        badge.className = "badge " + (status === SHIPMENT_STATUS_RECEIVED ? "badge-received" : "badge-otw");
+        badge.textContent = status;
+        td.className = "readonly readonly-no-select";
+        td.appendChild(badge);
+        tr.appendChild(td);
+        return;
+      }
       const text = formatShipmentCell(col, shipment);
       if (text === EMPTY_DISPLAY) {
         setDisplayText(td, EMPTY_DISPLAY);
