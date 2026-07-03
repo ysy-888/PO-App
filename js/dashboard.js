@@ -10,9 +10,23 @@
  */
 
 let dashCalCursor = null; // { year, month } — null = current month
+let dashSelectedYmd = ""; // day selected on the calendar; drives the day pane
 
-/** Max event chips shown per calendar day before collapsing behind "+N more". */
-const DASH_CAL_MAX_EVENTS = 4;
+/** Max event chips shown per calendar day; the rest roll up into "+N more". */
+const DASH_CAL_MAX_EVENTS = 3;
+
+/** Display order of the SO dot+count summary groups on calendar days. */
+const DASH_SO_SUMMARY_ORDER = [
+  "dash-event--so-major",
+  "dash-event--so-private",
+  "dash-event--so-specialty",
+];
+
+const DASH_SO_TYPE_LABELS = {
+  "dash-event--so-major": "Major",
+  "dash-event--so-private": "Private Label",
+  "dash-event--so-specialty": "Specialty",
+};
 
 function dashTodayYmd() {
   return formatDateToYmd(new Date());
@@ -188,6 +202,7 @@ function renderDashCalendar() {
     cell.className = "dash-cal-cell";
     if (date.getMonth() !== month) cell.classList.add("is-outside");
     if (ymd === todayYmd) cell.classList.add("is-today");
+    if (ymd === dashSelectedYmd) cell.classList.add("is-selected");
 
     const num = document.createElement("span");
     num.className = "dash-cal-date";
@@ -195,14 +210,50 @@ function renderDashCalendar() {
     cell.appendChild(num);
 
     const dayEvents = byDate.get(ymd) || [];
-    // Busy days collapse to a few chips + "+N more" so one day can't blow up the row.
-    const collapsed = dayEvents.length > DASH_CAL_MAX_EVENTS + 1;
+    // SOs collapse into one compact dot+count line (details live in the day
+    // pane); shipments/ASNs keep full clickable chips.
+    const soEvents = dayEvents.filter(ev => ev.kind === 0);
+    const chipEvents = dayEvents.filter(ev => ev.kind !== 0);
 
-    dayEvents.forEach((ev, index) => {
+    if (soEvents.length === 1) {
+      // A lone SO shows its full info, as a display-only chip.
+      const ev = soEvents[0];
+      const chip = document.createElement("span");
+      chip.className = `dash-event ${ev.cls}${ev.done ? " is-done" : ""}`;
+      chip.title = ev.meta ? `${ev.title} · ${ev.meta}` : ev.title;
+      const label = document.createElement("span");
+      label.className = "dash-event-title";
+      label.textContent = ev.title;
+      chip.appendChild(label);
+      if (ev.meta) {
+        const meta = document.createElement("span");
+        meta.className = "dash-event-meta";
+        meta.textContent = ev.meta;
+        chip.appendChild(meta);
+      }
+      cell.appendChild(chip);
+    } else if (soEvents.length > 1) {
+      // One bar per order type: "4 Major Orders", "2 Specialty Orders"…
+      DASH_SO_SUMMARY_ORDER.forEach(cls => {
+        const count = soEvents.filter(ev => ev.cls === cls).length;
+        if (count === 0) return;
+        const bar = document.createElement("span");
+        bar.className = "dash-so-summary";
+        bar.title = "Click day for details";
+        const dot = document.createElement("i");
+        dot.className = `dash-dot ${cls.replace("dash-event--", "dash-dot--")}`;
+        bar.appendChild(dot);
+        bar.append(`${count} ${DASH_SO_TYPE_LABELS[cls]} Order${count === 1 ? "" : "s"}`);
+        cell.appendChild(bar);
+      });
+    }
+
+    const collapsed = chipEvents.length > DASH_CAL_MAX_EVENTS + 1;
+    chipEvents.forEach((ev, index) => {
+      if (collapsed && index >= DASH_CAL_MAX_EVENTS) return;
       const chip = document.createElement("button");
       chip.type = "button";
       chip.className = `dash-event ${ev.cls}${ev.done ? " is-done" : ""}`;
-      if (collapsed && index >= DASH_CAL_MAX_EVENTS) chip.classList.add("dash-event-overflow");
       chip.title = ev.meta ? `${ev.title} · ${ev.meta}` : ev.title;
 
       const label = document.createElement("span");
@@ -217,27 +268,81 @@ function renderDashCalendar() {
         chip.appendChild(meta);
       }
 
-      chip.addEventListener("click", ev.open);
+      chip.addEventListener("click", e => {
+        e.stopPropagation();
+        ev.open();
+      });
       cell.appendChild(chip);
     });
 
     if (collapsed) {
-      const hiddenCount = dayEvents.length - DASH_CAL_MAX_EVENTS;
-      const more = document.createElement("button");
-      more.type = "button";
+      // Plain indicator — clicking it (or anywhere in the cell) opens the day pane.
+      const more = document.createElement("span");
       more.className = "dash-cal-more";
-      more.textContent = `+${hiddenCount} more`;
-      more.addEventListener("click", () => {
-        const expanded = cell.classList.toggle("is-expanded");
-        more.textContent = expanded ? "Show less" : `+${hiddenCount} more`;
-      });
+      more.textContent = `+${chipEvents.length - DASH_CAL_MAX_EVENTS} more`;
       cell.appendChild(more);
     }
 
+    cell.addEventListener("click", () => selectDashDay(ymd));
     body.appendChild(cell);
   }
 
   grid.appendChild(body);
+}
+
+// ── Day pane (opens beside the calendar when a day is selected) ──
+
+function selectDashDay(ymd) {
+  dashSelectedYmd = ymd === dashSelectedYmd ? "" : ymd;
+  renderDashCalendar();
+  renderDashDayPane();
+}
+
+function closeDashDayPane() {
+  dashSelectedYmd = "";
+  renderDashCalendar();
+  renderDashDayPane();
+}
+
+function renderDashDayPane() {
+  const pane = document.getElementById("dashDayPane");
+  if (!pane) return;
+  if (!dashSelectedYmd) {
+    pane.hidden = true;
+    return;
+  }
+  pane.hidden = false;
+
+  const title = document.getElementById("dashDayPaneTitle");
+  const selectedDate = parseYmdToLocalDate(dashSelectedYmd);
+  if (title) {
+    title.textContent = selectedDate
+      ? selectedDate.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })
+      : dashSelectedYmd;
+  }
+
+  const events = buildDashEventsByDate().get(dashSelectedYmd) || [];
+  const countEl = document.getElementById("dashDayPaneCount");
+  if (countEl) countEl.textContent = events.length ? String(events.length) : "";
+
+  const list = document.getElementById("dashDayPaneList");
+  if (!list) return;
+  list.innerHTML = "";
+  if (events.length === 0) {
+    list.appendChild(dashEmptyState("Nothing scheduled this day."));
+    return;
+  }
+  events.forEach(ev => {
+    const row = dashListRow({
+      id: ev.title,
+      sub: ev.meta,
+      date: "",
+      dot: ev.cls.replace("dash-event--", "dash-dot--"),
+      onOpen: ev.open,
+    });
+    if (ev.done) row.classList.add("is-done");
+    list.appendChild(row);
+  });
 }
 
 // ── KPI cards ────────────────────────────────────────────────
@@ -314,11 +419,17 @@ function dashEmptyState(text) {
   return el;
 }
 
-function dashListRow({ id, sub, date, dateLabel = "", overdue = false, onOpen, action = null }) {
+function dashListRow({ id, sub, date, dateLabel = "", overdue = false, onOpen, action = null, dot = "" }) {
   const row = document.createElement("div");
   row.className = "dash-list-row";
   row.setAttribute("role", "button");
   row.tabIndex = 0;
+
+  if (dot) {
+    const dotEl = document.createElement("i");
+    dotEl.className = `dash-dot ${dot}`;
+    row.appendChild(dotEl);
+  }
 
   const main = document.createElement("span");
   main.className = "dash-row-main";
@@ -334,19 +445,21 @@ function dashListRow({ id, sub, date, dateLabel = "", overdue = false, onOpen, a
   }
   row.appendChild(main);
 
-  const end = document.createElement("span");
-  end.className = "dash-row-end";
-  const dateEl = document.createElement("span");
-  dateEl.className = "dash-row-date" + (overdue ? " is-overdue" : "");
-  dateEl.textContent = date || "—";
-  end.appendChild(dateEl);
-  if (dateLabel) {
-    const dateLabelEl = document.createElement("span");
-    dateLabelEl.className = "dash-row-sub";
-    dateLabelEl.textContent = dateLabel;
-    end.appendChild(dateLabelEl);
+  if (date || dateLabel) {
+    const end = document.createElement("span");
+    end.className = "dash-row-end";
+    const dateEl = document.createElement("span");
+    dateEl.className = "dash-row-date" + (overdue ? " is-overdue" : "");
+    dateEl.textContent = date || "—";
+    end.appendChild(dateEl);
+    if (dateLabel) {
+      const dateLabelEl = document.createElement("span");
+      dateLabelEl.className = "dash-row-sub";
+      dateLabelEl.textContent = dateLabel;
+      end.appendChild(dateLabelEl);
+    }
+    row.appendChild(end);
   }
-  row.appendChild(end);
 
   if (action) {
     const btn = document.createElement("button");
@@ -535,6 +648,7 @@ function renderDashAsns() {
 function renderDashboard() {
   renderDashKpis();
   renderDashCalendar();
+  renderDashDayPane();
   renderDashWeeks();
   renderDashShipments();
   renderDashAsns();
@@ -557,6 +671,7 @@ function initDashboard() {
     dashCalCursor = null;
     renderDashCalendar();
   });
+  document.getElementById("dashDayPaneClose")?.addEventListener("click", closeDashDayPane);
 }
 
 initDashboard();

@@ -8754,24 +8754,29 @@ td.has-pending-approval .pending-approval-value {
   box-sizing: border-box;
 }
 #salesOrderTable { min-width: 1888px; }
+/* Safety net: any column without an explicit rule still gets a usable floor.
+   :where() keeps specificity at zero so the per-column rules below win. */
+#salesOrderTable :where(col:not(.col-flag):not(.col-select)) { min-width: 60px; }
 #salesOrderTable .col-flag,
 #invoiceTable .col-flag          { width: 34px;  max-width: 34px; }
 #salesOrderTable .col-select,
 #invoiceTable .col-select        { width: 30px;  max-width: 30px; }
-#salesOrderTable .col-so         { width: 70px;  max-width: 70px; }
-#salesOrderTable .col-buyer      { width: 180px; min-width: 160px; }
-#salesOrderTable .col-buyer-po   { width: 150px; min-width: 130px; }
-#salesOrderTable .col-division   { width: 104px; max-width: 104px; }
-#salesOrderTable .col-date       { width: 76px;  max-width: 76px; }
-#salesOrderTable .col-cxl        { width: 76px;  max-width: 76px; }
-#salesOrderTable .col-vendor     { width: 104px; max-width: 104px; }
-#salesOrderTable .col-n41-status { width: 90px;  max-width: 90px; }
-#salesOrderTable .col-order-type { width: 112px; max-width: 112px; }
-#salesOrderTable .col-so-styles  { width: 68px;  max-width: 68px; }
-#salesOrderTable .col-so-units   { width: 68px;  max-width: 68px; }
-#salesOrderTable .col-so-price   { width: 84px;  max-width: 84px; }
-#salesOrderTable .col-so-style-nums { width: 420px; min-width: 340px; }
-#salesOrderTable .col-so-memo    { min-width: 140px; }
+#salesOrderTable .col-so         { width: 70px;  min-width: 64px;  max-width: 90px; }
+#salesOrderTable .col-buyer      { width: 180px; min-width: 160px; max-width: 240px; }
+#salesOrderTable .col-buyer-po   { width: 150px; min-width: 130px; max-width: 200px; }
+#salesOrderTable .col-division   { width: 104px; min-width: 88px;  max-width: 104px; }
+#salesOrderTable .col-date       { width: 76px;  min-width: 68px;  max-width: 76px; }
+#salesOrderTable .col-cxl        { width: 76px;  min-width: 68px;  max-width: 76px; }
+#salesOrderTable .col-status     { width: 112px; min-width: 96px;  max-width: 132px; }
+#salesOrderTable .col-vendor     { width: 104px; min-width: 88px;  max-width: 104px; }
+#salesOrderTable .col-n41-status { width: 90px;  min-width: 76px;  max-width: 90px; }
+#salesOrderTable .col-order-type { width: 112px; min-width: 96px;  max-width: 112px; }
+#salesOrderTable .col-cust-type  { width: 112px; min-width: 96px;  max-width: 132px; }
+#salesOrderTable .col-so-styles  { width: 68px;  min-width: 56px;  max-width: 68px; }
+#salesOrderTable .col-so-units   { width: 68px;  min-width: 56px;  max-width: 68px; }
+#salesOrderTable .col-so-price   { width: 84px;  min-width: 72px;  max-width: 104px; }
+#salesOrderTable .col-so-style-nums { width: 420px; min-width: 340px; max-width: 560px; }
+#salesOrderTable .col-so-memo    { min-width: 140px; max-width: 360px; }
 
 #salesOrderTable th.th-flag-col,
 #salesOrderTable td.td-flag-cell,
@@ -9123,11 +9128,11 @@ button.app-logo-text.is-active { cursor: default; opacity: 1; }
 .dashboard-wrap {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
-  padding: 18px 24px 28px;
+  overflow: hidden; /* the page never scrolls; panels scroll internally */
+  padding: 14px 20px 16px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .dashboard-kpis {
@@ -9170,19 +9175,54 @@ button.dash-kpi:hover { border-color: var(--border-strong); background: var(--ro
 
 .dash-kpi.is-alert .dash-kpi-value { color: var(--danger); }
 
-.dashboard-grid-top {
-  display: grid;
-  grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr);
-  gap: 16px;
+.dashboard-main {
+  position: relative; /* anchors the day pane overlay */
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  gap: 12px;
   align-items: stretch;
 }
 
-.dashboard-grid-bottom {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  align-items: start;
+.dashboard-calendar-panel {
+  flex: 1 1 auto;
+  min-width: 0;
 }
+
+.dashboard-side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 0 0 320px;
+  max-width: 320px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.dashboard-side .dashboard-panel { flex: 1 1 0; }
+.dashboard-side .dashboard-weeks-panel { flex: 1.4 1 0; }
+
+/* Day pane floats above the layout instead of pushing it aside. */
+.dashboard-day-pane {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 320px;
+  z-index: 40;
+  background: var(--surface);
+  box-shadow: -10px 0 28px rgba(0, 0, 0, 0.12);
+}
+
+.dashboard-day-pane[hidden] { display: none !important; }
+
+.dashboard-day-pane-close {
+  margin-left: 4px;
+  flex-shrink: 0;
+}
+
+.dash-list-row.is-done { opacity: 0.55; }
+.dash-list-row.is-done .dash-row-id { text-decoration: line-through; }
 
 .dashboard-panel {
   display: flex;
@@ -9222,15 +9262,22 @@ button.dash-kpi:hover { border-color: var(--border-strong); background: var(--ro
 .dashboard-panel-count:empty { display: none; }
 
 .dashboard-panel-body {
+  flex: 1;
   overflow-y: auto;
   min-height: 0;
 }
 
-.dashboard-weeks-panel .dashboard-panel-body { max-height: 680px; }
-.dashboard-grid-bottom .dashboard-panel-body { max-height: 420px; }
-
 /* Calendar */
 .dashboard-cal-header { gap: 12px; }
+
+.dashboard-cal {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  /* On short viewports the calendar scrolls internally — never the page. */
+  overflow-y: auto;
+}
 
 .dashboard-cal-title {
   font-size: 14px;
@@ -9290,12 +9337,14 @@ button.dash-kpi:hover { border-color: var(--border-strong); background: var(--ro
 }
 
 .dash-cal-body {
+  flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: repeat(7, 1fr);
+  grid-auto-rows: minmax(84px, 1fr);
 }
 
 .dash-cal-cell {
-  min-height: 96px;
   padding: 4px;
   border-right: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
@@ -9303,11 +9352,20 @@ button.dash-kpi:hover { border-color: var(--border-strong); background: var(--ro
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  cursor: pointer;
 }
 
 .dash-cal-cell:nth-child(7n) { border-right: none; }
+.dash-cal-cell:hover { background: var(--row-hover); }
 .dash-cal-cell.is-outside { background: var(--bg); }
 .dash-cal-cell.is-outside .dash-cal-date { color: var(--empty-display); }
+
+.dash-cal-cell.is-selected {
+  background: var(--accent-light);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
 
 .dash-cal-date {
   align-self: flex-start;
@@ -9342,7 +9400,9 @@ button.dash-kpi:hover { border-color: var(--border-strong); background: var(--ro
   cursor: pointer;
 }
 
-.dash-event:hover { filter: brightness(0.9); }
+button.dash-event { cursor: pointer; }
+button.dash-event:hover { filter: brightness(0.9); }
+span.dash-event { cursor: pointer; /* clicking selects the day */ }
 
 .dash-event--so-major { background: #3f51b5; }
 .dash-event--so-private { background: #8e24aa; }
@@ -9457,31 +9517,37 @@ button.dash-kpi:hover { border-color: var(--border-strong); background: var(--ro
   color: var(--text-muted);
 }
 
-@media (max-width: 1200px) {
+/* Narrow screens: stack panels and let the page scroll again. */
+@media (max-width: 1100px) {
+  .dashboard-wrap { overflow-y: auto; }
   .dashboard-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .dashboard-grid-top { grid-template-columns: 1fr; }
+  .dashboard-main { flex-direction: column; }
+  .dashboard-calendar-panel { min-height: 520px; }
+  .dashboard-side { flex: none; max-width: none; }
+  .dashboard-side .dashboard-panel-body { max-height: 320px; }
+  /* Stacked layout is tall — pin the pane to the window instead. */
+  .dashboard-day-pane {
+    position: fixed;
+    top: 56px;
+    width: min(320px, 88vw);
+    z-index: 200;
+  }
   .dashboard-cal-legend { display: none; }
 }
 
-.dash-cal-cell:not(.is-expanded) .dash-event.dash-event-overflow { display: none; }
-
 .dash-cal-more {
   align-self: flex-start;
-  border: none;
-  background: transparent;
   padding: 1px 5px;
   font-family: var(--font);
   font-size: 10.5px;
   font-weight: 600;
   color: var(--text-muted);
-  cursor: pointer;
   border-radius: 4px;
 }
 
-.dash-cal-more:hover {
-  color: var(--text);
-  background: var(--accent-light);
-}
+.dash-cal-cell:hover .dash-cal-more { color: var(--text); }
+
+.dash-dot--asn { background: #d3402e; }
 
 .dashboard-wrap[hidden] { display: none !important; }
 
@@ -9491,4 +9557,31 @@ button.dash-kpi:hover { border-color: var(--border-strong); background: var(--ro
 #shipmentModalStatusBadge,
 #asnRequestStatusBadge {
   flex-shrink: 0;
+}
+
+/* Compact per-day SO summary (dot + count per order type) */
+.dash-so-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--accent-light);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.dash-so-summary-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dash-so-summary .dash-dot {
+  width: 7px;
+  height: 7px;
 }

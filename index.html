@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>PO Table</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-<link rel="stylesheet" href="po-table.css?v=20260703-2" />
+<link rel="stylesheet" href="po-table.css?v=20260703-6" />
 </head>
 <body>
 
@@ -237,7 +237,7 @@
 <div id="appMain" class="app-main">
 <div id="dashboardWrap" class="dashboard-wrap" hidden>
   <div class="dashboard-kpis" id="dashboardKpis"></div>
-  <div class="dashboard-grid-top">
+  <div class="dashboard-main">
     <section class="dashboard-panel dashboard-calendar-panel">
       <div class="dashboard-panel-header dashboard-cal-header">
         <span class="dashboard-cal-title" id="dashCalTitle">—</span>
@@ -255,29 +255,37 @@
       </div>
       <div class="dashboard-cal" id="dashCalGrid"></div>
     </section>
-    <section class="dashboard-panel dashboard-weeks-panel">
+    <div class="dashboard-side">
+      <section class="dashboard-panel dashboard-weeks-panel">
+        <div class="dashboard-panel-header">
+          <span class="dashboard-panel-title">Open Orders by Week</span>
+          <span class="dashboard-panel-count" id="dashWeeksCount"></span>
+        </div>
+        <div class="dashboard-panel-body" id="dashWeeksList"></div>
+      </section>
+      <section class="dashboard-panel">
+        <div class="dashboard-panel-header">
+          <span class="dashboard-panel-title">Open Shipments</span>
+          <span class="dashboard-panel-count" id="dashShipmentsCount"></span>
+        </div>
+        <div class="dashboard-panel-body" id="dashShipmentsList"></div>
+      </section>
+      <section class="dashboard-panel">
+        <div class="dashboard-panel-header">
+          <span class="dashboard-panel-title">Open ASNs</span>
+          <span class="dashboard-panel-count" id="dashAsnCount"></span>
+        </div>
+        <div class="dashboard-panel-body" id="dashAsnList"></div>
+      </section>
+    </div>
+    <aside class="dashboard-panel dashboard-day-pane" id="dashDayPane" hidden>
       <div class="dashboard-panel-header">
-        <span class="dashboard-panel-title">Open Orders by Week</span>
-        <span class="dashboard-panel-count" id="dashWeeksCount"></span>
+        <span class="dashboard-panel-title" id="dashDayPaneTitle">—</span>
+        <span class="dashboard-panel-count" id="dashDayPaneCount"></span>
+        <button type="button" class="btn-close dashboard-day-pane-close" id="dashDayPaneClose" aria-label="Close day view">✕</button>
       </div>
-      <div class="dashboard-panel-body" id="dashWeeksList"></div>
-    </section>
-  </div>
-  <div class="dashboard-grid-bottom">
-    <section class="dashboard-panel">
-      <div class="dashboard-panel-header">
-        <span class="dashboard-panel-title">Open Shipments</span>
-        <span class="dashboard-panel-count" id="dashShipmentsCount"></span>
-      </div>
-      <div class="dashboard-panel-body" id="dashShipmentsList"></div>
-    </section>
-    <section class="dashboard-panel">
-      <div class="dashboard-panel-header">
-        <span class="dashboard-panel-title">Open ASNs</span>
-        <span class="dashboard-panel-count" id="dashAsnCount"></span>
-      </div>
-      <div class="dashboard-panel-body" id="dashAsnList"></div>
-    </section>
+      <div class="dashboard-panel-body" id="dashDayPaneList"></div>
+    </aside>
   </div>
 </div>
 <div id="poViewContent" class="po-view-content" hidden>
@@ -1641,7 +1649,7 @@
 <script src="js/invoices.js"></script>
 <script src="js/invoices-import.js"></script>
 <script src="js/shipments-init.js"></script>
-<script src="js/dashboard.js?v=20260703-1"></script>
+<script src="js/dashboard.js?v=20260703-4"></script>
 <script src="js/packing-print.js"></script>
 <div id="packingPrintRoot" aria-hidden="true"></div>
 </body>
