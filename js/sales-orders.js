@@ -4,6 +4,8 @@ const SO_SEARCH_COLUMNS = [
   "SO #",
   "Customer",
   "Customer PO #",
+  "INVOICE #",
+  "INVOICE STATUS",
   "Store",
   "N41 Status",
   "Order Type",
@@ -27,6 +29,150 @@ function normalizeSoNumber(value) {
   if (!raw) return "";
   const n = Number(raw);
   return Number.isFinite(n) ? String(n) : raw;
+}
+
+function normalizeInvoiceNumber(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const n = Number(raw);
+  return Number.isFinite(n) ? String(n) : raw;
+}
+
+function findSalesOrderByNumber(soNumber) {
+  const key = normalizeSoNumber(soNumber);
+  if (!key) return null;
+  return (allSalesOrders ?? []).find(order => normalizeSoNumber(order["SO #"]) === key) ?? null;
+}
+
+function findInvoiceByNumber(invoiceNo) {
+  const key = normalizeInvoiceNumber(invoiceNo);
+  if (!key) return null;
+  return (allInvoices ?? []).find(inv => normalizeInvoiceNumber(inv["Invoice #"]) === key) ?? null;
+}
+
+function getLinkedInvoicesForSalesOrder(order) {
+  const soNum = normalizeSoNumber(order?.["SO #"]);
+  if (!soNum) return [];
+  const seen = new Set();
+  return (allInvoices ?? []).filter(inv => {
+    if (normalizeSoNumber(inv["SO #"]) !== soNum) return false;
+    const invoiceNo = normalizeInvoiceNumber(inv["Invoice #"]);
+    if (!invoiceNo || seen.has(invoiceNo)) return false;
+    seen.add(invoiceNo);
+    return true;
+  });
+}
+
+function getInvoiceUnitQtyForSalesOrder(order) {
+  return getLinkedInvoicesForSalesOrder(order).reduce((sum, inv) => sum + toInvNumberForSo(inv["Unit Qty"]), 0);
+}
+
+function getInvoiceTotalForSalesOrder(order) {
+  return getLinkedInvoicesForSalesOrder(order).reduce((sum, inv) => sum + toInvNumberForSo(inv.Total), 0);
+}
+
+function getInvoiceStatusesForSalesOrder(order) {
+  const statuses = [];
+  const seen = new Set();
+  getLinkedInvoicesForSalesOrder(order).forEach(inv => {
+    const status = String(inv.Status ?? "").trim();
+    const key = status.toLowerCase();
+    if (!status || seen.has(key)) return;
+    seen.add(key);
+    statuses.push(status);
+  });
+  return statuses;
+}
+
+function toInvNumberForSo(val) {
+  const n = Number(String(val ?? "").replace(/[$,]/g, ""));
+  return Number.isFinite(n) ? n : 0;
+}
+
+function getSoComputedColumnValue(col, order) {
+  if (col === "INVOICE #") {
+    return getLinkedInvoicesForSalesOrder(order)
+      .map(inv => String(inv["Invoice #"] ?? "").trim())
+      .filter(Boolean)
+      .join(", ");
+  }
+  if (col === "INVOICE UNIT QTY") return getInvoiceUnitQtyForSalesOrder(order);
+  if (col === "TOTAL") return getInvoiceTotalForSalesOrder(order);
+  if (col === "INVOICE STATUS") return getInvoiceStatusesForSalesOrder(order).join(", ");
+  return undefined;
+}
+
+function createRecordLinkButton(text, className, onClick, title) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = `record-link ${className || ""}`.trim();
+  btn.textContent = text;
+  btn.title = title || text;
+  btn.addEventListener("click", e => {
+    e.stopPropagation();
+    onClick();
+  });
+  return btn;
+}
+
+function mountInvoiceLinks(container, invoices, { closeSalesOrder = false } = {}) {
+  if (!container) return;
+  container.replaceChildren();
+  const linked = (invoices ?? []).filter(inv => String(inv?.["Invoice #"] ?? "").trim());
+  if (linked.length === 0) {
+    setDisplayText(container, EMPTY_DISPLAY);
+    return;
+  }
+  container.classList.remove("empty-display");
+  const list = document.createElement("span");
+  list.className = "record-link-list";
+  linked.forEach((inv, index) => {
+    if (index > 0) list.appendChild(document.createTextNode(", "));
+    const invoiceNo = String(inv["Invoice #"] ?? "").trim();
+    list.appendChild(createRecordLinkButton(
+      invoiceNo,
+      "invoice-record-link",
+      () => {
+        if (closeSalesOrder) closeSalesOrderModal();
+        if (typeof openInvoiceModal === "function") openInvoiceModal(inv);
+      },
+      `Open invoice ${invoiceNo}`
+    ));
+  });
+  container.appendChild(list);
+}
+
+function mountSalesOrderLink(container, soNumber, { closeInvoice = false } = {}) {
+  if (!container) return;
+  container.replaceChildren();
+  const display = String(soNumber ?? "").trim();
+  if (!display) {
+    setDisplayText(container, EMPTY_DISPLAY);
+    return;
+  }
+  const order = findSalesOrderByNumber(display);
+  if (!order) {
+    setDisplayText(container, display);
+    return;
+  }
+  container.classList.remove("empty-display");
+  const list = document.createElement("span");
+  list.className = "record-link-list";
+  list.appendChild(createRecordLinkButton(
+    display,
+    "so-record-link",
+    () => {
+      if (closeInvoice && typeof closeInvoiceModal === "function") closeInvoiceModal();
+      openSalesOrderModal(order);
+    },
+    `Open SO ${display}`
+  ));
+  container.appendChild(list);
+}
+
+function renderSalesOrderLinkCell(td, soNumber) {
+  td.className = "readonly readonly-no-select";
+  mountSalesOrderLink(td, soNumber);
 }
 
 function getLinkedSalesOrderForPo(poRow) {
@@ -212,6 +358,8 @@ function onSalesOrdersDataLoaded(rows) {
 }
 
 function getSoSortValue(order, col) {
+  const computed = getSoComputedColumnValue(col, order);
+  if (computed !== undefined) return computed;
   if (col === "Styles") return (order.Lines ?? []).length;
   if (col === "Style #s") return (order.Lines ?? []).map(l => l["Style #"] ?? "").join(", ");
   if (col === "Total Units") return soTotalUnits(order);
@@ -223,7 +371,14 @@ function compareSoOrdersByColumn(col, a, b) {
   if (SO_DATE_FILTER_COLUMNS.has(col)) {
     return compareDateFieldValues(a[col], b[col]);
   }
-  if (col === "Styles" || col === "Style #s" || col === "Total Units" || col === "Total Price") {
+  if (
+    col === "Styles"
+    || col === "Style #s"
+    || col === "Total Units"
+    || col === "Total Price"
+    || col === "INVOICE UNIT QTY"
+    || col === "TOTAL"
+  ) {
     return compareTextFieldValues(getSoSortValue(a, col), getSoSortValue(b, col));
   }
   if (col === "SO #") {
@@ -259,7 +414,7 @@ function applySalesOrderFilters() {
     if (typeof rowPassesSoColumnFilters === "function" && !rowPassesSoColumnFilters(order)) return false;
     if (!q) return true;
     const haystack = SO_SEARCH_COLUMNS
-      .map(col => String(order[col] ?? ""))
+      .map(col => String(getSoComputedColumnValue(col, order) ?? order[col] ?? ""))
       .join(" ")
       .toLowerCase();
     if (haystack.includes(q)) return true;
@@ -464,6 +619,23 @@ function renderSalesOrdersTable() {
         renderSoSelectedCell(td, order);
       } else if (col === "Flag") {
         renderSoFlagCell(td, order);
+      } else if (col === "SO #") {
+        renderSalesOrderLinkCell(td, order["SO #"]);
+      } else if (col === "INVOICE #") {
+        td.className = "readonly readonly-no-select";
+        mountInvoiceLinks(td, getLinkedInvoicesForSalesOrder(order));
+      } else if (col === "INVOICE UNIT QTY") {
+        const qty = getInvoiceUnitQtyForSalesOrder(order);
+        td.textContent = qty > 0 ? qty.toLocaleString() : "—";
+        td.className = "td-num";
+      } else if (col === "TOTAL") {
+        const total = getInvoiceTotalForSalesOrder(order);
+        td.textContent = total > 0 ? formatSoPrice(total) : "—";
+        td.className = "td-num";
+      } else if (col === "INVOICE STATUS") {
+        const status = getInvoiceStatusesForSalesOrder(order).join(", ");
+        td.textContent = status || "—";
+        if (status) td.dataset.status = status.toLowerCase();
       } else if (col === "Styles") {
         td.textContent = String((order.Lines ?? []).length);
         td.className = "td-num";
@@ -629,6 +801,32 @@ function buildLinkedPosSection(order) {
 </div>`;
 }
 
+function buildLinkedInvoicesSection(order) {
+  const linked = getLinkedInvoicesForSalesOrder(order);
+  if (linked.length === 0) {
+    return `<div class="so-linked-invoices">
+  <div class="so-section-title">Linked Invoices</div>
+  <p class="so-linked-empty">No linked invoices found.</p>
+</div>`;
+  }
+
+  const items = linked.map(inv => {
+    const invoiceNo = String(inv["Invoice #"] ?? "").trim();
+    const qty = toInvNumberForSo(inv["Unit Qty"]);
+    const total = toInvNumberForSo(inv.Total);
+    const status = String(inv.Status ?? "").trim();
+    return `<button type="button" class="so-linked-po-btn so-linked-invoice-btn" data-invoice="${escSo(invoiceNo)}">
+  <span class="so-linked-po-num">Invoice #${escSo(invoiceNo)}</span>
+  <span class="so-linked-po-meta">${qty > 0 ? "Qty " + qty.toLocaleString() : "Qty —"}${total > 0 ? " · " + escSo(formatSoPrice(total)) : ""}${status ? " · " + escSo(status) : ""}</span>
+</button>`;
+  }).join("");
+
+  return `<div class="so-linked-invoices">
+  <div class="so-section-title">Linked Invoices <span class="so-linked-count">(${linked.length})</span></div>
+  <div class="so-linked-po-list">${items}</div>
+</div>`;
+}
+
 function openSalesOrderModal(order) {
   const overlay = document.getElementById("salesOrderModalOverlay");
   if (!overlay) return;
@@ -655,6 +853,10 @@ function openSalesOrderModal(order) {
   const totalStyles = lines.length;
   const totalUnits = soTotalUnits(order);
   const totalPrice = soTotalPrice(order);
+  const linkedInvoices = getLinkedInvoicesForSalesOrder(order);
+  const invoiceUnitQty = getInvoiceUnitQtyForSalesOrder(order);
+  const invoiceTotal = getInvoiceTotalForSalesOrder(order);
+  const invoiceStatus = getInvoiceStatusesForSalesOrder(order).join(", ");
 
   // Build modal body
   const bodyEl = overlay.querySelector(".so-modal-body");
@@ -669,6 +871,10 @@ function openSalesOrderModal(order) {
   <div class="so-field"><span class="so-field-label">Store</span><span class="so-field-value">${escSo(order.Store ?? "—")}</span></div>
   <div class="so-field"><span class="so-field-label">Order Type</span><span class="so-field-value">${escSo(order["Order Type"] ?? "—")}</span></div>
   <div class="so-field"><span class="so-field-label">Customer Type</span><span class="so-field-value">${escSo(order["Customer Type"] ?? "—")}</span></div>
+  <div class="so-field"><span class="so-field-label">Invoice #</span><span class="so-field-value" data-so-invoice-links></span></div>
+  <div class="so-field"><span class="so-field-label">Invoice Unit Qty</span><span class="so-field-value">${invoiceUnitQty > 0 ? invoiceUnitQty.toLocaleString() : "—"}</span></div>
+  <div class="so-field"><span class="so-field-label">Total</span><span class="so-field-value">${invoiceTotal > 0 ? formatSoPrice(invoiceTotal) : "—"}</span></div>
+  <div class="so-field"><span class="so-field-label">Invoice Status</span><span class="so-field-value">${escSo(invoiceStatus || "—")}</span></div>
 </div>
 
 <div class="so-totals-bar">
@@ -681,6 +887,8 @@ function openSalesOrderModal(order) {
   ${buildSoLineItemsTable(lines)}
 </div>
 
+${buildLinkedInvoicesSection(order)}
+
 <div class="so-memo-section">
   <div class="so-section-title">Memo</div>
   <textarea class="so-memo-textarea" id="soMemoTextarea" placeholder="Add a note for this sales order…" rows="3">${escSo(order.Memo ?? "")}</textarea>
@@ -691,6 +899,8 @@ function openSalesOrderModal(order) {
 </div>
 
 ${buildLinkedPosSection(order)}`;
+
+  mountInvoiceLinks(bodyEl.querySelector("[data-so-invoice-links]"), linkedInvoices, { closeSalesOrder: true });
 
   // Wire Memo save button
   const memoTextarea = bodyEl.querySelector("#soMemoTextarea");
@@ -731,6 +941,15 @@ ${buildLinkedPosSection(order)}`;
     });
   });
 
+  bodyEl.querySelectorAll(".so-linked-invoice-btn[data-invoice]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const inv = findInvoiceByNumber(btn.dataset.invoice);
+      if (!inv) return;
+      closeSalesOrderModal();
+      if (typeof openInvoiceModal === "function") openInvoiceModal(inv);
+    });
+  });
+
   overlay.classList.add("open");
 }
 
@@ -757,7 +976,7 @@ function initSoLinkFromPoTable() {
     const soNum = String(poRow["SO #"] ?? "").trim();
     if (!soNum) return;
 
-    const soOrder = (allSalesOrders ?? []).find(o => String(o["SO #"] ?? "").trim() === soNum);
+    const soOrder = findSalesOrderByNumber(soNum);
     if (!soOrder) return;
 
     e.stopPropagation();

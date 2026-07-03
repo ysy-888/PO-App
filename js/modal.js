@@ -109,6 +109,8 @@ function setFieldDisplayContent(fieldEl, col, row) {
     renderFlagCell(fieldEl, row);
   } else if (DATE_FIELDS.has(col)) {
     applyDateCellDisplay(fieldEl, col, row, { context: "modal" });
+  } else if (col === "SO #" && typeof mountSalesOrderLink === "function") {
+    mountSalesOrderLink(fieldEl, val);
   } else if (COPY_ON_CLICK_COLS.has(col)) {
     mountCopyableText(fieldEl, col, val);
   } else if ((col === "Actual Qty" || col === "Ctn Qty") && toQtyNumber(val) <= 0) {

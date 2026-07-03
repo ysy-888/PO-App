@@ -737,7 +737,8 @@ function renderAsnRequestLinkedPoSection(pos, isView = false) {
   table.appendChild(thead);
 
   const tbody = document.createElement("tbody");
-  pos.forEach(row => {
+  const sortedPos = typeof sortLinkedPoRows === "function" ? sortLinkedPoRows(pos) : pos;
+  sortedPos.forEach(row => {
     const tr = document.createElement("tr");
     tr.dataset.po = row["PO #"];
     attachRequestLinkedPoRowOpen(tr, row["PO #"]);
@@ -753,6 +754,7 @@ function renderAsnRequestLinkedPoSection(pos, isView = false) {
 
     ASN_REQUEST_LINKED_PO_COLUMNS.forEach(({ col, cellClass }) => {
       const td = document.createElement("td");
+      td.dataset.col = col;
       renderRequestLinkedPoDataCell(td, col, row, { cellClass });
       tr.appendChild(td);
     });
@@ -762,6 +764,7 @@ function renderAsnRequestLinkedPoSection(pos, isView = false) {
   table.appendChild(tbody);
   wrap.appendChild(table);
   section.appendChild(wrap);
+  if (typeof wireLinkedPoTableSorting === "function") wireLinkedPoTableSorting(table);
   return section;
 }
 

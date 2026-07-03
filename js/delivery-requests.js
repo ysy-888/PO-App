@@ -463,7 +463,8 @@ function renderDeliveryRequestLinkedPoSection(pos, isReadOnly = false) {
   table.appendChild(thead);
 
   const tbody = document.createElement("tbody");
-  pos.forEach(row => {
+  const sortedPos = typeof sortLinkedPoRows === "function" ? sortLinkedPoRows(pos) : pos;
+  sortedPos.forEach(row => {
     const tr = document.createElement("tr");
     tr.dataset.po = row["PO #"];
     attachRequestLinkedPoRowOpen(tr, row["PO #"]);
@@ -477,6 +478,7 @@ function renderDeliveryRequestLinkedPoSection(pos, isReadOnly = false) {
     tr.appendChild(selectTd);
     DELIVERY_PICKUP_LINKED_PO_COLUMNS.forEach(({ col, cellClass }) => {
       const td = document.createElement("td");
+      td.dataset.col = col;
       renderRequestLinkedPoDataCell(td, col, row, { cellClass });
       tr.appendChild(td);
     });
@@ -486,6 +488,7 @@ function renderDeliveryRequestLinkedPoSection(pos, isReadOnly = false) {
   table.appendChild(tbody);
   wrap.appendChild(table);
   section.appendChild(wrap);
+  if (typeof wireLinkedPoTableSorting === "function") wireLinkedPoTableSorting(table);
   return section;
 }
 

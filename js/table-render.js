@@ -320,6 +320,8 @@ function renderTable() {
         } else {
           applyDateCellDisplay(td, col, row, { context: "table" });
         }
+      } else if (col === "SO #" && typeof renderSalesOrderLinkCell === "function") {
+        renderSalesOrderLinkCell(td, val);
       } else if (col === "Status") {
 
         td.innerHTML = renderStatus(val);

@@ -164,6 +164,7 @@ function initInvSelectionAndFlagControls() {
 function onInvoicesDataLoaded(rows) {
   allInvoices = (rows ?? []).map(row => ({ ...row }));
   applyInvoiceFilters();
+  if (typeof applySalesOrderFilters === "function") applySalesOrderFilters();
 }
 
 function getInvSortValue(inv, col) {
@@ -409,6 +410,10 @@ function renderInvoicesTable() {
         renderInvSelectedCell(td, inv);
       } else if (col === "Flag") {
         renderInvFlagCell(td, inv);
+      } else if (col === "Invoice #") {
+        td.className = "readonly readonly-no-select";
+        if (typeof mountInvoiceLinks === "function") mountInvoiceLinks(td, [inv]);
+        else td.textContent = String(inv[col] ?? "") || "—";
       } else if (INV_CURRENCY_COLUMNS.has(col)) {
         const n = toInvNumber(inv[col]);
         td.textContent = n !== 0 ? formatInvCurrency(n) : "—";
@@ -423,6 +428,9 @@ function renderInvoicesTable() {
         const status = String(inv[col] ?? "").trim();
         td.textContent = status || "—";
         if (status) td.dataset.status = status.toLowerCase();
+      } else if (col === "SO #" && typeof mountSalesOrderLink === "function") {
+        td.className = "readonly readonly-no-select";
+        mountSalesOrderLink(td, inv[col]);
       } else {
         td.textContent = String(inv[col] ?? "") || "—";
       }
@@ -465,7 +473,7 @@ function openInvoiceModal(inv) {
   bodyEl.innerHTML = `
 <div class="so-header-fields">
   <div class="so-field"><span class="so-field-label">INV DATE</span><span class="so-field-value">${formatInvDate(inv["INV DATE"])}</span></div>
-  <div class="so-field"><span class="so-field-label">SO #</span><span class="so-field-value">${escInv(inv["SO #"] ?? "—")}</span></div>
+  <div class="so-field"><span class="so-field-label">SO #</span><span class="so-field-value" data-inv-so-link></span></div>
   <div class="so-field"><span class="so-field-label">Pick #</span><span class="so-field-value">${escInv(inv["Pick #"] ?? "—")}</span></div>
   <div class="so-field"><span class="so-field-label">Tracking #</span><span class="so-field-value">${escInv(inv["Tracking #"] ?? "—")}</span></div>
   <div class="so-field"><span class="so-field-label">Unit Qty</span><span class="so-field-value">${escInv(inv["Unit Qty"] ?? "—")}</span></div>
@@ -494,6 +502,13 @@ function openInvoiceModal(inv) {
     <button type="button" class="so-memo-save-btn" id="invMemoSaveBtn">Save</button>
   </div>
 </div>`;
+
+  if (typeof mountSalesOrderLink === "function") {
+    mountSalesOrderLink(bodyEl.querySelector("[data-inv-so-link]"), inv["SO #"], { closeInvoice: true });
+  } else {
+    const soLinkEl = bodyEl.querySelector("[data-inv-so-link]");
+    if (soLinkEl) soLinkEl.textContent = String(inv["SO #"] ?? "—");
+  }
 
   const memoTextarea = bodyEl.querySelector("#invMemoTextarea");
   const houseMemoTextarea = bodyEl.querySelector("#invHouseMemoTextarea");

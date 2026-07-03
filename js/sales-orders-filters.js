@@ -3,6 +3,7 @@
 const SO_COLUMN_FILTER_COLS = [
   "Customer",
   "Customer PO #",
+  "INVOICE STATUS",
   "Store",
   "N41 Status",
   "Order Type",
@@ -27,6 +28,10 @@ function normalizeSoFilterValue(val) {
 }
 
 function getSoColumnFilterRawValue(col, order) {
+  if (typeof getSoComputedColumnValue === "function") {
+    const computed = getSoComputedColumnValue(col, order);
+    if (computed !== undefined) return computed;
+  }
   return order[col];
 }
 

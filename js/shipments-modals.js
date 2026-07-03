@@ -886,7 +886,8 @@ function renderShipmentLinkedPoSection(source) {
   table.appendChild(thead);
 
   const tbody = document.createElement("tbody");
-  pos.forEach(row => {
+  const sortedPos = typeof sortLinkedPoRows === "function" ? sortLinkedPoRows(pos) : pos;
+  sortedPos.forEach(row => {
     const tr = document.createElement("tr");
     tr.dataset.po = row["PO #"];
     attachRequestLinkedPoRowOpen(tr, row["PO #"]);
@@ -902,6 +903,7 @@ function renderShipmentLinkedPoSection(source) {
 
     SHIPMENT_LINKED_PO_COLUMNS.forEach(({ col, cellClass }) => {
       const td = document.createElement("td");
+      td.dataset.col = col;
       if (cellClass) td.className = cellClass;
       const text = formatShipmentLinkedPoCell(col, row);
       if (col === "PO #") {
@@ -919,6 +921,7 @@ function renderShipmentLinkedPoSection(source) {
   table.appendChild(tbody);
   wrap.appendChild(table);
   section.appendChild(wrap);
+  if (typeof wireLinkedPoTableSorting === "function") wireLinkedPoTableSorting(table);
   updateShipmentLinkedPoSelectAllHeader(pos);
   return section;
 }

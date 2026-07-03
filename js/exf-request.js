@@ -892,7 +892,8 @@ function renderExfRequestLinkedPoSection(pos, isView = false) {
   table.appendChild(thead);
 
   const tbody = document.createElement("tbody");
-  pos.forEach(row => {
+  const sortedPos = typeof sortLinkedPoRows === "function" ? sortLinkedPoRows(pos) : pos;
+  sortedPos.forEach(row => {
     const tr = document.createElement("tr");
     tr.dataset.po = row["PO #"];
     attachRequestLinkedPoRowOpen(tr, row["PO #"]);
@@ -909,6 +910,7 @@ function renderExfRequestLinkedPoSection(pos, isView = false) {
 
     EXF_REQUEST_LINKED_PO_COLUMNS.forEach(({ col, cellClass, editable, editor, rows }) => {
       const td = document.createElement("td");
+      td.dataset.col = col;
       if (cellClass) td.className = cellClass;
       if (editable && !isView) {
         const input = createRequestLinkedPoEditableControl(col, row, { editor, rows });
@@ -930,6 +932,7 @@ function renderExfRequestLinkedPoSection(pos, isView = false) {
   table.appendChild(tbody);
   wrap.appendChild(table);
   section.appendChild(wrap);
+  if (typeof wireLinkedPoTableSorting === "function") wireLinkedPoTableSorting(table);
   if (!isView) {
     const footer = renderExfRequestLinkedPoFooter(pos);
     if (footer) section.appendChild(footer);

@@ -1738,6 +1738,13 @@ th.th-filterable .th-label {
   min-height: 0;
 }
 
+.settings-section--edit-table:not([hidden]) > [id^="editTableGroup"]:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 .settings-section--edit-table:not([hidden]) .edit-table-picker-list,
 .settings-section--edit-table:not([hidden]) .edit-table-order-list {
   min-height: 140px;
@@ -5858,7 +5865,8 @@ td.n41-status-mismatch,
   min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: 24px;
 }
 
@@ -5976,8 +5984,14 @@ td.n41-status-mismatch,
   flex: 1 1 0;
   min-width: 0;
   min-height: 0;
+  align-self: flex-start;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  position: sticky;
+  top: 0;
+  width: 100%;
+  max-height: calc(100vh - 190px);
 }
 
 .shipment-form-edit {
@@ -6350,6 +6364,20 @@ td.n41-status-mismatch,
   text-overflow: ellipsis;
   white-space: nowrap;
   user-select: none;
+}
+
+.shipment-modal-card .email-po-table th.linked-po-sortable-header,
+.shipment-modal-card .shipment-linked-po-table th.linked-po-sortable-header {
+  cursor: pointer;
+}
+
+.shipment-modal-card .email-po-table th.linked-po-sortable-header:hover,
+.shipment-modal-card .shipment-linked-po-table th.linked-po-sortable-header:hover,
+.shipment-modal-card .email-po-table th.linked-po-sortable-header:focus-visible,
+.shipment-modal-card .shipment-linked-po-table th.linked-po-sortable-header:focus-visible {
+  color: #111827;
+  background: #eef0f3;
+  outline: none;
 }
 
 .shipment-modal-card .email-po-table td,
@@ -6811,6 +6839,32 @@ td.n41-status-mismatch,
   text-underline-offset: 2px;
 }
 
+.record-link-list {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+
+.record-link {
+  border: none;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--accent, #3b82f6);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 2px;
+}
+
+.record-link:hover {
+  color: var(--text);
+  text-decoration-color: currentColor;
+}
+
 .shipment-id-icon-btn {
   display: inline-flex;
   align-items: center;
@@ -6937,6 +6991,7 @@ td.n41-status-mismatch,
   flex-direction: column;
   width: min(760px, calc(100vw - 40px));
   max-width: 760px;
+  max-height: calc(100vh - 40px);
   padding: 0;
   overflow: hidden;
 }
@@ -6960,7 +7015,7 @@ td.n41-status-mismatch,
   display: flex;
   flex: 1 1 auto;
   height: min(72vh, 520px);
-  min-height: min(72vh, 520px);
+  min-height: 0;
   max-height: min(72vh, 520px);
 }
 
@@ -8928,7 +8983,8 @@ td.has-pending-approval .pending-approval-value {
 .so-status-badge[data-status="canceled"] { color: #dc2626; }
 
 /* ── Linked POs section ─────────────────────────────────────── */
-.so-linked-pos {
+.so-linked-pos,
+.so-linked-invoices {
   padding-top: 4px;
 }
 .so-linked-count {

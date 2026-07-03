@@ -197,8 +197,93 @@ const LINKED_PO_SPLIT_HEADER_COLS = {
   "Ctn Qty": ["CTN", "QTY"],
 };
 
+const LINKED_PO_DEFAULT_SORT_COL = "PO #";
+const LINKED_PO_DEFAULT_SORT_DIR = 1;
+
+function compareLinkedPoRowsByColumn(col, a, b) {
+  if (!a && !b) return 0;
+  if (!a) return 1;
+  if (!b) return -1;
+  if (col === "Weight" && typeof getPackingWeightForPo === "function") {
+    const aWeight = getPackingWeightForPo(a?.["PO #"]);
+    const bWeight = getPackingWeightForPo(b?.["PO #"]);
+    return compareTextFieldValues(aWeight > 0 ? aWeight : "", bWeight > 0 ? bWeight : "");
+  }
+  if (typeof compareRowsByColumn === "function") return compareRowsByColumn(col, a, b);
+  if (typeof DATE_FIELDS !== "undefined" && DATE_FIELDS.has(col)) {
+    return compareDateFieldValues(a?.[col], b?.[col]);
+  }
+  return compareTextFieldValues(a?.[col], b?.[col]);
+}
+
+function sortLinkedPoRows(rows, sortCol = LINKED_PO_DEFAULT_SORT_COL, sortDir = LINKED_PO_DEFAULT_SORT_DIR) {
+  return [...(rows ?? [])].sort((a, b) => {
+    const primary = compareLinkedPoRowsByColumn(sortCol, a, b) * sortDir;
+    if (primary !== 0) return primary;
+    if (sortCol === LINKED_PO_DEFAULT_SORT_COL) return 0;
+    return compareLinkedPoRowsByColumn(LINKED_PO_DEFAULT_SORT_COL, a, b);
+  });
+}
+
+function updateLinkedPoSortHeaders(table, sortCol, sortDir) {
+  table.querySelectorAll("thead th[data-linked-po-sort-col]").forEach(th => {
+    const active = th.dataset.linkedPoSortCol === sortCol;
+    th.classList.toggle("sorted-asc", active && sortDir === 1);
+    th.classList.toggle("sorted-desc", active && sortDir === -1);
+    th.setAttribute("aria-sort", active ? (sortDir === 1 ? "ascending" : "descending") : "none");
+  });
+}
+
+function sortLinkedPoTableBody(table, sortCol, sortDir) {
+  const tbody = table.querySelector("tbody");
+  if (!tbody) return;
+  const rows = [...tbody.querySelectorAll("tr[data-po]")];
+  rows.sort((a, b) => {
+    const rowA = typeof findRowByPo === "function" ? findRowByPo(a.dataset.po) : null;
+    const rowB = typeof findRowByPo === "function" ? findRowByPo(b.dataset.po) : null;
+    return compareLinkedPoRowsByColumn(sortCol, rowA, rowB) * sortDir ||
+      compareLinkedPoRowsByColumn(LINKED_PO_DEFAULT_SORT_COL, rowA, rowB);
+  });
+  rows.forEach(row => tbody.appendChild(row));
+}
+
+function wireLinkedPoTableSorting(table, { defaultCol = LINKED_PO_DEFAULT_SORT_COL, defaultDir = LINKED_PO_DEFAULT_SORT_DIR } = {}) {
+  if (!table) return;
+  table.dataset.linkedPoSortCol = defaultCol;
+  table.dataset.linkedPoSortDir = String(defaultDir);
+
+  table.querySelectorAll("thead th[data-linked-po-sort-col]").forEach(th => {
+    th.classList.add("linked-po-sortable-header");
+    th.tabIndex = 0;
+    th.setAttribute("role", "button");
+    th.title = `Sort by ${th.textContent.trim()}`;
+
+    const applySort = () => {
+      const col = th.dataset.linkedPoSortCol;
+      const currentCol = table.dataset.linkedPoSortCol;
+      const currentDir = Number(table.dataset.linkedPoSortDir || defaultDir);
+      const nextDir = currentCol === col ? currentDir * -1 : 1;
+      table.dataset.linkedPoSortCol = col;
+      table.dataset.linkedPoSortDir = String(nextDir);
+      sortLinkedPoTableBody(table, col, nextDir);
+      updateLinkedPoSortHeaders(table, col, nextDir);
+    };
+
+    th.addEventListener("click", applySort);
+    th.addEventListener("keydown", e => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();
+      applySort();
+    });
+  });
+
+  sortLinkedPoTableBody(table, defaultCol, defaultDir);
+  updateLinkedPoSortHeaders(table, defaultCol, defaultDir);
+}
+
 function renderLinkedPoTableHeaderCell(th, { label, col, cellClass }) {
   if (cellClass) th.className = cellClass;
+  th.dataset.linkedPoSortCol = col;
   const lines = LINKED_PO_SPLIT_HEADER_COLS[col];
   if (lines) {
     th.classList.add("linked-po-th--split");
@@ -561,12 +646,14 @@ function renderRequestLinkedPoTable(pos, { columns } = {}) {
   table.appendChild(thead);
 
   const tbody = document.createElement("tbody");
-  pos.forEach(row => {
+  const sortedPos = sortLinkedPoRows(pos);
+  sortedPos.forEach(row => {
     const tr = document.createElement("tr");
     tr.dataset.po = row["PO #"];
     attachRequestLinkedPoRowOpen(tr, row["PO #"]);
     colDefs.forEach(({ col, cellClass, editable, editor, rows }) => {
       const td = document.createElement("td");
+      td.dataset.col = col;
       if (editable) {
         if (cellClass) td.className = cellClass;
         const input = createRequestLinkedPoEditableControl(col, row, { editor, rows });
@@ -581,6 +668,7 @@ function renderRequestLinkedPoTable(pos, { columns } = {}) {
   table.appendChild(tbody);
   wrap.appendChild(table);
   section.appendChild(wrap);
+  wireLinkedPoTableSorting(table);
   return section;
 }
 
@@ -752,7 +840,8 @@ function renderAvailablePoLinkedSection(pos, {
   table.appendChild(thead);
 
   const tbody = document.createElement("tbody");
-  pos.forEach(row => {
+  const sortedPos = sortLinkedPoRows(pos);
+  sortedPos.forEach(row => {
     const tr = document.createElement("tr");
     tr.dataset.po = row["PO #"];
 
@@ -766,6 +855,7 @@ function renderAvailablePoLinkedSection(pos, {
 
     columns.forEach(({ col, cellClass }) => {
       const td = document.createElement("td");
+      td.dataset.col = col;
       renderRequestLinkedPoDataCell(td, col, row, { cellClass });
       tr.appendChild(td);
     });
@@ -779,6 +869,7 @@ function renderAvailablePoLinkedSection(pos, {
 
   wrap.appendChild(table);
   section.appendChild(wrap);
+  wireLinkedPoTableSorting(table);
   requestAnimationFrame(() => updateAvailablePoPickerSelectAll(pos, selectAllCb, selection));
   return section;
 }
