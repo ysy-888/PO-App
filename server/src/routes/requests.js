@@ -32,8 +32,17 @@ import {
 } from "../packingListPrint/index.js";
 import { getCartonWeightLbs } from "../packingListPrint/helpers.js";
 import { archiveAttachmentsToDrive } from "../google.js";
+import { requestCalendarSync } from "../calendarSync.js";
 
 const router = Router();
+
+// Successful ASN writes may change ASN dates → refresh the calendar soon after.
+router.use("/asn", (_req, res, next) => {
+  res.on("finish", () => {
+    if (res.statusCode < 400) requestCalendarSync();
+  });
+  next();
+});
 
 // ── ID generators ─────────────────────────────────────────────────────────────
 

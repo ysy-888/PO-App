@@ -142,7 +142,7 @@ function nextYmd(ymd) {
   return d.toISOString().slice(0, 10);
 }
 
-function eventBody({ summary, description, dateYmd }) {
+export function eventBody({ summary, description, dateYmd, colorId }) {
   return {
     summary,
     description: description || "",
@@ -150,6 +150,9 @@ function eventBody({ summary, description, dateYmd }) {
     end: { date: nextYmd(dateYmd) }, // all-day events end the next day (exclusive)
     extendedProperties: { private: { [MANAGED_PROP]: "true" } },
     status: "confirmed",
+    // Synced operational dates should never pop notifications.
+    reminders: { useDefault: false, overrides: [] },
+    ...(colorId ? { colorId } : {}),
   };
 }
 
@@ -162,7 +165,7 @@ export async function listManagedCalendarEvents() {
       privateExtendedProperty: `${MANAGED_PROP}=true`,
       maxResults: "2500",
       singleEvents: "true",
-      fields: "items(id,summary,description,start),nextPageToken",
+      fields: "items(id,summary,description,start,colorId,reminders),nextPageToken",
     };
     if (pageToken) params.pageToken = pageToken;
     const json = await googleJson(calendarUrl("/events", params));

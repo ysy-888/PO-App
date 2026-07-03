@@ -12,8 +12,17 @@ import { Router } from "express";
 import supabase from "../supabase.js";
 import { requireAuth } from "../auth.js";
 import { sanitizeUpdates } from "../importHelpers.js";
+import { requestCalendarSync } from "../calendarSync.js";
 
 const router = Router();
+
+// Any successful shipment write may change IHDs → refresh the calendar soon after.
+router.use((_req, res, next) => {
+  res.on("finish", () => {
+    if (res.statusCode < 400) requestCalendarSync();
+  });
+  next();
+});
 
 const SHIPMENT_PO_SYNC_FIELDS = [
   "Ship Method", "Vessel", "House #", "EXF", "Shipped", "ETD", "ETA", "IHD",

@@ -17,11 +17,23 @@ import supabase from "./supabase.js";
 import {
   calendarConfigured,
   calendarEventId,
+  eventBody,
   listManagedCalendarEvents,
   upsertCalendarEvent,
   patchCalendarEvent,
   deleteCalendarEvent,
 } from "./google.js";
+
+// Google Calendar colorIds (1-11).
+// Sales orders use the blue/purple family, varying by Order Type so they
+// still read as one group; shipments and ASNs sit outside that family.
+const SO_COLOR_BY_ORDER_TYPE = {
+  "MAJOR": "9",         // blueberry (dark blue)
+  "PRIVATE LABEL": "3", // grape (purple)
+  "SPECIALTY": "1",     // lavender (light purple)
+};
+const SHIPMENT_COLOR_ID = "10"; // basil (green)
+const ASN_COLOR_ID = "6";       // tangerine (orange)
 
 const LOOKBACK_DAYS = 60;
 // Calendar API default quota is ~600 requests/min; pace mutations well under it.
@@ -57,9 +69,9 @@ function describe(lines) {
 async function buildDesiredEvents(cutoff) {
   const desired = new Map();
 
-  const add = (idParts, dateYmd, summary, description) => {
+  const add = (idParts, dateYmd, summary, description, colorId = "") => {
     if (!dateYmd || dateYmd < cutoff) return;
-    desired.set(calendarEventId(...idParts), { summary, description, dateYmd });
+    desired.set(calendarEventId(...idParts), { summary, description, dateYmd, colorId });
   };
 
   const [salesOrders, shipments, asns] = await Promise.all([
@@ -73,16 +85,28 @@ async function buildDesiredEvents(cutoff) {
     const soNumber = String(so["SO #"] ?? "").trim();
     const date = toYmd(so["CXL Date"]);
     if (!soNumber || !date) continue;
+    // Shopify orders don't belong on the operations calendar.
+    if (String(so["Order Type"] ?? "").trim().toUpperCase() === "SHOPIFY") continue;
+    // Styles and units live on the SO's line items, not the header.
+    const lines = Array.isArray(so["Lines"]) ? so["Lines"] : [];
+    const styleNumbers = [...new Set(
+      lines.map((line) => String(line?.["Style #"] ?? "").trim()).filter(Boolean)
+    )];
+    const totalUnits = lines.reduce(
+      (sum, line) => sum + (Number(line?.["Total Units"]) || 0), 0
+    );
     add(
       ["so-cxl", row.tenant_id, soNumber],
       date,
-      `CXL: SO ${soNumber}${so["Customer"] ? ` · ${so["Customer"]}` : ""}`,
+      `SO# ${soNumber}${so["Customer"] ? ` · ${so["Customer"]}` : ""}`,
       describe([
         so["Customer PO #"] && `Customer PO #: ${so["Customer PO #"]}`,
-        so["Total Units"] && `Units: ${so["Total Units"]}`,
+        styleNumbers.length > 0 && `Style #s: ${styleNumbers.join(", ")}`,
+        totalUnits > 0 && `Units: ${totalUnits}`,
         so["Ship Date"] && `Ship Date: ${toYmd(so["Ship Date"])}`,
         so["N41 Status"] && `N41 Status: ${so["N41 Status"]}`,
-      ])
+      ]),
+      SO_COLOR_BY_ORDER_TYPE[String(so["Order Type"] ?? "").trim().toUpperCase()] || ""
     );
   }
 
@@ -100,7 +124,8 @@ async function buildDesiredEvents(cutoff) {
         shipment["Vessel"] && `Vessel: ${shipment["Vessel"]}`,
         shipment["PO Count"] && `POs: ${shipment["PO Count"]}`,
         shipment["ETA"] && `ETA: ${toYmd(shipment["ETA"])}`,
-      ])
+      ]),
+      SHIPMENT_COLOR_ID
     );
   }
 
@@ -116,7 +141,8 @@ async function buildDesiredEvents(cutoff) {
       describe([
         asn["PO Numbers"] && `POs: ${asn["PO Numbers"]}`,
         asn["Carrier"] && `Carrier: ${asn["Carrier"]}`,
-      ])
+      ]),
+      ASN_COLOR_ID
     );
   }
 
@@ -127,7 +153,11 @@ function eventNeedsUpdate(existing, spec) {
   return (
     existing.summary !== spec.summary ||
     (existing.description || "") !== (spec.description || "") ||
-    existing.start?.date !== spec.dateYmd
+    existing.start?.date !== spec.dateYmd ||
+    (existing.colorId || "") !== (spec.colorId || "") ||
+    // Reminders must be explicitly disabled on every managed event.
+    existing.reminders?.useDefault !== false ||
+    (existing.reminders?.overrides || []).length > 0
   );
 }
 
@@ -160,13 +190,7 @@ export async function syncCalendar() {
         created++;
         await sleep(MUTATION_DELAY_MS);
       } else if (eventNeedsUpdate(current, spec)) {
-        await patchCalendarEvent(id, {
-          summary: spec.summary,
-          description: spec.description || "",
-          start: { date: spec.dateYmd },
-          end: { date: nextDay(spec.dateYmd) },
-          status: "confirmed",
-        });
+        await patchCalendarEvent(id, eventBody(spec));
         updated++;
         await sleep(MUTATION_DELAY_MS);
       }
@@ -195,10 +219,22 @@ export async function syncCalendar() {
   }
 }
 
-function nextDay(ymd) {
-  const d = new Date(`${ymd}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + 1);
-  return d.toISOString().slice(0, 10);
+/**
+ * Debounced sync trigger for save paths: coalesces bursts of edits into one
+ * sync shortly after the last write. If a sync is mid-flight when the timer
+ * fires, it retries so the latest changes aren't missed.
+ */
+let debounceTimer = null;
+export function requestCalendarSync(delayMs = 15 * 1000) {
+  if (!calendarConfigured) return;
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(async () => {
+    const result = await syncCalendar();
+    if (result.skipped && result.reason === "Sync already running.") {
+      requestCalendarSync(30 * 1000);
+    }
+  }, delayMs);
+  debounceTimer.unref?.();
 }
 
 /** Boot-time scheduler: first sync shortly after start, then every 6 hours. */

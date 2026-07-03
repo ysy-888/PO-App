@@ -13,8 +13,17 @@ import {
   buildSalesOrderData,
   salesOrderValuesEqual,
 } from "../salesOrderHelpers.js";
+import { requestCalendarSync } from "../calendarSync.js";
 
 const router = Router();
+
+// Any successful SO write may change CXL dates → refresh the calendar soon after.
+router.use((_req, res, next) => {
+  res.on("finish", () => {
+    if (res.statusCode < 400) requestCalendarSync();
+  });
+  next();
+});
 
 router.post("/bulk-upsert", requireAuth, async (req, res) => {
   const rows = req.body?.rows;
