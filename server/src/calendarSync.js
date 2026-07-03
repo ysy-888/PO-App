@@ -1,10 +1,9 @@
 /**
  * Syncs PO App dates into the configured Google Calendar as all-day events:
  *
- *   CXL dates      — one event per open PO with a CXL Date
- *   EXF dates      — one event per EXF request with an EXF Date
- *   Pickup dates   — one event per pickup request with a Pickup Date
- *   Delivery dates — one event per delivery request with a Delivery Date
+ *   Sales orders — one event per SO with a CXL Date, on that date
+ *   Shipments    — one event per shipment with an IHD, on that date
+ *   ASNs         — one event per ASN request with an ASN Date, on that date
  *
  * The sync is a diff: it lists the events it manages (marked with a private
  * extended property), compares them to what the database says, and only
@@ -15,7 +14,6 @@
  */
 
 import supabase from "./supabase.js";
-import { isPoClosed } from "./importHelpers.js";
 import {
   calendarConfigured,
   calendarEventId,
@@ -64,55 +62,63 @@ async function buildDesiredEvents(cutoff) {
     desired.set(calendarEventId(...idParts), { summary, description, dateYmd });
   };
 
-  const [pos, exfs, pickups, deliveries] = await Promise.all([
-    fetchAll("purchase_orders"),
-    fetchAll("exf_requests"),
-    fetchAll("pickup_requests"),
-    fetchAll("delivery_requests"),
+  const [salesOrders, shipments, asns] = await Promise.all([
+    fetchAll("sales_orders"),
+    fetchAll("shipments"),
+    fetchAll("asn_requests"),
   ]);
 
-  for (const row of pos) {
-    const po = row.data || {};
-    if (isPoClosed(po)) continue;
-    const poNumber = String(po["PO #"] ?? "").trim();
-    const date = toYmd(po["CXL Date"]);
-    if (!poNumber || !date) continue;
+  for (const row of salesOrders) {
+    const so = row.data || {};
+    const soNumber = String(so["SO #"] ?? "").trim();
+    const date = toYmd(so["CXL Date"]);
+    if (!soNumber || !date) continue;
     add(
-      ["cxl", row.tenant_id, poNumber],
+      ["so-cxl", row.tenant_id, soNumber],
       date,
-      `CXL: PO ${poNumber}${po["Buyer"] ? ` · ${po["Buyer"]}` : ""}`,
+      `CXL: SO ${soNumber}${so["Customer"] ? ` · ${so["Customer"]}` : ""}`,
       describe([
-        po["Style #"] && `Style: ${po["Style #"]}${po["Color"] ? ` / ${po["Color"]}` : ""}`,
-        po["PO Qty"] && `Qty: ${po["PO Qty"]}`,
-        po["Vendor"] && `Vendor: ${po["Vendor"]}`,
-        po["Status"] && `Status: ${po["Status"]}`,
+        so["Customer PO #"] && `Customer PO #: ${so["Customer PO #"]}`,
+        so["Total Units"] && `Units: ${so["Total Units"]}`,
+        so["Ship Date"] && `Ship Date: ${toYmd(so["Ship Date"])}`,
+        so["N41 Status"] && `N41 Status: ${so["N41 Status"]}`,
       ])
     );
   }
 
-  const addRequestEvents = (rows, { idField, dateField, label }) => {
-    for (const row of rows) {
-      const data = row.data || {};
-      const entityId = String(data[idField] ?? "").trim();
-      const date = toYmd(data[dateField]);
-      if (!entityId || !date) continue;
-      const poNumbers = String(data["PO Numbers"] ?? data["PO #"] ?? "").trim();
-      add(
-        [label.toLowerCase(), row.tenant_id, entityId],
-        date,
-        `${label}: ${entityId}`,
-        describe([
-          poNumbers && `POs: ${poNumbers}`,
-          data["From"] && `From: ${data["From"]}`,
-          data["To"] && `To: ${data["To"]}`,
-        ])
-      );
-    }
-  };
+  for (const row of shipments) {
+    const shipment = row.data || {};
+    const shipmentId = String(shipment["Shipment ID"] ?? "").trim();
+    const date = toYmd(shipment["IHD"]);
+    if (!shipmentId || !date) continue;
+    add(
+      ["shipment-ihd", row.tenant_id, shipmentId],
+      date,
+      `IHD: ${shipmentId}`,
+      describe([
+        shipment["Ship Method"] && `Ship Method: ${shipment["Ship Method"]}`,
+        shipment["Vessel"] && `Vessel: ${shipment["Vessel"]}`,
+        shipment["PO Count"] && `POs: ${shipment["PO Count"]}`,
+        shipment["ETA"] && `ETA: ${toYmd(shipment["ETA"])}`,
+      ])
+    );
+  }
 
-  addRequestEvents(exfs, { idField: "EXF Request ID", dateField: "EXF Date", label: "EXF" });
-  addRequestEvents(pickups, { idField: "Pickup Request ID", dateField: "Pickup Date", label: "Pickup" });
-  addRequestEvents(deliveries, { idField: "Delivery Request ID", dateField: "Delivery Date", label: "Delivery" });
+  for (const row of asns) {
+    const asn = row.data || {};
+    const asnId = String(asn["ASN Request ID"] ?? "").trim();
+    const date = toYmd(asn["ASN Date"]);
+    if (!asnId || !date) continue;
+    add(
+      ["asn", row.tenant_id, asnId],
+      date,
+      `ASN: ${asnId}${asn["Buyer"] ? ` · ${asn["Buyer"]}` : ""}`,
+      describe([
+        asn["PO Numbers"] && `POs: ${asn["PO Numbers"]}`,
+        asn["Carrier"] && `Carrier: ${asn["Carrier"]}`,
+      ])
+    );
+  }
 
   return desired;
 }

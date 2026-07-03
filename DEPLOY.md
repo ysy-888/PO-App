@@ -52,7 +52,7 @@ needed (org policy blocks key creation anyway):
 5. **Calendar**: set `GOOGLE_CALENDAR_ID` — either `primary` (the account's
    own calendar) or the ID of a shared calendar the account can edit
    (Calendar settings → Integrate calendar). The server keeps all-day events
-   in sync for open-PO CXL dates and EXF/Pickup/Delivery request dates — on
+   in sync for sales-order CXL dates, shipment IHDs, and ASN dates — on
    boot, every 6 hours, and on demand via `POST /api/google/sync-calendar`.
 6. **Drive**: create a folder the account can edit and set
    `GOOGLE_DRIVE_FOLDER_ID` (the ID segment of the folder URL). Packing-list
