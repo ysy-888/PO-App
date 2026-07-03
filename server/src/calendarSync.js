@@ -32,8 +32,8 @@ const SO_COLOR_BY_ORDER_TYPE = {
   "PRIVATE LABEL": "3", // grape (purple)
   "SPECIALTY": "1",     // lavender (light purple)
 };
-const SHIPMENT_COLOR_ID = "10"; // basil (green)
-const ASN_COLOR_ID = "6";       // tangerine (orange)
+const SHIPMENT_COLOR_ID = "4"; // flamingo (pink — closest event color to Cherry Blossom)
+const ASN_COLOR_ID = "11";     // tomato (red)
 
 const LOOKBACK_DAYS = 60;
 // Calendar API default quota is ~600 requests/min; pace mutations well under it.
