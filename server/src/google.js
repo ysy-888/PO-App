@@ -1,13 +1,22 @@
 /**
- * Google Calendar + Drive integration (service account).
+ * Google Calendar + Drive integration.
  *
- * Configuration (all optional — features no-op when unset):
- *   GOOGLE_SERVICE_ACCOUNT_KEY  service-account JSON key, raw or base64-encoded
+ * Two auth modes, checked in order (all optional — features no-op when unset):
+ *
+ * 1. OAuth as a real Google account (e.g. shipping@) — preferred; works even
+ *    when an org policy blocks service-account key creation, and Drive files
+ *    end up owned by that account instead of a robot:
+ *      GOOGLE_OAUTH_CLIENT_ID       OAuth "Desktop app" client ID
+ *      GOOGLE_OAUTH_CLIENT_SECRET   its client secret
+ *      GOOGLE_OAUTH_REFRESH_TOKEN   from `node scripts/google-oauth-setup.mjs`
+ *
+ * 2. Service account (fallback if no OAuth vars):
+ *      GOOGLE_SERVICE_ACCOUNT_KEY   JSON key, raw or base64-encoded
+ *    (share the calendar and Drive folder with the key's client_email)
+ *
+ * Plus, either way:
  *   GOOGLE_CALENDAR_ID          calendar to sync PO/request dates into
  *   GOOGLE_DRIVE_FOLDER_ID      Drive folder that receives generated PDFs
- *
- * Setup: share the target calendar ("Make changes to events") and Drive
- * folder ("Editor") with the service account's client_email.
  *
  * Calendar events are managed idempotently: every event gets a deterministic
  * ID derived from its source record plus a private extended property
@@ -15,10 +24,11 @@
  */
 
 import crypto from "node:crypto";
-import { JWT } from "google-auth-library";
+import { JWT, OAuth2Client } from "google-auth-library";
 
 const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar";
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
+export const GOOGLE_SCOPES = [CALENDAR_SCOPE, DRIVE_SCOPE];
 
 function parseServiceAccountKey(raw) {
   if (!raw) return null;
@@ -33,26 +43,42 @@ function parseServiceAccountKey(raw) {
   }
 }
 
-const serviceAccountKey = parseServiceAccountKey(process.env.GOOGLE_SERVICE_ACCOUNT_KEY);
+const oauthClientId = (process.env.GOOGLE_OAUTH_CLIENT_ID || "").trim();
+const oauthClientSecret = (process.env.GOOGLE_OAUTH_CLIENT_SECRET || "").trim();
+const oauthRefreshToken = (process.env.GOOGLE_OAUTH_REFRESH_TOKEN || "").trim();
+const oauthReady = Boolean(oauthClientId && oauthClientSecret && oauthRefreshToken);
+
+const serviceAccountKey = oauthReady
+  ? null
+  : parseServiceAccountKey(process.env.GOOGLE_SERVICE_ACCOUNT_KEY);
 export const calendarId = (process.env.GOOGLE_CALENDAR_ID || "").trim();
 export const driveFolderId = (process.env.GOOGLE_DRIVE_FOLDER_ID || "").trim();
 
-if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY && !serviceAccountKey) {
+if (!oauthReady && process.env.GOOGLE_SERVICE_ACCOUNT_KEY && !serviceAccountKey) {
   console.warn("GOOGLE_SERVICE_ACCOUNT_KEY is set but could not be parsed — Google integration disabled.");
 }
+if ((oauthClientId || oauthClientSecret || oauthRefreshToken) && !oauthReady) {
+  console.warn("Google OAuth vars are only partially set (need CLIENT_ID, CLIENT_SECRET, and REFRESH_TOKEN) — Google integration disabled.");
+}
 
-export const calendarConfigured = Boolean(serviceAccountKey && calendarId);
-export const driveConfigured = Boolean(serviceAccountKey && driveFolderId);
+const authAvailable = oauthReady || Boolean(serviceAccountKey);
+export const calendarConfigured = Boolean(authAvailable && calendarId);
+export const driveConfigured = Boolean(authAvailable && driveFolderId);
 
 let authClient = null;
 function getAuthClient() {
-  if (!serviceAccountKey) return null;
+  if (!authAvailable) return null;
   if (!authClient) {
-    authClient = new JWT({
-      email: serviceAccountKey.client_email,
-      key: serviceAccountKey.private_key,
-      scopes: [CALENDAR_SCOPE, DRIVE_SCOPE],
-    });
+    if (oauthReady) {
+      authClient = new OAuth2Client(oauthClientId, oauthClientSecret);
+      authClient.setCredentials({ refresh_token: oauthRefreshToken });
+    } else {
+      authClient = new JWT({
+        email: serviceAccountKey.client_email,
+        key: serviceAccountKey.private_key,
+        scopes: GOOGLE_SCOPES,
+      });
+    }
   }
   return authClient;
 }
@@ -86,6 +112,7 @@ async function googleJson(url, options = {}) {
 
 export function getGoogleStatus() {
   return {
+    authMode: oauthReady ? "oauth" : (serviceAccountKey ? "service_account" : ""),
     serviceAccount: serviceAccountKey ? serviceAccountKey.client_email : "",
     calendarConfigured,
     driveConfigured,
