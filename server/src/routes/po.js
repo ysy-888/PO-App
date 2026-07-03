@@ -1,6 +1,14 @@
 /**
  * POST /api/po/update       — single-field save (mirrors handleUpdate)
  * POST /api/po/bulk-upsert  — CSV import batches (mirrors handleBulkUpsertPos)
+ * POST /api/po/batch-update — multi-PO field updates in one call
+ *
+ * All updates go through the merge_po_updates Postgres function
+ * (db/migrations/006_merge_po_updates.sql), which merges only the changed
+ * JSON keys atomically — concurrent editors of different fields no longer
+ * clobber each other, and batches are one round trip instead of one per PO.
+ * If the function isn't installed yet, falls back to the legacy
+ * read-merge-write path so the app keeps working pre-migration.
  */
 
 import { Router } from "express";
@@ -15,6 +23,81 @@ import {
 
 const router = Router();
 
+/** PostgREST code when an RPC function is missing from the schema cache. */
+function isMissingFunctionError(error) {
+  if (!error) return false;
+  if (error.code === "PGRST202" || error.code === "42883") return true;
+  const msg = String(error.message || "").toLowerCase();
+  return msg.includes("could not find the function") || msg.includes("does not exist");
+}
+
+let mergeFunctionAvailable = true;
+
+/**
+ * Apply merged updates to POs. items: [{ poNumber, updates }] (already sanitized).
+ * Returns { updated, missing, errors } or { error } on hard failure.
+ */
+async function mergePoUpdates(tenantId, items) {
+  if (mergeFunctionAvailable) {
+    const { data, error } = await supabase.rpc("merge_po_updates", {
+      p_tenant_id: tenantId,
+      p_items: items,
+    });
+    if (!error) {
+      return { updated: data?.updated ?? 0, missing: data?.missing ?? [], errors: [] };
+    }
+    if (!isMissingFunctionError(error)) {
+      console.error("merge_po_updates RPC failed:", error);
+      return { error };
+    }
+    // Migration 006 not applied yet — remember and fall back.
+    mergeFunctionAvailable = false;
+    console.warn("merge_po_updates function not found — using legacy per-row updates. Apply db/migrations/006_merge_po_updates.sql.");
+  }
+  return legacyMergePoUpdates(tenantId, items);
+}
+
+/** Legacy read-merge-write path (subject to lost updates; pre-migration only). */
+async function legacyMergePoUpdates(tenantId, items) {
+  const poNumbers = [...new Set(items.map((i) => i.poNumber))];
+  const { data: existingRows, error: fetchErr } = await supabase
+    .from("purchase_orders")
+    .select("id, po_number, data")
+    .eq("tenant_id", tenantId)
+    .in("po_number", poNumbers);
+
+  if (fetchErr) {
+    console.error("purchase_orders fetch failed:", fetchErr);
+    return { error: fetchErr };
+  }
+
+  const byPo = new Map((existingRows || []).map((r) => [r.po_number, r]));
+  const missing = [];
+  const errors = [];
+  let updated = 0;
+
+  for (const item of items) {
+    const existing = byPo.get(item.poNumber);
+    if (!existing) {
+      missing.push(item.poNumber);
+      continue;
+    }
+    const merged = { ...(existing.data || {}), ...item.updates };
+    const { error: updateErr } = await supabase
+      .from("purchase_orders")
+      .update({ data: merged })
+      .eq("id", existing.id)
+      .eq("tenant_id", tenantId);
+    if (updateErr) {
+      console.error(`PO ${item.poNumber} update failed:`, updateErr);
+      errors.push({ poNumber: item.poNumber, error: updateErr.message });
+    } else {
+      updated++;
+    }
+  }
+  return { updated, missing, errors };
+}
+
 router.post("/update", requireAuth, async (req, res) => {
   const { poNumber, updates } = req.body || {};
 
@@ -26,35 +109,17 @@ router.post("/update", requireAuth, async (req, res) => {
   }
 
   const cleanUpdates = sanitizeUpdates(updates);
+  const result = await mergePoUpdates(req.tenantId, [
+    { poNumber: poNumber.trim(), updates: cleanUpdates },
+  ]);
 
-  // Fetch the existing row so we can merge rather than overwrite.
-  const { data: existing, error: fetchErr } = await supabase
-    .from("purchase_orders")
-    .select("id, data")
-    .eq("tenant_id", req.tenantId)
-    .eq("po_number", poNumber.trim())
-    .maybeSingle();
-
-  if (fetchErr) {
-    console.error("purchase_orders fetch failed:", fetchErr);
-    return res.status(500).json({ success: false, error: "Failed to look up PO." });
+  if (result.error) {
+    return res.status(500).json({ success: false, error: "Failed to save update." });
   }
-
-  if (!existing) {
+  if (result.missing.length > 0) {
     return res.status(404).json({ success: false, error: `PO # not found: ${poNumber}` });
   }
-
-  // Merge the updates into the existing data object.
-  const updatedData = { ...(existing.data || {}), ...cleanUpdates };
-
-  const { error: updateErr } = await supabase
-    .from("purchase_orders")
-    .update({ data: updatedData })
-    .eq("id", existing.id)
-    .eq("tenant_id", req.tenantId); // belt-and-suspenders tenant check
-
-  if (updateErr) {
-    console.error("purchase_orders update failed:", updateErr);
+  if (result.errors.length > 0) {
     return res.status(500).json({ success: false, error: "Failed to save update." });
   }
 
@@ -112,8 +177,7 @@ router.post("/bulk-upsert", requireAuth, async (req, res) => {
       const changed = pickChangedImportUpdates(existing.data || {}, updates);
       if (Object.keys(changed).length === 0) return;
 
-      const merged = { ...(existing.data || {}), ...sanitizeUpdates(changed) };
-      toUpdate.push({ id: existing.id, data: merged });
+      toUpdate.push({ poNumber, updates: sanitizeUpdates(changed) });
       updatedPoNumbers.push(poNumber);
       updated++;
       return;
@@ -138,16 +202,12 @@ router.post("/bulk-upsert", requireAuth, async (req, res) => {
     }
   }
 
-  for (const row of toUpdate) {
-    const { error: updateErr } = await supabase
-      .from("purchase_orders")
-      .update({ data: row.data })
-      .eq("id", row.id)
-      .eq("tenant_id", req.tenantId);
-    if (updateErr) {
-      console.error("purchase_orders bulk update failed:", updateErr);
+  if (toUpdate.length > 0) {
+    const result = await mergePoUpdates(req.tenantId, toUpdate);
+    if (result.error) {
       return res.status(500).json({ success: false, error: "Failed to update POs." });
     }
+    result.errors.forEach((e) => errors.push(e));
   }
 
   return res.json({
@@ -173,51 +233,33 @@ router.post("/batch-update", requireAuth, async (req, res) => {
     return res.status(400).json({ success: false, error: "items array is required." });
   }
 
-  const poNumbers = [...new Set(items.map(i => String(i.poNumber ?? "").trim()).filter(Boolean))];
-  if (poNumbers.length === 0) {
+  const cleanItems = items
+    .map((item) => ({
+      poNumber: String(item?.poNumber ?? "").trim(),
+      updates: item?.updates,
+    }))
+    .filter(
+      (item) =>
+        item.poNumber &&
+        item.updates &&
+        typeof item.updates === "object" &&
+        !Array.isArray(item.updates)
+    )
+    .map((item) => ({ poNumber: item.poNumber, updates: sanitizeUpdates(item.updates) }));
+
+  if (cleanItems.length === 0) {
     return res.status(400).json({ success: false, error: "All items are missing poNumber." });
   }
 
-  // Fetch existing rows in one query.
-  const { data: existingRows, error: fetchErr } = await supabase
-    .from("purchase_orders")
-    .select("id, po_number, data")
-    .eq("tenant_id", req.tenantId)
-    .in("po_number", poNumbers);
-
-  if (fetchErr) {
-    console.error("batch-update fetch failed:", fetchErr);
-    return res.status(500).json({ success: false, error: "Failed to look up POs." });
+  const result = await mergePoUpdates(req.tenantId, cleanItems);
+  if (result.error) {
+    return res.status(500).json({ success: false, error: "Failed to update POs." });
   }
 
-  const byPo = new Map((existingRows || []).map(r => [r.po_number, r]));
-  const errors = [];
-
-  for (const item of items) {
-    const poNumber = String(item.poNumber ?? "").trim();
-    if (!poNumber) continue;
-    const updates = item.updates;
-    if (!updates || typeof updates !== "object") continue;
-
-    const existing = byPo.get(poNumber);
-    if (!existing) {
-      errors.push({ poNumber, error: "PO not found" });
-      continue;
-    }
-
-    const merged = { ...(existing.data || {}), ...sanitizeUpdates(updates) };
-    const { error: updateErr } = await supabase
-      .from("purchase_orders")
-      .update({ data: merged })
-      .eq("id", existing.id)
-      .eq("tenant_id", req.tenantId);
-
-    if (updateErr) {
-      console.error(`batch-update PO ${poNumber} failed:`, updateErr);
-      errors.push({ poNumber, error: updateErr.message });
-    }
-  }
-
+  const errors = [
+    ...result.missing.map((poNumber) => ({ poNumber, error: "PO not found" })),
+    ...result.errors,
+  ];
   return res.json({ success: true, errors });
 });
 

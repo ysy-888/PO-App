@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import compression from "compression";
 import appStateRouter from "./routes/appState.js";
 import poRouter from "./routes/po.js";
 import customersRouter from "./routes/customers.js";
@@ -37,6 +38,9 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+
+// Gzip responses — /api/app-state returns large, highly compressible JSON.
+app.use(compression());
 
 app.use(express.json({ limit: "10mb" }));
 
@@ -78,3 +82,17 @@ app.use((err, _req, res, _next) => {
 app.listen(PORT, () => {
   console.log(`PO App API running on port ${PORT}`);
 });
+
+// ── Keep-alive (Render free tier) ───────────────────────────
+// The free plan spins the service down after ~15 min without inbound
+// traffic, making the next request wait 30-60s for a cold start.
+// When KEEP_ALIVE_URL is set to the service's public URL, ping /health
+// through the public proxy every 10 minutes so it stays warm.
+const keepAliveUrl = (process.env.KEEP_ALIVE_URL || "").replace(/\/$/, "");
+if (keepAliveUrl) {
+  const interval = setInterval(() => {
+    fetch(`${keepAliveUrl}/health`).catch(() => {});
+  }, 10 * 60 * 1000);
+  interval.unref();
+  console.log(`Keep-alive pings enabled → ${keepAliveUrl}/health`);
+}
