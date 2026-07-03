@@ -14,11 +14,6 @@
  */
 
 import supabase from "./supabase.js";
-import {
-  buildPoText,
-  REQUEST_EMAIL_TABLE_COLUMNS,
-  REQUEST_EMAIL_TABLE_LABELS,
-} from "./emailTemplates.js";
 import { getCartonWeightLbs } from "./packingListPrint/helpers.js";
 import {
   calendarConfigured,
@@ -79,9 +74,75 @@ function clampDescription(text) {
   return `${text.slice(0, MAX_DESCRIPTION_LENGTH - 1)}…`;
 }
 
-/** Same table the request emails use, from the same builder. */
-function poTable(poRows) {
-  return buildPoText(poRows, REQUEST_EMAIL_TABLE_COLUMNS, REQUEST_EMAIL_TABLE_LABELS);
+// ── HTML description helpers ─────────────────────────────────
+// Google Calendar renders a sanitized HTML subset in descriptions:
+// <b>/<i>/<a>/<br>/lists survive, but <table> is stripped — so the PO
+// breakdown is one bolded line per PO instead of a literal table.
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function toQtyNumber(value) {
+  const n = Number(String(value ?? "").replace(/,/g, "").trim());
+  return Number.isFinite(n) ? n : 0;
+}
+
+function formatQty(value) {
+  const n = toQtyNumber(value);
+  return (Math.round(n * 100) / 100).toLocaleString();
+}
+
+function formatLbs(value) {
+  const n = toQtyNumber(value);
+  return n > 0 ? `${formatQty(n)} lbs` : "";
+}
+
+function htmlMetaLine(label, value) {
+  const v = String(value ?? "").trim();
+  return v ? `<b>${escapeHtml(label)}:</b> ${escapeHtml(v)}` : "";
+}
+
+function poHtmlLine(row, index) {
+  const qtyParts = [
+    toQtyNumber(row["Actual Qty"]) > 0 && `${formatQty(row["Actual Qty"])} pcs`,
+    toQtyNumber(row["Ctn Qty"]) > 0 && `${formatQty(row["Ctn Qty"])} ctn`,
+    formatLbs(row["Weight"]),
+  ].filter(Boolean).join(" / ");
+
+  const parts = [
+    row["Buyer"] && escapeHtml(row["Buyer"]),
+    [
+      row["Style #"] && escapeHtml(row["Style #"]),
+      row["Color"] && escapeHtml(row["Color"]),
+    ].filter(Boolean).join(" "),
+    row["Buyer PO #"] && `Buyer PO ${escapeHtml(row["Buyer PO #"])}`,
+    qtyParts,
+  ].filter(Boolean).join(" · ");
+
+  return `${index + 1}. <b>PO ${escapeHtml(row["PO #"])}</b>${parts ? ` — ${parts}` : ""}`;
+}
+
+/** Per-PO breakdown plus a totals line, as Calendar-safe HTML. */
+function poHtmlList(poRows) {
+  if (!poRows.length) return "<i>No linked POs.</i>";
+  const lines = poRows.map(poHtmlLine);
+  const totals = poRows.reduce(
+    (sum, row) => ({
+      qty: sum.qty + toQtyNumber(row["Actual Qty"]),
+      ctn: sum.ctn + toQtyNumber(row["Ctn Qty"]),
+      weight: sum.weight + toQtyNumber(row["Weight"]),
+    }),
+    { qty: 0, ctn: 0, weight: 0 }
+  );
+  lines.push("");
+  lines.push(
+    `<b>Total:</b> ${formatQty(totals.qty)} pcs / ${formatQty(totals.ctn)} ctn / ${formatLbs(totals.weight) || "0 lbs"}`
+  );
+  return lines.join("<br>");
 }
 
 /**
@@ -194,13 +255,13 @@ async function buildDesiredEvents(cutoff) {
       date,
       shipmentId,
       clampDescription([
-        describe([
-          shipment["Ship Method"] && `Ship Method: ${shipment["Ship Method"]}`,
-          shipment["Vessel"] && `Vessel: ${shipment["Vessel"]}`,
-          shipment["ETA"] && `ETA: ${toYmd(shipment["ETA"])}`,
-        ]),
-        poTable(poRows),
-      ].filter(Boolean).join("\n\n")),
+        [
+          htmlMetaLine("Ship Method", shipment["Ship Method"]),
+          htmlMetaLine("Vessel", shipment["Vessel"]),
+          htmlMetaLine("ETA", toYmd(shipment["ETA"])),
+        ].filter(Boolean).join("<br>"),
+        poHtmlList(poRows),
+      ].filter(Boolean).join("<br><br>")),
       SHIPMENT_COLOR_ID
     );
   }
@@ -219,11 +280,9 @@ async function buildDesiredEvents(cutoff) {
       date,
       `${asnId}${asn["Buyer"] ? ` · ${asn["Buyer"]}` : ""}`,
       clampDescription([
-        describe([
-          asn["Carrier"] && `Carrier: ${asn["Carrier"]}`,
-        ]),
-        poTable(poRows),
-      ].filter(Boolean).join("\n\n")),
+        htmlMetaLine("Carrier", asn["Carrier"]),
+        poHtmlList(poRows),
+      ].filter(Boolean).join("<br><br>")),
       ASN_COLOR_ID
     );
   }

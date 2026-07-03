@@ -59,11 +59,11 @@ const EMAIL_PO_TD_NUM_STYLE = EMAIL_PO_TD_STYLE + "text-align:right;";
 const EMAIL_PO_TD_ROW_NUM_STYLE = EMAIL_PO_TD_STYLE + "text-align:center;color:#6b7280;";
 const EMAIL_PO_FOOTER_TD_STYLE = "padding:10px 12px;font-weight:600;background-color:#eef0f3;color:#1a1a18;border-bottom:none;font-size:13px;";
 
-export const REQUEST_EMAIL_TABLE_COLUMNS = [
+const REQUEST_EMAIL_TABLE_COLUMNS = [
   "_num", "PO #", "Buyer", "Style #", "Buyer PO #", "Color", "Actual Qty", "Ctn Qty", "Weight",
 ];
 
-export const REQUEST_EMAIL_TABLE_LABELS = {
+const REQUEST_EMAIL_TABLE_LABELS = {
   "Actual Qty": "Unit Qty",
   "Buyer PO #": "Buyer PO",
 };
@@ -364,7 +364,7 @@ function buildPoTableHtml(rows, columns, labels, { isExf = false, hasCtnQty = tr
 </table>`;
 }
 
-export function buildPoText(rows, columns, labels, { qtyFooterCol = "Actual Qty", hasCtnQty = true } = {}) {
+function buildPoText(rows, columns, labels, { qtyFooterCol = "Actual Qty", hasCtnQty = true } = {}) {
   if (!rows.length) return "No linked POs.";
   const textColumns = columns.filter(col => col !== "_num");
   const lines = [["", ...textColumns.map(col => labels[col] || col)].join(" | ")];
