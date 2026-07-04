@@ -4,8 +4,9 @@
     {
       "name": "po-app",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["--yes", "http-server", "-p", "5500", "-c-1", "."],
-      "port": 5500
+      "runtimeArgs": ["--yes", "http-server", "-c-1", "."],
+      "port": 5500,
+      "autoPort": true
     }
   ]
 }

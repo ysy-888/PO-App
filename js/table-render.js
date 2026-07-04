@@ -141,9 +141,6 @@ function renderTable() {
     tr.className = "clickable-row";
 
     if (isTruthy(row["Flag"])) tr.classList.add("row-flagged");
-    else if (typeof isN41ClosedStatusMismatch === "function" && isN41ClosedStatusMismatch(row)) {
-      tr.classList.add("row-flagged");
-    }
 
     getColumnOrder().forEach(col => {
 

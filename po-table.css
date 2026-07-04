@@ -3067,6 +3067,26 @@ td.n41-status-mismatch,
   flex-shrink: 0;
 }
 
+.modal-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  padding: 5px 10px 5px 8px;
+  border: none;
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.modal-back-btn svg { flex: 0 0 auto; }
+.modal-back-btn:hover { background: var(--border-strong); color: var(--text); }
+.modal-back-btn[hidden] { display: none !important; }
+
 .modal-freight-header {
   display: flex;
   align-items: center;
@@ -9297,7 +9317,20 @@ button.dash-kpi:hover { border-color: var(--border-strong); background: var(--ro
 }
 
 /* Calendar */
-.dashboard-cal-header { gap: 12px; }
+.dashboard-cal-header {
+  position: relative;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+/* Title sits dead-center of the header frame regardless of the side content. */
+.dashboard-cal-header .dashboard-cal-title {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  white-space: nowrap;
+}
 
 .dashboard-cal {
   display: flex;
@@ -9318,21 +9351,21 @@ button.dash-kpi:hover { border-color: var(--border-strong); background: var(--ro
 
 .dashboard-cal-title {
   font-size: 14px;
-  font-weight: 600;
-  min-width: 128px;
+  font-weight: 700;
 }
 
 .dashboard-cal-nav {
   display: flex;
   align-items: center;
   gap: 4px;
+  flex-shrink: 0;
 }
 
 .dashboard-cal-legend {
-  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-shrink: 0;
 }
 
 .dash-legend-item {
@@ -9376,10 +9409,13 @@ button.dash-kpi:hover { border-color: var(--border-strong); background: var(--ro
   letter-spacing: 0.05em;
 }
 
+/* Weekend columns read distinctly from weekdays. */
+.dash-cal-head-cell.is-weekend { color: var(--text-muted); }
+
 .dash-cal-body {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  grid-auto-rows: minmax(96px, auto);
+  grid-auto-rows: var(--dash-cal-row-h, 96px);
 }
 
 .dash-cal-cell {
@@ -9396,7 +9432,10 @@ button.dash-kpi:hover { border-color: var(--border-strong); background: var(--ro
   transition: background 0.12s ease;
 }
 
-.dash-cal-cell:nth-child(7n) { border-right: none; }
+.dash-cal-body .dash-cal-cell:nth-child(7n) { border-right: none; }
+
+/* Weekend days tint gently against white weekdays. */
+.dash-cal-cell.is-weekend { background: var(--bg); }
 
 /* Only days with events react to hover / selection. */
 .dash-cal-cell.has-events { cursor: pointer; }
@@ -9416,9 +9455,6 @@ button.dash-kpi:hover { border-color: var(--border-strong); background: var(--ro
   border-radius: 3px;
   pointer-events: none;
 }
-
-/* A new month gets a heavier top edge to break up the continuous scroll. */
-.dash-cal-cell.is-month-start { border-top: 2px solid var(--border-strong); }
 
 .dash-cal-date {
   align-self: flex-start;
@@ -9561,26 +9597,51 @@ span.dash-event { cursor: pointer; /* clicking selects the day */ }
   padding: 3px 10px;
 }
 
-.dash-week-header {
-  position: sticky;
-  top: 0;
-  z-index: 1;
+/* Past Due / This Week / Next Week segmented control. */
+.dash-weeks-tabs {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 5px 16px;
-  background: var(--header-bg);
+  gap: 4px;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--border);
-  font-size: 10.5px;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  flex-shrink: 0;
 }
 
-.dash-week-header.is-current { color: var(--text); }
-.dash-week-header.is-overdue { color: var(--danger); }
+.dash-weeks-tab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 5px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  font-family: var(--font);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.dash-weeks-tab:hover { background: var(--bg); color: var(--text); }
+
+.dash-weeks-tab.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.dash-weeks-tab-count {
+  font-size: 10.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: inherit;
+  opacity: 0.75;
+}
+
+.dash-weeks-tab-count:empty { display: none; }
 
 .dash-empty {
   padding: 26px 16px;
@@ -9658,28 +9719,30 @@ span.dash-event { cursor: pointer; /* clicking selects the day */ }
   height: 7px;
 }
 
-/* Light, unobtrusive scrollbars for the dashboard scroll areas. */
-.dash-scroll,
-.dashboard-panel-body {
+/* Light, unobtrusive scrollbars — applied app-wide (tables, settings, modals)
+   to match the dashboard's design. */
+* {
   scrollbar-width: thin;
   scrollbar-color: #d4d9df transparent;
 }
-.dash-scroll::-webkit-scrollbar,
-.dashboard-panel-body::-webkit-scrollbar {
+*::-webkit-scrollbar {
   width: 12px;
   height: 12px;
 }
-.dash-scroll::-webkit-scrollbar-track,
-.dashboard-panel-body::-webkit-scrollbar-track {
-  background: var(--surface);
+*::-webkit-scrollbar-track {
+  background: transparent;
 }
-.dash-scroll::-webkit-scrollbar-thumb,
-.dashboard-panel-body::-webkit-scrollbar-thumb {
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
   background: #e5e7eb;
   border-radius: 8px;
   border: 3px solid var(--surface);
 }
-.dash-scroll::-webkit-scrollbar-thumb:hover,
-.dashboard-panel-body::-webkit-scrollbar-thumb:hover {
+*::-webkit-scrollbar-thumb:hover {
   background: #cbd0d6;
 }
+
+/* "Add POs" pinned to the left edge of modal footers. */
+.modal-footer-add-pos { margin-right: auto; }

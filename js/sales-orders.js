@@ -121,7 +121,7 @@ function createRecordLinkButton(text, className, onClick, title) {
   return btn;
 }
 
-function mountInvoiceLinks(container, invoices, { closeSalesOrder = false } = {}) {
+function mountInvoiceLinks(container, invoices, { closeSalesOrder = false, navFrom = null } = {}) {
   if (!container) return;
   container.replaceChildren();
   const linked = (invoices ?? []).filter(inv => String(inv?.["Invoice #"] ?? "").trim());
@@ -140,6 +140,7 @@ function mountInvoiceLinks(container, invoices, { closeSalesOrder = false } = {}
       "invoice-record-link",
       () => {
         if (closeSalesOrder) closeSalesOrderModal();
+        if (navFrom && typeof modalNavPush === "function") modalNavPush(navFrom);
         if (typeof openInvoiceModal === "function") openInvoiceModal(inv);
       },
       `Open invoice ${invoiceNo}`
@@ -148,7 +149,7 @@ function mountInvoiceLinks(container, invoices, { closeSalesOrder = false } = {}
   container.appendChild(list);
 }
 
-function mountSalesOrderLink(container, soNumber, { closeInvoice = false } = {}) {
+function mountSalesOrderLink(container, soNumber, { closeInvoice = false, closePo = false, navFrom = null } = {}) {
   if (!container) return;
   container.replaceChildren();
   const display = String(soNumber ?? "").trim();
@@ -169,6 +170,8 @@ function mountSalesOrderLink(container, soNumber, { closeInvoice = false } = {})
     "so-record-link",
     () => {
       if (closeInvoice && typeof closeInvoiceModal === "function") closeInvoiceModal();
+      if (closePo && typeof cancelModalChanges === "function") cancelModalChanges();
+      if (navFrom && typeof modalNavPush === "function") modalNavPush(navFrom);
       openSalesOrderModal(order);
     },
     `Open SO ${display}`
@@ -873,6 +876,9 @@ function openSalesOrderModal(order) {
   const customer = String(order.Customer ?? "").trim();
   const status = String(order["N41 Status"] ?? "").trim();
 
+  const backBtn = document.getElementById("salesOrderModalBackBtn");
+  if (backBtn) backBtn.hidden = !(typeof modalNavOnOpen === "function" && modalNavOnOpen());
+
   // Header
   const headingEl = overlay.querySelector(".so-modal-heading");
   if (headingEl) headingEl.textContent = `SO #${soNum}`;
@@ -937,7 +943,10 @@ ${buildLinkedInvoicesSection(order)}
 
 ${buildLinkedPosSection(order)}`;
 
-  mountInvoiceLinks(bodyEl.querySelector("[data-so-invoice-links]"), linkedInvoices, { closeSalesOrder: true });
+  mountInvoiceLinks(bodyEl.querySelector("[data-so-invoice-links]"), linkedInvoices, {
+    closeSalesOrder: true,
+    navFrom: { type: "so", id: soNum },
+  });
 
   // Wire Memo save button
   const memoTextarea = bodyEl.querySelector("#soMemoTextarea");
@@ -945,6 +954,13 @@ ${buildLinkedPosSection(order)}`;
   const memoStatus = bodyEl.querySelector("#soMemoStatus");
 
   if (memoSaveBtn && memoTextarea) {
+    let savedMemo = String(order.Memo ?? "");
+    const updateMemoSaveVisibility = () => {
+      memoSaveBtn.hidden = memoTextarea.value === savedMemo;
+    };
+    updateMemoSaveVisibility();
+    memoTextarea.addEventListener("input", updateMemoSaveVisibility);
+
     memoSaveBtn.addEventListener("click", async () => {
       const memo = memoTextarea.value;
       memoSaveBtn.disabled = true;
@@ -953,6 +969,8 @@ ${buildLinkedPosSection(order)}`;
         const json = await postApi("/api/sales-orders/memo", { soNumber: soNum, memo });
         if (!json.success) throw new Error(json.error || "Failed to save memo.");
         order.Memo = json.memo;
+        savedMemo = String(json.memo ?? "");
+        updateMemoSaveVisibility();
         if (memoStatus) { memoStatus.textContent = "Saved"; memoStatus.className = "so-memo-status is-saved"; }
         renderSalesOrdersTable();
         setTimeout(() => { if (memoStatus) memoStatus.textContent = ""; }, 2500);
@@ -970,11 +988,10 @@ ${buildLinkedPosSection(order)}`;
       const poNumber = btn.dataset.po;
       const poRow = (typeof allRows !== "undefined" ? allRows : [])
         .find(po => String(po["PO #"] ?? "").trim() === poNumber);
+      if (!poRow || typeof openPODetail !== "function") return;
       closeSalesOrderModal();
-      if (typeof switchAppView === "function") switchAppView("po");
-      if (poRow && typeof openPODetail === "function") {
-        setTimeout(() => openPODetail(poRow), 50);
-      }
+      if (typeof modalNavPush === "function") modalNavPush({ type: "so", id: soNum });
+      openPODetail(poRow);
     });
   });
 
@@ -983,6 +1000,7 @@ ${buildLinkedPosSection(order)}`;
       const inv = findInvoiceByNumber(btn.dataset.invoice);
       if (!inv) return;
       closeSalesOrderModal();
+      if (typeof modalNavPush === "function") modalNavPush({ type: "so", id: soNum });
       if (typeof openInvoiceModal === "function") openInvoiceModal(inv);
     });
   });
@@ -1067,6 +1085,9 @@ function initSalesOrdersView() {
 
   // Close button
   document.getElementById("salesOrderModalCloseBtn")?.addEventListener("click", closeSalesOrderModal);
+  document.getElementById("salesOrderModalBackBtn")?.addEventListener("click", () => {
+    if (typeof modalNavBack === "function") modalNavBack(closeSalesOrderModal);
+  });
 
   // Close on overlay backdrop click
   const overlay = document.getElementById("salesOrderModalOverlay");

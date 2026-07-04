@@ -221,18 +221,18 @@ function buildDashCalCell(date, byDate, todayYmd) {
   const cell = document.createElement("div");
   cell.className = "dash-cal-cell";
   cell.dataset.ymd = ymd;
+  const weekday = date.getDay();
+  if (weekday === 0 || weekday === 6) cell.classList.add("is-weekend");
   if (ymd === todayYmd) cell.classList.add("is-today");
   if (ymd === dashSelectedYmd) cell.classList.add("is-selected");
 
   const num = document.createElement("span");
   num.className = "dash-cal-date";
-  // The 1st of a month is labelled (e.g. "Jul 1") to orient continuous scroll.
+  // Every day shows m/d so months stay legible in the continuous scroll.
+  num.textContent = `${date.getMonth() + 1}/${date.getDate()}`;
   if (date.getDate() === 1) {
     cell.classList.add("is-month-start");
-    num.textContent = `${date.toLocaleDateString(undefined, { month: "short" })} 1`;
     dashCalMonthAnchors[`${date.getFullYear()}-${date.getMonth()}`] = cell;
-  } else {
-    num.textContent = String(date.getDate());
   }
   cell.appendChild(num);
 
@@ -318,9 +318,20 @@ function buildDashCalCell(date, byDate, todayYmd) {
   return cell;
 }
 
+/** Size week rows so roughly one month (≈5 rows) fills the viewport. */
+function sizeDashCalRows() {
+  const scrollEl = dashCalScrollEl;
+  if (!scrollEl) return;
+  const headH = scrollEl.querySelector(".dash-cal-head")?.offsetHeight || 0;
+  const avail = scrollEl.clientHeight - headH;
+  const rowH = Math.max(84, Math.floor(avail / 5));
+  scrollEl.style.setProperty("--dash-cal-row-h", `${rowH}px`);
+}
+
 /**
  * Continuous month grid: renders a range of weeks around the cursor month and
- * lets the user scroll seamlessly. The arrows/Today jump between months.
+ * scrolls seamlessly. Month boundaries are traced with heavier borders; the
+ * arrows/Today jump month to month and the centered title tracks the view.
  */
 function renderDashCalendar() {
   const grid = document.getElementById("dashCalGrid");
@@ -340,9 +351,10 @@ function renderDashCalendar() {
 
   const head = document.createElement("div");
   head.className = "dash-cal-head";
-  ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].forEach(day => {
+  ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].forEach((day, i) => {
     const cell = document.createElement("div");
     cell.className = "dash-cal-head-cell";
+    if (i === 0 || i === 6) cell.classList.add("is-weekend");
     cell.textContent = day;
     head.appendChild(cell);
   });
@@ -366,6 +378,7 @@ function renderDashCalendar() {
 
   dashCalScrollEl = scroll;
   scroll.addEventListener("scroll", onDashCalScroll, { passive: true });
+  sizeDashCalRows();
   scrollDashCalToMonth(year, month, { instant: true });
 }
 
@@ -575,78 +588,81 @@ function dashListRow({ id, sub, date, dateLabel = "", overdue = false, onOpen, a
 }
 
 // ── Open orders by week ──────────────────────────────────────
+// Only three buckets, keyed by the SO's CXL week: past due, this week, next.
+
+const DASH_WEEK_BUCKETS = [
+  { id: "past", label: "Past Due" },
+  { id: "this", label: "This Week" },
+  { id: "next", label: "Next Week" },
+];
+let dashWeeksBucket = "this";
+
+/** Which bucket an SO's CXL week falls in, or null if further out / undated. */
+function dashOrderWeekBucket(order, thisWeekStart, nextWeekStart) {
+  const cxlDate = parseYmdToLocalDate(normalizeToYmd(order["CXL Date"]));
+  if (!cxlDate) return null;
+  const weekStart = dashWeekStartYmd(cxlDate);
+  if (weekStart < thisWeekStart) return "past";
+  if (weekStart === thisWeekStart) return "this";
+  if (weekStart === nextWeekStart) return "next";
+  return null;
+}
 
 function renderDashWeeks() {
   const list = document.getElementById("dashWeeksList");
   if (!list) return;
-  list.innerHTML = "";
 
   const todayYmd = dashTodayYmd();
   const thisWeekStart = dashWeekStartYmd(new Date());
+  const nextWeekDate = new Date();
+  nextWeekDate.setDate(nextWeekDate.getDate() + 7);
+  const nextWeekStart = dashWeekStartYmd(nextWeekDate);
 
-  const orders = getDashOpenSalesOrders()
-    .filter(order => normalizeToYmd(order["CXL Date"]))
-    .sort((a, b) =>
-      normalizeToYmd(a["CXL Date"]).localeCompare(normalizeToYmd(b["CXL Date"])) ||
-      String(a["SO #"]).localeCompare(String(b["SO #"]), undefined, { numeric: true })
-    );
+  const buckets = { past: [], this: [], next: [] };
+  getDashOpenSalesOrders().forEach(order => {
+    const bucket = dashOrderWeekBucket(order, thisWeekStart, nextWeekStart);
+    if (bucket) buckets[bucket].push(order);
+  });
+
+  // Segmented control — reflect counts and the active selection.
+  const tabs = document.getElementById("dashWeeksTabs");
+  if (tabs) {
+    tabs.querySelectorAll("[data-week-bucket]").forEach(btn => {
+      const id = btn.dataset.weekBucket;
+      const active = id === dashWeeksBucket;
+      btn.classList.toggle("is-active", active);
+      btn.setAttribute("aria-selected", active ? "true" : "false");
+      const countEl = btn.querySelector(".dash-weeks-tab-count");
+      if (countEl) countEl.textContent = buckets[id].length ? String(buckets[id].length) : "";
+    });
+  }
+
+  const orders = buckets[dashWeeksBucket].slice().sort((a, b) =>
+    normalizeToYmd(a["CXL Date"]).localeCompare(normalizeToYmd(b["CXL Date"])) ||
+    String(a["SO #"]).localeCompare(String(b["SO #"]), undefined, { numeric: true })
+  );
 
   const countEl = document.getElementById("dashWeeksCount");
   if (countEl) countEl.textContent = orders.length ? String(orders.length) : "";
 
+  list.innerHTML = "";
   if (orders.length === 0) {
-    list.appendChild(dashEmptyState("No open sales orders with a CXL date."));
+    const label = DASH_WEEK_BUCKETS.find(b => b.id === dashWeeksBucket)?.label ?? "";
+    list.appendChild(dashEmptyState(`No open sales orders for ${label}.`));
     return;
   }
 
-  // Group by CXL week (Sun–Sat); everything before this week collapses into "Past due".
-  const groups = new Map();
   orders.forEach(order => {
-    const cxlDate = parseYmdToLocalDate(normalizeToYmd(order["CXL Date"]));
-    if (!cxlDate) return;
-    const weekStart = dashWeekStartYmd(cxlDate);
-    const key = weekStart < thisWeekStart ? "past" : weekStart;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(order);
-  });
-
-  const keys = [...groups.keys()].sort((a, b) => {
-    if (a === "past") return -1;
-    if (b === "past") return 1;
-    return a.localeCompare(b);
-  });
-
-  keys.forEach(key => {
-    const group = groups.get(key);
-    const units = group.reduce((sum, order) => sum + dashSoUnits(order), 0);
-
-    const header = document.createElement("div");
-    header.className = "dash-week-header";
-    if (key === "past") header.classList.add("is-overdue");
-    else if (key === thisWeekStart) header.classList.add("is-current");
-
-    const labelEl = document.createElement("span");
-    labelEl.textContent = key === "past"
-      ? "Past due"
-      : (key === thisWeekStart ? "This week" : `Week of ${formatDateForDisplay(key)}`);
-    const metaEl = document.createElement("span");
-    metaEl.textContent = `${group.length} SO${group.length === 1 ? "" : "s"}${units > 0 ? ` · ${units.toLocaleString()} pcs` : ""}`;
-    header.appendChild(labelEl);
-    header.appendChild(metaEl);
-    list.appendChild(header);
-
-    group.forEach(order => {
-      const cxl = normalizeToYmd(order["CXL Date"]);
-      const orderUnits = dashSoUnits(order);
-      list.appendChild(dashListRow({
-        id: `SO ${String(order["SO #"] ?? "").trim()}`,
-        sub: String(order["Customer"] ?? "").trim(),
-        date: formatDateForDisplay(cxl),
-        dateLabel: orderUnits > 0 ? `${orderUnits.toLocaleString()} pcs` : "",
-        overdue: cxl < todayYmd,
-        onOpen: () => { if (typeof openSalesOrderModal === "function") openSalesOrderModal(order); },
-      }));
-    });
+    const cxl = normalizeToYmd(order["CXL Date"]);
+    const orderUnits = dashSoUnits(order);
+    list.appendChild(dashListRow({
+      id: `SO ${String(order["SO #"] ?? "").trim()}`,
+      sub: String(order["Customer"] ?? "").trim(),
+      date: formatDateForDisplay(cxl),
+      dateLabel: orderUnits > 0 ? `${orderUnits.toLocaleString()} pcs` : "",
+      overdue: cxl < todayYmd,
+      onOpen: () => { if (typeof openSalesOrderModal === "function") openSalesOrderModal(order); },
+    }));
   });
 }
 
@@ -765,6 +781,29 @@ function initDashboard() {
     }
   });
   document.getElementById("dashDayPaneClose")?.addEventListener("click", closeDashDayPane);
+
+  // Clicking anywhere on the dashboard that isn't a date (or the day pane
+  // itself) clears the selection and closes the overlay.
+  document.getElementById("dashboardWrap")?.addEventListener("click", e => {
+    if (!dashSelectedYmd) return;
+    if (e.target.closest(".dash-cal-cell")) return;
+    if (e.target.closest("#dashDayPane")) return;
+    closeDashDayPane();
+  });
+
+  document.getElementById("dashWeeksTabs")?.addEventListener("click", e => {
+    const btn = e.target.closest("[data-week-bucket]");
+    if (!btn) return;
+    dashWeeksBucket = btn.dataset.weekBucket;
+    renderDashWeeks();
+  });
+
+  // Keep ≈one month visible as the window resizes.
+  window.addEventListener("resize", () => {
+    if (typeof currentAppView !== "undefined" && currentAppView === "dashboard") {
+      sizeDashCalRows();
+    }
+  });
 }
 
 initDashboard();

@@ -110,7 +110,10 @@ function setFieldDisplayContent(fieldEl, col, row) {
   } else if (DATE_FIELDS.has(col)) {
     applyDateCellDisplay(fieldEl, col, row, { context: "modal" });
   } else if (col === "SO #" && typeof mountSalesOrderLink === "function") {
-    mountSalesOrderLink(fieldEl, val);
+    mountSalesOrderLink(fieldEl, val, {
+      closePo: true,
+      navFrom: { type: "po", id: String(row["PO #"] ?? "").trim() },
+    });
   } else if (COPY_ON_CLICK_COLS.has(col)) {
     mountCopyableText(fieldEl, col, val);
   } else if ((col === "Actual Qty" || col === "Ctn Qty") && toQtyNumber(val) <= 0) {
@@ -2264,6 +2267,8 @@ function shouldIgnoreRowDblClick(e) {
 
 function openPODetail(row) {
   if (isAppSaving() || modalSaveInProgress) return;
+  const poBackBtn = document.getElementById("modalBackBtn");
+  if (poBackBtn) poBackBtn.hidden = !(typeof modalNavOnOpen === "function" && modalNavOnOpen());
   closeCellSelectDropdown(false);
   if (typeof closeCellDatePopover === "function") closeCellDatePopover(false);
   clearModalPendingSubmission();
@@ -2282,6 +2287,8 @@ function openPODetail(row) {
 
 function openPODetailForPendingSubmission(row, submission) {
   if (isAppSaving() || modalSaveInProgress) return;
+  const poBackBtn = document.getElementById("modalBackBtn");
+  if (poBackBtn) poBackBtn.hidden = !(typeof modalNavOnOpen === "function" && modalNavOnOpen());
   closeCellSelectDropdown(false);
   if (typeof closeCellDatePopover === "function") closeCellDatePopover(false);
 
@@ -2755,5 +2762,9 @@ function initPoModalActions() {
   });
   document.getElementById("modalCancelBtn")?.addEventListener("click", () => {
     cancelModalChanges();
+  });
+  document.getElementById("modalBackBtn")?.addEventListener("click", () => {
+    if (isAppSaving() || modalSaveInProgress) return;
+    if (typeof modalNavBack === "function") modalNavBack(cancelModalChanges);
   });
 }

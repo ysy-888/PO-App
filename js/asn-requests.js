@@ -235,6 +235,11 @@ async function setAsnRequestPickedUp(requestId, pickedUp) {
     Object.assign(request, patch);
     applyAsnRequestFilters();
     if (typeof refreshDashboardIfActive === "function") refreshDashboardIfActive();
+    // Re-render the open modal so the PO checkboxes lock/unlock with the status.
+    if (asnRequestModalRow === request &&
+        document.getElementById("asnRequestOverlay")?.classList.contains("open")) {
+      renderAsnRequestModal(asnRequestPoNumbers, { request });
+    }
     showIndicator(pickedUp ? `${id} picked up ${CHECK_MARK}` : `${id} reopened`, "success");
   } catch (err) {
     showIndicator(`${pickedUp ? "Pickup" : "Reopen"} failed: ` + err.message, "error");
@@ -767,19 +772,82 @@ async function addPosToAsnRequest(poNumbers, { keepPanelOpen = false } = {}) {
   }
 }
 
-function removePosFromAsnRequest() {
+async function removePosFromAsnRequest() {
   captureAsnRequestDraft();
   const linked = getAsnRequestRows().filter(isAsnFormPoSelected);
   if (linked.length === 0) { showIndicator("Select POs to remove", "error"); return; }
   const removeSet = new Set(linked.map(row => String(row["PO #"])));
-  asnRequestPoNumbers = asnRequestPoNumbers.filter(po => !removeSet.has(String(po)));
-  renderAsnRequestModal(asnRequestPoNumbers, getAsnRequestModalRenderOptions());
+  const nextPoNumbers = asnRequestPoNumbers.filter(po => !removeSet.has(String(po)));
+
+  const requestId = getAsnRequestRecordId(asnRequestModalRow);
+  if (!requestId) {
+    // Unsaved (create) request — just edit the local list.
+    asnRequestPoNumbers = nextPoNumbers;
+    renderAsnRequestModal(asnRequestPoNumbers, getAsnRequestModalRenderOptions());
+    return;
+  }
+
+  if (asnRequestOpInProgress || isAsnRequestPickedUp(asnRequestModalRow)) return;
+  asnRequestOpInProgress = true;
+  setAsnRequestFooterMessage("");
+  showIndicator(`Removing POs${ELLIPSIS}`, "");
+
+  try {
+    const json = await postApi("/api/requests/asn/update", {
+      asnRequestId: requestId,
+      request: { "PO Numbers": nextPoNumbers.join(", "), "PO Count": nextPoNumbers.length },
+    });
+    if (!json.success) throw new Error(json.error || "Failed to remove POs.");
+
+    // Clear ASN fields on the removed POs (the server only mirrors to POs
+    // still linked to the request).
+    const items = [...removeSet].map(poNumber => ({
+      poNumber,
+      updates: {
+        [ASN_REQUEST_ID_FIELD]: "",
+        "ASN Requested": false,
+        [ASN_DATE_FIELD]: "",
+        "ASN Req Date": "",
+      },
+    }));
+    const poJson = await postApi("/api/po/batch-update", { items });
+    if (!poJson.success) throw new Error(poJson.error || "Failed to update removed POs.");
+
+    asnRequestPoNumbers = nextPoNumbers;
+    const request = allAsnRequests.find(r => getAsnRequestRecordId(r) === requestId);
+    const mergedRequest = json.request
+      || { ...(asnRequestModalRow || {}), "PO Numbers": nextPoNumbers.join(", "), "PO Count": nextPoNumbers.length };
+    if (request) Object.assign(request, mergedRequest);
+    asnRequestModalRow = request || mergedRequest;
+
+    removeSet.forEach(poNumber => {
+      const row = allRows.find(r => String(r["PO #"]) === String(poNumber));
+      if (!row) return;
+      row[ASN_REQUEST_ID_FIELD] = "";
+      row["ASN Requested"] = false;
+      row[ASN_DATE_FIELD] = "";
+      row["ASN Req Date"] = "";
+    });
+
+    clearAsnFormSelection();
+    applyAsnRequestFilters();
+    applyFilters();
+    renderAsnRequestModal(asnRequestPoNumbers, { request: asnRequestModalRow });
+    showIndicator(`POs removed from ASN ${CHECK_MARK}`, "success");
+  } catch (err) {
+    setAsnRequestFooterMessage("Remove POs failed: " + err.message);
+    showIndicator("Remove POs failed: " + err.message, "error");
+  } finally {
+    asnRequestOpInProgress = false;
+  }
 }
 
 function renderAsnRequestLinkedPoSection(pos, isView = false) {
+  // Once the ASN is picked up, its PO list is locked (no add/remove).
+  const pickedUp = isView && asnRequestModalRow && isAsnRequestPickedUp(asnRequestModalRow);
   const section = document.createElement("section");
   section.className = "shipment-linked-pos";
-  section.classList.toggle("shipment-linked-pos--selection-disabled", asnRequestAddPoPanelOpen || isView);
+  section.classList.toggle("shipment-linked-pos--selection-disabled", asnRequestAddPoPanelOpen || Boolean(pickedUp));
 
   const wrap = document.createElement("div");
   wrap.className = "email-po-table-wrap";
@@ -793,7 +861,7 @@ function renderAsnRequestLinkedPoSection(pos, isView = false) {
 
   const selectTh = document.createElement("th");
   selectTh.className = "th-select-col";
-  if (!isView) {
+  if (!pickedUp) {
     const selectAllCb = document.createElement("input");
     selectAllCb.type = "checkbox";
     selectAllCb.setAttribute("aria-label", "Select all");
@@ -823,7 +891,7 @@ function renderAsnRequestLinkedPoSection(pos, isView = false) {
     attachRequestLinkedPoRowOpen(tr, row["PO #"]);
 
     const selectTd = document.createElement("td");
-    if (!isView) {
+    if (!pickedUp) {
       renderFormSelectedCell(selectTd, row, isAsnFormPoSelected(row), selected => {
         toggleAsnFormPoSelected(row, selected);
         updateAsnRequestActionButtons();
@@ -908,9 +976,11 @@ function updateAsnRequestActionButtons() {
     }
   }
   if (isView) {
+    // Picked-up ASNs are locked — no adding or removing POs.
     const hasAvailablePos = getAvailableAsnRequestPanelRows().length > 0;
-    if (addBtn) addBtn.hidden = asnRequestAddPoPanelOpen || !hasAvailablePos;
-    if (removeBtn) removeBtn.hidden = true;
+    const anySelected = getAsnRequestRows().some(isAsnFormPoSelected);
+    if (addBtn) addBtn.hidden = pickedUp || asnRequestAddPoPanelOpen || !hasAvailablePos;
+    if (removeBtn) removeBtn.hidden = pickedUp || asnRequestAddPoPanelOpen || !anySelected;
     if (doneBtn) doneBtn.hidden = !asnRequestAddPoPanelOpen;
     if (addSelectedBtn) addSelectedBtn.hidden = !asnRequestAddPoPanelOpen || asnRequestAvailablePoSelection.size === 0;
     return;
@@ -929,7 +999,7 @@ function updateAsnRequestActionButtons() {
 
   const anySelected = getAsnRequestRows().some(isAsnFormPoSelected);
   const hasAvailablePos = getAvailableAsnRequestPanelRows().length > 0;
-  if (addBtn) addBtn.hidden = anySelected || !hasAvailablePos;
+  if (addBtn) addBtn.hidden = !hasAvailablePos;
   if (removeBtn) removeBtn.hidden = !anySelected;
 }
 

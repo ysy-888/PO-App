@@ -470,6 +470,9 @@ function openInvoiceModal(inv) {
   const customer = String(inv.Customer ?? "").trim();
   const status = String(inv.Status ?? "").trim();
 
+  const backBtn = document.getElementById("invoiceModalBackBtn");
+  if (backBtn) backBtn.hidden = !(typeof modalNavOnOpen === "function" && modalNavOnOpen());
+
   const headingEl = overlay.querySelector(".inv-modal-heading");
   if (headingEl) headingEl.textContent = `Invoice #${invoiceNo}`;
   const subEl = overlay.querySelector(".inv-modal-subheading");
@@ -519,7 +522,10 @@ function openInvoiceModal(inv) {
 </div>`;
 
   if (typeof mountSalesOrderLink === "function") {
-    mountSalesOrderLink(bodyEl.querySelector("[data-inv-so-link]"), inv["SO #"], { closeInvoice: true });
+    mountSalesOrderLink(bodyEl.querySelector("[data-inv-so-link]"), inv["SO #"], {
+      closeInvoice: true,
+      navFrom: { type: "invoice", id: invoiceNo },
+    });
   } else {
     const soLinkEl = bodyEl.querySelector("[data-inv-so-link]");
     if (soLinkEl) soLinkEl.textContent = String(inv["SO #"] ?? "—");
@@ -531,6 +537,17 @@ function openInvoiceModal(inv) {
   const memoStatus = bodyEl.querySelector("#invMemoStatus");
 
   if (memoSaveBtn) {
+    let savedMemo = String(inv.Memo ?? "");
+    let savedHouseMemo = String(inv["House Memo"] ?? "");
+    const updateMemoSaveVisibility = () => {
+      const memoDirty = (memoTextarea?.value ?? "") !== savedMemo;
+      const houseMemoDirty = (houseMemoTextarea?.value ?? "") !== savedHouseMemo;
+      memoSaveBtn.hidden = !memoDirty && !houseMemoDirty;
+    };
+    updateMemoSaveVisibility();
+    memoTextarea?.addEventListener("input", updateMemoSaveVisibility);
+    houseMemoTextarea?.addEventListener("input", updateMemoSaveVisibility);
+
     memoSaveBtn.addEventListener("click", async () => {
       const memo = memoTextarea?.value ?? "";
       const houseMemo = houseMemoTextarea?.value ?? "";
@@ -541,6 +558,9 @@ function openInvoiceModal(inv) {
         if (!json.success) throw new Error(json.error || "Failed to save.");
         inv.Memo = json.memo;
         inv["House Memo"] = json.houseMemo;
+        savedMemo = String(json.memo ?? "");
+        savedHouseMemo = String(json.houseMemo ?? "");
+        updateMemoSaveVisibility();
         if (memoStatus) { memoStatus.textContent = "Saved"; memoStatus.className = "so-memo-status is-saved"; }
         renderInvoicesTable();
         setTimeout(() => { if (memoStatus) memoStatus.textContent = ""; }, 2500);
@@ -595,6 +615,9 @@ function initInvoicesView() {
   }
 
   document.getElementById("invoiceModalCloseBtn")?.addEventListener("click", closeInvoiceModal);
+  document.getElementById("invoiceModalBackBtn")?.addEventListener("click", () => {
+    if (typeof modalNavBack === "function") modalNavBack(closeInvoiceModal);
+  });
 
   const overlay = document.getElementById("invoiceModalOverlay");
   if (overlay) {

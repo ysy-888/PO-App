@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>PO Table</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-<link rel="stylesheet" href="po-table.css?v=20260703-10" />
+<link rel="stylesheet" href="po-table.css?v=20260703-12" />
 </head>
 <body>
 
@@ -240,18 +240,18 @@
   <div class="dashboard-main">
     <section class="dashboard-panel dashboard-calendar-panel">
       <div class="dashboard-panel-header dashboard-cal-header">
-        <span class="dashboard-cal-title" id="dashCalTitle">—</span>
-        <div class="dashboard-cal-nav">
-          <button type="button" class="btn btn-page" id="dashCalPrev" title="Previous month" aria-label="Previous month">‹</button>
-          <button type="button" class="btn" id="dashCalToday">Today</button>
-          <button type="button" class="btn btn-page" id="dashCalNext" title="Next month" aria-label="Next month">›</button>
-        </div>
         <div class="dashboard-cal-legend" aria-hidden="true">
           <span class="dash-legend-item"><i class="dash-dot dash-dot--so-major"></i>Major</span>
           <span class="dash-legend-item"><i class="dash-dot dash-dot--so-private"></i>Private Label</span>
           <span class="dash-legend-item"><i class="dash-dot dash-dot--so-specialty"></i>Specialty</span>
           <span class="dash-legend-item"><i class="dash-dot dash-dot--shipment"></i>Shipments</span>
           <span class="dash-legend-item"><i class="dash-dot dash-dot--asn"></i>ASNs</span>
+        </div>
+        <span class="dashboard-cal-title" id="dashCalTitle">—</span>
+        <div class="dashboard-cal-nav">
+          <button type="button" class="btn btn-page" id="dashCalPrev" title="Previous month" aria-label="Previous month">‹</button>
+          <button type="button" class="btn" id="dashCalToday">Today</button>
+          <button type="button" class="btn btn-page" id="dashCalNext" title="Next month" aria-label="Next month">›</button>
         </div>
       </div>
       <div class="dashboard-cal" id="dashCalGrid"></div>
@@ -261,6 +261,11 @@
         <div class="dashboard-panel-header">
           <span class="dashboard-panel-title">Open Orders by Week</span>
           <span class="dashboard-panel-count" id="dashWeeksCount"></span>
+        </div>
+        <div class="dash-weeks-tabs" id="dashWeeksTabs" role="tablist" aria-label="Open orders by week">
+          <button type="button" class="dash-weeks-tab" data-week-bucket="past" role="tab">Past Due<span class="dash-weeks-tab-count"></span></button>
+          <button type="button" class="dash-weeks-tab is-active" data-week-bucket="this" role="tab" aria-selected="true">This Week<span class="dash-weeks-tab-count"></span></button>
+          <button type="button" class="dash-weeks-tab" data-week-bucket="next" role="tab">Next Week<span class="dash-weeks-tab-count"></span></button>
         </div>
         <div class="dashboard-panel-body" id="dashWeeksList"></div>
       </section>
@@ -1096,13 +1101,14 @@
             <span id="shipmentModalPoCount" class="shipment-modal-po-count"></span>
             <button type="button" class="btn btn-secondary" id="shipmentDetailAddSelectedPosBtn" hidden>Add</button>
             <button type="button" class="btn btn-secondary" id="shipmentDetailAddPoDoneBtn" hidden>Done</button>
+            <button type="button" class="btn btn-secondary btn-icon" id="shipmentDetailRemovePosBtn" hidden title="Remove selected POs" aria-label="Remove selected POs">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>
+            </button>
             <div class="header-menu-wrap modal-header-menu-wrap">
               <button type="button" class="btn btn-icon" id="shipmentModalMenuBtn" aria-label="Shipment menu" aria-haspopup="menu" aria-expanded="false">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.75"/><circle cx="12" cy="12" r="1.75"/><circle cx="12" cy="19" r="1.75"/></svg>
               </button>
               <div id="shipmentModalMenuDropdown" class="header-menu-dropdown modal-header-menu-dropdown" hidden role="menu">
-                <button type="button" class="header-menu-item" id="shipmentDetailAddPosBtn" role="menuitem">Add POs</button>
-                <button type="button" class="header-menu-item" id="shipmentDetailRemovePosBtn" role="menuitem" hidden>Remove POs</button>
                 <button type="button" class="header-menu-item" id="shipmentModalPrintBtn" role="menuitem" hidden title="Print packing list for linked POs">Print Packing List</button>
                 <button type="button" class="header-menu-item" id="shipmentReceiveBtn" role="menuitem" hidden>Receive</button>
               </div>
@@ -1114,6 +1120,10 @@
     </div>
     <div class="modal-body" id="shipmentModalBody"></div>
     <div class="modal-footer">
+      <button type="button" class="btn btn-secondary modal-footer-add-pos" id="shipmentDetailAddPosBtn">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        Add POs
+      </button>
       <div id="shipmentModalFooterMessage" class="modal-footer-message shipment-footer-message" role="status" aria-live="polite" hidden></div>
       <button type="button" class="btn btn-primary" id="shipmentModalSaveBtn" hidden>
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
@@ -1141,13 +1151,14 @@
             <span id="exfRequestPoCount" class="shipment-modal-po-count"></span>
             <button type="button" class="btn btn-secondary" id="exfRequestAddSelectedPosBtn" hidden>Add</button>
             <button type="button" class="btn btn-secondary" id="exfRequestAddPoDoneBtn" hidden>Done</button>
+            <button type="button" class="btn btn-secondary btn-icon" id="exfRequestRemovePosBtn" hidden title="Remove selected POs" aria-label="Remove selected POs">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>
+            </button>
             <div class="header-menu-wrap modal-header-menu-wrap">
               <button type="button" class="btn btn-icon" id="exfRequestMenuBtn" aria-label="EXF request menu" aria-haspopup="menu" aria-expanded="false">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.75"/><circle cx="12" cy="12" r="1.75"/><circle cx="12" cy="19" r="1.75"/></svg>
               </button>
               <div id="exfRequestMenuDropdown" class="header-menu-dropdown modal-header-menu-dropdown" hidden role="menu">
-                <button type="button" class="header-menu-item" id="exfRequestAddPosBtn" role="menuitem">Add POs</button>
-                <button type="button" class="header-menu-item" id="exfRequestRemovePosBtn" role="menuitem" hidden>Remove POs</button>
                 <button type="button" class="header-menu-item" id="exfRequestResendBtn" role="menuitem" hidden>Resend Email</button>
               </div>
             </div>
@@ -1158,6 +1169,10 @@
     </div>
     <div class="modal-body" id="exfRequestBody"></div>
     <div class="modal-footer">
+      <button type="button" class="btn btn-secondary modal-footer-add-pos" id="exfRequestAddPosBtn">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        Add POs
+      </button>
       <div id="exfRequestFooterMessage" class="modal-footer-message shipment-footer-message" role="status" aria-live="polite" hidden></div>
       <button type="button" class="btn btn-secondary" id="exfRequestCreateShipmentBtn" hidden>
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v10H3z"/><path d="M14 10h4l3 3v4h-7z"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>
@@ -1188,13 +1203,14 @@
             <span id="asnRequestStatusBadge" class="badge" hidden></span>
             <button type="button" class="btn btn-secondary" id="asnRequestAddSelectedPosBtn" hidden>Add</button>
             <button type="button" class="btn btn-secondary" id="asnRequestAddPoDoneBtn" hidden>Done</button>
+            <button type="button" class="btn btn-secondary btn-icon" id="asnRequestRemovePosBtn" hidden title="Remove selected POs" aria-label="Remove selected POs">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>
+            </button>
             <div class="header-menu-wrap modal-header-menu-wrap">
               <button type="button" class="btn btn-icon" id="asnRequestMenuBtn" aria-label="ASN request menu" aria-haspopup="menu" aria-expanded="false">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.75"/><circle cx="12" cy="12" r="1.75"/><circle cx="12" cy="19" r="1.75"/></svg>
               </button>
               <div id="asnRequestMenuDropdown" class="header-menu-dropdown modal-header-menu-dropdown" hidden role="menu">
-                <button type="button" class="header-menu-item" id="asnRequestAddPosBtn" role="menuitem">Add POs</button>
-                <button type="button" class="header-menu-item" id="asnRequestRemovePosBtn" role="menuitem" hidden>Remove POs</button>
                 <button type="button" class="header-menu-item" id="asnRequestPrintBtn" role="menuitem" hidden title="Print packing list for linked POs">Print Packing List</button>
                 <button type="button" class="header-menu-item" id="asnCartonLabelBtn" role="menuitem" hidden>Carton Label</button>
                 <button type="button" class="header-menu-item" id="asnResendEmailBtn" role="menuitem" hidden>Resend Email</button>
@@ -1209,6 +1225,10 @@
     </div>
     <div class="modal-body" id="asnRequestBody"></div>
     <div class="modal-footer">
+      <button type="button" class="btn btn-secondary modal-footer-add-pos" id="asnRequestAddPosBtn">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        Add POs
+      </button>
       <div id="asnRequestFooterMessage" class="modal-footer-message shipment-footer-message" role="status" aria-live="polite" hidden></div>
       <button type="button" class="btn btn-primary" id="asnRequestSubmitBtn">
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
@@ -1315,6 +1335,10 @@
     <div class="modal-header so-modal-header">
       <div class="modal-header-main">
         <h3 class="so-modal-heading">SO #—</h3>
+        <button type="button" class="modal-back-btn" id="salesOrderModalBackBtn" hidden>
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+          <span>Back</span>
+        </button>
         <p class="so-modal-subheading"></p>
       </div>
       <div class="modal-header-actions">
@@ -1331,6 +1355,10 @@
     <div class="modal-header so-modal-header">
       <div class="modal-header-main">
         <h3 class="inv-modal-heading">Invoice #—</h3>
+        <button type="button" class="modal-back-btn" id="invoiceModalBackBtn" hidden>
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+          <span>Back</span>
+        </button>
         <p class="inv-modal-subheading"></p>
       </div>
       <div class="modal-header-actions">
@@ -1577,6 +1605,10 @@
     <div class="modal-header">
       <div class="modal-header-main">
         <h3 class="modal-po-heading">PO #<span id="modalPoNum" class="modal-po-num">—</span><span id="modalPoMeta" class="modal-po-heading-meta"></span></h3>
+        <button type="button" class="modal-back-btn" id="modalBackBtn" hidden>
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+          <span>Back</span>
+        </button>
       </div>
       <div class="modal-header-actions">
         <button type="button" class="btn btn-secondary packing-list-header-btn" id="modalPackingListBtn" hidden>Add Packing List</button>
@@ -1623,16 +1655,17 @@
 <script src="js/row-context-menu.js"></script>
 <script src="js/table-render.js"></script>
 <script src="js/cell-edit.js"></script>
+<script src="js/modal-nav.js"></script>
 <script src="js/modal.js"></script>
 <script src="js/po-packing-pane.js"></script>
 <script src="js/save.js"></script>
 <script src="js/batch-edit.js"></script>
 <script src="js/main.js"></script>
 <script src="js/shipments-tables.js?v=20260703-2"></script>
-<script src="js/shipments-modals.js?v=20260703-3"></script>
+<script src="js/shipments-modals.js?v=20260703-4"></script>
 <script src="js/request-modals.js?v=20260605-10"></script>
-<script src="js/exf-request.js?v=20260703-1"></script>
-<script src="js/asn-requests.js?v=20260703-4"></script>
+<script src="js/exf-request.js?v=20260703-2"></script>
+<script src="js/asn-requests.js?v=20260703-5"></script>
 <script src="js/approval-requests.js?v=20260703-1"></script>
 <script src="js/packing-reviews.js"></script>
 <script src="js/customers-import.js"></script>
@@ -1649,7 +1682,7 @@
 <script src="js/invoices.js"></script>
 <script src="js/invoices-import.js"></script>
 <script src="js/shipments-init.js"></script>
-<script src="js/dashboard.js?v=20260703-6"></script>
+<script src="js/dashboard.js?v=20260703-8"></script>
 <script src="js/packing-print.js"></script>
 <div id="packingPrintRoot" aria-hidden="true"></div>
 </body>

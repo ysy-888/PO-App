@@ -398,11 +398,11 @@ function updateShipmentModalActionButtons() {
 
   const linked = getLinkedPosFromModalTable();
   const linkedSelected = linked.filter(isShipmentFormPoSelected).length;
-  const showAdd = linkedSelected === 0;
-  const showRemove = linkedSelected > 0;
 
-  if (addBtn) addBtn.hidden = !showAdd;
-  if (removeBtn) removeBtn.hidden = !showRemove;
+  // Add POs lives at the bottom of the form and stays available; the trash
+  // (Remove POs) button appears only while POs are selected.
+  if (addBtn) addBtn.hidden = false;
+  if (removeBtn) removeBtn.hidden = linkedSelected === 0;
 }
 
 function openShipmentAddPoPanel() {
