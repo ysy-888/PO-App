@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>PO Table</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-<link rel="stylesheet" href="po-table.css?v=20260703-6" />
+<link rel="stylesheet" href="po-table.css?v=20260703-10" />
 </head>
 <body>
 
@@ -250,7 +250,8 @@
           <span class="dash-legend-item"><i class="dash-dot dash-dot--so-major"></i>Major</span>
           <span class="dash-legend-item"><i class="dash-dot dash-dot--so-private"></i>Private Label</span>
           <span class="dash-legend-item"><i class="dash-dot dash-dot--so-specialty"></i>Specialty</span>
-          <span class="dash-legend-item"><i class="dash-dot dash-dot--shipment"></i>Shipments &amp; ASNs</span>
+          <span class="dash-legend-item"><i class="dash-dot dash-dot--shipment"></i>Shipments</span>
+          <span class="dash-legend-item"><i class="dash-dot dash-dot--asn"></i>ASNs</span>
         </div>
       </div>
       <div class="dashboard-cal" id="dashCalGrid"></div>
@@ -1114,11 +1115,11 @@
     <div class="modal-body" id="shipmentModalBody"></div>
     <div class="modal-footer">
       <div id="shipmentModalFooterMessage" class="modal-footer-message shipment-footer-message" role="status" aria-live="polite" hidden></div>
-      <button type="button" class="btn btn-primary" id="shipmentModalSaveBtn">
+      <button type="button" class="btn btn-primary" id="shipmentModalSaveBtn" hidden>
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
         Save
       </button>
-      <button type="button" class="btn" data-dismiss="shipment-modal">Close</button>
+      <button type="button" class="btn" data-dismiss="shipment-modal">Cancel</button>
     </div>
   </div>
 </div>
@@ -1182,11 +1183,9 @@
         <div class="email-header-meta">
           <div class="email-header-id-block">
             <div class="email-request-id" id="asnRequestModalId">New</div>
-            <div class="email-request-date" id="asnRequestModalDate"></div>
           </div>
           <div class="modal-header-actions">
             <span id="asnRequestStatusBadge" class="badge" hidden></span>
-            <span id="asnRequestPoCount" class="shipment-modal-po-count"></span>
             <button type="button" class="btn btn-secondary" id="asnRequestAddSelectedPosBtn" hidden>Add</button>
             <button type="button" class="btn btn-secondary" id="asnRequestAddPoDoneBtn" hidden>Done</button>
             <div class="header-menu-wrap modal-header-menu-wrap">
@@ -1459,38 +1458,16 @@
         <section class="settings-section settings-section--edit-table" id="settingsSectionEditTable" data-settings-section="edit-table" hidden>
           <h4 class="settings-section-title">Edit table</h4>
           <div class="edit-table-target-row">
-            <label class="settings-switch-label" for="editTableTargetSelect">Table</label>
-            <select id="editTableTargetSelect" class="filter-select edit-table-target-select">
-              <option value="po">Purchase Orders</option>
+            <select id="editTableTargetSelect" class="filter-select edit-table-target-select" aria-label="Table">
               <option value="so">Sales Orders</option>
+              <option value="po">Purchase Orders</option>
               <option value="inv">Invoices</option>
             </select>
           </div>
           <p class="edit-table-subtitle">Choose columns on the left. Drag the list on the right to set display order.</p>
 
-          <!-- Purchase Orders editor -->
-          <div id="editTableGroupPo">
-            <div class="edit-table-toolbar-links">
-              <button type="button" class="column-filter-link" id="editTableSelectAll">Select all</button>
-              <span class="column-filter-sep">|</span>
-              <button type="button" class="column-filter-link" id="editTableClearAll">Clear all</button>
-            </div>
-            <div class="edit-table-panels">
-              <div class="edit-table-panel edit-table-panel-picker">
-                <div class="edit-table-picker-list" id="editTableColumnPicker"></div>
-              </div>
-              <div class="edit-table-panel edit-table-panel-order">
-                <div class="edit-table-order-list" id="editTableColumnOrder"></div>
-              </div>
-            </div>
-            <div class="edit-table-default-actions">
-              <button type="button" class="btn edit-table-default-btn" id="editTableSaveDefault">Save as default</button>
-              <button type="button" class="btn edit-table-default-btn" id="editTableResetDefault">Reset to default</button>
-            </div>
-          </div>
-
           <!-- Sales Orders editor -->
-          <div id="editTableGroupSo" hidden>
+          <div id="editTableGroupSo">
             <div class="edit-table-toolbar-links">
               <button type="button" class="column-filter-link" id="soEditTableSelectAll">Select all</button>
               <span class="column-filter-sep">|</span>
@@ -1502,6 +1479,23 @@
               </div>
               <div class="edit-table-panel edit-table-panel-order">
                 <div class="edit-table-order-list" id="soEditTableColumnOrder"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Purchase Orders editor -->
+          <div id="editTableGroupPo" hidden>
+            <div class="edit-table-toolbar-links">
+              <button type="button" class="column-filter-link" id="editTableSelectAll">Select all</button>
+              <span class="column-filter-sep">|</span>
+              <button type="button" class="column-filter-link" id="editTableClearAll">Clear all</button>
+            </div>
+            <div class="edit-table-panels">
+              <div class="edit-table-panel edit-table-panel-picker">
+                <div class="edit-table-picker-list" id="editTableColumnPicker"></div>
+              </div>
+              <div class="edit-table-panel edit-table-panel-order">
+                <div class="edit-table-order-list" id="editTableColumnOrder"></div>
               </div>
             </div>
           </div>
@@ -1521,6 +1515,12 @@
                 <div class="edit-table-order-list" id="invEditTableColumnOrder"></div>
               </div>
             </div>
+          </div>
+
+          <!-- Shared for all three tables -->
+          <div class="edit-table-default-actions">
+            <button type="button" class="btn edit-table-default-btn" id="editTableSaveDefault">Save as default</button>
+            <button type="button" class="btn edit-table-default-btn" id="editTableResetDefault">Reset to default</button>
           </div>
         </section>
         <section class="settings-section" id="settingsSectionVendorPortal" data-settings-section="vendor-portal" hidden>
@@ -1629,10 +1629,10 @@
 <script src="js/batch-edit.js"></script>
 <script src="js/main.js"></script>
 <script src="js/shipments-tables.js?v=20260703-2"></script>
-<script src="js/shipments-modals.js?v=20260703-2"></script>
+<script src="js/shipments-modals.js?v=20260703-3"></script>
 <script src="js/request-modals.js?v=20260605-10"></script>
 <script src="js/exf-request.js?v=20260703-1"></script>
-<script src="js/asn-requests.js?v=20260703-3"></script>
+<script src="js/asn-requests.js?v=20260703-4"></script>
 <script src="js/approval-requests.js?v=20260703-1"></script>
 <script src="js/packing-reviews.js"></script>
 <script src="js/customers-import.js"></script>
@@ -1649,7 +1649,7 @@
 <script src="js/invoices.js"></script>
 <script src="js/invoices-import.js"></script>
 <script src="js/shipments-init.js"></script>
-<script src="js/dashboard.js?v=20260703-4"></script>
+<script src="js/dashboard.js?v=20260703-6"></script>
 <script src="js/packing-print.js"></script>
 <div id="packingPrintRoot" aria-hidden="true"></div>
 </body>

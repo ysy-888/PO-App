@@ -33,7 +33,7 @@ const SO_COLOR_BY_ORDER_TYPE = {
   "PRIVATE LABEL": "3", // grape (purple)
   "SPECIALTY": "1",     // lavender (light purple)
 };
-const SHIPMENT_COLOR_ID = "11"; // tomato (red — same as ASN)
+const SHIPMENT_COLOR_ID = "6";  // tangerine (orange) — matches the dashboard
 const ASN_COLOR_ID = "11";      // tomato (red)
 
 // Google Calendar caps descriptions around 8k characters.

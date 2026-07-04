@@ -480,6 +480,7 @@ function rerenderOpenShipmentModalBody() {
     setShipmentModalAddPanelClass(detailBody, shipmentAddPoPanelOpen);
     setShipmentModalPoCount(document.getElementById("shipmentModalPoCount"), shipmentModalRow);
     updateShipmentPackingListPrintBtn("detail");
+    captureShipmentModalSnapshot();
   }
 }
 
@@ -583,6 +584,30 @@ function readShipmentForm(container) {
       : el.value ?? "";
   });
   return data;
+}
+
+// The detail modal's Save appears only once a field (date/notes/ship method/
+// vessel/house) differs from what's saved; Cancel just closes without saving.
+let shipmentModalSnapshot = null;
+
+function captureShipmentModalSnapshot() {
+  const form = document.getElementById("shipmentEditForm");
+  shipmentModalSnapshot = form ? readShipmentForm(form) : null;
+  updateShipmentSaveButtonVisibility();
+}
+
+function isShipmentModalDirty() {
+  const form = document.getElementById("shipmentEditForm");
+  if (!form || !shipmentModalSnapshot) return false;
+  const current = readShipmentForm(form);
+  return Object.keys(current).some(
+    key => String(current[key] ?? "") !== String(shipmentModalSnapshot[key] ?? "")
+  );
+}
+
+function updateShipmentSaveButtonVisibility() {
+  const btn = document.getElementById("shipmentModalSaveBtn");
+  if (btn) btn.hidden = !isShipmentModalDirty();
 }
 
 function getMajorityShipMethodFromPoRows(rows) {
@@ -1050,6 +1075,7 @@ function renderShipmentModalContent(shipment) {
   setShipmentModalAddPanelClass(body, false);
   updateShipmentPackingListPrintBtn("detail");
   updateShipmentModalActionButtons();
+  captureShipmentModalSnapshot();
 }
 
 async function saveShipmentModal() {

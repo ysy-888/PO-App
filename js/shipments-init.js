@@ -72,9 +72,13 @@ function initShipments() {
     bindModalHeaderMenu("shipmentModalMenuBtn", "shipmentModalMenuDropdown");
   }
   document.getElementById("shipmentModalCloseBtn")?.addEventListener("click", closeShipmentModalForce);
-  document.getElementById("shipmentModalBody")?.addEventListener("input", () => {
+  const shipmentBody = document.getElementById("shipmentModalBody");
+  const onShipmentBodyEdit = () => {
     clearShipmentFooterMessage("shipmentModalFooterMessage");
-  });
+    if (typeof updateShipmentSaveButtonVisibility === "function") updateShipmentSaveButtonVisibility();
+  };
+  shipmentBody?.addEventListener("input", onShipmentBodyEdit);
+  shipmentBody?.addEventListener("change", onShipmentBodyEdit);
   document.querySelector('[data-dismiss="shipment-modal"]')?.addEventListener("click", closeShipmentModalForce);
   document.getElementById("shipmentDetailAddPosBtn")?.addEventListener("click", openShipmentAddPoPanel);
   document.getElementById("shipmentDetailRemovePosBtn")?.addEventListener("click", removePosFromShipment);
@@ -85,7 +89,7 @@ function initShipments() {
   bindDirectBackdropDismiss(document.getElementById("createShipmentOverlay"), closeCreateShipmentModal);
 
   initShipmentSelection();
-  switchAppView("sales");
+  switchAppView("dashboard");
   if (typeof refreshSplitViewLayoutIfReady === "function") refreshSplitViewLayoutIfReady();
 }
 

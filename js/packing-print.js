@@ -623,22 +623,27 @@ function buildGroupPackingListPrintHtml(poNumbers, {
   return plPrintPageStyles() + titlePage + rows.map(row => buildPlPrintPoSectionHtml(row)).join("\n");
 }
 
+// Sized for a 4x6 thermal label printed landscape (6in wide x 4in tall).
+// Physical units (in/pt) keep the output true-to-size regardless of the print
+// dialog's scaling; the label bleeds to a small safe margin inside the page.
 const CARTON_LABEL_PAGE_STYLES = `
 <style type="text/css">
   * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  @page { size: letter portrait; margin: 0; }
-  html, body { margin: 0; padding: 0; width: 816px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.4; color: #1a1a18; background: #fff; }
-  .pdf-page { width: 816px; min-height: 1056px; margin: 0; padding: 48px; page-break-after: always; background: #fff; display: flex; align-items: center; justify-content: center; }
+  @page { size: 6in 4in; margin: 0; }
+  html, body { margin: 0; padding: 0; width: 6in; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #000; background: #fff; }
+  .pdf-page { width: 6in; height: 4in; margin: 0; padding: 0.1in; page-break-after: always; background: #fff; overflow: hidden; }
   .pdf-page:last-child, .pdf-page-last { page-break-after: auto; }
-  .carton-label { width: 100%; max-width: 520px; border: 2px solid #1a1a18; padding: 32px 36px; }
-  .carton-label-field { margin-bottom: 20px; }
-  .carton-label-field:last-child { margin-bottom: 0; }
-  .carton-label-label { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #6b7280; margin-bottom: 4px; }
-  .carton-label-value { font-size: 18px; font-weight: 700; color: #1a1a18; word-break: break-word; }
-  .carton-label-value--box { font-size: 24px; }
-  .carton-label-skus { margin-top: 24px; padding-top: 16px; border-top: 1px solid #e5e7eb; }
-  .carton-label-skus-title { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #6b7280; margin-bottom: 10px; }
-  .carton-label-sku-line { display: flex; justify-content: space-between; gap: 16px; padding: 6px 0; font-size: 14px; border-bottom: 1px solid #f3f4f6; }
+  .carton-label { width: 100%; height: 100%; border: 2.5px solid #000; padding: 0.12in 0.16in; display: flex; gap: 0.16in; overflow: hidden; }
+  .carton-label-main { flex: 0 0 2.15in; display: flex; flex-direction: column; border-right: 2px solid #000; padding-right: 0.16in; overflow: hidden; }
+  .carton-label-field { margin-bottom: 0.12in; }
+  .carton-label-field--box { margin-top: auto; margin-bottom: 0; }
+  .carton-label-label { font-size: 7.5pt; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #444; margin-bottom: 0.02in; }
+  .carton-label-value { font-size: 13pt; font-weight: 700; color: #000; word-break: break-word; line-height: 1.12; }
+  .carton-label-value--box { font-size: 26pt; line-height: 1; }
+  .carton-label-skus { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+  .carton-label-skus-title { font-size: 7.5pt; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #444; margin-bottom: 0.06in; }
+  .carton-label-sku-lines { flex: 1; overflow: hidden; }
+  .carton-label-sku-line { display: flex; justify-content: space-between; gap: 0.12in; padding: 0.028in 0; font-size: 9.5pt; border-bottom: 0.5pt solid #bbb; }
   .carton-label-sku-line:last-child { border-bottom: none; }
   .carton-label-sku { font-weight: 600; flex: 1; word-break: break-word; }
   .carton-label-qty { font-weight: 700; white-space: nowrap; }
@@ -666,10 +671,15 @@ function buildCartonLabelPageHtml(row, carton, cartonIndex, totalCartons, shipNo
   const pageClass = "pdf-page" + (isLast ? " pdf-page-last" : "");
   return `<div class="${pageClass}">
   <div class="carton-label">
-    <div class="carton-label-field"><div class="carton-label-label">ASN #</div><div class="carton-label-value">${plPrintEsc(asnNumber)}</div></div>
-    <div class="carton-label-field"><div class="carton-label-label">Ship Notice #</div><div class="carton-label-value">${plPrintEsc(shipNotice)}</div></div>
-    <div class="carton-label-field"><div class="carton-label-label">Carton</div><div class="carton-label-value carton-label-value--box">${plPrintEsc(boxLabel)}</div></div>
-    <div class="carton-label-skus"><div class="carton-label-skus-title">Contents</div>${buildCartonLabelSkuLinesHtml(row, carton, allCartons, colorCode)}</div>
+    <div class="carton-label-main">
+      <div class="carton-label-field"><div class="carton-label-label">ASN #</div><div class="carton-label-value">${plPrintEsc(asnNumber)}</div></div>
+      <div class="carton-label-field"><div class="carton-label-label">Ship Notice #</div><div class="carton-label-value">${plPrintEsc(shipNotice)}</div></div>
+      <div class="carton-label-field carton-label-field--box"><div class="carton-label-label">Carton</div><div class="carton-label-value carton-label-value--box">${plPrintEsc(boxLabel)}</div></div>
+    </div>
+    <div class="carton-label-skus">
+      <div class="carton-label-skus-title">Contents</div>
+      <div class="carton-label-sku-lines">${buildCartonLabelSkuLinesHtml(row, carton, allCartons, colorCode)}</div>
+    </div>
   </div>
 </div>`;
 }

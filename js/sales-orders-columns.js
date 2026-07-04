@@ -239,7 +239,18 @@ function renderSoEditTableOrder() {
     item.className = "edit-table-order-item";
     item.draggable = true;
     item.dataset.col = col;
-    item.textContent = col;
+
+    const handle = document.createElement("span");
+    handle.className = "edit-table-drag-handle";
+    handle.textContent = "⋮⋮";
+    handle.setAttribute("aria-hidden", "true");
+    item.appendChild(handle);
+
+    const labelSpan = document.createElement("span");
+    labelSpan.className = "edit-table-order-item-label";
+    labelSpan.textContent = col;
+    item.appendChild(labelSpan);
+
     item.addEventListener("dragstart", () => { soEditTableDragFromIndex = index; });
     item.addEventListener("dragend", () => { soEditTableDragFromIndex = null; });
     item.addEventListener("dragover", e => {
@@ -282,6 +293,24 @@ function applySoEditTableFromPopover() {
 
 function cancelSoEditTableFromPopover() {
   prepareSoEditTableDraft();
+}
+
+/** Global "Reset to default" dispatched from the shared edit-table button. */
+function resetSoEditTableToDefault() {
+  soColumnOrderDraft = normalizeSoColumnOrder([...SO_COLUMNS]);
+  soColumnVisibilityDraft = new Set(SO_COLUMNS);
+  renderSoEditTablePicker();
+  renderSoEditTableOrder();
+  if (typeof setEditTableFooterMessage === "function") {
+    setEditTableFooterMessage("Reset to default", "success");
+  }
+}
+
+/** Global "Save as default": commit the current layout as the saved view. */
+function saveSoEditTableDefault() {
+  if (applySoEditTableFromPopover() && typeof setEditTableFooterMessage === "function") {
+    setEditTableFooterMessage("Default view saved", "success");
+  }
 }
 
 function setSoEditTableDraftSelectAll(selectAll) {

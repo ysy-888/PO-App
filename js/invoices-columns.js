@@ -236,7 +236,18 @@ function renderInvEditTableOrder() {
     item.className = "edit-table-order-item";
     item.draggable = true;
     item.dataset.col = col;
-    item.textContent = col;
+
+    const handle = document.createElement("span");
+    handle.className = "edit-table-drag-handle";
+    handle.textContent = "⋮⋮";
+    handle.setAttribute("aria-hidden", "true");
+    item.appendChild(handle);
+
+    const labelSpan = document.createElement("span");
+    labelSpan.className = "edit-table-order-item-label";
+    labelSpan.textContent = col;
+    item.appendChild(labelSpan);
+
     item.addEventListener("dragstart", () => { invEditTableDragFromIndex = index; });
     item.addEventListener("dragend", () => { invEditTableDragFromIndex = null; });
     item.addEventListener("dragover", e => {
@@ -279,6 +290,24 @@ function applyInvoiceEditTableFromPopover() {
 
 function cancelInvoiceEditTableFromPopover() {
   prepareInvoiceEditTableDraft();
+}
+
+/** Global "Reset to default" dispatched from the shared edit-table button. */
+function resetInvEditTableToDefault() {
+  invColumnOrderDraft = normalizeInvColumnOrder([...INV_COLUMNS]);
+  invColumnVisibilityDraft = new Set(INV_COLUMNS);
+  renderInvEditTablePicker();
+  renderInvEditTableOrder();
+  if (typeof setEditTableFooterMessage === "function") {
+    setEditTableFooterMessage("Reset to default", "success");
+  }
+}
+
+/** Global "Save as default": commit the current layout as the saved view. */
+function saveInvEditTableDefault() {
+  if (applyInvoiceEditTableFromPopover() && typeof setEditTableFooterMessage === "function") {
+    setEditTableFooterMessage("Default view saved", "success");
+  }
 }
 
 function setInvEditTableDraftSelectAll(selectAll) {

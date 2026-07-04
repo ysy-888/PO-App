@@ -629,7 +629,7 @@ function renderAsnRequestModal(poNumbers, { asnDate = formatDateToYmd(new Date()
   body.appendChild(outer);
   setAsnRequestModalAddPanelClass(body, asnRequestAddPoPanelOpen);
   const headerCount = document.getElementById("asnRequestPoCount");
-  setRequestModalPoCount(headerCount, pos.length);
+  if (headerCount) setRequestModalPoCount(headerCount, pos.length);
 
   const titleLabel = String(document.getElementById("asnRequestModalId")?.textContent ?? "").trim() || "ASN Request";
   const requestId = titleLabel !== "ASN Request" && titleLabel !== "New" ? titleLabel : "";

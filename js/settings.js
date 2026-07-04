@@ -295,11 +295,15 @@ function renderSettingsCarrierList() {
         renderSettingsAsnDefaultCarrierList();
       });
 
+      const actions = document.createElement("div");
+      actions.className = "settings-carrier-actions";
+      actions.appendChild(editBtn);
+      actions.appendChild(deleteBtn);
+
       row.appendChild(nameEl);
       row.appendChild(emailEl);
       row.appendChild(ccEl);
-      row.appendChild(editBtn);
-      row.appendChild(deleteBtn);
+      row.appendChild(actions);
     }
     container.appendChild(row);
   });
@@ -585,6 +589,20 @@ function initSettings() {
       cancelInvoiceEditTableFromPopover();
     }
     closeSettingsModal();
+  });
+
+  // Shared "Save as default" / "Reset to default" — dispatch to the active target.
+  document.getElementById("editTableSaveDefault")?.addEventListener("click", () => {
+    const target = getEditTableTarget();
+    if (target === "po" && typeof saveDefaultColumnVisibility === "function") saveDefaultColumnVisibility();
+    else if (target === "so" && typeof saveSoEditTableDefault === "function") saveSoEditTableDefault();
+    else if (target === "inv" && typeof saveInvEditTableDefault === "function") saveInvEditTableDefault();
+  });
+  document.getElementById("editTableResetDefault")?.addEventListener("click", () => {
+    const target = getEditTableTarget();
+    if (target === "po" && typeof resetEditTableToDefault === "function") resetEditTableToDefault();
+    else if (target === "so" && typeof resetSoEditTableToDefault === "function") resetSoEditTableToDefault();
+    else if (target === "inv" && typeof resetInvEditTableToDefault === "function") resetInvEditTableToDefault();
   });
 
   document.getElementById("invEditTableSelectAll")?.addEventListener("click", () => {

@@ -5778,6 +5778,18 @@ td.n41-status-mismatch,
   outline: none;
 }
 
+/* ⋮ menu button reads on the dark modal header. */
+.shipment-modal-card .email-header-request .modal-header-menu-wrap .btn-icon {
+  color: #d4d9df;
+  background: transparent;
+  border-color: transparent;
+}
+.shipment-modal-card .email-header-request .modal-header-menu-wrap .btn-icon:hover,
+.shipment-modal-card .email-header-request .modal-header-menu-wrap .btn-icon[aria-expanded="true"] {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+}
+
 .shipment-modal-card .email-header-request .btn-secondary {
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.22);
@@ -6340,7 +6352,9 @@ td.n41-status-mismatch,
   background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
-  overflow: hidden;
+  /* Must NOT be a scroll container, or the sticky <th> anchors to the table
+     itself (which scrolls away) instead of the scrollable wrap. */
+  overflow: visible;
 }
 
 .shipment-modal-card .email-po-table th,
@@ -7115,7 +7129,7 @@ td.n41-status-mismatch,
 .settings-group-label {
   font-size: 12px;
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--qty-total-fg);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   margin-bottom: 8px;
@@ -7284,8 +7298,22 @@ td.n41-status-mismatch,
   box-sizing: border-box;
 }
 
+.settings-carrier-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-start;
+}
+
 .settings-carrier-action-btn {
   white-space: nowrap;
+  padding: 4px 14px;
+  font-size: 12px;
+}
+
+/* In a saved row, Edit/Delete sit inline and size to content, not full width. */
+.settings-carrier-row .settings-carrier-actions .settings-carrier-action-btn {
+  width: auto;
+  flex: 0 0 auto;
 }
 
 .settings-asn-default-carrier-list {
@@ -7312,6 +7340,7 @@ td.n41-status-mismatch,
 
 .settings-carrier-select {
   width: 100%;
+  max-width: 260px;
 }
 
 .asn-send-checkbox-td {
@@ -9275,8 +9304,16 @@ button.dash-kpi:hover { border-color: var(--border-strong); background: var(--ro
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  /* On short viewports the calendar scrolls internally — never the page. */
+  overflow: hidden; /* scrolling lives on .dash-cal-scroll */
+}
+
+/* Continuous multi-month scroll viewport. */
+.dash-cal-scroll {
+  position: relative; /* offsetParent for month anchors */
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .dashboard-cal-title {
@@ -9318,9 +9355,12 @@ button.dash-kpi:hover { border-color: var(--border-strong); background: var(--ro
 .dash-dot--so-major { background: #3f51b5; }
 .dash-dot--so-private { background: #8e24aa; }
 .dash-dot--so-specialty { background: #7986cb; }
-.dash-dot--shipment { background: #d3402e; }
+.dash-dot--shipment { background: #ef6c00; }
 
 .dash-cal-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   border-bottom: 1px solid var(--border);
@@ -9331,20 +9371,19 @@ button.dash-kpi:hover { border-color: var(--border-strong); background: var(--ro
   padding: 5px 8px;
   font-size: 10.5px;
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--qty-total-fg);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
 .dash-cal-body {
-  flex: 1;
-  min-height: 0;
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  grid-auto-rows: minmax(84px, 1fr);
+  grid-auto-rows: minmax(96px, auto);
 }
 
 .dash-cal-cell {
+  position: relative;
   padding: 4px;
   border-right: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
@@ -9354,32 +9393,65 @@ button.dash-kpi:hover { border-color: var(--border-strong); background: var(--ro
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  cursor: pointer;
+  transition: background 0.12s ease;
 }
 
 .dash-cal-cell:nth-child(7n) { border-right: none; }
-.dash-cal-cell:hover { background: var(--row-hover); }
-.dash-cal-cell.is-outside { background: var(--bg); }
-.dash-cal-cell.is-outside .dash-cal-date { color: var(--empty-display); }
 
-.dash-cal-cell.is-selected {
-  background: var(--accent-light);
-  box-shadow: inset 0 0 0 2px var(--accent);
+/* Only days with events react to hover / selection. */
+.dash-cal-cell.has-events { cursor: pointer; }
+.dash-cal-cell.has-events:hover { background: var(--accent-light); }
+
+.dash-cal-cell.is-selected,
+.dash-cal-cell.is-selected.has-events:hover {
+  background: var(--accent-heavy);
 }
+
+/* A crisp accent outline reads cleaner than a full inset ring. */
+.dash-cal-cell.is-selected::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1.5px solid var(--accent);
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+/* A new month gets a heavier top edge to break up the continuous scroll. */
+.dash-cal-cell.is-month-start { border-top: 2px solid var(--border-strong); }
 
 .dash-cal-date {
   align-self: flex-start;
   font-size: 11px;
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--qty-total-fg);
   padding: 1px 5px;
-  border-radius: 9px;
+  border-radius: 11px;
   font-variant-numeric: tabular-nums;
 }
 
+.dash-cal-cell.is-month-start .dash-cal-date {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.dash-cal-cell.is-today {
+  background: var(--accent-light);
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
 .dash-cal-cell.is-today .dash-cal-date {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
   background: var(--accent);
   color: #fff;
+  font-size: 11.5px;
+  font-weight: 700;
 }
 
 .dash-event {
@@ -9407,7 +9479,7 @@ span.dash-event { cursor: pointer; /* clicking selects the day */ }
 .dash-event--so-major { background: #3f51b5; }
 .dash-event--so-private { background: #8e24aa; }
 .dash-event--so-specialty { background: #7986cb; }
-.dash-event--shipment { background: #d3402e; }
+.dash-event--shipment { background: #ef6c00; }
 .dash-event--asn { background: #d3402e; }
 
 .dash-event.is-done {
@@ -9584,4 +9656,30 @@ span.dash-event { cursor: pointer; /* clicking selects the day */ }
 .dash-so-summary .dash-dot {
   width: 7px;
   height: 7px;
+}
+
+/* Light, unobtrusive scrollbars for the dashboard scroll areas. */
+.dash-scroll,
+.dashboard-panel-body {
+  scrollbar-width: thin;
+  scrollbar-color: #d4d9df transparent;
+}
+.dash-scroll::-webkit-scrollbar,
+.dashboard-panel-body::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+.dash-scroll::-webkit-scrollbar-track,
+.dashboard-panel-body::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+.dash-scroll::-webkit-scrollbar-thumb,
+.dashboard-panel-body::-webkit-scrollbar-thumb {
+  background: #e5e7eb;
+  border-radius: 8px;
+  border: 3px solid var(--surface);
+}
+.dash-scroll::-webkit-scrollbar-thumb:hover,
+.dashboard-panel-body::-webkit-scrollbar-thumb:hover {
+  background: #cbd0d6;
 }

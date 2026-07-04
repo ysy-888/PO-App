@@ -1001,7 +1001,6 @@ function initEditTable() {
 
   document.getElementById("editTableSelectAll")?.addEventListener("click", () => setEditTableDraftSelectAll(true));
   document.getElementById("editTableClearAll")?.addEventListener("click", () => setEditTableDraftSelectAll(false));
-  document.getElementById("editTableSaveDefault")?.addEventListener("click", saveDefaultColumnVisibility);
-  document.getElementById("editTableResetDefault")?.addEventListener("click", resetEditTableToDefault);
-  // OK/Cancel are dispatched centrally in settings.js (supports all table targets).
+  // OK/Cancel and the shared Save/Reset-default buttons are dispatched centrally
+  // in settings.js so they work for all three table targets.
 }

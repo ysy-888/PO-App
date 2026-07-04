@@ -9,8 +9,15 @@
  *   ASNs       — open (not yet picked up) ASN requests by ASN Date
  */
 
-let dashCalCursor = null; // { year, month } — null = current month
+let dashCalCursor = null; // { year, month } — month the arrows/title target
 let dashSelectedYmd = ""; // day selected on the calendar; drives the day pane
+let dashCalScrollEl = null; // the continuous-scroll viewport
+let dashCalMonthAnchors = {}; // "year-month" → first cell of that month
+let dashCalScrollRaf = 0; // rAF handle for throttling scroll → title updates
+
+/** Months rendered before / after the cursor month in the continuous view. */
+const DASH_CAL_MONTHS_BEFORE = 3;
+const DASH_CAL_MONTHS_AFTER = 12;
 
 /** Max event chips shown per calendar day; the rest roll up into "+N more". */
 const DASH_CAL_MAX_EVENTS = 3;
@@ -156,31 +163,180 @@ function getDashCalCursor() {
   return dashCalCursor;
 }
 
-function stepDashMonth(delta) {
-  const { year, month } = getDashCalCursor();
-  const next = new Date(year, month + delta, 1);
-  dashCalCursor = { year: next.getFullYear(), month: next.getMonth() };
-  renderDashCalendar();
-}
-
-function renderDashCalendar() {
-  const grid = document.getElementById("dashCalGrid");
-  if (!grid) return;
-
-  const { year, month } = getDashCalCursor();
+function setDashCalTitle(year, month) {
   const title = document.getElementById("dashCalTitle");
   if (title) {
     title.textContent = new Date(year, month, 1)
       .toLocaleDateString(undefined, { month: "long", year: "numeric" });
   }
+}
+
+/** Arrows: retarget a month and glide to it; rebuild if it's outside the range. */
+function stepDashMonth(delta) {
+  const { year, month } = getDashCalCursor();
+  const next = new Date(year, month + delta, 1);
+  dashCalCursor = { year: next.getFullYear(), month: next.getMonth() };
+  setDashCalTitle(dashCalCursor.year, dashCalCursor.month);
+  if (!scrollDashCalToMonth(dashCalCursor.year, dashCalCursor.month)) {
+    renderDashCalendar();
+  }
+}
+
+function scrollDashCalToMonth(year, month, { instant = false } = {}) {
+  const scrollEl = dashCalScrollEl;
+  const anchor = dashCalMonthAnchors[`${year}-${month}`];
+  if (!scrollEl || !anchor) return false;
+  const headH = scrollEl.querySelector(".dash-cal-head")?.offsetHeight || 0;
+  scrollEl.scrollTo({
+    top: Math.max(0, anchor.offsetTop - headH),
+    behavior: instant ? "auto" : "smooth",
+  });
+  return true;
+}
+
+/** As the user scrolls, sync the title/cursor to the month at the top edge. */
+function onDashCalScroll() {
+  if (dashCalScrollRaf) return;
+  dashCalScrollRaf = requestAnimationFrame(() => {
+    dashCalScrollRaf = 0;
+    const scrollEl = dashCalScrollEl;
+    if (!scrollEl) return;
+    const headH = scrollEl.querySelector(".dash-cal-head")?.offsetHeight || 0;
+    const edge = scrollEl.scrollTop + headH + 4;
+    let current = null;
+    for (const [key, el] of Object.entries(dashCalMonthAnchors)) {
+      if (el.offsetTop <= edge) current = key;
+      else break;
+    }
+    if (!current) return;
+    const [year, month] = current.split("-").map(Number);
+    dashCalCursor = { year, month };
+    setDashCalTitle(year, month);
+  });
+}
+
+/** Build one day cell (events, chips, selection, click) for the grid. */
+function buildDashCalCell(date, byDate, todayYmd) {
+  const ymd = formatDateToYmd(date);
+  const cell = document.createElement("div");
+  cell.className = "dash-cal-cell";
+  cell.dataset.ymd = ymd;
+  if (ymd === todayYmd) cell.classList.add("is-today");
+  if (ymd === dashSelectedYmd) cell.classList.add("is-selected");
+
+  const num = document.createElement("span");
+  num.className = "dash-cal-date";
+  // The 1st of a month is labelled (e.g. "Jul 1") to orient continuous scroll.
+  if (date.getDate() === 1) {
+    cell.classList.add("is-month-start");
+    num.textContent = `${date.toLocaleDateString(undefined, { month: "short" })} 1`;
+    dashCalMonthAnchors[`${date.getFullYear()}-${date.getMonth()}`] = cell;
+  } else {
+    num.textContent = String(date.getDate());
+  }
+  cell.appendChild(num);
+
+  const dayEvents = byDate.get(ymd) || [];
+  // SOs collapse into per-type summary lines (details live in the day pane);
+  // shipments/ASNs keep full clickable chips.
+  const soEvents = dayEvents.filter(ev => ev.kind === 0);
+  const chipEvents = dayEvents.filter(ev => ev.kind !== 0);
+
+  if (soEvents.length === 1) {
+    // A lone SO shows its full info, as a display-only chip.
+    const ev = soEvents[0];
+    const chip = document.createElement("span");
+    chip.className = `dash-event ${ev.cls}${ev.done ? " is-done" : ""}`;
+    chip.title = ev.meta ? `${ev.title} · ${ev.meta}` : ev.title;
+    const label = document.createElement("span");
+    label.className = "dash-event-title";
+    label.textContent = ev.title;
+    chip.appendChild(label);
+    if (ev.meta) {
+      const meta = document.createElement("span");
+      meta.className = "dash-event-meta";
+      meta.textContent = ev.meta;
+      chip.appendChild(meta);
+    }
+    cell.appendChild(chip);
+  } else if (soEvents.length > 1) {
+    // One bar per order type: "4 Major Orders", "2 Specialty Orders"…
+    DASH_SO_SUMMARY_ORDER.forEach(cls => {
+      const count = soEvents.filter(ev => ev.cls === cls).length;
+      if (count === 0) return;
+      const bar = document.createElement("span");
+      bar.className = "dash-so-summary";
+      bar.title = "Click day for details";
+      const dot = document.createElement("i");
+      dot.className = `dash-dot ${cls.replace("dash-event--", "dash-dot--")}`;
+      bar.appendChild(dot);
+      bar.append(`${count} ${DASH_SO_TYPE_LABELS[cls]} Order${count === 1 ? "" : "s"}`);
+      cell.appendChild(bar);
+    });
+  }
+
+  const collapsed = chipEvents.length > DASH_CAL_MAX_EVENTS + 1;
+  chipEvents.forEach((ev, index) => {
+    if (collapsed && index >= DASH_CAL_MAX_EVENTS) return;
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = `dash-event ${ev.cls}${ev.done ? " is-done" : ""}`;
+    chip.title = ev.meta ? `${ev.title} · ${ev.meta}` : ev.title;
+
+    const label = document.createElement("span");
+    label.className = "dash-event-title";
+    label.textContent = ev.title;
+    chip.appendChild(label);
+
+    if (ev.meta) {
+      const meta = document.createElement("span");
+      meta.className = "dash-event-meta";
+      meta.textContent = ev.meta;
+      chip.appendChild(meta);
+    }
+
+    chip.addEventListener("click", e => {
+      e.stopPropagation();
+      ev.open();
+    });
+    cell.appendChild(chip);
+  });
+
+  if (collapsed) {
+    const more = document.createElement("span");
+    more.className = "dash-cal-more";
+    more.textContent = `+${chipEvents.length - DASH_CAL_MAX_EVENTS} more`;
+    cell.appendChild(more);
+  }
+
+  // Only days with events are interactive (hover/select/open the day pane).
+  if (dayEvents.length > 0) {
+    cell.classList.add("has-events");
+    cell.addEventListener("click", () => selectDashDay(ymd));
+  }
+
+  return cell;
+}
+
+/**
+ * Continuous month grid: renders a range of weeks around the cursor month and
+ * lets the user scroll seamlessly. The arrows/Today jump between months.
+ */
+function renderDashCalendar() {
+  const grid = document.getElementById("dashCalGrid");
+  if (!grid) return;
+
+  const { year, month } = getDashCalCursor();
+  setDashCalTitle(year, month);
 
   const byDate = buildDashEventsByDate();
   const todayYmd = dashTodayYmd();
-  const firstDay = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const weeks = Math.ceil((firstDay + daysInMonth) / 7);
+  dashCalMonthAnchors = {};
 
   grid.innerHTML = "";
+
+  const scroll = document.createElement("div");
+  scroll.className = "dash-cal-scroll dash-scroll";
 
   const head = document.createElement("div");
   head.className = "dash-cal-head";
@@ -190,117 +346,50 @@ function renderDashCalendar() {
     cell.textContent = day;
     head.appendChild(cell);
   });
-  grid.appendChild(head);
+  scroll.appendChild(head);
 
   const body = document.createElement("div");
   body.className = "dash-cal-body";
 
-  for (let i = 0; i < weeks * 7; i++) {
-    const date = new Date(year, month, 1 - firstDay + i);
-    const ymd = formatDateToYmd(date);
-    const cell = document.createElement("div");
-    cell.className = "dash-cal-cell";
-    if (date.getMonth() !== month) cell.classList.add("is-outside");
-    if (ymd === todayYmd) cell.classList.add("is-today");
-    if (ymd === dashSelectedYmd) cell.classList.add("is-selected");
+  // Range spans a few months back to a year forward; start/end snap to whole weeks.
+  const start = new Date(year, month - DASH_CAL_MONTHS_BEFORE, 1);
+  start.setDate(start.getDate() - start.getDay());
+  const end = new Date(year, month + DASH_CAL_MONTHS_AFTER + 1, 0);
+  end.setDate(end.getDate() + (6 - end.getDay()));
 
-    const num = document.createElement("span");
-    num.className = "dash-cal-date";
-    num.textContent = String(date.getDate());
-    cell.appendChild(num);
-
-    const dayEvents = byDate.get(ymd) || [];
-    // SOs collapse into one compact dot+count line (details live in the day
-    // pane); shipments/ASNs keep full clickable chips.
-    const soEvents = dayEvents.filter(ev => ev.kind === 0);
-    const chipEvents = dayEvents.filter(ev => ev.kind !== 0);
-
-    if (soEvents.length === 1) {
-      // A lone SO shows its full info, as a display-only chip.
-      const ev = soEvents[0];
-      const chip = document.createElement("span");
-      chip.className = `dash-event ${ev.cls}${ev.done ? " is-done" : ""}`;
-      chip.title = ev.meta ? `${ev.title} · ${ev.meta}` : ev.title;
-      const label = document.createElement("span");
-      label.className = "dash-event-title";
-      label.textContent = ev.title;
-      chip.appendChild(label);
-      if (ev.meta) {
-        const meta = document.createElement("span");
-        meta.className = "dash-event-meta";
-        meta.textContent = ev.meta;
-        chip.appendChild(meta);
-      }
-      cell.appendChild(chip);
-    } else if (soEvents.length > 1) {
-      // One bar per order type: "4 Major Orders", "2 Specialty Orders"…
-      DASH_SO_SUMMARY_ORDER.forEach(cls => {
-        const count = soEvents.filter(ev => ev.cls === cls).length;
-        if (count === 0) return;
-        const bar = document.createElement("span");
-        bar.className = "dash-so-summary";
-        bar.title = "Click day for details";
-        const dot = document.createElement("i");
-        dot.className = `dash-dot ${cls.replace("dash-event--", "dash-dot--")}`;
-        bar.appendChild(dot);
-        bar.append(`${count} ${DASH_SO_TYPE_LABELS[cls]} Order${count === 1 ? "" : "s"}`);
-        cell.appendChild(bar);
-      });
-    }
-
-    const collapsed = chipEvents.length > DASH_CAL_MAX_EVENTS + 1;
-    chipEvents.forEach((ev, index) => {
-      if (collapsed && index >= DASH_CAL_MAX_EVENTS) return;
-      const chip = document.createElement("button");
-      chip.type = "button";
-      chip.className = `dash-event ${ev.cls}${ev.done ? " is-done" : ""}`;
-      chip.title = ev.meta ? `${ev.title} · ${ev.meta}` : ev.title;
-
-      const label = document.createElement("span");
-      label.className = "dash-event-title";
-      label.textContent = ev.title;
-      chip.appendChild(label);
-
-      if (ev.meta) {
-        const meta = document.createElement("span");
-        meta.className = "dash-event-meta";
-        meta.textContent = ev.meta;
-        chip.appendChild(meta);
-      }
-
-      chip.addEventListener("click", e => {
-        e.stopPropagation();
-        ev.open();
-      });
-      cell.appendChild(chip);
-    });
-
-    if (collapsed) {
-      // Plain indicator — clicking it (or anywhere in the cell) opens the day pane.
-      const more = document.createElement("span");
-      more.className = "dash-cal-more";
-      more.textContent = `+${chipEvents.length - DASH_CAL_MAX_EVENTS} more`;
-      cell.appendChild(more);
-    }
-
-    cell.addEventListener("click", () => selectDashDay(ymd));
-    body.appendChild(cell);
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    body.appendChild(buildDashCalCell(new Date(d), byDate, todayYmd));
   }
 
-  grid.appendChild(body);
+  scroll.appendChild(body);
+  grid.appendChild(scroll);
+
+  dashCalScrollEl = scroll;
+  scroll.addEventListener("scroll", onDashCalScroll, { passive: true });
+  scrollDashCalToMonth(year, month, { instant: true });
 }
 
 // ── Day pane (opens beside the calendar when a day is selected) ──
 
+/** Toggle in place so the scroll position is preserved (no full re-render). */
+function applyDashDaySelection() {
+  document.querySelectorAll("#dashCalGrid .dash-cal-cell.is-selected")
+    .forEach(cell => cell.classList.remove("is-selected"));
+  if (dashSelectedYmd) {
+    document.querySelector(`#dashCalGrid .dash-cal-cell[data-ymd="${dashSelectedYmd}"]`)
+      ?.classList.add("is-selected");
+  }
+}
+
 function selectDashDay(ymd) {
   dashSelectedYmd = ymd === dashSelectedYmd ? "" : ymd;
-  renderDashCalendar();
+  applyDashDaySelection();
   renderDashDayPane();
 }
 
 function closeDashDayPane() {
   dashSelectedYmd = "";
-  renderDashCalendar();
+  applyDashDaySelection();
   renderDashDayPane();
 }
 
@@ -668,8 +757,12 @@ function initDashboard() {
   document.getElementById("dashCalPrev")?.addEventListener("click", () => stepDashMonth(-1));
   document.getElementById("dashCalNext")?.addEventListener("click", () => stepDashMonth(1));
   document.getElementById("dashCalToday")?.addEventListener("click", () => {
-    dashCalCursor = null;
-    renderDashCalendar();
+    const now = new Date();
+    dashCalCursor = { year: now.getFullYear(), month: now.getMonth() };
+    setDashCalTitle(dashCalCursor.year, dashCalCursor.month);
+    if (!scrollDashCalToMonth(dashCalCursor.year, dashCalCursor.month)) {
+      renderDashCalendar();
+    }
   });
   document.getElementById("dashDayPaneClose")?.addEventListener("click", closeDashDayPane);
 }
