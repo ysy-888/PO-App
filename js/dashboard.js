@@ -35,6 +35,36 @@ const DASH_SO_TYPE_LABELS = {
   "dash-event--so-specialty": "Specialty",
 };
 
+/** Event kinds — also the sort order: shipments and ASNs come before SOs. */
+const DASH_EVENT_KIND_SHIPMENT = 0;
+const DASH_EVENT_KIND_ASN = 1;
+const DASH_EVENT_KIND_SO = 2;
+
+/** Small inline icons shown on shipment/ASN calendar chips. */
+const DASH_EVENT_ICON_SVGS = {
+  "dash-event--shipment": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 3h15v13H1z"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>',
+  "dash-event--asn": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>',
+};
+
+function createDashEventIcon(cls) {
+  const svg = DASH_EVENT_ICON_SVGS[cls];
+  if (!svg) return null;
+  const icon = document.createElement("i");
+  icon.className = "dash-event-icon";
+  icon.innerHTML = svg;
+  return icon;
+}
+
+/** Event-type filter opened from the Filter button in the calendar header. */
+const DASH_CAL_FILTER_OPTIONS = [
+  { cls: "dash-event--shipment", label: "Shipments" },
+  { cls: "dash-event--asn", label: "ASNs" },
+  { cls: "dash-event--so-major", label: "Major" },
+  { cls: "dash-event--so-private", label: "Private Label" },
+  { cls: "dash-event--so-specialty", label: "Specialty" },
+];
+let dashCalFilterSelection = new Set(DASH_CAL_FILTER_OPTIONS.map(o => o.cls));
+
 function dashTodayYmd() {
   return formatDateToYmd(new Date());
 }
@@ -100,10 +130,15 @@ function buildDashEventsByDate() {
     const soNum = String(order?.["SO #"] ?? "").trim();
     const date = normalizeToYmd(order?.["CXL Date"]);
     if (!soNum || !date) return;
+    // Major / Private Label orders show the buyer's PO alongside the SO #.
+    const type = String(order?.["Order Type"] ?? "").trim().toUpperCase();
+    const customerPo = (type === "MAJOR" || type === "PRIVATE LABEL")
+      ? String(order?.["Customer PO #"] ?? "").trim()
+      : "";
     events.push({
-      kind: 0,
+      kind: DASH_EVENT_KIND_SO,
       dateYmd: date,
-      title: `SO ${soNum}`,
+      title: customerPo ? `SO ${soNum} (${customerPo})` : `SO ${soNum}`,
       meta: String(order?.["Customer"] ?? "").trim(),
       cls: dashSoEventClass(order),
       done: isDashClosedSalesOrder(order),
@@ -116,7 +151,7 @@ function buildDashEventsByDate() {
     const date = normalizeToYmd(shipment?.["IHD"]);
     if (!id || !date) return;
     events.push({
-      kind: 1,
+      kind: DASH_EVENT_KIND_SHIPMENT,
       dateYmd: date,
       title: id,
       meta: String(shipment?.["Ship Method"] ?? "").trim(),
@@ -131,7 +166,7 @@ function buildDashEventsByDate() {
     const date = normalizeToYmd(request?.[ASN_DATE_FIELD]);
     if (!id || !date) return;
     events.push({
-      kind: 2,
+      kind: DASH_EVENT_KIND_ASN,
       dateYmd: date,
       title: id,
       meta: String(request?.["Buyer"] ?? "").trim(),
@@ -147,10 +182,90 @@ function buildDashEventsByDate() {
 
   const byDate = new Map();
   events.forEach(ev => {
+    if (!dashCalFilterSelection.has(ev.cls)) return;
     if (!byDate.has(ev.dateYmd)) byDate.set(ev.dateYmd, []);
     byDate.get(ev.dateYmd).push(ev);
   });
   return byDate;
+}
+
+// ── Calendar event-type filter ───────────────────────────────
+
+function isDashCalFilterActive() {
+  return dashCalFilterSelection.size < DASH_CAL_FILTER_OPTIONS.length;
+}
+
+function updateDashCalFilterButton() {
+  document.getElementById("dashCalFilterBtn")
+    ?.classList.toggle("is-filtered", isDashCalFilterActive());
+}
+
+function renderDashCalFilterList() {
+  const list = document.getElementById("dashCalFilterList");
+  if (!list) return;
+  list.innerHTML = "";
+  DASH_CAL_FILTER_OPTIONS.forEach(({ cls, label }) => {
+    const option = document.createElement("label");
+    option.className = "column-filter-option";
+
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = dashCalFilterSelection.has(cls);
+    cb.addEventListener("change", () => {
+      if (cb.checked) dashCalFilterSelection.add(cls);
+      else dashCalFilterSelection.delete(cls);
+      onDashCalFilterChange();
+    });
+
+    const dot = document.createElement("i");
+    dot.className = `dash-dot ${cls.replace("dash-event--", "dash-dot--")}`;
+    const span = document.createElement("span");
+    span.textContent = label;
+
+    option.appendChild(cb);
+    option.appendChild(dot);
+    option.appendChild(span);
+    list.appendChild(option);
+  });
+}
+
+function onDashCalFilterChange() {
+  updateDashCalFilterButton();
+  renderDashCalendar();
+  renderDashDayPane();
+}
+
+function setDashCalFilterAll(selectAll) {
+  dashCalFilterSelection = new Set(
+    selectAll ? DASH_CAL_FILTER_OPTIONS.map(o => o.cls) : []
+  );
+  renderDashCalFilterList();
+  onDashCalFilterChange();
+}
+
+function toggleDashCalFilterPopover() {
+  const pop = document.getElementById("dashCalFilterPopover");
+  const btn = document.getElementById("dashCalFilterBtn");
+  if (!pop || !btn) return;
+  if (!pop.hidden) {
+    closeDashCalFilterPopover();
+    return;
+  }
+  renderDashCalFilterList();
+  pop.hidden = false;
+  btn.setAttribute("aria-expanded", "true");
+  requestAnimationFrame(() => {
+    const rect = btn.getBoundingClientRect();
+    const maxLeft = window.innerWidth - pop.offsetWidth - 8;
+    pop.style.top = `${rect.bottom + 4}px`;
+    pop.style.left = `${Math.min(Math.max(8, rect.left), maxLeft)}px`;
+  });
+}
+
+function closeDashCalFilterPopover() {
+  const pop = document.getElementById("dashCalFilterPopover");
+  if (pop) pop.hidden = true;
+  document.getElementById("dashCalFilterBtn")?.setAttribute("aria-expanded", "false");
 }
 
 // ── Calendar grid ────────────────────────────────────────────
@@ -238,9 +353,46 @@ function buildDashCalCell(date, byDate, todayYmd) {
 
   const dayEvents = byDate.get(ymd) || [];
   // SOs collapse into per-type summary lines (details live in the day pane);
-  // shipments/ASNs keep full clickable chips.
-  const soEvents = dayEvents.filter(ev => ev.kind === 0);
-  const chipEvents = dayEvents.filter(ev => ev.kind !== 0);
+  // shipments/ASNs keep full clickable chips and render above the SOs.
+  const soEvents = dayEvents.filter(ev => ev.kind === DASH_EVENT_KIND_SO);
+  const chipEvents = dayEvents.filter(ev => ev.kind !== DASH_EVENT_KIND_SO);
+
+  const collapsed = chipEvents.length > DASH_CAL_MAX_EVENTS + 1;
+  chipEvents.forEach((ev, index) => {
+    if (collapsed && index >= DASH_CAL_MAX_EVENTS) return;
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = `dash-event ${ev.cls}${ev.done ? " is-done" : ""}`;
+    chip.title = ev.meta ? `${ev.title} · ${ev.meta}` : ev.title;
+
+    const icon = createDashEventIcon(ev.cls);
+    if (icon) chip.appendChild(icon);
+
+    const label = document.createElement("span");
+    label.className = "dash-event-title";
+    label.textContent = ev.title;
+    chip.appendChild(label);
+
+    if (ev.meta) {
+      const meta = document.createElement("span");
+      meta.className = "dash-event-meta";
+      meta.textContent = ev.meta;
+      chip.appendChild(meta);
+    }
+
+    chip.addEventListener("click", e => {
+      e.stopPropagation();
+      ev.open();
+    });
+    cell.appendChild(chip);
+  });
+
+  if (collapsed) {
+    const more = document.createElement("span");
+    more.className = "dash-cal-more";
+    more.textContent = `+${chipEvents.length - DASH_CAL_MAX_EVENTS} more`;
+    cell.appendChild(more);
+  }
 
   if (soEvents.length === 1) {
     // A lone SO shows its full info, as a display-only chip.
@@ -273,40 +425,6 @@ function buildDashCalCell(date, byDate, todayYmd) {
       bar.append(`${count} ${DASH_SO_TYPE_LABELS[cls]} Order${count === 1 ? "" : "s"}`);
       cell.appendChild(bar);
     });
-  }
-
-  const collapsed = chipEvents.length > DASH_CAL_MAX_EVENTS + 1;
-  chipEvents.forEach((ev, index) => {
-    if (collapsed && index >= DASH_CAL_MAX_EVENTS) return;
-    const chip = document.createElement("button");
-    chip.type = "button";
-    chip.className = `dash-event ${ev.cls}${ev.done ? " is-done" : ""}`;
-    chip.title = ev.meta ? `${ev.title} · ${ev.meta}` : ev.title;
-
-    const label = document.createElement("span");
-    label.className = "dash-event-title";
-    label.textContent = ev.title;
-    chip.appendChild(label);
-
-    if (ev.meta) {
-      const meta = document.createElement("span");
-      meta.className = "dash-event-meta";
-      meta.textContent = ev.meta;
-      chip.appendChild(meta);
-    }
-
-    chip.addEventListener("click", e => {
-      e.stopPropagation();
-      ev.open();
-    });
-    cell.appendChild(chip);
-  });
-
-  if (collapsed) {
-    const more = document.createElement("span");
-    more.className = "dash-cal-more";
-    more.textContent = `+${chipEvents.length - DASH_CAL_MAX_EVENTS} more`;
-    cell.appendChild(more);
   }
 
   // Only days with events are interactive (hover/select/open the day pane).
@@ -781,6 +899,22 @@ function initDashboard() {
     }
   });
   document.getElementById("dashDayPaneClose")?.addEventListener("click", closeDashDayPane);
+
+  document.getElementById("dashCalFilterBtn")?.addEventListener("click", e => {
+    e.stopPropagation();
+    toggleDashCalFilterPopover();
+  });
+  document.getElementById("dashCalFilterSelectAll")?.addEventListener("click", () => setDashCalFilterAll(true));
+  document.getElementById("dashCalFilterClearAll")?.addEventListener("click", () => setDashCalFilterAll(false));
+  document.addEventListener("click", e => {
+    const pop = document.getElementById("dashCalFilterPopover");
+    if (!pop || pop.hidden) return;
+    if (pop.contains(e.target) || e.target.closest("#dashCalFilterBtn")) return;
+    closeDashCalFilterPopover();
+  });
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape") closeDashCalFilterPopover();
+  });
 
   // Clicking anywhere on the dashboard that isn't a date (or the day pane
   // itself) clears the selection and closes the overlay.

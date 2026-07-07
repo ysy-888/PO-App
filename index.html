@@ -240,12 +240,11 @@
   <div class="dashboard-main">
     <section class="dashboard-panel dashboard-calendar-panel">
       <div class="dashboard-panel-header dashboard-cal-header">
-        <div class="dashboard-cal-legend" aria-hidden="true">
-          <span class="dash-legend-item"><i class="dash-dot dash-dot--so-major"></i>Major</span>
-          <span class="dash-legend-item"><i class="dash-dot dash-dot--so-private"></i>Private Label</span>
-          <span class="dash-legend-item"><i class="dash-dot dash-dot--so-specialty"></i>Specialty</span>
-          <span class="dash-legend-item"><i class="dash-dot dash-dot--shipment"></i>Shipments</span>
-          <span class="dash-legend-item"><i class="dash-dot dash-dot--asn"></i>ASNs</span>
+        <div class="dashboard-cal-legend">
+          <button type="button" class="btn" id="dashCalFilterBtn" aria-haspopup="true" aria-expanded="false">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/></svg>
+            Filter
+          </button>
         </div>
         <span class="dashboard-cal-title" id="dashCalTitle">—</span>
         <div class="dashboard-cal-nav">
@@ -957,6 +956,15 @@
     </div>
   </div>
 </footer>
+
+<div id="dashCalFilterPopover" class="column-filter-popover dash-cal-filter-popover" hidden>
+  <div class="column-filter-toolbar">
+    <button type="button" class="column-filter-link" id="dashCalFilterSelectAll">Select all</button>
+    <span class="column-filter-sep">|</span>
+    <button type="button" class="column-filter-link" id="dashCalFilterClearAll">Clear all</button>
+  </div>
+  <div class="column-filter-list" id="dashCalFilterList"></div>
+</div>
 
 <div id="columnFilterPopover" class="column-filter-popover" hidden>
   <div class="column-filter-toolbar" id="columnFilterToolbar">

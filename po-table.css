@@ -9368,15 +9368,19 @@ button.dash-kpi:hover { border-color: var(--border-strong); background: var(--ro
   flex-shrink: 0;
 }
 
-.dash-legend-item {
+#dashCalFilterBtn {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--text-muted);
-  white-space: nowrap;
 }
+
+#dashCalFilterBtn.is-filtered {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.dash-cal-filter-popover { min-width: 170px; }
+.dash-cal-filter-popover .column-filter-list { margin-bottom: 0; }
 
 .dash-dot {
   width: 8px;
@@ -9388,7 +9392,7 @@ button.dash-kpi:hover { border-color: var(--border-strong); background: var(--ro
 .dash-dot--so-major { background: #3f51b5; }
 .dash-dot--so-private { background: #8e24aa; }
 .dash-dot--so-specialty { background: #7986cb; }
-.dash-dot--shipment { background: #ef6c00; }
+.dash-dot--shipment { background: #f6bf26; }
 
 .dash-cal-head {
   position: sticky;
@@ -9515,12 +9519,24 @@ span.dash-event { cursor: pointer; /* clicking selects the day */ }
 .dash-event--so-major { background: #3f51b5; }
 .dash-event--so-private { background: #8e24aa; }
 .dash-event--so-specialty { background: #7986cb; }
-.dash-event--shipment { background: #ef6c00; }
+/* Yellow needs dark text — every other chip stays white-on-color. */
+.dash-event--shipment { background: #f6bf26; color: #4a3b00; }
 .dash-event--asn { background: #d3402e; }
 
 .dash-event.is-done {
   opacity: 0.45;
   text-decoration: line-through;
+}
+
+.dash-event-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.dash-event-icon svg {
+  width: 10px;
+  height: 10px;
+  display: block;
 }
 
 .dash-event-title {
@@ -9665,7 +9681,6 @@ span.dash-event { cursor: pointer; /* clicking selects the day */ }
     width: min(320px, 88vw);
     z-index: 200;
   }
-  .dashboard-cal-legend { display: none; }
 }
 
 .dash-cal-more {

@@ -512,7 +512,11 @@ function renderAsnRequestModal(poNumbers, { asnDate = formatDateToYmd(new Date()
       ? (request[ASN_REQ_SUBMIT_DATE_FIELD] ?? submitDate)
       : submitDate,
   });
-  if (submitBtn) submitBtn.hidden = isView;
+  if (submitBtn) {
+    submitBtn.hidden = isView;
+    // Existing ASNs are saved in place; only new ones are created.
+    if (submitBtn.lastChild) submitBtn.lastChild.textContent = isExisting ? "Save" : "Create";
+  }
 
   asnRequestPoNumbers = poNumbers.slice();
   const pos = getAsnRequestRows();
@@ -557,18 +561,19 @@ function renderAsnRequestModal(poNumbers, { asnDate = formatDateToYmd(new Date()
     });
   }
 
-  // Build send checkboxes (only on new/edit, not on view)
-  const sendBuyerRow = !isView
+  // Build send checkboxes (only on create — editing an existing ASN saves
+  // fields without sending emails; resend uses the dedicated buttons).
+  const sendBuyerRow = !isExisting
     ? createAsnSendCheckboxMetaRow("Send to Buyer", "asnSendToBuyerCb", asnRequestSendBuyer)
     : null;
-  const sendCarrierRow = !isView
+  const sendCarrierRow = !isExisting
     ? createAsnSendCheckboxMetaRow("Send to Carrier", "asnSendToCarrierCb", asnRequestSendCarrier)
     : null;
 
-  if (!isView && sendBuyerRow) {
+  if (sendBuyerRow) {
     sendBuyerRow.checkbox.addEventListener("change", () => { asnRequestSendBuyer = sendBuyerRow.checkbox.checked; });
   }
-  if (!isView && sendCarrierRow) {
+  if (sendCarrierRow) {
     sendCarrierRow.checkbox.addEventListener("change", () => { asnRequestSendCarrier = sendCarrierRow.checkbox.checked; });
   }
 
@@ -948,14 +953,15 @@ function updateAsnRequestActionButtons() {
       ? "Reprint Labels"
       : "Carton Label";
   }
+  // Resend buttons apply to any existing ASN (sent or not), not just view mode.
   const resendEmailBtn = document.getElementById("asnResendEmailBtn");
   if (resendEmailBtn) {
-    resendEmailBtn.hidden = !isView || !asnRequestModalRow;
+    resendEmailBtn.hidden = !asnRequestModalRow;
     resendEmailBtn.disabled = asnRequestOpInProgress || isAppSaving();
   }
   const resendCarrierBtn = document.getElementById("asnResendCarrierBtn");
   if (resendCarrierBtn) {
-    resendCarrierBtn.hidden = !isView || !asnRequestModalRow || !isAsnRequestEligibleForPickup(asnRequestModalRow);
+    resendCarrierBtn.hidden = !asnRequestModalRow || !isAsnRequestEligibleForPickup(asnRequestModalRow);
     resendCarrierBtn.disabled = asnRequestOpInProgress || isAppSaving();
   }
 
@@ -1091,12 +1097,45 @@ function closeAsnRequestModal() {
   updateToolbarRequestButtons();
 }
 
+async function saveAsnRequestEdits(savedRow, data) {
+  const requestId = getAsnRequestRecordId(savedRow);
+  closeAsnRequestModal();
+  asnRequestOpInProgress = true;
+  showIndicator(`Saving${ELLIPSIS}`, "");
+
+  try {
+    const json = await postApi("/api/requests/asn/update", { asnRequestId: requestId, request: data });
+    if (!json.success) throw new Error(json.error || "Update failed");
+
+    const request = allAsnRequests.find(r => getAsnRequestRecordId(r) === requestId);
+    const merged = json.request || { ...savedRow, ...data };
+    if (request) Object.assign(request, merged);
+
+    // Mirror the saved date to every linked PO row.
+    getRequestPoNumbers(merged, ASN_REQUEST_ID_FIELD).forEach(poNumber => {
+      const row = allRows.find(r => String(r["PO #"]) === String(poNumber));
+      if (row) row[ASN_DATE_FIELD] = merged[ASN_DATE_FIELD] ?? "";
+    });
+
+    applyAsnRequestFilters();
+    applyFilters();
+    showIndicator(`ASN request saved ${CHECK_MARK}`, "success");
+  } catch (err) {
+    showIndicator("Save failed: " + err.message, "error");
+  } finally {
+    asnRequestOpInProgress = false;
+  }
+}
+
 async function submitAsnRequest() {
   if (asnRequestOpInProgress || asnRequestPoNumbers.length === 0) return;
   setAsnRequestFooterMessage("");
 
   const form = document.getElementById("asnRequestForm");
   const data = readRequestForm(form);
+
+  const savedRow = asnRequestModalRow;
+  const isEdit = Boolean(getAsnRequestRecordId(savedRow));
 
   // Read checkbox states
   const sendBuyerCb = document.getElementById("asnSendToBuyerCb");
@@ -1110,6 +1149,10 @@ async function submitAsnRequest() {
   }
   if (isEmptyValue(data[ASN_REQ_SUBMIT_DATE_FIELD])) {
     setAsnRequestFooterMessage("Request Date is required");
+    return;
+  }
+  if (isEdit) {
+    await saveAsnRequestEdits(savedRow, data);
     return;
   }
   if (sendBuyer && isEmptyValue(data["Buyer Email"])) {

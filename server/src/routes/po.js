@@ -18,7 +18,6 @@ import {
   sanitizeUpdates,
   pickImportUpdates,
   pickChangedImportUpdates,
-  isPoClosed,
 } from "../importHelpers.js";
 
 const router = Router();
@@ -170,10 +169,6 @@ router.post("/bulk-upsert", requireAuth, async (req, res) => {
     const existing = existingByPo.get(poNumber);
 
     if (existing) {
-      if (isPoClosed(existing.data)) {
-        skipped++;
-        return;
-      }
       const changed = pickChangedImportUpdates(existing.data || {}, updates);
       if (Object.keys(changed).length === 0) return;
 
