@@ -27,6 +27,7 @@ export function buildSalesOrderData(raw) {
     "Order Date": orderDate,
     "Ship Date": shipDate,
     "CXL Date": cxlDate,
+    "CXL Reason": cxlReason,
     Store,
     "N41 Status": n41Status,
     "Order Type": orderType,
@@ -42,6 +43,7 @@ export function buildSalesOrderData(raw) {
     "Order Date": String(orderDate ?? "").trim(),
     "Ship Date": String(shipDate ?? "").trim(),
     "CXL Date": String(cxlDate ?? "").trim(),
+    "CXL Reason": String(cxlReason ?? "").trim(),
     Store: String(Store ?? "").trim(),
     "N41 Status": String(n41Status ?? "").trim(),
     "Order Type": String(orderType ?? "").trim(),
@@ -52,7 +54,7 @@ export function buildSalesOrderData(raw) {
 
 const HEADER_FIELDS = [
   "SO #", "Customer", "Customer PO #", "Division", "Order Date", "Ship Date",
-  "CXL Date", "Store", "N41 Status", "Order Type", "Customer Type",
+  "CXL Date", "CXL Reason", "Store", "N41 Status", "Order Type", "Customer Type",
 ];
 
 /**

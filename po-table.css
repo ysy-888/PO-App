@@ -8884,11 +8884,32 @@ td.has-pending-approval .pending-approval-value {
 
 /* ── Sales Order modal card ─────────────────────────────────── */
 .so-modal-card {
-  max-width: 1100px;
+  max-width: 1280px;
   width: 96vw;
   max-height: 92vh;
   display: flex;
   flex-direction: column;
+}
+
+/* Main content on the left, comments panel on the right. */
+.so-modal-columns {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+}
+.so-modal-main {
+  flex: 1;
+  min-width: 0;
+}
+.so-modal-side {
+  width: 300px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+}
+@media (max-width: 960px) {
+  .so-modal-columns { flex-direction: column; }
+  .so-modal-side { width: 100%; position: static; }
 }
 .so-modal-body {
   flex: 1;
@@ -9014,8 +9035,9 @@ td.has-pending-approval .pending-approval-value {
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
 }
-.so-line-table thead th.so-size-col,
 .so-line-table thead th.so-price-col { text-align: right; }
+.so-line-table thead th.so-size-col,
+.so-line-table thead th.so-total-col { text-align: center; }
 .so-line-table thead th.so-size-col { padding-left: 5px; padding-right: 5px; }
 .so-line-table tbody td {
   padding: 6px 10px;
@@ -9025,6 +9047,7 @@ td.has-pending-approval .pending-approval-value {
 .so-line-table tbody tr:last-child td { border-bottom: none; }
 .so-line-table tbody tr:hover { background: var(--row-hover, #f8fafc); }
 .so-line-table .td-num { text-align: right; }
+.so-line-table .td-qty { text-align: center; }
 .so-line-table .so-size-col {
   width: 34px;
   min-width: 34px;
@@ -9032,17 +9055,29 @@ td.has-pending-approval .pending-approval-value {
   padding-left: 5px;
   padding-right: 5px;
 }
-.so-line-table .so-price-col { min-width: 80px; white-space: nowrap; }
-.so-line-table .so-style-col { font-family: monospace; font-size: 12px; min-width: 90px; }
-.so-line-table .so-desc-col { min-width: 240px; color: var(--text-secondary, #666); font-size: 12px; }
+.so-line-table .so-price-col { min-width: 60px; white-space: nowrap; }
+.so-line-table .so-style-col { font-family: monospace; font-size: 12px; min-width: 70px; }
+.so-line-table .so-desc-col { min-width: 280px; color: var(--text-secondary, #666); font-size: 12px; }
 .so-line-table .so-color-col { min-width: 120px; }
+.so-line-table .so-status-col { width: 64px; min-width: 64px; }
+.so-line-table .so-cxl-reason-col {
+  min-width: 96px;
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+}
 .so-line-table .so-total-col {
-  width: 42px;
-  min-width: 42px;
-  max-width: 50px;
+  min-width: 56px;
   font-weight: 600;
+  white-space: nowrap;
 }
 .so-line-table .so-cell-empty { color: var(--empty-display, #ccc); }
+.so-line-table tfoot .so-line-totals-row td {
+  background: var(--table-header-bg, #f8fafc);
+  border-top: 1px solid var(--border);
+  padding: 7px 10px;
+  font-weight: 700;
+  font-size: 12px;
+}
 
 /* Style order status badge */
 .so-status-badge { font-size: 12px; }
@@ -9167,15 +9202,19 @@ td.has-pending-approval .pending-approval-value {
 
 /* ── Sales order comments (internal team + showroom portal) ── */
 .so-comments-section {
-  padding-top: 12px;
-  margin-top: 12px;
-  border-top: 1px solid var(--border);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface, #fff);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
 }
 .so-comments-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 260px;
+  max-height: 52vh;
+  min-height: 80px;
   overflow-y: auto;
   margin-bottom: 10px;
 }
@@ -9249,6 +9288,14 @@ td.has-pending-approval .pending-approval-value {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, #3b82f6) 15%, transparent);
 }
 .so-comment-post-btn { flex-shrink: 0; }
+
+/* ── Showroom portal (body.portal-mode) ─────────────────────── */
+/* Elevator Disco only: no division buttons, no toolbar dividers. */
+body.portal-mode #salesOrderToolbar .toolbar-filter-cluster > .toolbar-filter-section:first-child,
+body.portal-mode #salesOrderToolbar .toolbar-filter-divider,
+body.portal-mode #soStatusFilters .filter-btn-group-divider {
+  display: none;
+}
 /* ── Dashboard ── */
 button.app-logo-text {
   border: none;

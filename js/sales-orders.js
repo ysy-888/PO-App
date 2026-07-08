@@ -728,7 +728,7 @@ function getSizeLabelsForLine(line) {
   return Array.from({ length: n }, (_, i) => String(i + 1));
 }
 
-function buildSoLineItemsTable(lines) {
+function buildSoLineItemsTable(lines, order = null) {
   if (!lines || lines.length === 0) {
     return "<p class='so-modal-empty'>No style lines.</p>";
   }
@@ -753,23 +753,28 @@ function buildSoLineItemsTable(lines) {
     sizeHeaders = Array.from({ length: maxSizeQty }, (_, i) => String(i + 1));
   }
 
+  const orderCxlReason = String(order?.["CXL Reason"] ?? "").trim();
+
   let html = `
 <div class="so-line-table-wrap">
 <table class="so-line-table">
 <thead>
 <tr>
-  <th>Style #</th>
+  <th class="so-style-col">Style #</th>
   <th class="so-desc-col">Description</th>
   <th class="so-color-col">Color</th>
-  <th>Status</th>
+  <th class="so-status-col">Status</th>
+  <th class="so-cxl-reason-col">CXL Reason</th>
   ${sizeHeaders.map(h => `<th class="so-size-col">${escSo(h)}</th>`).join("")}
-  <th class="so-size-col">Total</th>
+  <th class="so-total-col">Total</th>
   <th class="so-price-col">Price</th>
   <th class="so-price-col">Ext Price</th>
 </tr>
 </thead>
 <tbody>`;
 
+  let sumUnits = 0;
+  let sumExtPrice = 0;
   lines.forEach(line => {
     const sizeQty = Math.min(Number(line["Size Qty"] ?? maxSizeQty), 15);
     const unitCells = [];
@@ -778,29 +783,50 @@ function buildSoLineItemsTable(lines) {
       if (i <= sizeQty) {
         const qty = toSoQty(line[`Unit ${i}`]);
         lineTotal += qty;
-        unitCells.push(`<td class="so-size-col td-num">${qty > 0 ? qty.toLocaleString() : "—"}</td>`);
+        unitCells.push(`<td class="so-size-col td-qty">${qty > 0 ? qty.toLocaleString() : "—"}</td>`);
       } else {
-        unitCells.push(`<td class="so-size-col td-num so-cell-empty">—</td>`);
+        unitCells.push(`<td class="so-size-col td-qty so-cell-empty">—</td>`);
       }
     }
     const totalUnits = toSoQty(line["Total Units"]) || lineTotal;
     const price = toSoQty(line["Price"]);
     const extPrice = toSoQty(line["Ext Price"]);
     const statusVal = String(line["Style Order Status"] ?? "").trim();
+    const cxlReason = String(line["CXL Reason"] ?? "").trim() || orderCxlReason;
+    sumUnits += totalUnits;
+    sumExtPrice += extPrice;
     html += `
 <tr>
   <td class="so-style-col">${escSo(line["Style #"] ?? "—")}</td>
   <td class="so-desc-col">${escSo(line["Style Description"] ?? "")}</td>
   <td class="so-color-col">${escSo(line.Color ?? "—")}</td>
-  <td><span class="so-status-badge" data-status="${escSo(statusVal.toLowerCase())}">${escSo(statusVal || "—")}</span></td>
+  <td class="so-status-col"><span class="so-status-badge" data-status="${escSo(statusVal.toLowerCase())}">${escSo(statusVal || "—")}</span></td>
+  <td class="so-cxl-reason-col">${escSo(cxlReason || "—")}</td>
   ${unitCells.join("")}
-  <td class="so-size-col td-num so-total-col">${totalUnits.toLocaleString()}</td>
+  <td class="so-total-col td-qty">${totalUnits.toLocaleString()}</td>
   <td class="so-price-col td-num">${price > 0 ? formatSoPrice(price) : "—"}</td>
   <td class="so-price-col td-num">${extPrice > 0 ? formatSoPrice(extPrice) : "—"}</td>
 </tr>`;
   });
 
-  html += "</tbody></table></div>";
+  // Totals row: style count under Style #, total units under Total,
+  // total price under Ext Price.
+  html += `
+</tbody>
+<tfoot>
+<tr class="so-line-totals-row">
+  <td class="so-style-col">${lines.length} Style${lines.length === 1 ? "" : "s"}</td>
+  <td class="so-desc-col"></td>
+  <td class="so-color-col"></td>
+  <td class="so-status-col"></td>
+  <td class="so-cxl-reason-col"></td>
+  ${sizeHeaders.map(() => `<td class="so-size-col"></td>`).join("")}
+  <td class="so-total-col td-qty">${sumUnits.toLocaleString()}</td>
+  <td class="so-price-col"></td>
+  <td class="so-price-col td-num">${formatSoPrice(sumExtPrice)}</td>
+</tr>
+</tfoot>
+</table></div>`;
   return html;
 }
 
@@ -946,9 +972,6 @@ function openSalesOrderModal(order) {
   }
 
   const lines = order.Lines ?? [];
-  const totalStyles = lines.length;
-  const totalUnits = soTotalUnits(order);
-  const totalPrice = soTotalPrice(order);
   const linkedInvoices = getLinkedInvoicesForSalesOrder(order);
   const invoiceUnitQty = getInvoiceUnitQtyForSalesOrder(order);
   const invoiceTotal = getInvoiceTotalForSalesOrder(order);
@@ -978,6 +1001,8 @@ function openSalesOrderModal(order) {
 </div>`;
 
   bodyEl.innerHTML = `
+<div class="so-modal-columns">
+<div class="so-modal-main">
 <div class="so-header-fields">
   <div class="so-field"><span class="so-field-label">Customer PO #</span><span class="so-field-value">${escSo(order["Customer PO #"] ?? "—")}</span></div>
   <div class="so-field"><span class="so-field-label">Division</span><span class="so-field-value">${escSo(order.Division ?? "—")}</span></div>
@@ -989,19 +1014,16 @@ function openSalesOrderModal(order) {
   <div class="so-field"><span class="so-field-label">Customer Type</span><span class="so-field-value">${escSo(order["Customer Type"] ?? "—")}</span></div>${invoiceHeaderFields}
 </div>
 
-<div class="so-totals-bar">
-  <div class="so-total-item"><span class="so-total-label">Styles</span><span class="so-total-value">${totalStyles}</span></div>
-  <div class="so-total-item"><span class="so-total-label">Total Units</span><span class="so-total-value">${totalUnits.toLocaleString()}</span></div>
-  <div class="so-total-item"><span class="so-total-label">Total Price</span><span class="so-total-value">${formatSoPrice(totalPrice)}</span></div>
-</div>
-
 <div class="so-lines-section">
-  ${buildSoLineItemsTable(lines)}
+  ${buildSoLineItemsTable(lines, order)}
 </div>
 
 ${portal ? "" : buildLinkedInvoicesSection(order)}
 ${memoSection}
+${portal ? "" : buildLinkedPosSection(order)}
+</div>
 
+<aside class="so-modal-side">
 <div class="so-comments-section">
   <div class="so-section-title">Comments <span class="so-linked-count" id="soCommentsCount"></span></div>
   <div class="so-comments-list" id="soCommentsList"></div>
@@ -1010,8 +1032,8 @@ ${memoSection}
     <button type="button" class="btn btn-primary so-comment-post-btn" id="soCommentPostBtn">Post</button>
   </div>
 </div>
-
-${portal ? "" : buildLinkedPosSection(order)}`;
+</aside>
+</div>`;
 
   if (!portal) {
     mountInvoiceLinks(bodyEl.querySelector("[data-so-invoice-links]"), linkedInvoices, {

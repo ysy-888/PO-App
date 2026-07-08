@@ -2,17 +2,18 @@
 
 // Maps CSV field names → Sales Order document field names (header-level).
 const SO_CSV_HEADER_MAP = {
-  orderNo:    "SO #",
-  custName:   "Customer",
-  po:         "Customer PO #",
-  division:   "Division",
-  orderDate:  "Order Date",
-  shipDate:   "Ship Date",
-  cancelDate: "CXL Date",
-  store:      "Store",
-  status:     "N41 Status",
-  orderType:  "Order Type",
-  custType:   "Customer Type",
+  orderNo:      "SO #",
+  custName:     "Customer",
+  po:           "Customer PO #",
+  division:     "Division",
+  orderDate:    "Order Date",
+  shipDate:     "Ship Date",
+  cancelDate:   "CXL Date",
+  cancelReason: "CXL Reason",
+  store:        "Store",
+  status:       "N41 Status",
+  orderType:    "Order Type",
+  custType:     "Customer Type",
 };
 
 // Maps CSV field names → Line object field names (per-style row).

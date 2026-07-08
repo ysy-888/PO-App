@@ -70,12 +70,17 @@ router.get("/app-state", requireAuth, async (req, res) => {
         locations: [],
         stylePhotos: [],
         styles: [],
-        // Memo is internal-only — strip it so it can't surface via search,
-        // export, or the network payload. Comments stay (shared thread).
-        salesOrders: (salesOrdersResult.data || []).map(row => {
-          const { Memo, ...rest } = row.data || {};
-          return rest;
-        }),
+        // Portal accounts see Elevator Disco orders only. Memo is
+        // internal-only — strip it so it can't surface via search, export,
+        // or the network payload. Comments stay (shared thread).
+        salesOrders: (salesOrdersResult.data || [])
+          .map(row => {
+            const { Memo, ...rest } = row.data || {};
+            return rest;
+          })
+          .filter(order =>
+            String(order.Division ?? "").trim().toLowerCase() === "elevator disco"
+          ),
         invoices: [],
         vendorSubmitMode: "review",
         chargebacksEnabled: false,
