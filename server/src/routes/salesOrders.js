@@ -185,6 +185,9 @@ router.post("/comment", requireAuth, async (req, res) => {
 
   const comments = Array.isArray(existing.data?.Comments) ? existing.data.Comments.slice() : [];
   comments.push({
+    // authorId lets the client resolve the current display name at render
+    // time; author is an email snapshot for legacy/fallback display.
+    authorId: req.userId,
     author: req.userEmail || "Unknown",
     text: commentText.slice(0, 2000),
     at: new Date().toISOString(),

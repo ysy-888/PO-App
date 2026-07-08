@@ -11,6 +11,7 @@
 import { Router } from "express";
 import supabase from "../supabase.js";
 import { requireAuth } from "../auth.js";
+import { fetchTenantUsers } from "../userDirectory.js";
 
 const router = Router();
 
@@ -181,6 +182,60 @@ router.post("/features", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("features settings failed:", err);
     return res.status(500).json({ success: false, error: err.message || "Failed to save feature settings." });
+  }
+});
+
+/**
+ * GET /api/settings/users
+ * Lists the tenant's members with email + display name so an admin can
+ * manage the names shown in comment threads.
+ */
+router.get("/users", requireAuth, async (req, res) => {
+  try {
+    const users = await fetchTenantUsers(req.tenantId);
+    return res.json({ success: true, users });
+  } catch (err) {
+    console.error("list users failed:", err);
+    return res.status(500).json({ success: false, error: err.message || "Failed to load users." });
+  }
+});
+
+/**
+ * POST /api/settings/user-display-name
+ * Body: { userId: string, displayName: string }
+ * Sets a member's display name. The target must belong to the caller's
+ * tenant (so one tenant can't rename another's users).
+ */
+router.post("/user-display-name", requireAuth, async (req, res) => {
+  const userId = String(req.body?.userId ?? "").trim();
+  const displayName = String(req.body?.displayName ?? "").trim().slice(0, 120);
+  if (!userId) {
+    return res.status(400).json({ success: false, error: "userId is required." });
+  }
+
+  try {
+    // Verify the target user is a member of this tenant.
+    const { data: membership, error: membershipErr } = await supabase
+      .from("tenant_memberships")
+      .select("user_id")
+      .eq("tenant_id", req.tenantId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (membershipErr) throw membershipErr;
+    if (!membership) {
+      return res.status(404).json({ success: false, error: "User is not a member of this tenant." });
+    }
+
+    const { error: updateErr } = await supabase
+      .from("profiles")
+      .update({ display_name: displayName || null })
+      .eq("id", userId);
+    if (updateErr) throw updateErr;
+
+    return res.json({ success: true, userId, displayName });
+  } catch (err) {
+    console.error("user-display-name failed:", err);
+    return res.status(500).json({ success: false, error: err.message || "Failed to save display name." });
   }
 });
 

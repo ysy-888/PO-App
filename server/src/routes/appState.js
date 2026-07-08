@@ -10,8 +10,19 @@
 import { Router } from "express";
 import supabase from "../supabase.js";
 import { requireAuth, isPortalRole } from "../auth.js";
+import { fetchTenantUsers, usersToMap } from "../userDirectory.js";
 
 const router = Router();
+
+/** Best-effort tenant user directory; never fails the whole app-state load. */
+async function loadTenantUsersSafe(tenantId) {
+  try {
+    return await fetchTenantUsers(tenantId);
+  } catch (err) {
+    console.warn("tenant user directory unavailable:", err.message);
+    return [];
+  }
+}
 
 /** PostgREST / Postgres codes when a settings table is missing or not in schema cache. */
 function isMissingTableError(error) {
@@ -41,9 +52,11 @@ router.get("/app-state", requireAuth, async (req, res) => {
   // when it sees portalMode: true.
   if (isPortalRole(req.userRole)) {
     try {
-      const [salesOrdersResult, userSettingsResult] = await Promise.all([
+      const [salesOrdersResult, stylesResult, userSettingsResult, users] = await Promise.all([
         supabase.from("sales_orders").select("data").eq("tenant_id", tid).order("created_at", { ascending: true }),
+        supabase.from("styles").select("data").eq("tenant_id", tid),
         supabase.from("user_settings").select("settings").eq("tenant_id", tid).eq("user_id", req.userId).maybeSingle(),
+        loadTenantUsersSafe(tid),
       ]);
       if (salesOrdersResult.error) {
         console.error("portal app-state query failed:", salesOrdersResult.error);
@@ -53,6 +66,8 @@ router.get("/app-state", requireAuth, async (req, res) => {
         success: true,
         portalMode: true,
         userEmail: req.userEmail || "",
+        currentUserId: req.userId,
+        users: usersToMap(users),
         data: [],
         shipments: [],
         exfRequests: [],
@@ -69,7 +84,9 @@ router.get("/app-state", requireAuth, async (req, res) => {
         vendors: [],
         locations: [],
         stylePhotos: [],
-        styles: [],
+        // Styles master ships so the sales-order line table can label size
+        // columns (XS/S/M/…) — it has no PO/shipment data.
+        styles: stylesResult.error ? [] : (stylesResult.data || []).map(row => row.data),
         // Portal accounts see Elevator Disco orders only. Memo is
         // internal-only — strip it so it can't surface via search, export,
         // or the network payload. Comments stay (shared thread).
@@ -141,6 +158,8 @@ router.get("/app-state", requireAuth, async (req, res) => {
       supabase.from("user_settings").select("settings").eq("tenant_id", tid).eq("user_id", req.userId).maybeSingle(),
     ]);
 
+    const tenantUsers = await loadTenantUsersSafe(tid);
+
     // Surface any Supabase errors.  Tables from migration 002 may not exist
     // yet if that migration hasn't been applied; in that case just return empty
     // arrays so the app still loads POs correctly.
@@ -192,6 +211,8 @@ router.get("/app-state", requireAuth, async (req, res) => {
       success: true,
       portalMode: false,
       userEmail: req.userEmail || "",
+      currentUserId: req.userId,
+      users: usersToMap(tenantUsers),
       // PO data
       data: rows(posResult),
       // Shipments

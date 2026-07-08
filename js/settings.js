@@ -534,11 +534,111 @@ function openSettingsModal(sectionId = "general") {
   if (typeof closeHeaderMenu === "function") closeHeaderMenu();
   selectSettingsSection(sectionId);
   updateSettingsUi();
+  loadSettingsUsers();
   const overlay = document.getElementById("settingsOverlay");
   if (!overlay) return;
   overlay.classList.add("open");
   overlay.setAttribute("aria-hidden", "false");
   if (typeof bringModalToFront === "function") bringModalToFront(overlay);
+}
+
+// ── User display names ────────────────────────────────────────────────────────
+
+let settingsUsers = [];
+
+async function loadSettingsUsers() {
+  const list = document.getElementById("settingsUsersList");
+  if (!list) return;
+  list.innerHTML = `<p class="settings-users-status">Loading…</p>`;
+  try {
+    const json = await getApi("/api/settings/users");
+    if (!json.success) throw new Error(json.error || "Failed to load users.");
+    settingsUsers = Array.isArray(json.users) ? json.users : [];
+    renderSettingsUsersList();
+  } catch (err) {
+    list.innerHTML = "";
+    const p = document.createElement("p");
+    p.className = "settings-users-status is-error";
+    p.textContent = "Could not load users: " + err.message;
+    list.appendChild(p);
+  }
+}
+
+function renderSettingsUsersList() {
+  const list = document.getElementById("settingsUsersList");
+  if (!list) return;
+  list.innerHTML = "";
+  if (settingsUsers.length === 0) {
+    const p = document.createElement("p");
+    p.className = "settings-users-status";
+    p.textContent = "No users found.";
+    list.appendChild(p);
+    return;
+  }
+
+  settingsUsers.forEach(user => {
+    const row = document.createElement("div");
+    row.className = "settings-user-row";
+
+    const info = document.createElement("div");
+    info.className = "settings-user-info";
+    const emailEl = document.createElement("span");
+    emailEl.className = "settings-user-email";
+    emailEl.textContent = user.email || "(no email)";
+    info.appendChild(emailEl);
+    if (user.role) {
+      const roleEl = document.createElement("span");
+      roleEl.className = "settings-user-role";
+      roleEl.textContent = user.role;
+      info.appendChild(roleEl);
+    }
+
+    const field = document.createElement("div");
+    field.className = "settings-user-field";
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "shipment-form-input settings-user-name-input";
+    input.placeholder = "Display name";
+    input.value = user.displayName || "";
+    input.maxLength = 120;
+    const status = document.createElement("span");
+    status.className = "settings-user-save-status";
+
+    const save = async () => {
+      const displayName = input.value.trim();
+      if (displayName === (user.displayName || "")) return;
+      status.textContent = "Saving…";
+      status.className = "settings-user-save-status";
+      input.disabled = true;
+      try {
+        const json = await postApi("/api/settings/user-display-name", { userId: user.id, displayName });
+        if (!json.success) throw new Error(json.error || "Save failed.");
+        user.displayName = displayName;
+        // Reflect the change in the live comment directory immediately.
+        if (typeof getTenantUsersById === "function") {
+          const dir = getTenantUsersById();
+          if (dir[user.id]) dir[user.id].displayName = displayName;
+        }
+        status.textContent = "Saved";
+        status.className = "settings-user-save-status is-saved";
+        setTimeout(() => { status.textContent = ""; }, 2000);
+      } catch (err) {
+        status.textContent = err.message || "Error";
+        status.className = "settings-user-save-status is-error";
+      } finally {
+        input.disabled = false;
+      }
+    };
+
+    input.addEventListener("blur", save);
+    input.addEventListener("keydown", e => { if (e.key === "Enter") input.blur(); });
+
+    field.appendChild(input);
+    field.appendChild(status);
+    row.appendChild(info);
+    row.appendChild(field);
+    list.appendChild(row);
+  });
 }
 
 function closeSettingsModal() {

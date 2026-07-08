@@ -10,6 +10,9 @@
 
 let portalModeActive = false;
 let currentUserEmail = "";
+let currentUserId = "";
+// userId → { email, displayName } for everyone in the tenant.
+let tenantUsersById = {};
 
 function isPortalMode() {
   return portalModeActive;
@@ -19,9 +22,29 @@ function getCurrentUserEmail() {
   return currentUserEmail;
 }
 
+function getCurrentUserId() {
+  return currentUserId;
+}
+
+function getTenantUsersById() {
+  return tenantUsersById;
+}
+
+/** Preferred display label for a user: display name → email → fallback. */
+function getUserDisplayLabel(userId, fallbackEmail = "") {
+  const entry = userId ? tenantUsersById[userId] : null;
+  if (entry) return String(entry.displayName || entry.email || fallbackEmail || "Unknown");
+  // No id match — the fallback might itself be an email we can map by value.
+  if (fallbackEmail) {
+    const byEmail = Object.values(tenantUsersById).find(u => u.email === fallbackEmail);
+    if (byEmail && byEmail.displayName) return byEmail.displayName;
+  }
+  return String(fallbackEmail || "Unknown");
+}
+
 /** Columns that never show in the portal's Sales Orders table. */
 const PORTAL_HIDDEN_SO_COLUMNS = new Set([
-  "Memo", "INVOICE #", "INV QTY", "Subtotal", "TOTAL", "INVOICE STATUS",
+  "Division", "Memo", "INVOICE #", "INV QTY", "Subtotal", "TOTAL", "INVOICE STATUS",
 ]);
 
 function isPortalHiddenSoColumn(col) {
@@ -32,6 +55,12 @@ function isPortalHiddenSoColumn(col) {
 function setPortalStateFromAppState(json) {
   if (typeof json?.userEmail === "string" && json.userEmail) {
     currentUserEmail = json.userEmail;
+  }
+  if (typeof json?.currentUserId === "string" && json.currentUserId) {
+    currentUserId = json.currentUserId;
+  }
+  if (json?.users && typeof json.users === "object" && !Array.isArray(json.users)) {
+    tenantUsersById = json.users;
   }
   // The Supabase fallback payload has no portalMode flag — keep the
   // previous state rather than silently unlocking the full app.

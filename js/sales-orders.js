@@ -895,9 +895,9 @@ function buildLinkedInvoicesSection(order) {
 function formatSoCommentTime(at) {
   const d = new Date(at);
   if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleString(undefined, {
-    month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit",
-  });
+  const date = `${d.getMonth() + 1}/${d.getDate()}/${String(d.getFullYear()).slice(-2)}`;
+  const time = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  return `${date}, ${time}`;
 }
 
 /** Render the conversation thread in the SO modal (DOM-built, so comment text is inert). */
@@ -918,9 +918,15 @@ function renderSoCommentsList(order) {
     return;
   }
 
-  const me = typeof getCurrentUserEmail === "function" ? getCurrentUserEmail() : "";
+  const myId = typeof getCurrentUserId === "function" ? getCurrentUserId() : "";
+  const myEmail = typeof getCurrentUserEmail === "function" ? getCurrentUserEmail() : "";
   comments.forEach(c => {
-    const isOwn = Boolean(me) && String(c?.author ?? "") === me;
+    const authorId = String(c?.authorId ?? "");
+    const isOwn = (Boolean(myId) && authorId === myId) ||
+      (!authorId && Boolean(myEmail) && String(c?.author ?? "") === myEmail);
+    const label = typeof getUserDisplayLabel === "function"
+      ? getUserDisplayLabel(authorId, String(c?.author ?? ""))
+      : String(c?.author ?? "Unknown");
     const item = document.createElement("div");
     item.className = "so-comment" + (isOwn ? " is-own" : "");
 
@@ -928,7 +934,7 @@ function renderSoCommentsList(order) {
     meta.className = "so-comment-meta";
     const author = document.createElement("span");
     author.className = "so-comment-author";
-    author.textContent = isOwn ? "You" : String(c?.author ?? "Unknown");
+    author.textContent = isOwn ? "You" : label;
     const time = document.createElement("span");
     time.className = "so-comment-time";
     time.textContent = formatSoCommentTime(c?.at);

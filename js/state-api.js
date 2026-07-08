@@ -298,6 +298,42 @@ async function postApi(path, body, options = {}) {
   }
 }
 
+async function getApi(path, options = {}) {
+  const token = typeof getAccessTokenAsync === "function"
+    ? await getAccessTokenAsync()
+    : (typeof getAccessToken === "function" ? getAccessToken() : null);
+  if (!token) {
+    throw new Error("Not signed in");
+  }
+
+  const timeoutMs = options.timeoutMs ?? API_FETCH_TIMEOUT_MS;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(`${getApiBaseUrl()}${path}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    const text = await res.text();
+    let json;
+    try {
+      json = text ? JSON.parse(text) : {};
+    } catch (_parseErr) {
+      throw new Error(text.trim() || `HTTP ${res.status}`);
+    }
+    return json;
+  } catch (err) {
+    if (err.name === "AbortError") {
+      throw new Error("Request timed out");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 function shouldUseDatabaseUserSettings() {
   return (
     typeof getAccessToken === "function" &&

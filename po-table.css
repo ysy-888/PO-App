@@ -7446,6 +7446,59 @@ td.n41-status-mismatch,
   padding: 8px 0;
 }
 
+/* ── Users settings (display names) ── */
+.settings-users-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.settings-users-status {
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 6px 0;
+}
+.settings-users-status.is-error { color: #dc2626; }
+.settings-user-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.settings-user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.settings-user-email {
+  font-size: 13px;
+  color: var(--text);
+  word-break: break-all;
+}
+.settings-user-role {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+.settings-user-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.settings-user-name-input { width: 180px; }
+.settings-user-save-status {
+  font-size: 12px;
+  min-width: 44px;
+  color: var(--text-muted);
+}
+.settings-user-save-status.is-saved { color: #16a34a; }
+.settings-user-save-status.is-error { color: #dc2626; }
+
 .settings-vendor-links-list {
   display: flex;
   flex-direction: column;
@@ -8902,7 +8955,7 @@ td.has-pending-approval .pending-approval-value {
   min-width: 0;
 }
 .so-modal-side {
-  width: 300px;
+  width: 380px;
   flex-shrink: 0;
   position: sticky;
   top: 0;
@@ -8911,6 +8964,10 @@ td.has-pending-approval .pending-approval-value {
   .so-modal-columns { flex-direction: column; }
   .so-modal-side { width: 100%; position: static; }
 }
+/* The modal body itself never scrolls sideways; wide line tables scroll
+   inside their own bordered box (.so-line-table-wrap). */
+.so-modal-body { overflow-x: hidden; }
+.so-line-table .so-desc-col { white-space: normal; }
 .so-modal-body {
   flex: 1;
   overflow-y: auto;
@@ -9055,18 +9112,19 @@ td.has-pending-approval .pending-approval-value {
   padding-left: 5px;
   padding-right: 5px;
 }
-.so-line-table .so-price-col { min-width: 60px; white-space: nowrap; }
+.so-line-table .so-price-col { width: 52px; min-width: 52px; white-space: nowrap; }
 .so-line-table .so-style-col { font-family: monospace; font-size: 12px; min-width: 70px; }
-.so-line-table .so-desc-col { min-width: 280px; color: var(--text-secondary, #666); font-size: 12px; }
-.so-line-table .so-color-col { min-width: 120px; }
-.so-line-table .so-status-col { width: 64px; min-width: 64px; }
+.so-line-table .so-desc-col { min-width: 200px; color: var(--text-secondary, #666); font-size: 12px; }
+.so-line-table .so-color-col { min-width: 96px; }
+.so-line-table .so-status-col { min-width: 80px; }
 .so-line-table .so-cxl-reason-col {
-  min-width: 96px;
+  min-width: 116px;
   font-size: 12px;
   color: var(--text-secondary, #666);
 }
 .so-line-table .so-total-col {
-  min-width: 56px;
+  width: 48px;
+  min-width: 48px;
   font-weight: 600;
   white-space: nowrap;
 }
