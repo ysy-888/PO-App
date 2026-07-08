@@ -66,6 +66,7 @@ function getSoVisibleColumns() {
 }
 
 function isSoColumnVisible(col) {
+  if (typeof isPortalHiddenSoColumn === "function" && isPortalHiddenSoColumn(col)) return false;
   return soVisibleColumns.has(col);
 }
 

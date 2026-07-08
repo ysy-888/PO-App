@@ -410,6 +410,8 @@ function syncViewActionToolbars(view = currentAppView) {
 }
 
 function switchAppView(view) {
+  // Showroom portal accounts only ever see the Sales Orders view.
+  if (typeof isPortalMode === "function" && isPortalMode() && view !== "sales") view = "sales";
   currentAppView = view;
   const splitView = isSplitViewLayoutEnabled();
   const splitActive = splitView && isSplitViewTab(view);

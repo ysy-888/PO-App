@@ -530,6 +530,7 @@ function selectSettingsSection(sectionId) {
 }
 
 function openSettingsModal(sectionId = "general") {
+  if (typeof isPortalMode === "function" && isPortalMode()) return;
   if (typeof closeHeaderMenu === "function") closeHeaderMenu();
   selectSettingsSection(sectionId);
   updateSettingsUi();

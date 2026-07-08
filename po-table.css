@@ -9164,6 +9164,91 @@ td.has-pending-approval .pending-approval-value {
 }
 .so-memo-save-btn:hover { opacity: 0.88; }
 .so-memo-save-btn:disabled { opacity: 0.45; cursor: default; }
+
+/* ── Sales order comments (internal team + showroom portal) ── */
+.so-comments-section {
+  padding-top: 12px;
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.so-comments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+  margin-bottom: 10px;
+}
+.so-comments-empty {
+  color: var(--empty-display, #aaa);
+  font-size: 13px;
+  margin: 0;
+  padding: 4px 0;
+}
+.so-comment {
+  max-width: 78%;
+  align-self: flex-start;
+  background: var(--row-hover, #f3f4f6);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  border-top-left-radius: 3px;
+  padding: 7px 11px;
+}
+.so-comment.is-own {
+  align-self: flex-end;
+  background: color-mix(in srgb, var(--accent, #3b82f6) 10%, var(--surface, #fff));
+  border-color: color-mix(in srgb, var(--accent, #3b82f6) 30%, var(--border));
+  border-radius: 10px;
+  border-top-right-radius: 3px;
+}
+.so-comment-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+.so-comment-author {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--text);
+}
+.so-comment-time {
+  font-size: 10.5px;
+  color: var(--text-secondary, #888);
+  white-space: nowrap;
+}
+.so-comment-text {
+  font-size: 13px;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.so-comment-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.so-comment-input {
+  flex: 1;
+  box-sizing: border-box;
+  min-height: 40px;
+  max-height: 140px;
+  resize: vertical;
+  font-size: 13px;
+  font-family: inherit;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface, #fff);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.so-comment-input:focus {
+  border-color: var(--accent, #3b82f6);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, #3b82f6) 15%, transparent);
+}
+.so-comment-post-btn { flex-shrink: 0; }
 /* ── Dashboard ── */
 button.app-logo-text {
   border: none;

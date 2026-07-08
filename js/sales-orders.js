@@ -866,6 +866,60 @@ function buildLinkedInvoicesSection(order) {
 </div>`;
 }
 
+function formatSoCommentTime(at) {
+  const d = new Date(at);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString(undefined, {
+    month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit",
+  });
+}
+
+/** Render the conversation thread in the SO modal (DOM-built, so comment text is inert). */
+function renderSoCommentsList(order) {
+  const list = document.getElementById("soCommentsList");
+  const count = document.getElementById("soCommentsCount");
+  if (!list) return;
+
+  const comments = Array.isArray(order?.Comments) ? order.Comments : [];
+  if (count) count.textContent = comments.length ? `(${comments.length})` : "";
+
+  list.innerHTML = "";
+  if (comments.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "so-comments-empty";
+    empty.textContent = "No comments yet.";
+    list.appendChild(empty);
+    return;
+  }
+
+  const me = typeof getCurrentUserEmail === "function" ? getCurrentUserEmail() : "";
+  comments.forEach(c => {
+    const isOwn = Boolean(me) && String(c?.author ?? "") === me;
+    const item = document.createElement("div");
+    item.className = "so-comment" + (isOwn ? " is-own" : "");
+
+    const meta = document.createElement("div");
+    meta.className = "so-comment-meta";
+    const author = document.createElement("span");
+    author.className = "so-comment-author";
+    author.textContent = isOwn ? "You" : String(c?.author ?? "Unknown");
+    const time = document.createElement("span");
+    time.className = "so-comment-time";
+    time.textContent = formatSoCommentTime(c?.at);
+    meta.appendChild(author);
+    meta.appendChild(time);
+
+    const text = document.createElement("div");
+    text.className = "so-comment-text";
+    text.textContent = String(c?.text ?? "");
+
+    item.appendChild(meta);
+    item.appendChild(text);
+    list.appendChild(item);
+  });
+  list.scrollTop = list.scrollHeight;
+}
+
 function openSalesOrderModal(order) {
   const overlay = document.getElementById("salesOrderModalOverlay");
   if (!overlay) return;
@@ -904,6 +958,25 @@ function openSalesOrderModal(order) {
   const bodyEl = overlay.querySelector(".so-modal-body");
   if (!bodyEl) return;
 
+  // Showroom portal: no invoice fields, no linked invoices/POs, no memo.
+  const portal = typeof isPortalMode === "function" && isPortalMode();
+
+  const invoiceHeaderFields = portal ? "" : `
+  <div class="so-field"><span class="so-field-label">Invoice #</span><span class="so-field-value" data-so-invoice-links></span></div>
+  <div class="so-field"><span class="so-field-label">Invoice Unit Qty</span><span class="so-field-value">${invoiceUnitQty > 0 ? invoiceUnitQty.toLocaleString() : "—"}</span></div>
+  <div class="so-field"><span class="so-field-label">Total</span><span class="so-field-value">${invoiceTotal > 0 ? formatSoPrice(invoiceTotal) : "—"}</span></div>
+  <div class="so-field"><span class="so-field-label">Invoice Status</span><span class="so-field-value">${escSo(invoiceStatus || "—")}</span></div>`;
+
+  const memoSection = portal ? "" : `
+<div class="so-memo-section">
+  <div class="so-section-title">Memo</div>
+  <textarea class="so-memo-textarea" id="soMemoTextarea" placeholder="Add a note for this sales order…" rows="3">${escSo(order.Memo ?? "")}</textarea>
+  <div class="so-memo-footer">
+    <span class="so-memo-status" id="soMemoStatus"></span>
+    <button type="button" class="so-memo-save-btn" id="soMemoSaveBtn">Save</button>
+  </div>
+</div>`;
+
   bodyEl.innerHTML = `
 <div class="so-header-fields">
   <div class="so-field"><span class="so-field-label">Customer PO #</span><span class="so-field-value">${escSo(order["Customer PO #"] ?? "—")}</span></div>
@@ -913,11 +986,7 @@ function openSalesOrderModal(order) {
   <div class="so-field"><span class="so-field-label">CXL Date</span><span class="so-field-value">${formatSoDate(order["CXL Date"])}</span></div>
   <div class="so-field"><span class="so-field-label">Store</span><span class="so-field-value">${escSo(order.Store ?? "—")}</span></div>
   <div class="so-field"><span class="so-field-label">Order Type</span><span class="so-field-value">${escSo(order["Order Type"] ?? "—")}</span></div>
-  <div class="so-field"><span class="so-field-label">Customer Type</span><span class="so-field-value">${escSo(order["Customer Type"] ?? "—")}</span></div>
-  <div class="so-field"><span class="so-field-label">Invoice #</span><span class="so-field-value" data-so-invoice-links></span></div>
-  <div class="so-field"><span class="so-field-label">Invoice Unit Qty</span><span class="so-field-value">${invoiceUnitQty > 0 ? invoiceUnitQty.toLocaleString() : "—"}</span></div>
-  <div class="so-field"><span class="so-field-label">Total</span><span class="so-field-value">${invoiceTotal > 0 ? formatSoPrice(invoiceTotal) : "—"}</span></div>
-  <div class="so-field"><span class="so-field-label">Invoice Status</span><span class="so-field-value">${escSo(invoiceStatus || "—")}</span></div>
+  <div class="so-field"><span class="so-field-label">Customer Type</span><span class="so-field-value">${escSo(order["Customer Type"] ?? "—")}</span></div>${invoiceHeaderFields}
 </div>
 
 <div class="so-totals-bar">
@@ -930,23 +999,56 @@ function openSalesOrderModal(order) {
   ${buildSoLineItemsTable(lines)}
 </div>
 
-${buildLinkedInvoicesSection(order)}
+${portal ? "" : buildLinkedInvoicesSection(order)}
+${memoSection}
 
-<div class="so-memo-section">
-  <div class="so-section-title">Memo</div>
-  <textarea class="so-memo-textarea" id="soMemoTextarea" placeholder="Add a note for this sales order…" rows="3">${escSo(order.Memo ?? "")}</textarea>
-  <div class="so-memo-footer">
-    <span class="so-memo-status" id="soMemoStatus"></span>
-    <button type="button" class="so-memo-save-btn" id="soMemoSaveBtn">Save</button>
+<div class="so-comments-section">
+  <div class="so-section-title">Comments <span class="so-linked-count" id="soCommentsCount"></span></div>
+  <div class="so-comments-list" id="soCommentsList"></div>
+  <div class="so-comment-composer">
+    <textarea class="so-comment-input" id="soCommentInput" rows="2" placeholder="Write a comment…"></textarea>
+    <button type="button" class="btn btn-primary so-comment-post-btn" id="soCommentPostBtn">Post</button>
   </div>
 </div>
 
-${buildLinkedPosSection(order)}`;
+${portal ? "" : buildLinkedPosSection(order)}`;
 
-  mountInvoiceLinks(bodyEl.querySelector("[data-so-invoice-links]"), linkedInvoices, {
-    closeSalesOrder: true,
-    navFrom: { type: "so", id: soNum },
-  });
+  if (!portal) {
+    mountInvoiceLinks(bodyEl.querySelector("[data-so-invoice-links]"), linkedInvoices, {
+      closeSalesOrder: true,
+      navFrom: { type: "so", id: soNum },
+    });
+  }
+
+  // Comments thread (shared between the internal team and the portal).
+  renderSoCommentsList(order);
+  const commentInput = bodyEl.querySelector("#soCommentInput");
+  const commentPostBtn = bodyEl.querySelector("#soCommentPostBtn");
+  if (commentInput && commentPostBtn) {
+    const postComment = async () => {
+      const text = commentInput.value.trim();
+      if (!text) return;
+      commentPostBtn.disabled = true;
+      try {
+        const json = await postApi("/api/sales-orders/comment", { soNumber: soNum, text });
+        if (!json.success) throw new Error(json.error || "Failed to post comment.");
+        order.Comments = json.comments;
+        commentInput.value = "";
+        renderSoCommentsList(order);
+      } catch (err) {
+        showIndicator("Comment failed: " + err.message, "error");
+      } finally {
+        commentPostBtn.disabled = false;
+      }
+    };
+    commentPostBtn.addEventListener("click", postComment);
+    commentInput.addEventListener("keydown", e => {
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        postComment();
+      }
+    });
+  }
 
   // Wire Memo save button
   const memoTextarea = bodyEl.querySelector("#soMemoTextarea");

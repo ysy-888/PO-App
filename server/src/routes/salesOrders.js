@@ -156,6 +156,56 @@ router.post("/memo", requireAuth, async (req, res) => {
   return res.json({ success: true, memo: updatedData.Memo });
 });
 
+// Conversation-style comments on a sales order (internal team + showroom portal).
+router.post("/comment", requireAuth, async (req, res) => {
+  const { soNumber, text } = req.body ?? {};
+  if (!soNumber && soNumber !== 0) {
+    return res.status(400).json({ success: false, error: "Missing soNumber." });
+  }
+  const commentText = String(text ?? "").trim();
+  if (!commentText) {
+    return res.status(400).json({ success: false, error: "Comment text is required." });
+  }
+
+  const entityId = salesOrderEntityId(soNumber);
+  if (!entityId) {
+    return res.status(400).json({ success: false, error: "Invalid soNumber." });
+  }
+
+  const { data: existing, error: fetchErr } = await supabase
+    .from("sales_orders")
+    .select("id, data")
+    .eq("tenant_id", req.tenantId)
+    .eq("entity_id", entityId)
+    .single();
+
+  if (fetchErr || !existing) {
+    return res.status(404).json({ success: false, error: "Sales order not found." });
+  }
+
+  const comments = Array.isArray(existing.data?.Comments) ? existing.data.Comments.slice() : [];
+  comments.push({
+    author: req.userEmail || "Unknown",
+    text: commentText.slice(0, 2000),
+    at: new Date().toISOString(),
+  });
+
+  const updatedData = { ...(existing.data || {}), Comments: comments };
+
+  const { error: updateErr } = await supabase
+    .from("sales_orders")
+    .update({ data: updatedData })
+    .eq("id", existing.id)
+    .eq("tenant_id", req.tenantId);
+
+  if (updateErr) {
+    console.error("sales_orders comment update failed:", updateErr);
+    return res.status(500).json({ success: false, error: "Failed to save comment." });
+  }
+
+  return res.json({ success: true, comments });
+});
+
 router.post("/flag", requireAuth, async (req, res) => {
   const { soNumber, flag } = req.body ?? {};
   if (!soNumber && soNumber !== 0) {

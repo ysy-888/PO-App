@@ -9,7 +9,7 @@
 
 import { Router } from "express";
 import supabase from "../supabase.js";
-import { requireAuth } from "../auth.js";
+import { requireAuth, isPortalRole } from "../auth.js";
 
 const router = Router();
 
@@ -35,6 +35,60 @@ function unwrapSettings(result, label) {
 
 router.get("/app-state", requireAuth, async (req, res) => {
   const tid = req.tenantId;
+
+  // Showroom portal accounts get sales orders only — no POs, shipments,
+  // invoices, or any other entity. The frontend switches to portal mode
+  // when it sees portalMode: true.
+  if (isPortalRole(req.userRole)) {
+    try {
+      const [salesOrdersResult, userSettingsResult] = await Promise.all([
+        supabase.from("sales_orders").select("data").eq("tenant_id", tid).order("created_at", { ascending: true }),
+        supabase.from("user_settings").select("settings").eq("tenant_id", tid).eq("user_id", req.userId).maybeSingle(),
+      ]);
+      if (salesOrdersResult.error) {
+        console.error("portal app-state query failed:", salesOrdersResult.error);
+        return res.status(500).json({ success: false, error: "Failed to load app state." });
+      }
+      return res.json({
+        success: true,
+        portalMode: true,
+        userEmail: req.userEmail || "",
+        data: [],
+        shipments: [],
+        exfRequests: [],
+        asnRequests: [],
+        deliveryRequests: [],
+        pickupRequests: [],
+        approvals: [],
+        chargebacks: [],
+        packingLists: [],
+        packingCartons: [],
+        pendingPackingLists: [],
+        customers: [],
+        contacts: [],
+        vendors: [],
+        locations: [],
+        stylePhotos: [],
+        styles: [],
+        // Memo is internal-only — strip it so it can't surface via search,
+        // export, or the network payload. Comments stay (shared thread).
+        salesOrders: (salesOrdersResult.data || []).map(row => {
+          const { Memo, ...rest } = row.data || {};
+          return rest;
+        }),
+        invoices: [],
+        vendorSubmitMode: "review",
+        chargebacksEnabled: false,
+        vendorSubmissionsEnabled: false,
+        userSettings: unwrapSettings(userSettingsResult, "user_settings"),
+        defaultColumns: null,
+        defaultStatusFilter: "__open__",
+      });
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ success: false, error: "Server error." });
+    }
+  }
 
   try {
     // Run all table queries in parallel for speed.
@@ -131,6 +185,8 @@ router.get("/app-state", requireAuth, async (req, res) => {
 
     return res.json({
       success: true,
+      portalMode: false,
+      userEmail: req.userEmail || "",
       // PO data
       data: rows(posResult),
       // Shipments
