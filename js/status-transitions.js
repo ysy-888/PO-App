@@ -98,6 +98,8 @@ function isPoEligibleForExfRequest(row) {
 
 function isPoEligibleForShipment(row) {
   if (!row || poHasShipment(row)) return false;
+  // Allow N41-Closed POs onto shipments (e.g. late adds after N41 closed the order).
+  if (getN41Status(row) === "Closed") return true;
   const status = getRowStatus(row);
   if (isExfRequested(row)) return status === "Requested";
   return status === "WIP";

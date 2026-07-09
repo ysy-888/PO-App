@@ -30,6 +30,8 @@ updateFlagFilterHeaderState();
 applyColumnOrder();
 applyColumnVisibility();
 // initAuth() handles the first loadData() call after sign-in.
+// Show the CSV-import-style spinner until that first load finishes.
+if (typeof setAppSaving === "function") setAppSaving(true, "Loading...");
 if (typeof initAuth === "function") {
   initAuth();
 } else {

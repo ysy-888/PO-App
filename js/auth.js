@@ -131,6 +131,7 @@ async function _attemptLogin(overlay) {
 }
 
 function _showLoginUI() {
+  if (typeof clearAppInitialLoading === "function") clearAppInitialLoading();
   const overlay = _buildLoginOverlay();
   document.body.appendChild(overlay);
 

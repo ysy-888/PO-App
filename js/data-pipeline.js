@@ -31,13 +31,19 @@ function applyUserSettingsFromServer(settings) {
 }
 
 async function loadData() {
-  showIndicator(`Refreshing${ELLIPSIS}`, "");
+  const isInitialLoad = typeof appInitialLoadPending !== "undefined" && appInitialLoadPending;
+  if (isInitialLoad && typeof setAppSaving === "function") {
+    setAppSaving(true, "Loading...");
+  } else {
+    showIndicator(`Refreshing${ELLIPSIS}`, "");
+  }
   try {
     const token = typeof getAccessTokenAsync === "function"
       ? await getAccessTokenAsync()
       : (typeof getAccessToken === "function" ? getAccessToken() : null);
     if (!token) {
       // initAuth() will call loadData() again once the user signs in.
+      if (typeof clearAppInitialLoading === "function") clearAppInitialLoading();
       showIndicator("Waiting for sign-in…", "");
       return;
     }
@@ -96,8 +102,10 @@ async function loadData() {
     applyFilters();
     if (typeof onPoSelectionChanged === "function") onPoSelectionChanged();
     if (typeof refreshDashboardIfActive === "function") refreshDashboardIfActive();
+    if (typeof clearAppInitialLoading === "function") clearAppInitialLoading();
     showIndicator("Loaded", "success");
   } catch (err) {
+    if (typeof clearAppInitialLoading === "function") clearAppInitialLoading();
     showIndicator("Load failed: " + err.message, "error");
   }
 }

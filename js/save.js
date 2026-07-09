@@ -34,6 +34,8 @@ async function saveUpdate(poNumber, updates, options = {}) {
 }
 
 let appSaveInProgress = false;
+/** True until the first successful (or failed) app-state load finishes. */
+let appInitialLoadPending = true;
 
 function isAppSaving() {
   return appSaveInProgress;
@@ -51,6 +53,12 @@ function setAppSaving(active, message = "Saving…") {
     overlay.setAttribute("aria-hidden", active ? "false" : "true");
   }
   if (msgEl && active) msgEl.textContent = message;
+}
+
+function clearAppInitialLoading() {
+  if (!appInitialLoadPending) return;
+  appInitialLoadPending = false;
+  if (typeof setAppSaving === "function") setAppSaving(false);
 }
 
 let indicatorTimer;
