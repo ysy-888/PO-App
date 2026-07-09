@@ -18,6 +18,8 @@ import { sendEmail } from "../email.js";
 import { buildCustomerEmailHtml } from "../emailTemplates.js";
 import { archiveAttachmentsToDrive } from "../google.js";
 import { buildSalesOrderPdfAttachment } from "../salesOrderPdf.js";
+import { createMentionNotifications } from "./notifications.js";
+import { fetchTenantUsers } from "../userDirectory.js";
 
 const router = Router();
 
@@ -232,6 +234,8 @@ router.post("/memo", requireAuth, async (req, res) => {
 });
 
 // Conversation-style comments on a sales order (internal team + showroom portal).
+// Body: { soNumber, text, mentions?: [{ id, label }] } — mentioned tenant
+// members each receive a notification.
 router.post("/comment", requireAuth, async (req, res) => {
   const { soNumber, text } = req.body ?? {};
   if (!soNumber && soNumber !== 0) {
@@ -258,15 +262,37 @@ router.post("/comment", requireAuth, async (req, res) => {
     return res.status(404).json({ success: false, error: "Sales order not found." });
   }
 
-  const comments = Array.isArray(existing.data?.Comments) ? existing.data.Comments.slice() : [];
-  comments.push({
+  // Validate mentions against actual tenant members; keep label snapshots
+  // for highlight rendering.
+  let mentions = [];
+  const rawMentions = Array.isArray(req.body?.mentions) ? req.body.mentions.slice(0, 20) : [];
+  if (rawMentions.length > 0) {
+    try {
+      const members = await fetchTenantUsers(req.tenantId);
+      const byId = new Map(members.map(u => [u.id, u]));
+      const seen = new Set();
+      mentions = rawMentions
+        .map(m => ({ id: String(m?.id ?? "").trim(), label: String(m?.label ?? "").trim().slice(0, 120) }))
+        .filter(m => m.id && m.label && byId.has(m.id) && !seen.has(m.id) && seen.add(m.id));
+    } catch (err) {
+      console.warn("comment mention validation failed:", err.message);
+      mentions = [];
+    }
+  }
+
+  const storedText = commentText.slice(0, 2000);
+  const comment = {
     // authorId lets the client resolve the current display name at render
     // time; author is an email snapshot for legacy/fallback display.
     authorId: req.userId,
     author: req.userEmail || "Unknown",
-    text: commentText.slice(0, 2000),
+    text: storedText,
     at: new Date().toISOString(),
-  });
+  };
+  if (mentions.length > 0) comment.mentions = mentions;
+
+  const comments = Array.isArray(existing.data?.Comments) ? existing.data.Comments.slice() : [];
+  comments.push(comment);
 
   const updatedData = { ...(existing.data || {}), Comments: comments };
 
@@ -279,6 +305,26 @@ router.post("/comment", requireAuth, async (req, res) => {
   if (updateErr) {
     console.error("sales_orders comment update failed:", updateErr);
     return res.status(500).json({ success: false, error: "Failed to save comment." });
+  }
+
+  // Notify mentioned users (never the author; never blocks the comment).
+  const notifyIds = mentions.map(m => m.id).filter(id => id !== req.userId);
+  if (notifyIds.length > 0) {
+    const soData = existing.data || {};
+    await createMentionNotifications({
+      tenantId: req.tenantId,
+      userIds: notifyIds,
+      data: {
+        type: "so_comment_mention",
+        soNumber: String(soData["SO #"] ?? soNumber).trim(),
+        customer: String(soData["Customer"] ?? "").trim(),
+        customerPo: String(soData["Customer PO #"] ?? "").trim(),
+        preview: storedText.slice(0, 160),
+        fromId: req.userId,
+        from: req.userEmail || "Unknown",
+        at: comment.at,
+      },
+    });
   }
 
   return res.json({ success: true, comments });

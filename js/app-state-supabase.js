@@ -125,6 +125,7 @@ async function fetchSupabaseAppState() {
 
 function applyAppStatePayload(json) {
   if (typeof setPortalStateFromAppState === "function") setPortalStateFromAppState(json);
+  if (typeof refreshNotifications === "function") refreshNotifications();
   allChargebacks = (json.chargebacks ?? []).map(normalizeChargeback);
   allAsnRequests = (json.asnRequests ?? []).map(row => ({ ...row }));
   allPackingLists = (json.packingLists ?? []).map(normalizePackingList);

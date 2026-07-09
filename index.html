@@ -106,6 +106,19 @@
         <input type="search" id="invoiceSearchInput" placeholder="Search" />
       </div>
     </div>
+    <div class="header-menu-wrap notifications-wrap">
+      <button type="button" class="btn btn-icon" id="notificationsBtn" aria-label="Notifications" aria-haspopup="true" aria-expanded="false">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span class="notifications-badge" id="notificationsBadge" hidden></span>
+      </button>
+      <div id="notificationsPanel" class="header-menu-dropdown notifications-panel" hidden>
+        <div class="notifications-panel-header">
+          <span class="notifications-panel-title">Notifications</span>
+          <button type="button" class="column-filter-link" id="notificationsClearAllBtn">Clear all</button>
+        </div>
+        <div class="notifications-list" id="notificationsList"></div>
+      </div>
+    </div>
     <button type="button" class="btn btn-primary btn-icon" onclick="loadData()" aria-label="Refresh">
       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
     </button>
@@ -1710,6 +1723,7 @@
 <script src="js/sales-orders-columns.js"></script>
 <script src="js/sales-orders-filters.js"></script>
 <script src="js/sales-orders.js"></script>
+<script src="js/notifications.js"></script>
 <script src="js/sales-orders-import.js"></script>
 <script src="js/invoices-columns.js"></script>
 <script src="js/invoices-filters.js"></script>

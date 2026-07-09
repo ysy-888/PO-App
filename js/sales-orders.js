@@ -1005,6 +1005,176 @@ function formatSoCommentTime(at) {
   return `${date}, ${time}`;
 }
 
+// ── @mentions in comments ────────────────────────────────────────────────────
+
+function escapeSoRegExp(s) {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Mention label shown/inserted for a user entry: display name, else email. */
+function soMentionLabel(user) {
+  return String(user?.displayName || user?.email || "").trim();
+}
+
+/** Find an "@query" mention being typed at the caret, or null. */
+function getSoMentionQuery(text, caret) {
+  const upto = String(text ?? "").slice(0, caret);
+  const atIdx = upto.lastIndexOf("@");
+  if (atIdx === -1) return null;
+  // "@" must start the text or follow whitespace/punctuation, not an email.
+  if (atIdx > 0 && !/[\s([{,;:]/.test(upto[atIdx - 1])) return null;
+  const query = upto.slice(atIdx + 1);
+  if (query.includes("\n") || query.length > 40) return null;
+  return { start: atIdx, query };
+}
+
+function searchSoMentionUsers(query) {
+  const dir = typeof getTenantUsersById === "function" ? getTenantUsersById() : {};
+  const q = String(query ?? "").trim().toLowerCase();
+  const users = Object.entries(dir).map(([id, u]) => ({ id, email: u?.email ?? "", displayName: u?.displayName ?? "" }));
+  return users
+    .filter(u => soMentionLabel(u))
+    .filter(u => !q ||
+      u.displayName.toLowerCase().includes(q) ||
+      u.email.toLowerCase().includes(q))
+    .sort((a, b) => soMentionLabel(a).localeCompare(soMentionLabel(b), undefined, { sensitivity: "base" }))
+    .slice(0, 6);
+}
+
+/**
+ * Wires @mention autocomplete onto the comment textarea. Returns
+ * { getMentions } — the mentions (id + label) still present in the text.
+ */
+function attachSoMentionAutocomplete(input, composerEl) {
+  const dropdown = document.createElement("div");
+  dropdown.className = "so-mention-dropdown";
+  dropdown.hidden = true;
+  composerEl.appendChild(dropdown);
+
+  const draftMentions = new Map(); // id → label
+  let matches = [];
+  let activeIndex = 0;
+  let currentQuery = null;
+
+  const close = () => {
+    dropdown.hidden = true;
+    matches = [];
+    currentQuery = null;
+  };
+
+  const renderDropdown = () => {
+    dropdown.innerHTML = "";
+    matches.forEach((user, index) => {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "so-mention-item" + (index === activeIndex ? " is-active" : "");
+      const name = document.createElement("span");
+      name.className = "so-mention-item-name";
+      name.textContent = soMentionLabel(user);
+      item.appendChild(name);
+      if (user.displayName && user.email) {
+        const email = document.createElement("span");
+        email.className = "so-mention-item-email";
+        email.textContent = user.email;
+        item.appendChild(email);
+      }
+      // mousedown so selection happens before the textarea loses focus.
+      item.addEventListener("mousedown", e => {
+        e.preventDefault();
+        select(index);
+      });
+      dropdown.appendChild(item);
+    });
+    dropdown.hidden = matches.length === 0;
+  };
+
+  const select = (index) => {
+    const user = matches[index];
+    if (!user || !currentQuery) return;
+    const label = soMentionLabel(user);
+    const caret = input.selectionStart;
+    const before = input.value.slice(0, currentQuery.start);
+    const after = input.value.slice(caret);
+    input.value = `${before}@${label} ${after}`;
+    const newCaret = before.length + label.length + 2;
+    input.setSelectionRange(newCaret, newCaret);
+    draftMentions.set(user.id, label);
+    close();
+    input.focus();
+  };
+
+  const update = () => {
+    currentQuery = getSoMentionQuery(input.value, input.selectionStart);
+    if (!currentQuery) {
+      close();
+      return;
+    }
+    matches = searchSoMentionUsers(currentQuery.query);
+    activeIndex = 0;
+    renderDropdown();
+  };
+
+  input.addEventListener("input", update);
+  input.addEventListener("click", update);
+  input.addEventListener("blur", () => setTimeout(close, 150));
+  input.addEventListener("keydown", e => {
+    if (dropdown.hidden) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      activeIndex = (activeIndex + 1) % matches.length;
+      renderDropdown();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      activeIndex = (activeIndex - 1 + matches.length) % matches.length;
+      renderDropdown();
+    } else if (e.key === "Enter" || e.key === "Tab") {
+      e.preventDefault();
+      e.stopPropagation();
+      select(activeIndex);
+    } else if (e.key === "Escape") {
+      e.stopPropagation();
+      close();
+    }
+  });
+
+  return {
+    getMentions() {
+      const text = input.value;
+      return [...draftMentions.entries()]
+        .filter(([, label]) => text.includes(`@${label}`))
+        .map(([id, label]) => ({ id, label }));
+    },
+    reset() {
+      draftMentions.clear();
+      close();
+    },
+  };
+}
+
+/** Append comment text with @mention labels highlighted (DOM-built, inert). */
+function appendSoCommentText(container, text, mentions) {
+  const labels = (Array.isArray(mentions) ? mentions : [])
+    .map(m => String(m?.label ?? "").trim())
+    .filter(Boolean);
+  const value = String(text ?? "");
+  if (labels.length === 0) {
+    container.textContent = value;
+    return;
+  }
+  const labelSet = new Set(labels);
+  const pattern = new RegExp(`(${labels.map(l => "@" + escapeSoRegExp(l)).join("|")})`, "g");
+  value.split(pattern).forEach(part => {
+    if (part.startsWith("@") && labelSet.has(part.slice(1))) {
+      const span = document.createElement("span");
+      span.className = "so-comment-mention";
+      span.textContent = part;
+      container.appendChild(span);
+    } else if (part) {
+      container.appendChild(document.createTextNode(part));
+    }
+  });
+}
+
 /** Render the conversation thread in the SO modal (DOM-built, so comment text is inert). */
 function renderSoCommentsList(order) {
   const list = document.getElementById("soCommentsList");
@@ -1048,7 +1218,7 @@ function renderSoCommentsList(order) {
 
     const text = document.createElement("div");
     text.className = "so-comment-text";
-    text.textContent = String(c?.text ?? "");
+    appendSoCommentText(text, c?.text, c?.mentions);
 
     item.appendChild(meta);
     item.appendChild(text);
@@ -1214,15 +1384,19 @@ ${portal ? "" : buildLinkedPosSection(order)}
   const commentInput = bodyEl.querySelector("#soCommentInput");
   const commentPostBtn = bodyEl.querySelector("#soCommentPostBtn");
   if (commentInput && commentPostBtn) {
+    const composerEl = bodyEl.querySelector(".so-comment-composer");
+    const mentionCtl = composerEl ? attachSoMentionAutocomplete(commentInput, composerEl) : null;
     const postComment = async () => {
       const text = commentInput.value.trim();
       if (!text) return;
       commentPostBtn.disabled = true;
       try {
-        const json = await postApi("/api/sales-orders/comment", { soNumber: soNum, text });
+        const mentions = mentionCtl ? mentionCtl.getMentions() : [];
+        const json = await postApi("/api/sales-orders/comment", { soNumber: soNum, text, mentions });
         if (!json.success) throw new Error(json.error || "Failed to post comment.");
         order.Comments = json.comments;
         commentInput.value = "";
+        if (mentionCtl) mentionCtl.reset();
         renderSoCommentsList(order);
       } catch (err) {
         showIndicator("Comment failed: " + err.message, "error");

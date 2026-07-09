@@ -15,6 +15,7 @@ import pendingPackingListsRouter from "./routes/pendingPackingLists.js";
 import salesOrdersRouter from "./routes/salesOrders.js";
 import invoicesRouter from "./routes/invoices.js";
 import googleRouter from "./routes/google.js";
+import notificationsRouter from "./routes/notifications.js";
 import { getEmailServiceStatus } from "./email.js";
 import { getGoogleStatus } from "./google.js";
 import { scheduleCalendarSync } from "./calendarSync.js";
@@ -77,6 +78,7 @@ app.use("/api/pending-packing-lists", pendingPackingListsRouter);
 app.use("/api/sales-orders", salesOrdersRouter);
 app.use("/api/invoices", invoicesRouter);
 app.use("/api/google", googleRouter);
+app.use("/api/notifications", notificationsRouter);
 
 // ── Error handler ───────────────────────────────────────────
 app.use((err, _req, res, _next) => {

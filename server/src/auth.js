@@ -88,6 +88,10 @@ export function isPortalRole(role) {
 const PORTAL_ALLOWED_ENDPOINTS = [
   { method: "GET", path: "/api/app-state" },
   { method: "POST", path: "/api/sales-orders/comment" },
+  // Notifications are per-user (mentions in SO comments) — portal-safe.
+  { method: "GET", path: "/api/notifications" },
+  { method: "POST", path: "/api/notifications/mark-read" },
+  { method: "POST", path: "/api/notifications/clear-all" },
 ];
 
 function isPortalEndpointAllowed(req) {
