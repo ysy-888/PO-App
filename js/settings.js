@@ -622,6 +622,11 @@ function renderSettingsUsersList() {
           const dir = getTenantUsersById();
           if (dir[user.id]) dir[user.id].displayName = displayName;
         }
+        if (typeof updateHeaderGreeting === "function"
+          && typeof getCurrentUserId === "function"
+          && getCurrentUserId() === user.id) {
+          updateHeaderGreeting();
+        }
         status.textContent = "Saved";
         status.className = "settings-user-save-status is-saved";
         setTimeout(() => { status.textContent = ""; }, 2000);

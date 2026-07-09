@@ -15,6 +15,16 @@ const ASN_PICKED_UP_DATE_FIELD = "Picked Up Date";
 const ASN_STATUS_PICKED_UP = "Picked Up";
 const ASN_STATUS_OPEN = "Open";
 
+const ASN_STATUS_FILTER_ALL = "";
+const ASN_STATUS_FILTER_BUTTONS = [
+  { label: "All", value: ASN_STATUS_FILTER_ALL },
+  { divider: true },
+  { label: "Open", value: ASN_STATUS_OPEN },
+  { label: "Picked Up", value: ASN_STATUS_PICKED_UP },
+];
+
+let asnActiveStatusFilter = ASN_STATUS_OPEN;
+
 const ASN_REQUEST_TABLE_COLUMNS = [
   ASN_REQUEST_ID_FIELD,
   ASN_STATUS_FIELD,
@@ -276,6 +286,9 @@ function openAsnRequestDetail(id) {
 function applyAsnRequestFilters() {
   const q = (document.getElementById("asnRequestSearchInput")?.value ?? "").toLowerCase();
   filteredAsnRequests = allAsnRequests.filter(request => {
+    if (asnActiveStatusFilter && getAsnRequestStatus(request) !== asnActiveStatusFilter) {
+      return false;
+    }
     if (!q) return true;
     return ASN_REQUEST_TABLE_COLUMNS
       .filter(col => col !== "Action")
@@ -292,6 +305,41 @@ function applyAsnRequestFilters() {
   });
   renderAsnRequestTable();
   updateAsnRequestRowCounter();
+}
+
+function syncAsnStatusFilterToolbar() {
+  document.querySelectorAll("#asnStatusFilters .filter-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.status === asnActiveStatusFilter);
+  });
+}
+
+function setAsnStatusFilter(status) {
+  asnActiveStatusFilter = String(status ?? "");
+  syncAsnStatusFilterToolbar();
+  applyAsnRequestFilters();
+}
+
+function initAsnStatusFilters() {
+  const statusGroup = document.getElementById("asnStatusFilters");
+  if (!statusGroup) return;
+  statusGroup.replaceChildren();
+  ASN_STATUS_FILTER_BUTTONS.forEach(item => {
+    if (item.divider) {
+      const divider = document.createElement("div");
+      divider.className = "filter-btn-group-divider";
+      divider.setAttribute("aria-hidden", "true");
+      statusGroup.appendChild(divider);
+      return;
+    }
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "filter-btn";
+    btn.dataset.status = item.value;
+    btn.textContent = item.label;
+    btn.addEventListener("click", () => setAsnStatusFilter(item.value));
+    statusGroup.appendChild(btn);
+  });
+  syncAsnStatusFilterToolbar();
 }
 
 function updateAsnRequestRowCounter() {
@@ -1478,6 +1526,7 @@ function initAsnRequests() {
   document.querySelector('[data-dismiss="asn-request"]')?.addEventListener("click", closeAsnRequestModal);
   bindDirectBackdropDismiss(document.getElementById("asnRequestOverlay"), closeAsnRequestModal);
   document.getElementById("asnRequestSearchInput")?.addEventListener("input", applyAsnRequestFilters);
+  initAsnStatusFilters();
 }
 
 initAsnRequests();

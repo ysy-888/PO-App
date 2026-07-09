@@ -1317,34 +1317,37 @@ function openSalesOrderModal(order) {
   </select>
 </label>`;
 
+  const customerEmail = getCustomerEmailForSalesOrder(order);
   const outreachEditorHtml = portal ? "" : `
-<div class="so-outreach-add">
-  <input type="date" id="soOutreachDate" class="shipment-form-input so-outreach-date" />
-  <select id="soOutreachMethod" class="filter-select so-outreach-method-select">
-    ${SO_OUTREACH_METHODS.map(m => `<option value="${escSo(m)}">${escSo(soOutreachMethodLabel(m))}</option>`).join("")}
-  </select>
-  <input type="text" id="soOutreachNotes" class="shipment-form-input so-outreach-notes-input" placeholder="Notes" maxlength="2000" />
-  <button type="button" class="btn so-outreach-add-btn" id="soOutreachAddBtn">Add</button>
-</div>
 <div class="so-outreach-email-row">
+  <p class="so-outreach-customer-email">
+    <span class="so-outreach-customer-email-label">Customer Email</span>
+    <span class="so-outreach-customer-email-value${customerEmail ? "" : " is-missing"}">${escSo(customerEmail || "No email on file")}</span>
+  </p>
   <select id="soOutreachEmailTemplate" class="filter-select so-outreach-template-select">
     ${SO_OUTREACH_EMAIL_TEMPLATES.map(t => `<option value="${escSo(t.key)}">${escSo(t.label)}</option>`).join("")}
   </select>
-  <button type="button" class="btn btn-primary so-outreach-send-btn" id="soOutreachSendBtn">Send Email</button>
+  <button type="button" class="btn btn-primary so-outreach-send-btn" id="soOutreachSendBtn"${customerEmail ? "" : " disabled"}>Send Email</button>
   <span class="so-memo-status" id="soOutreachEmailStatus"></span>
+</div>
+<div class="so-outreach-manual">
+  <button type="button" class="btn btn-secondary so-outreach-new-btn" id="soOutreachNewBtn">+ New Outreach</button>
+  <div class="so-outreach-add" id="soOutreachAddRow" hidden>
+    <input type="date" id="soOutreachDate" class="shipment-form-input so-outreach-date" />
+    <select id="soOutreachMethod" class="filter-select so-outreach-method-select">
+      ${SO_OUTREACH_METHODS.map(m => `<option value="${escSo(m)}">${escSo(soOutreachMethodLabel(m))}</option>`).join("")}
+    </select>
+    <input type="text" id="soOutreachNotes" class="shipment-form-input so-outreach-notes-input" placeholder="Notes" maxlength="2000" />
+    <button type="button" class="btn so-outreach-add-btn" id="soOutreachAddBtn">Add</button>
+  </div>
 </div>`;
 
-  const customerEmail = getCustomerEmailForSalesOrder(order);
   const outreachSection = `
 <div class="so-outreach-section">
   <div class="so-outreach-header">
     <div class="so-section-title">Outreach Log <span class="so-linked-count" id="soOutreachCount"></span></div>
     ${outreachStatusControl}
   </div>
-  <p class="so-outreach-customer-email">
-    <span class="so-outreach-customer-email-label">Customer Email</span>
-    <span class="so-outreach-customer-email-value${customerEmail ? "" : " is-missing"}">${escSo(customerEmail || "No email on file")}</span>
-  </p>
   <div class="so-outreach-list" id="soOutreachList"></div>
   ${outreachEditorHtml}
 </div>`;
@@ -1528,9 +1531,18 @@ ${outreachSection}
     });
   }
 
+  const outreachNewBtn = bodyEl.querySelector("#soOutreachNewBtn");
+  const outreachAddRow = bodyEl.querySelector("#soOutreachAddRow");
   const outreachDate = bodyEl.querySelector("#soOutreachDate");
   const outreachAddBtn = bodyEl.querySelector("#soOutreachAddBtn");
   if (outreachDate) outreachDate.value = formatDateToYmd(new Date());
+  if (outreachNewBtn && outreachAddRow) {
+    outreachNewBtn.addEventListener("click", () => {
+      outreachAddRow.hidden = false;
+      outreachNewBtn.hidden = true;
+      outreachDate?.focus();
+    });
+  }
   if (outreachAddBtn) {
     outreachAddBtn.addEventListener("click", async () => {
       const date = outreachDate?.value ?? "";
@@ -1547,6 +1559,8 @@ ${outreachSection}
         order["Outreach Log"] = json.outreachLog;
         if (notesInput) notesInput.value = "";
         renderSoOutreachLog(order);
+        if (outreachAddRow) outreachAddRow.hidden = true;
+        if (outreachNewBtn) outreachNewBtn.hidden = false;
         showIndicator(`Outreach logged ${CHECK_MARK}`, "success");
       } catch (err) {
         showIndicator("Log failed: " + err.message, "error");
@@ -1559,7 +1573,10 @@ ${outreachSection}
   const outreachSendBtn = bodyEl.querySelector("#soOutreachSendBtn");
   const outreachEmailStatus = bodyEl.querySelector("#soOutreachEmailStatus");
   if (outreachSendBtn) {
+    const hasCustomerEmail = Boolean(customerEmail);
+    outreachSendBtn.disabled = !hasCustomerEmail;
     outreachSendBtn.addEventListener("click", async () => {
+      if (!hasCustomerEmail || outreachSendBtn.disabled) return;
       const template = bodyEl.querySelector("#soOutreachEmailTemplate")?.value ?? "";
       outreachSendBtn.disabled = true;
       if (outreachEmailStatus) { outreachEmailStatus.textContent = "Sending…"; outreachEmailStatus.className = "so-memo-status"; }
@@ -1575,7 +1592,7 @@ ${outreachSection}
         if (outreachEmailStatus) { outreachEmailStatus.textContent = err.message || "Error"; outreachEmailStatus.className = "so-memo-status is-error"; }
         showIndicator("Outreach email failed: " + err.message, "error");
       } finally {
-        outreachSendBtn.disabled = false;
+        outreachSendBtn.disabled = !hasCustomerEmail;
       }
     });
   }

@@ -89,6 +89,7 @@ function initShipments() {
   bindDirectBackdropDismiss(document.getElementById("createShipmentOverlay"), closeCreateShipmentModal);
 
   initShipmentSelection();
+  initShipmentStatusFilters();
   switchAppView("dashboard");
   if (typeof refreshSplitViewLayoutIfReady === "function") refreshSplitViewLayoutIfReady();
 }

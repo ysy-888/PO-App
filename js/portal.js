@@ -42,6 +42,29 @@ function getUserDisplayLabel(userId, fallbackEmail = "") {
   return String(fallbackEmail || "Unknown");
 }
 
+/** Display name for the signed-in user (greeting). */
+function getCurrentUserDisplayName() {
+  const label = getUserDisplayLabel(currentUserId, currentUserEmail);
+  if (!label || label === "Unknown") return "";
+  // If we only have an email, show the local-part rather than the full address.
+  if (label.includes("@")) return label.split("@")[0];
+  return label;
+}
+
+function updateHeaderGreeting() {
+  const wrap = document.getElementById("headerGreeting");
+  const nameEl = document.getElementById("headerGreetingName");
+  if (!wrap || !nameEl) return;
+  const name = getCurrentUserDisplayName();
+  if (!name) {
+    wrap.hidden = true;
+    nameEl.textContent = "";
+    return;
+  }
+  nameEl.textContent = name;
+  wrap.hidden = false;
+}
+
 /**
  * Default columns hidden from the portal's Sales Orders table when the tenant
  * has not saved a custom portal layout via the "Place Showroom Portal" target
@@ -106,6 +129,7 @@ function setPortalStateFromAppState(json) {
   if (json && json.portalMode !== undefined) {
     portalModeActive = json.portalMode === true;
   }
+  updateHeaderGreeting();
   if (portalModeActive) applyPortalModeUi();
 }
 

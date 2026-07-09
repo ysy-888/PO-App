@@ -10,6 +10,16 @@ const SHIPMENT_RECEIVED_DATE_FIELD = "Received Date";
 const SHIPMENT_STATUS_RECEIVED = "Received";
 const SHIPMENT_STATUS_OPEN = "Open";
 
+const SHIPMENT_STATUS_FILTER_ALL = "";
+const SHIPMENT_STATUS_FILTER_BUTTONS = [
+  { label: "All", value: SHIPMENT_STATUS_FILTER_ALL },
+  { divider: true },
+  { label: "Open", value: SHIPMENT_STATUS_OPEN },
+  { label: "Received", value: SHIPMENT_STATUS_RECEIVED },
+];
+
+let shipmentActiveStatusFilter = SHIPMENT_STATUS_OPEN;
+
 const SHIPMENT_TABLE_COLUMNS = [
   "Shipment ID", SHIPMENT_STATUS_FIELD, SHIPMENT_EXF_REQUEST_ID_FIELD, "Ship Method", "PO Count", "Vessel", "House #", "EXF",
   "Shipped", "ETD", "ETA", "IHD", "Notes"
@@ -358,6 +368,7 @@ function switchRequestType(type) {
   }
 
   updateRequestsRowCounter();
+  syncViewActionToolbars(currentAppView);
 }
 
 function updateRequestsRowCounter() {
@@ -392,21 +403,35 @@ function isSplitViewLayoutEnabled() {
 }
 
 function syncViewActionToolbars(view = currentAppView) {
-  const configs = [
-    { toolbarId: "shipmentToolbar", buttonId: "deleteShipmentBtn", activeView: "shipments" },
-    { toolbarId: "chargebackToolbar", buttonId: "deleteChargebackBtn", activeView: "chargebacks" },
-    { toolbarId: "customersToolbar", buttonId: "customersBatchEmailBtn", activeView: "customers" },
-    { toolbarId: "packingReviewToolbar", buttonId: "packingReviewApproveAllBtn", activeView: "packingReviews" },
+  const allToolbars = [
+    "shipmentToolbar",
+    "requestsToolbar",
+    "chargebackToolbar",
+    "customersToolbar",
+    "packingReviewToolbar",
+    "stylesToolbar",
   ];
-
-  configs.forEach(({ toolbarId, buttonId, activeView }) => {
-    const toolbar = document.getElementById(toolbarId);
-    const button = document.getElementById(buttonId);
-    if (!toolbar) return;
-    const viewActive = view === activeView;
-    const hasVisibleAction = button && !button.hidden;
-    toolbar.hidden = !viewActive || !hasVisibleAction;
+  allToolbars.forEach(id => {
+    const toolbar = document.getElementById(id);
+    if (toolbar) toolbar.hidden = true;
   });
+
+  const viewToolbarMap = {
+    shipments: "shipmentToolbar",
+    requests: "requestsToolbar",
+    chargebacks: "chargebackToolbar",
+    customers: "customersToolbar",
+    packingReviews: "packingReviewToolbar",
+    styles: "stylesToolbar",
+  };
+  const activeId = viewToolbarMap[view];
+  if (activeId) {
+    const toolbar = document.getElementById(activeId);
+    if (toolbar) toolbar.hidden = false;
+  }
+
+  const asnStatusCluster = document.getElementById("asnStatusFilterCluster");
+  if (asnStatusCluster) asnStatusCluster.hidden = !(view === "requests" && currentRequestType === "asn");
 }
 
 function switchAppView(view) {
@@ -537,6 +562,9 @@ function switchAppView(view) {
 function applyShipmentFilters() {
   const q = (document.getElementById("shipmentSearchInput")?.value ?? "").toLowerCase();
   filteredShipments = allShipments.filter(shipment => {
+    if (shipmentActiveStatusFilter && getShipmentStatus(shipment) !== shipmentActiveStatusFilter) {
+      return false;
+    }
     if (!q) return true;
     const haystack = SHIPMENT_TABLE_COLUMNS.map(col => {
       if (col === "PO Count") return String(countPosForShipment(shipment[SHIPMENT_ID_FIELD]));
@@ -550,6 +578,41 @@ function applyShipmentFilters() {
   renderShipmentsTable();
   updateShipmentSelectAllHeader();
   updateDeleteShipmentButton();
+}
+
+function syncShipmentStatusFilterToolbar() {
+  document.querySelectorAll("#shipmentStatusFilters .filter-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.status === shipmentActiveStatusFilter);
+  });
+}
+
+function setShipmentStatusFilter(status) {
+  shipmentActiveStatusFilter = String(status ?? "");
+  syncShipmentStatusFilterToolbar();
+  applyShipmentFilters();
+}
+
+function initShipmentStatusFilters() {
+  const statusGroup = document.getElementById("shipmentStatusFilters");
+  if (!statusGroup) return;
+  statusGroup.replaceChildren();
+  SHIPMENT_STATUS_FILTER_BUTTONS.forEach(item => {
+    if (item.divider) {
+      const divider = document.createElement("div");
+      divider.className = "filter-btn-group-divider";
+      divider.setAttribute("aria-hidden", "true");
+      statusGroup.appendChild(divider);
+      return;
+    }
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "filter-btn";
+    btn.dataset.status = item.value;
+    btn.textContent = item.label;
+    btn.addEventListener("click", () => setShipmentStatusFilter(item.value));
+    statusGroup.appendChild(btn);
+  });
+  syncShipmentStatusFilterToolbar();
 }
 
 function updateShipmentRowCounter() {

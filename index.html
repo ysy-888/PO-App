@@ -42,8 +42,10 @@
     <button type="button" class="app-title-tab" id="navTabPackingReviews" role="tab" aria-selected="false" hidden>Vendor Submissions</button>
   </nav>
   <div class="header-right">
+    <div class="header-greeting" id="headerGreeting" hidden>
+      Hello, <span class="header-greeting-name" id="headerGreetingName"></span>
+    </div>
     <div class="header-view-meta" id="poHeaderMeta" hidden>
-      <div class="counter" id="rowCounter">— rows</div>
       <div class="search-wrap header-search-wrap">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
         <input type="search" id="searchInput" placeholder="Search" />
@@ -51,56 +53,48 @@
       </div>
     </div>
     <div class="header-view-meta" id="shipmentHeaderMeta" hidden>
-      <div class="counter" id="shipmentRowCounter">— shipments</div>
       <div class="search-wrap header-search-wrap">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
         <input type="search" id="shipmentSearchInput" placeholder="Search" />
       </div>
     </div>
     <div class="header-view-meta" id="requestsHeaderMeta" hidden>
-      <div class="counter" id="requestsRowCounter">— requests</div>
       <div class="search-wrap header-search-wrap">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
         <input type="search" id="requestsSearchInput" placeholder="Search" />
       </div>
     </div>
     <div class="header-view-meta" id="chargebackHeaderMeta" hidden>
-      <div class="counter" id="chargebackRowCounter">— chargebacks</div>
       <div class="search-wrap header-search-wrap">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
         <input type="search" id="chargebackSearchInput" placeholder="Search" />
       </div>
     </div>
     <div class="header-view-meta" id="customersHeaderMeta" hidden>
-      <div class="counter" id="customersRowCounter">— customers</div>
       <div class="search-wrap header-search-wrap">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
         <input type="search" id="customersSearchInput" placeholder="Search" />
       </div>
     </div>
     <div class="header-view-meta" id="stylesHeaderMeta" hidden>
-      <div class="counter" id="stylesRowCounter">— styles</div>
       <div class="search-wrap header-search-wrap">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
         <input type="search" id="stylesSearchInput" placeholder="Search" />
       </div>
     </div>
     <div class="header-view-meta" id="packingReviewHeaderMeta" hidden>
-      <div class="counter" id="packingReviewRowCounter">— submissions</div>
       <div class="search-wrap header-search-wrap">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
         <input type="search" id="packingReviewSearchInput" placeholder="Search" />
       </div>
     </div>
     <div class="header-view-meta" id="salesOrderHeaderMeta">
-      <div class="counter" id="salesOrderRowCounter">— sales orders</div>
       <div class="search-wrap header-search-wrap">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
         <input type="search" id="salesOrderSearchInput" placeholder="Search" />
       </div>
     </div>
     <div class="header-view-meta" id="invoiceHeaderMeta" hidden>
-      <div class="counter" id="invoiceRowCounter">— invoices</div>
       <div class="search-wrap header-search-wrap">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
         <input type="search" id="invoiceSearchInput" placeholder="Search" />
@@ -157,6 +151,7 @@
   </div>
 
   <div class="toolbar-end">
+    <div class="counter toolbar-row-counter" id="salesOrderRowCounter">— sales orders</div>
     <button type="button" class="btn btn-secondary" id="soClearAllColumnFiltersBtn" hidden>
       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M7 12h10"/><path d="M10 18h4"/><path d="m14 4-4 16"/></svg>
       Clear all filters
@@ -176,6 +171,7 @@
   </div>
 
   <div class="toolbar-end">
+    <div class="counter toolbar-row-counter" id="invoiceRowCounter">— invoices</div>
     <button type="button" class="btn btn-secondary" id="invClearAllColumnFiltersBtn" hidden>
       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M7 12h10"/><path d="M10 18h4"/><path d="m14 4-4 16"/></svg>
       Clear all filters
@@ -195,6 +191,7 @@
   </div>
 
   <div class="toolbar-end">
+    <div class="counter toolbar-row-counter" id="rowCounter">— rows</div>
     <button type="button" class="btn btn-secondary" id="clearAllColumnFiltersBtn" hidden>
       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M7 12h10"/><path d="M10 18h4"/><path d="m14 4-4 16"/></svg>
       Clear all filters
@@ -219,7 +216,13 @@
 </div>
 
 <div id="shipmentToolbar" class="toolbar" hidden>
+  <div class="toolbar-filter-cluster">
+    <div class="toolbar-filter-section">
+      <div class="filter-btn-group status-filters" id="shipmentStatusFilters" role="group" aria-label="Shipment status"></div>
+    </div>
+  </div>
   <div class="toolbar-end">
+    <div class="counter toolbar-row-counter" id="shipmentRowCounter">— shipments</div>
     <button type="button" class="btn btn-danger" id="deleteShipmentBtn" hidden>Delete shipment</button>
   </div>
 </div>
@@ -229,20 +232,40 @@
 <input type="search" id="exfRequestSearchInput" style="display:none" aria-hidden="true" />
 <input type="search" id="asnRequestSearchInput" style="display:none" aria-hidden="true" />
 
+<div id="requestsToolbar" class="toolbar" hidden>
+  <div class="toolbar-filter-cluster" id="asnStatusFilterCluster" hidden>
+    <div class="toolbar-filter-section">
+      <div class="filter-btn-group status-filters" id="asnStatusFilters" role="group" aria-label="ASN request status"></div>
+    </div>
+  </div>
+  <div class="toolbar-end">
+    <div class="counter toolbar-row-counter" id="requestsRowCounter">— requests</div>
+  </div>
+</div>
+
 <div id="chargebackToolbar" class="toolbar" hidden>
   <div class="toolbar-end">
+    <div class="counter toolbar-row-counter" id="chargebackRowCounter">— chargebacks</div>
     <button type="button" class="btn btn-danger" id="deleteChargebackBtn" hidden>Delete chargeback</button>
   </div>
 </div>
 
 <div id="customersToolbar" class="toolbar" hidden>
   <div class="toolbar-end">
+    <div class="counter toolbar-row-counter" id="customersRowCounter">— customers</div>
     <button type="button" class="btn btn-primary" id="customersBatchEmailBtn" hidden>Batch Email</button>
+  </div>
+</div>
+
+<div id="stylesToolbar" class="toolbar" hidden>
+  <div class="toolbar-end">
+    <div class="counter toolbar-row-counter" id="stylesRowCounter">— styles</div>
   </div>
 </div>
 
 <div id="packingReviewToolbar" class="toolbar" hidden>
   <div class="toolbar-end">
+    <div class="counter toolbar-row-counter" id="packingReviewRowCounter">— submissions</div>
     <button type="button" class="btn btn-primary" id="packingReviewApproveAllBtn" hidden>Approve All</button>
   </div>
 </div>
