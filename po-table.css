@@ -9352,6 +9352,123 @@ td.has-pending-approval .pending-approval-value {
 }
 .so-comment-post-btn { flex-shrink: 0; }
 
+/* ── Sales Portal Memo + Outreach log ── */
+.so-portal-memo-text {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.so-outreach-section {
+  padding-top: 12px;
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.so-outreach-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.so-outreach-header .so-section-title { margin-bottom: 0; }
+.so-outreach-status-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary, #888);
+}
+.so-outreach-status-select { min-width: 140px; }
+.so-outreach-status-badge {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text-secondary, #666);
+  background: var(--row-hover, #f8fafc);
+}
+.so-outreach-status-badge[data-status="order-approved"] { color: #16a34a; border-color: #86efac; background: #f0fdf4; }
+.so-outreach-status-badge[data-status="awaiting-reply"] { color: #b45309; border-color: #fcd34d; background: #fffbeb; }
+.so-outreach-status-badge[data-status="no-response"] { color: #dc2626; border-color: #fca5a5; background: #fef2f2; }
+.so-outreach-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 240px;
+  overflow-y: auto;
+  margin-bottom: 10px;
+}
+.so-outreach-empty {
+  color: var(--empty-display, #aaa);
+  font-size: 13px;
+  margin: 0;
+  padding: 2px 0;
+}
+.so-outreach-entry {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 11px;
+}
+.so-outreach-entry-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.so-outreach-method {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--row-hover, #f8fafc);
+  color: var(--text-secondary, #555);
+}
+.so-outreach-method[data-method="email"] { color: #1d4ed8; border-color: #bfdbfe; background: #eff6ff; }
+.so-outreach-when {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+.so-outreach-author {
+  font-size: 11.5px;
+  color: var(--text-secondary, #888);
+  margin-left: auto;
+}
+.so-outreach-notes {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.so-outreach-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.so-outreach-date { width: 130px; }
+.so-outreach-method-select { min-width: 110px; }
+.so-outreach-notes-input { flex: 1; min-width: 160px; }
+.so-outreach-add-btn { flex-shrink: 0; }
+.so-outreach-email-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+.so-outreach-template-select { min-width: 160px; }
+
 /* ── Showroom portal (body.portal-mode) ─────────────────────── */
 /* Elevator Disco only: no division buttons, no toolbar dividers. */
 body.portal-mode #salesOrderToolbar .toolbar-filter-cluster > .toolbar-filter-section:first-child,

@@ -901,6 +901,102 @@ function buildLinkedInvoicesSection(order) {
 </div>`;
 }
 
+// ── Outreach log ─────────────────────────────────────────────────────────────
+
+const SO_OUTREACH_METHODS = ["email", "phone", "text", "instagram", "facebook", "shopify"];
+const SO_OUTREACH_STATUSES = ["No Response", "Awaiting reply", "Order Approved"];
+const SO_OUTREACH_EMAIL_TEMPLATES = [
+  { key: "outreach1", label: "Outreach email 1" },
+  { key: "outreach2", label: "Outreach email 2" },
+];
+
+function soOutreachMethodLabel(method) {
+  const m = String(method ?? "").trim().toLowerCase();
+  return m ? m.charAt(0).toUpperCase() + m.slice(1) : "—";
+}
+
+/** m/d/yy for date-only entries; m/d/yy, h:mm AM/PM when a time is present. */
+function formatSoOutreachTime(at) {
+  const s = String(at ?? "").trim();
+  if (!s) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const [y, m, d] = s.split("-").map(Number);
+    return `${m}/${d}/${String(y).slice(-2)}`;
+  }
+  return formatSoCommentTime(s);
+}
+
+function renderSoOutreachLog(order) {
+  const list = document.getElementById("soOutreachList");
+  const count = document.getElementById("soOutreachCount");
+  if (!list) return;
+
+  const log = Array.isArray(order?.["Outreach Log"]) ? order["Outreach Log"].slice() : [];
+  if (count) count.textContent = log.length ? `(${log.length})` : "";
+
+  // Newest first.
+  log.sort((a, b) => String(b?.at ?? "").localeCompare(String(a?.at ?? "")));
+
+  list.innerHTML = "";
+  if (log.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "so-outreach-empty";
+    empty.textContent = "No outreach logged yet.";
+    list.appendChild(empty);
+    return;
+  }
+
+  log.forEach(entry => {
+    const item = document.createElement("div");
+    item.className = "so-outreach-entry";
+
+    const meta = document.createElement("div");
+    meta.className = "so-outreach-entry-meta";
+
+    const method = document.createElement("span");
+    method.className = "so-outreach-method";
+    method.dataset.method = String(entry?.method ?? "").toLowerCase();
+    method.textContent = soOutreachMethodLabel(entry?.method);
+    meta.appendChild(method);
+
+    const when = document.createElement("span");
+    when.className = "so-outreach-when";
+    when.textContent = formatSoOutreachTime(entry?.at);
+    meta.appendChild(when);
+
+    const authorLabel = typeof getUserDisplayLabel === "function"
+      ? getUserDisplayLabel(String(entry?.authorId ?? ""), String(entry?.author ?? ""))
+      : String(entry?.author ?? "");
+    if (authorLabel && authorLabel !== "Unknown") {
+      const author = document.createElement("span");
+      author.className = "so-outreach-author";
+      author.textContent = authorLabel;
+      meta.appendChild(author);
+    }
+
+    item.appendChild(meta);
+
+    const notes = String(entry?.notes ?? "").trim();
+    if (notes) {
+      const notesEl = document.createElement("div");
+      notesEl.className = "so-outreach-notes";
+      notesEl.textContent = notes;
+      item.appendChild(notesEl);
+    }
+
+    list.appendChild(item);
+  });
+}
+
+function updateSoOutreachStatusBadge(order) {
+  const badge = document.getElementById("soOutreachStatusBadge");
+  if (!badge) return;
+  const status = String(order?.["Outreach Status"] ?? "").trim();
+  badge.textContent = status || "—";
+  badge.dataset.status = status.toLowerCase().replace(/\s+/g, "-");
+  badge.hidden = false;
+}
+
 function formatSoCommentTime(at) {
   const d = new Date(at);
   if (Number.isNaN(d.getTime())) return "";
@@ -1015,6 +1111,60 @@ function openSalesOrderModal(order) {
   </div>
 </div>`;
 
+  // Sales Portal Memo: internal users edit it; showroom users read it.
+  const portalMemoSection = portal
+    ? `
+<div class="so-memo-section so-portal-memo-section">
+  <div class="so-section-title">Sales Portal Memo</div>
+  <p class="so-portal-memo-text">${escSo(String(order["Sales Portal Memo"] ?? "").trim() || "—")}</p>
+</div>`
+    : `
+<div class="so-memo-section so-portal-memo-section">
+  <div class="so-section-title">Sales Portal Memo</div>
+  <textarea class="so-memo-textarea" id="soPortalMemoTextarea" placeholder="Memo shown to the showroom sales team…" rows="3">${escSo(order["Sales Portal Memo"] ?? "")}</textarea>
+  <div class="so-memo-footer">
+    <span class="so-memo-status" id="soPortalMemoStatus"></span>
+    <button type="button" class="so-memo-save-btn" id="soPortalMemoSaveBtn">Save</button>
+  </div>
+</div>`;
+
+  // Outreach: log + status visible to everyone; editing is internal-only.
+  const outreachStatusControl = portal
+    ? `<span class="so-outreach-status-badge" id="soOutreachStatusBadge"></span>`
+    : `<label class="so-outreach-status-label">Status
+  <select id="soOutreachStatusSelect" class="filter-select so-outreach-status-select">
+    <option value="">—</option>
+    ${SO_OUTREACH_STATUSES.map(s => `<option value="${escSo(s)}"${String(order["Outreach Status"] ?? "") === s ? " selected" : ""}>${escSo(s)}</option>`).join("")}
+  </select>
+</label>`;
+
+  const outreachEditorHtml = portal ? "" : `
+<div class="so-outreach-add">
+  <input type="date" id="soOutreachDate" class="shipment-form-input so-outreach-date" />
+  <select id="soOutreachMethod" class="filter-select so-outreach-method-select">
+    ${SO_OUTREACH_METHODS.map(m => `<option value="${escSo(m)}">${escSo(soOutreachMethodLabel(m))}</option>`).join("")}
+  </select>
+  <input type="text" id="soOutreachNotes" class="shipment-form-input so-outreach-notes-input" placeholder="Notes" maxlength="2000" />
+  <button type="button" class="btn so-outreach-add-btn" id="soOutreachAddBtn">Add</button>
+</div>
+<div class="so-outreach-email-row">
+  <select id="soOutreachEmailTemplate" class="filter-select so-outreach-template-select">
+    ${SO_OUTREACH_EMAIL_TEMPLATES.map(t => `<option value="${escSo(t.key)}">${escSo(t.label)}</option>`).join("")}
+  </select>
+  <button type="button" class="btn btn-primary so-outreach-send-btn" id="soOutreachSendBtn">Send Email</button>
+  <span class="so-memo-status" id="soOutreachEmailStatus"></span>
+</div>`;
+
+  const outreachSection = `
+<div class="so-outreach-section">
+  <div class="so-outreach-header">
+    <div class="so-section-title">Outreach Log <span class="so-linked-count" id="soOutreachCount"></span></div>
+    ${outreachStatusControl}
+  </div>
+  <div class="so-outreach-list" id="soOutreachList"></div>
+  ${outreachEditorHtml}
+</div>`;
+
   bodyEl.innerHTML = `
 <div class="so-modal-columns">
 <div class="so-modal-main">
@@ -1035,6 +1185,8 @@ function openSalesOrderModal(order) {
 
 ${portal ? "" : buildLinkedInvoicesSection(order)}
 ${memoSection}
+${portalMemoSection}
+${outreachSection}
 ${portal ? "" : buildLinkedPosSection(order)}
 </div>
 
@@ -1117,6 +1269,113 @@ ${portal ? "" : buildLinkedPosSection(order)}
         if (memoStatus) { memoStatus.textContent = err.message || "Error"; memoStatus.className = "so-memo-status is-error"; }
       } finally {
         memoSaveBtn.disabled = false;
+      }
+    });
+  }
+
+  // Wire Sales Portal Memo save (internal only — portal renders plain text)
+  const portalMemoTextarea = bodyEl.querySelector("#soPortalMemoTextarea");
+  const portalMemoSaveBtn = bodyEl.querySelector("#soPortalMemoSaveBtn");
+  const portalMemoStatus = bodyEl.querySelector("#soPortalMemoStatus");
+  if (portalMemoSaveBtn && portalMemoTextarea) {
+    let savedPortalMemo = String(order["Sales Portal Memo"] ?? "");
+    const updatePortalMemoSaveVisibility = () => {
+      portalMemoSaveBtn.hidden = portalMemoTextarea.value === savedPortalMemo;
+    };
+    updatePortalMemoSaveVisibility();
+    portalMemoTextarea.addEventListener("input", updatePortalMemoSaveVisibility);
+
+    portalMemoSaveBtn.addEventListener("click", async () => {
+      portalMemoSaveBtn.disabled = true;
+      if (portalMemoStatus) { portalMemoStatus.textContent = "Saving…"; portalMemoStatus.className = "so-memo-status"; }
+      try {
+        const json = await postApi("/api/sales-orders/portal-memo", { soNumber: soNum, memo: portalMemoTextarea.value });
+        if (!json.success) throw new Error(json.error || "Failed to save memo.");
+        order["Sales Portal Memo"] = json.memo;
+        savedPortalMemo = String(json.memo ?? "");
+        updatePortalMemoSaveVisibility();
+        if (portalMemoStatus) { portalMemoStatus.textContent = "Saved"; portalMemoStatus.className = "so-memo-status is-saved"; }
+        setTimeout(() => { if (portalMemoStatus) portalMemoStatus.textContent = ""; }, 2500);
+      } catch (err) {
+        if (portalMemoStatus) { portalMemoStatus.textContent = err.message || "Error"; portalMemoStatus.className = "so-memo-status is-error"; }
+      } finally {
+        portalMemoSaveBtn.disabled = false;
+      }
+    });
+  }
+
+  // Outreach log: render + wire the internal-only controls
+  renderSoOutreachLog(order);
+  if (portal) updateSoOutreachStatusBadge(order);
+
+  const outreachStatusSelect = bodyEl.querySelector("#soOutreachStatusSelect");
+  if (outreachStatusSelect) {
+    outreachStatusSelect.addEventListener("change", async () => {
+      const previous = String(order["Outreach Status"] ?? "");
+      const status = outreachStatusSelect.value;
+      outreachStatusSelect.disabled = true;
+      try {
+        const json = await postApi("/api/sales-orders/outreach-status", { soNumber: soNum, status });
+        if (!json.success) throw new Error(json.error || "Failed to save status.");
+        order["Outreach Status"] = json.outreachStatus;
+        showIndicator(`Outreach status saved ${CHECK_MARK}`, "success");
+      } catch (err) {
+        outreachStatusSelect.value = previous;
+        showIndicator("Status save failed: " + err.message, "error");
+      } finally {
+        outreachStatusSelect.disabled = false;
+      }
+    });
+  }
+
+  const outreachDate = bodyEl.querySelector("#soOutreachDate");
+  const outreachAddBtn = bodyEl.querySelector("#soOutreachAddBtn");
+  if (outreachDate) outreachDate.value = formatDateToYmd(new Date());
+  if (outreachAddBtn) {
+    outreachAddBtn.addEventListener("click", async () => {
+      const date = outreachDate?.value ?? "";
+      const method = bodyEl.querySelector("#soOutreachMethod")?.value ?? "";
+      const notesInput = bodyEl.querySelector("#soOutreachNotes");
+      if (!date) { showIndicator("Enter the outreach date", "error"); return; }
+      outreachAddBtn.disabled = true;
+      try {
+        const json = await postApi("/api/sales-orders/outreach-log", {
+          soNumber: soNum,
+          entry: { date, method, notes: notesInput?.value ?? "" },
+        });
+        if (!json.success) throw new Error(json.error || "Failed to add log entry.");
+        order["Outreach Log"] = json.outreachLog;
+        if (notesInput) notesInput.value = "";
+        renderSoOutreachLog(order);
+        showIndicator(`Outreach logged ${CHECK_MARK}`, "success");
+      } catch (err) {
+        showIndicator("Log failed: " + err.message, "error");
+      } finally {
+        outreachAddBtn.disabled = false;
+      }
+    });
+  }
+
+  const outreachSendBtn = bodyEl.querySelector("#soOutreachSendBtn");
+  const outreachEmailStatus = bodyEl.querySelector("#soOutreachEmailStatus");
+  if (outreachSendBtn) {
+    outreachSendBtn.addEventListener("click", async () => {
+      const template = bodyEl.querySelector("#soOutreachEmailTemplate")?.value ?? "";
+      outreachSendBtn.disabled = true;
+      if (outreachEmailStatus) { outreachEmailStatus.textContent = "Sending…"; outreachEmailStatus.className = "so-memo-status"; }
+      try {
+        const json = await postApi("/api/sales-orders/outreach-email", { soNumber: soNum, template }, { timeoutMs: 120000 });
+        if (!json.success) throw new Error(json.error || "Send failed.");
+        order["Outreach Log"] = json.outreachLog;
+        renderSoOutreachLog(order);
+        if (outreachEmailStatus) { outreachEmailStatus.textContent = `Sent to ${json.to}`; outreachEmailStatus.className = "so-memo-status is-saved"; }
+        showIndicator(`Outreach email sent ${CHECK_MARK}`, "success");
+        setTimeout(() => { if (outreachEmailStatus) outreachEmailStatus.textContent = ""; }, 4000);
+      } catch (err) {
+        if (outreachEmailStatus) { outreachEmailStatus.textContent = err.message || "Error"; outreachEmailStatus.className = "so-memo-status is-error"; }
+        showIndicator("Outreach email failed: " + err.message, "error");
+      } finally {
+        outreachSendBtn.disabled = false;
       }
     });
   }

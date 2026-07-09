@@ -14,8 +14,83 @@ import {
   salesOrderValuesEqual,
 } from "../salesOrderHelpers.js";
 import { requestCalendarSync } from "../calendarSync.js";
+import { sendEmail } from "../email.js";
+import { buildCustomerEmailHtml } from "../emailTemplates.js";
+import { archiveAttachmentsToDrive } from "../google.js";
+import { buildSalesOrderPdfAttachment } from "../salesOrderPdf.js";
 
 const router = Router();
+
+// ── Outreach constants ────────────────────────────────────────────────────────
+
+const OUTREACH_METHODS = new Set(["email", "phone", "text", "instagram", "facebook", "shopify"]);
+const OUTREACH_STATUSES = new Set(["", "No Response", "Awaiting reply", "Order Approved"]);
+
+/**
+ * Customer outreach email templates. The body supports {customer} and
+ * {soNumber} placeholders; the shared customer email shell supplies the
+ * general design (header, footer, styling).
+ */
+const OUTREACH_EMAIL_TEMPLATES = {
+  outreach1: {
+    label: "Outreach email 1",
+    subject: (soNum) => `[ELEVATOR DISCO] Sales Order #${soNum} — Order Details`,
+    body: (customer, soNum) => [
+      `Hi ${customer || "there"},`,
+      "",
+      `Thank you for your order! Please find attached the details for your sales order #${soNum}.`,
+      "",
+      "Kindly review and confirm at your earliest convenience. If anything needs to be adjusted, just reply to this email and we'll take care of it.",
+      "",
+      "Best regards,",
+      "Elevator Disco",
+      "www.elevatordisco.com",
+    ].join("\n"),
+  },
+  outreach2: {
+    label: "Outreach email 2",
+    subject: (soNum) => `[ELEVATOR DISCO] Following up — Sales Order #${soNum}`,
+    body: (customer, soNum) => [
+      `Hi ${customer || "there"},`,
+      "",
+      `Just following up on our previous email regarding sales order #${soNum} — the order details are attached again for your convenience.`,
+      "",
+      "Please let us know if you'd like to confirm the order as-is or make any changes. We want to make sure everything ships on schedule for you.",
+      "",
+      "Best regards,",
+      "Elevator Disco",
+      "www.elevatordisco.com",
+    ].join("\n"),
+  },
+};
+
+/** Fetch a sales order row by SO number; returns { row, errorResponse }. */
+async function fetchSalesOrderRow(tenantId, soNumber) {
+  const entityId = salesOrderEntityId(soNumber);
+  if (!entityId) return { row: null, status: 400, error: "Invalid soNumber." };
+
+  const { data: existing, error: fetchErr } = await supabase
+    .from("sales_orders")
+    .select("id, data")
+    .eq("tenant_id", tenantId)
+    .eq("entity_id", entityId)
+    .single();
+
+  if (fetchErr || !existing) return { row: null, status: 404, error: "Sales order not found." };
+  return { row: existing };
+}
+
+/** Persist a merged data patch onto a fetched sales order row. */
+async function updateSalesOrderData(tenantId, row, patch) {
+  const updatedData = { ...(row.data || {}), ...patch };
+  const { error } = await supabase
+    .from("sales_orders")
+    .update({ data: updatedData })
+    .eq("id", row.id)
+    .eq("tenant_id", tenantId);
+  if (error) throw error;
+  return updatedData;
+}
 
 // Any successful SO write may change CXL dates → refresh the calendar soon after.
 router.use((_req, res, next) => {
@@ -207,6 +282,167 @@ router.post("/comment", requireAuth, async (req, res) => {
   }
 
   return res.json({ success: true, comments });
+});
+
+// ── Sales Portal Memo (internal-only; portal accounts are blocked in auth) ──
+
+router.post("/portal-memo", requireAuth, async (req, res) => {
+  const { soNumber, memo } = req.body ?? {};
+  if (!soNumber && soNumber !== 0) {
+    return res.status(400).json({ success: false, error: "Missing soNumber." });
+  }
+
+  try {
+    const { row, status, error } = await fetchSalesOrderRow(req.tenantId, soNumber);
+    if (!row) return res.status(status).json({ success: false, error });
+
+    const value = String(memo ?? "").trim();
+    await updateSalesOrderData(req.tenantId, row, { "Sales Portal Memo": value });
+    return res.json({ success: true, memo: value });
+  } catch (err) {
+    console.error("sales_orders portal-memo failed:", err);
+    return res.status(500).json({ success: false, error: "Failed to save Sales Portal Memo." });
+  }
+});
+
+// ── Outreach log / status / email ────────────────────────────────────────────
+
+router.post("/outreach-log", requireAuth, async (req, res) => {
+  const { soNumber, entry } = req.body ?? {};
+  if (!soNumber && soNumber !== 0) {
+    return res.status(400).json({ success: false, error: "Missing soNumber." });
+  }
+  const method = String(entry?.method ?? "").trim().toLowerCase();
+  if (!OUTREACH_METHODS.has(method)) {
+    return res.status(400).json({ success: false, error: "Invalid outreach method." });
+  }
+  const date = String(entry?.date ?? "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return res.status(400).json({ success: false, error: "Entry date is required (YYYY-MM-DD)." });
+  }
+  const notes = String(entry?.notes ?? "").trim().slice(0, 2000);
+
+  try {
+    const { row, status, error } = await fetchSalesOrderRow(req.tenantId, soNumber);
+    if (!row) return res.status(status).json({ success: false, error });
+
+    const log = Array.isArray(row.data?.["Outreach Log"]) ? row.data["Outreach Log"].slice() : [];
+    log.push({
+      at: date,
+      method,
+      notes,
+      manual: true,
+      authorId: req.userId,
+      author: req.userEmail || "Unknown",
+      createdAt: new Date().toISOString(),
+    });
+
+    await updateSalesOrderData(req.tenantId, row, { "Outreach Log": log });
+    return res.json({ success: true, outreachLog: log });
+  } catch (err) {
+    console.error("sales_orders outreach-log failed:", err);
+    return res.status(500).json({ success: false, error: "Failed to save outreach log entry." });
+  }
+});
+
+router.post("/outreach-status", requireAuth, async (req, res) => {
+  const { soNumber } = req.body ?? {};
+  const status = String(req.body?.status ?? "").trim();
+  if (!soNumber && soNumber !== 0) {
+    return res.status(400).json({ success: false, error: "Missing soNumber." });
+  }
+  if (!OUTREACH_STATUSES.has(status)) {
+    return res.status(400).json({ success: false, error: "Invalid outreach status." });
+  }
+
+  try {
+    const { row, status: httpStatus, error } = await fetchSalesOrderRow(req.tenantId, soNumber);
+    if (!row) return res.status(httpStatus).json({ success: false, error });
+
+    await updateSalesOrderData(req.tenantId, row, { "Outreach Status": status });
+    return res.json({ success: true, outreachStatus: status });
+  } catch (err) {
+    console.error("sales_orders outreach-status failed:", err);
+    return res.status(500).json({ success: false, error: "Failed to save outreach status." });
+  }
+});
+
+/**
+ * POST /api/sales-orders/outreach-email
+ * Body: { soNumber, template: "outreach1" | "outreach2", to?: string }
+ * Sends a customer outreach email (general email design) with the Sales
+ * Order details PDF attached, then appends an entry to the Outreach Log.
+ * The recipient comes from the Customers DB unless `to` overrides it.
+ */
+router.post("/outreach-email", requireAuth, async (req, res) => {
+  const { soNumber } = req.body ?? {};
+  const templateKey = String(req.body?.template ?? "").trim();
+  if (!soNumber && soNumber !== 0) {
+    return res.status(400).json({ success: false, error: "Missing soNumber." });
+  }
+  const template = OUTREACH_EMAIL_TEMPLATES[templateKey];
+  if (!template) {
+    return res.status(400).json({ success: false, error: "Unknown outreach email template." });
+  }
+
+  try {
+    const { row, status, error } = await fetchSalesOrderRow(req.tenantId, soNumber);
+    if (!row) return res.status(status).json({ success: false, error });
+
+    const soData = row.data || {};
+    const soNum = String(soData["SO #"] ?? soNumber).trim();
+    const customerName = String(soData["Customer"] ?? "").trim();
+
+    // Recipient: explicit override, else the customer record's email.
+    let to = String(req.body?.to ?? "").trim();
+    if (!to && customerName) {
+      const { data: customerRow } = await supabase
+        .from("customers")
+        .select("data")
+        .eq("tenant_id", req.tenantId)
+        .eq("entity_id", customerName)
+        .maybeSingle();
+      to = String(customerRow?.data?.["Email"] ?? "").trim();
+    }
+    if (!to) {
+      return res.status(400).json({
+        success: false,
+        error: `No email on file for customer "${customerName}". Add one in the Customers tab or enter an address.`,
+      });
+    }
+
+    const bodyText = template.body(customerName, soNum);
+    const attachment = await buildSalesOrderPdfAttachment(supabase, req.tenantId, soData);
+
+    const result = await sendEmail({
+      to,
+      subject: template.subject(soNum),
+      text: bodyText,
+      html: buildCustomerEmailHtml(bodyText),
+      attachments: [attachment],
+    });
+    if (!result.emailSent) {
+      return res.json({ success: false, error: result.emailError || "Send failed.", emailSent: false });
+    }
+    archiveAttachmentsToDrive([attachment]);
+
+    // Auto-log the send.
+    const log = Array.isArray(soData["Outreach Log"]) ? soData["Outreach Log"].slice() : [];
+    log.push({
+      at: new Date().toISOString(),
+      method: "email",
+      notes: `Sent "${template.label}" to ${to}`,
+      template: templateKey,
+      authorId: req.userId,
+      author: req.userEmail || "Unknown",
+    });
+    await updateSalesOrderData(req.tenantId, row, { "Outreach Log": log });
+
+    return res.json({ success: true, emailSent: true, to, outreachLog: log });
+  } catch (err) {
+    console.error("sales_orders outreach-email failed:", err);
+    return res.status(500).json({ success: false, error: err.message || "Failed to send outreach email." });
+  }
 });
 
 router.post("/flag", requireAuth, async (req, res) => {
