@@ -498,6 +498,7 @@ function prepareCurrentEditTableTarget() {
   if (target === "po" && typeof prepareEditTableDraft === "function") prepareEditTableDraft();
   else if (target === "so" && typeof prepareSoEditTableDraft === "function") prepareSoEditTableDraft();
   else if (target === "inv" && typeof prepareInvoiceEditTableDraft === "function") prepareInvoiceEditTableDraft();
+  else if (target === "portal" && typeof preparePortalEditTableDraft === "function") preparePortalEditTableDraft();
 }
 
 function syncEditTableGroupVisibility() {
@@ -505,9 +506,11 @@ function syncEditTableGroupVisibility() {
   const groupPo = document.getElementById("editTableGroupPo");
   const groupSo = document.getElementById("editTableGroupSo");
   const groupInv = document.getElementById("editTableGroupInv");
+  const groupPortal = document.getElementById("editTableGroupPortal");
   if (groupPo) groupPo.hidden = target !== "po";
   if (groupSo) groupSo.hidden = target !== "so";
   if (groupInv) groupInv.hidden = target !== "inv";
+  if (groupPortal) groupPortal.hidden = target !== "portal";
 }
 
 function selectSettingsSection(sectionId) {
@@ -676,6 +679,8 @@ function initSettings() {
       applySoEditTableFromPopover();
     } else if (target === "inv" && typeof applyInvoiceEditTableFromPopover === "function") {
       applyInvoiceEditTableFromPopover();
+    } else if (target === "portal" && typeof applyPortalEditTableFromPopover === "function") {
+      applyPortalEditTableFromPopover();
     }
     closeSettingsModal();
   });
@@ -688,6 +693,8 @@ function initSettings() {
       cancelSoEditTableFromPopover();
     } else if (target === "inv" && typeof cancelInvoiceEditTableFromPopover === "function") {
       cancelInvoiceEditTableFromPopover();
+    } else if (target === "portal" && typeof cancelPortalEditTableFromPopover === "function") {
+      cancelPortalEditTableFromPopover();
     }
     closeSettingsModal();
   });
@@ -698,12 +705,14 @@ function initSettings() {
     if (target === "po" && typeof saveDefaultColumnVisibility === "function") saveDefaultColumnVisibility();
     else if (target === "so" && typeof saveSoEditTableDefault === "function") saveSoEditTableDefault();
     else if (target === "inv" && typeof saveInvEditTableDefault === "function") saveInvEditTableDefault();
+    else if (target === "portal" && typeof savePortalEditTableDefault === "function") savePortalEditTableDefault();
   });
   document.getElementById("editTableResetDefault")?.addEventListener("click", () => {
     const target = getEditTableTarget();
     if (target === "po" && typeof resetEditTableToDefault === "function") resetEditTableToDefault();
     else if (target === "so" && typeof resetSoEditTableToDefault === "function") resetSoEditTableToDefault();
     else if (target === "inv" && typeof resetInvEditTableToDefault === "function") resetInvEditTableToDefault();
+    else if (target === "portal" && typeof resetPortalEditTableToDefault === "function") resetPortalEditTableToDefault();
   });
 
   document.getElementById("invEditTableSelectAll")?.addEventListener("click", () => {
@@ -711,6 +720,13 @@ function initSettings() {
   });
   document.getElementById("invEditTableClearAll")?.addEventListener("click", () => {
     if (typeof setInvEditTableDraftSelectAll === "function") setInvEditTableDraftSelectAll(false);
+  });
+
+  document.getElementById("portalEditTableSelectAll")?.addEventListener("click", () => {
+    if (typeof setPortalEditTableDraftSelectAll === "function") setPortalEditTableDraftSelectAll(true);
+  });
+  document.getElementById("portalEditTableClearAll")?.addEventListener("click", () => {
+    if (typeof setPortalEditTableDraftSelectAll === "function") setPortalEditTableDraftSelectAll(false);
   });
 
   document.getElementById("settingsCountdownToggle")?.addEventListener("click", () => {

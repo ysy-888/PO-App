@@ -132,6 +132,39 @@ router.post("/user-preferences", requireAuth, async (req, res) => {
 });
 
 /**
+ * POST /api/settings/portal-columns
+ * Body: { portalColumns: { order: string[], visible: string[] } }
+ * Persists the tenant-wide Sales Orders column layout shown to showroom
+ * portal accounts (the "Place Showroom Portal" table).
+ */
+router.post("/portal-columns", requireAuth, async (req, res) => {
+  const config = req.body?.portalColumns;
+  if (!config || typeof config !== "object" || Array.isArray(config)
+    || !Array.isArray(config.order) || !Array.isArray(config.visible)) {
+    return res.status(400).json({
+      success: false,
+      error: "portalColumns must be an object with 'order' and 'visible' arrays.",
+    });
+  }
+
+  const clean = {
+    order: config.order.filter(c => typeof c === "string"),
+    visible: config.visible.filter(c => typeof c === "string"),
+  };
+  if (clean.visible.length === 0) {
+    return res.status(400).json({ success: false, error: "At least one column must be visible." });
+  }
+
+  try {
+    await mergeSettings(req.tenantId, { portalColumns: clean });
+    return res.json({ success: true, portalColumns: clean });
+  } catch (err) {
+    console.error("portal-columns failed:", err);
+    return res.status(500).json({ success: false, error: err.message || "Failed to save portal columns." });
+  }
+});
+
+/**
  * POST /api/settings/vendor-submit-mode
  * Body: { mode: "review" | "direct" }
  */

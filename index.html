@@ -1499,6 +1499,7 @@
               <option value="so">Sales Orders</option>
               <option value="po">Purchase Orders</option>
               <option value="inv">Invoices</option>
+              <option value="portal">Place Showroom Portal</option>
             </select>
           </div>
           <p class="edit-table-subtitle">Choose columns on the left. Drag the list on the right to set display order.</p>
@@ -1554,7 +1555,25 @@
             </div>
           </div>
 
-          <!-- Shared for all three tables -->
+          <!-- Place Showroom Portal editor -->
+          <div id="editTableGroupPortal" hidden>
+            <p class="edit-table-subtitle">Columns shown to showroom portal accounts on their Sales Orders view. Saved for the whole team.</p>
+            <div class="edit-table-toolbar-links">
+              <button type="button" class="column-filter-link" id="portalEditTableSelectAll">Select all</button>
+              <span class="column-filter-sep">|</span>
+              <button type="button" class="column-filter-link" id="portalEditTableClearAll">Clear all</button>
+            </div>
+            <div class="edit-table-panels">
+              <div class="edit-table-panel edit-table-panel-picker">
+                <div class="edit-table-picker-list" id="portalEditTableColumnPicker"></div>
+              </div>
+              <div class="edit-table-panel edit-table-panel-order">
+                <div class="edit-table-order-list" id="portalEditTableColumnOrder"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Shared for all tables -->
           <div class="edit-table-default-actions">
             <button type="button" class="btn edit-table-default-btn" id="editTableSaveDefault">Save as default</button>
             <button type="button" class="btn edit-table-default-btn" id="editTableResetDefault">Reset to default</button>

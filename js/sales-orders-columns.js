@@ -335,3 +335,190 @@ function initSoEditTable() {
     document.getElementById("settingsOverlay")?.classList.remove("open");
   });
 }
+
+/* ------------------------------------------------------------------ *
+ * Place Showroom Portal — admin-facing editor for the tenant-wide
+ * Sales Orders column layout shown to showroom portal accounts.
+ * The same SO_COLUMNS drive both tables; this editor persists its
+ * choice to the server (tenant_settings.portalColumns) so it applies
+ * to portal users, who have no Settings access of their own.
+ * ------------------------------------------------------------------ */
+
+let portalColumnOrderDraft = [...SO_COLUMNS];
+let portalColumnVisibilityDraft = new Set(SO_COLUMNS);
+let portalEditTableDragFromIndex = null;
+
+/** Default portal columns when the tenant hasn't saved a custom layout. */
+function getDefaultPortalVisibleColumns() {
+  const hidden = typeof PORTAL_HIDDEN_SO_COLUMNS !== "undefined" ? PORTAL_HIDDEN_SO_COLUMNS : new Set();
+  return SO_COLUMNS.filter(col => !hidden.has(col));
+}
+
+/** Current saved portal layout, or a sensible default. */
+function getPortalConfigOrDefault() {
+  const cfg = typeof getPortalColumnConfig === "function" ? getPortalColumnConfig() : null;
+  const visible = Array.isArray(cfg?.visible)
+    ? cfg.visible.filter(c => SO_COLUMNS.includes(c))
+    : getDefaultPortalVisibleColumns();
+  const order = Array.isArray(cfg?.order)
+    ? cfg.order.filter(c => SO_COLUMNS.includes(c))
+    : [...SO_COLUMNS];
+  return {
+    order: order.length ? order : [...SO_COLUMNS],
+    visible: visible.length ? visible : getDefaultPortalVisibleColumns(),
+  };
+}
+
+function preparePortalEditTableDraft() {
+  const { order, visible } = getPortalConfigOrDefault();
+  portalColumnOrderDraft = normalizeSoColumnOrder(order);
+  portalColumnVisibilityDraft = ensureSoAlwaysVisibleColumns(new Set(visible));
+  renderPortalEditTablePicker();
+  renderPortalEditTableOrder();
+}
+
+function getPortalEditTableOrderKeys(order) {
+  return normalizeSoColumnOrder(order).filter(col =>
+    portalColumnVisibilityDraft.has(col) && !SO_NON_TOGGLEABLE_COLUMNS.has(col)
+  );
+}
+
+function renderPortalEditTablePicker() {
+  const list = document.getElementById("portalEditTableColumnPicker");
+  if (!list) return;
+  list.replaceChildren();
+  getSoEditableColumns().sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" })).forEach(col => {
+    const label = document.createElement("label");
+    label.className = "edit-table-picker-option";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = portalColumnVisibilityDraft.has(col);
+    cb.addEventListener("change", () => {
+      if (cb.checked) {
+        portalColumnVisibilityDraft.add(col);
+        if (!getPortalEditTableOrderKeys(portalColumnOrderDraft).includes(col)) {
+          portalColumnOrderDraft = normalizeSoColumnOrder([...portalColumnOrderDraft, col]);
+        }
+      } else {
+        portalColumnVisibilityDraft.delete(col);
+        portalColumnOrderDraft = normalizeSoColumnOrder(
+          getPortalEditTableOrderKeys(portalColumnOrderDraft).filter(key => key !== col)
+        );
+      }
+      renderPortalEditTableOrder();
+    });
+    const span = document.createElement("span");
+    span.textContent = col;
+    label.appendChild(cb);
+    label.appendChild(span);
+    list.appendChild(label);
+  });
+}
+
+function renderPortalEditTableOrder() {
+  const list = document.getElementById("portalEditTableColumnOrder");
+  if (!list) return;
+  list.replaceChildren();
+  getPortalEditTableOrderKeys(portalColumnOrderDraft).forEach((col, index) => {
+    const item = document.createElement("div");
+    item.className = "edit-table-order-item";
+    item.draggable = true;
+    item.dataset.col = col;
+
+    const handle = document.createElement("span");
+    handle.className = "edit-table-drag-handle";
+    handle.textContent = "⋮⋮";
+    handle.setAttribute("aria-hidden", "true");
+    item.appendChild(handle);
+
+    const labelSpan = document.createElement("span");
+    labelSpan.className = "edit-table-order-item-label";
+    labelSpan.textContent = col;
+    item.appendChild(labelSpan);
+
+    item.addEventListener("dragstart", () => { portalEditTableDragFromIndex = index; });
+    item.addEventListener("dragend", () => { portalEditTableDragFromIndex = null; });
+    item.addEventListener("dragover", e => {
+      e.preventDefault();
+      item.classList.add("is-drag-over");
+    });
+    item.addEventListener("dragleave", () => item.classList.remove("is-drag-over"));
+    item.addEventListener("drop", e => {
+      e.preventDefault();
+      item.classList.remove("is-drag-over");
+      const keys = getPortalEditTableOrderKeys(portalColumnOrderDraft);
+      const from = portalEditTableDragFromIndex;
+      const to = keys.indexOf(col);
+      if (from == null || from < 0 || to < 0 || from === to) return;
+      const next = [...keys];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      portalColumnOrderDraft = normalizeSoColumnOrder([
+        ...SO_COLUMNS.filter(c => !next.includes(c)),
+        ...next,
+      ]);
+      renderPortalEditTableOrder();
+    });
+    list.appendChild(item);
+  });
+}
+
+async function savePortalColumnsToServer(payload) {
+  if (typeof setEditTableFooterMessage === "function") {
+    setEditTableFooterMessage(`Saving portal view${typeof ELLIPSIS !== "undefined" ? ELLIPSIS : "…"}`, "");
+  }
+  try {
+    const json = await postApi("/api/settings/portal-columns", { portalColumns: payload });
+    if (!json.success) throw new Error(json.error);
+    if (typeof setEditTableFooterMessage === "function") {
+      setEditTableFooterMessage("Portal view saved", "success");
+    }
+  } catch (err) {
+    if (typeof setEditTableFooterMessage === "function") {
+      setEditTableFooterMessage("Save portal view failed: " + err.message, "error");
+    }
+  }
+}
+
+function applyPortalEditTableFromPopover() {
+  const visible = getPortalEditTableOrderKeys(portalColumnOrderDraft);
+  if (visible.length === 0) {
+    if (typeof setEditTableFooterMessage === "function") {
+      setEditTableFooterMessage("Select at least one column.", "error");
+    }
+    return false;
+  }
+  const payload = {
+    order: normalizeSoColumnOrder(portalColumnOrderDraft),
+    visible: [...ensureSoAlwaysVisibleColumns(new Set(visible))],
+  };
+  if (typeof setPortalColumnConfig === "function") setPortalColumnConfig(payload);
+  savePortalColumnsToServer(payload);
+  return true;
+}
+
+function cancelPortalEditTableFromPopover() {
+  preparePortalEditTableDraft();
+}
+
+/** Portal layout is tenant-wide, so "Save as default" is the same commit as OK. */
+function savePortalEditTableDefault() {
+  applyPortalEditTableFromPopover();
+}
+
+function resetPortalEditTableToDefault() {
+  portalColumnOrderDraft = normalizeSoColumnOrder([...SO_COLUMNS]);
+  portalColumnVisibilityDraft = ensureSoAlwaysVisibleColumns(new Set(getDefaultPortalVisibleColumns()));
+  renderPortalEditTablePicker();
+  renderPortalEditTableOrder();
+  if (typeof setEditTableFooterMessage === "function") {
+    setEditTableFooterMessage("Reset to default", "success");
+  }
+}
+
+function setPortalEditTableDraftSelectAll(selectAll) {
+  portalColumnVisibilityDraft = selectAll ? new Set(SO_COLUMNS) : new Set();
+  portalColumnOrderDraft = normalizeSoColumnOrder([...SO_COLUMNS]);
+  renderPortalEditTablePicker();
+  renderPortalEditTableOrder();
+}

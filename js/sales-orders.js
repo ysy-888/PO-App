@@ -728,6 +728,15 @@ function getSizeLabelsForLine(line) {
   return Array.from({ length: n }, (_, i) => String(i + 1));
 }
 
+/** Dimmed em-dash placeholder for empty cells in the SO style table. */
+const SO_EMPTY_DASH = '<span class="so-dash">—</span>';
+
+/** escSo(value), or the dimmed em-dash placeholder when value is empty. */
+function soDashOr(value) {
+  const s = String(value ?? "").trim();
+  return s === "" ? SO_EMPTY_DASH : escSo(s);
+}
+
 function buildSoLineItemsTable(lines, order = null) {
   if (!lines || lines.length === 0) {
     return "<p class='so-modal-empty'>No style lines.</p>";
@@ -783,7 +792,7 @@ function buildSoLineItemsTable(lines, order = null) {
       if (i <= sizeQty) {
         const qty = toSoQty(line[`Unit ${i}`]);
         lineTotal += qty;
-        unitCells.push(`<td class="so-size-col td-qty">${qty > 0 ? qty.toLocaleString() : "—"}</td>`);
+        unitCells.push(`<td class="so-size-col td-qty">${qty > 0 ? qty.toLocaleString() : SO_EMPTY_DASH}</td>`);
       } else {
         unitCells.push(`<td class="so-size-col td-qty so-cell-empty">—</td>`);
       }
@@ -797,15 +806,15 @@ function buildSoLineItemsTable(lines, order = null) {
     sumExtPrice += extPrice;
     html += `
 <tr>
-  <td class="so-style-col">${escSo(line["Style #"] ?? "—")}</td>
+  <td class="so-style-col">${soDashOr(line["Style #"])}</td>
   <td class="so-desc-col">${escSo(line["Style Description"] ?? "")}</td>
-  <td class="so-color-col">${escSo(line.Color ?? "—")}</td>
-  <td class="so-status-col"><span class="so-status-badge" data-status="${escSo(statusVal.toLowerCase())}">${escSo(statusVal || "—")}</span></td>
-  <td class="so-cxl-reason-col">${escSo(cxlReason || "—")}</td>
+  <td class="so-color-col">${soDashOr(line.Color)}</td>
+  <td class="so-status-col"><span class="so-status-badge" data-status="${escSo(statusVal.toLowerCase())}">${statusVal ? escSo(statusVal) : SO_EMPTY_DASH}</span></td>
+  <td class="so-cxl-reason-col">${cxlReason ? escSo(cxlReason) : SO_EMPTY_DASH}</td>
   ${unitCells.join("")}
   <td class="so-total-col td-qty">${totalUnits.toLocaleString()}</td>
-  <td class="so-price-col td-num">${price > 0 ? formatSoPrice(price) : "—"}</td>
-  <td class="so-price-col td-num">${extPrice > 0 ? formatSoPrice(extPrice) : "—"}</td>
+  <td class="so-price-col td-num">${price > 0 ? formatSoPrice(price) : SO_EMPTY_DASH}</td>
+  <td class="so-price-col td-num">${extPrice > 0 ? formatSoPrice(extPrice) : SO_EMPTY_DASH}</td>
 </tr>`;
   });
 

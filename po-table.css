@@ -8911,6 +8911,9 @@ td.has-pending-approval .pending-approval-value {
 /* Store → left */
 #salesOrderTable :is(th, td)[data-col="Store"] { text-align: left; }
 
+/* Customer → left */
+#salesOrderTable :is(th, td)[data-col="Customer"] { text-align: left; }
+
 /* Style # list → left, wrapping */
 #salesOrderTable td[data-col="Style #s"] {
   text-align: left;
@@ -9112,10 +9115,10 @@ td.has-pending-approval .pending-approval-value {
   padding-left: 5px;
   padding-right: 5px;
 }
-.so-line-table .so-price-col { width: 52px; min-width: 52px; white-space: nowrap; }
-.so-line-table .so-style-col { font-family: monospace; font-size: 12px; min-width: 70px; }
+.so-line-table .so-price-col { width: 74px; min-width: 74px; white-space: nowrap; }
+.so-line-table .so-style-col { font-family: var(--font); font-size: 12px; min-width: 70px; }
 .so-line-table .so-desc-col { min-width: 200px; color: var(--text-secondary, #666); font-size: 12px; }
-.so-line-table .so-color-col { min-width: 96px; }
+.so-line-table .so-color-col { min-width: 130px; }
 .so-line-table .so-status-col { min-width: 80px; }
 .so-line-table .so-cxl-reason-col {
   min-width: 116px;
@@ -9123,15 +9126,17 @@ td.has-pending-approval .pending-approval-value {
   color: var(--text-secondary, #666);
 }
 .so-line-table .so-total-col {
-  width: 48px;
-  min-width: 48px;
+  width: 68px;
+  min-width: 68px;
   font-weight: 600;
   white-space: nowrap;
 }
 .so-line-table .so-cell-empty { color: var(--empty-display, #ccc); }
+.so-line-table .so-dash { color: var(--empty-display, #ccc); }
 .so-line-table tfoot .so-line-totals-row td {
   background: var(--table-header-bg, #f8fafc);
   border-top: 1px solid var(--border);
+  border-right: none;
   padding: 7px 10px;
   font-weight: 700;
   font-size: 12px;

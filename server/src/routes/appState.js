@@ -52,10 +52,11 @@ router.get("/app-state", requireAuth, async (req, res) => {
   // when it sees portalMode: true.
   if (isPortalRole(req.userRole)) {
     try {
-      const [salesOrdersResult, stylesResult, userSettingsResult, users] = await Promise.all([
+      const [salesOrdersResult, stylesResult, userSettingsResult, tenantSettingsResult, users] = await Promise.all([
         supabase.from("sales_orders").select("data").eq("tenant_id", tid).order("created_at", { ascending: true }),
         supabase.from("styles").select("data").eq("tenant_id", tid),
         supabase.from("user_settings").select("settings").eq("tenant_id", tid).eq("user_id", req.userId).maybeSingle(),
+        supabase.from("tenant_settings").select("settings").eq("tenant_id", tid).maybeSingle(),
         loadTenantUsersSafe(tid),
       ]);
       if (salesOrdersResult.error) {
@@ -103,6 +104,7 @@ router.get("/app-state", requireAuth, async (req, res) => {
         chargebacksEnabled: false,
         vendorSubmissionsEnabled: false,
         userSettings: unwrapSettings(userSettingsResult, "user_settings"),
+        portalColumns: unwrapSettings(tenantSettingsResult, "tenant_settings").portalColumns ?? null,
         defaultColumns: null,
         defaultStatusFilter: "__open__",
       });
@@ -243,6 +245,7 @@ router.get("/app-state", requireAuth, async (req, res) => {
       chargebacksEnabled: settings.chargebacksEnabled !== false,
       vendorSubmissionsEnabled: settings.vendorSubmissionsEnabled !== false,
       userSettings,
+      portalColumns: settings.portalColumns ?? null,
       defaultColumns,
       defaultStatusFilter,
     });
