@@ -8903,7 +8903,7 @@ td.has-pending-approval .pending-approval-value {
 #salesOrderTable .col-cust-type  { width: 112px; min-width: 96px;  max-width: 132px; }
 #salesOrderTable .col-so-styles  { width: 68px;  min-width: 56px;  max-width: 68px; }
 #salesOrderTable .col-so-units   { width: 68px;  min-width: 56px;  max-width: 68px; }
-#salesOrderTable .col-so-price   { width: 84px;  min-width: 72px;  max-width: 104px; }
+#salesOrderTable .col-so-price   { width: 104px; min-width: 92px;  max-width: 124px; }
 #salesOrderTable .col-so-style-nums { width: 420px; min-width: 340px; max-width: 560px; }
 #salesOrderTable .col-so-memo    { min-width: 140px; max-width: 360px; }
 
@@ -8930,10 +8930,65 @@ td.has-pending-approval .pending-approval-value {
 #salesOrderTable .col-so-units,
 #salesOrderTable .col-so-price { text-align: right; }
 
-/* Styles + Total Units + INV QTY → center */
+/* Styles + Total Units + INV QTY + INVOICE # → center */
 #salesOrderTable :is(th, td)[data-col="Styles"],
 #salesOrderTable :is(th, td)[data-col="Total Units"],
-#salesOrderTable :is(th, td)[data-col="INV QTY"] { text-align: center; }
+#salesOrderTable :is(th, td)[data-col="INV QTY"],
+#salesOrderTable :is(th, td)[data-col="INVOICE #"] { text-align: center; }
+
+#salesOrderTable td[data-col="INVOICE #"] .record-link-list--center {
+  justify-content: center;
+  width: 100%;
+}
+
+.invoice-link-summary {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.invoice-count-btn {
+  white-space: nowrap;
+}
+
+.invoice-link-overlay {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  min-width: 120px;
+  max-width: 220px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 6px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border-strong, #cbd5e1);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  text-align: left;
+}
+
+.invoice-link-overlay[hidden] {
+  display: none !important;
+}
+
+.invoice-link-overlay-item {
+  display: block;
+  width: 100%;
+  padding: 4px 8px;
+  border-radius: 4px;
+  text-align: left;
+}
+
+.invoice-link-overlay-item:hover {
+  background: var(--row-hover, #f8fafc);
+}
 
 /* Store → left */
 #salesOrderTable :is(th, td)[data-col="Store"] { text-align: left; }

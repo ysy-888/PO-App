@@ -121,6 +121,22 @@ function createRecordLinkButton(text, className, onClick, title) {
   return btn;
 }
 
+function openLinkedInvoiceFromSo(inv, { closeSalesOrder = false, navFrom = null } = {}) {
+  if (closeSalesOrder) closeSalesOrderModal();
+  if (navFrom && typeof modalNavPush === "function") modalNavPush(navFrom);
+  if (typeof openInvoiceModal === "function") openInvoiceModal(inv);
+}
+
+function createInvoiceLinkButton(inv, options = {}) {
+  const invoiceNo = String(inv?.["Invoice #"] ?? "").trim();
+  return createRecordLinkButton(
+    invoiceNo,
+    "invoice-record-link",
+    () => openLinkedInvoiceFromSo(inv, options),
+    `Open invoice ${invoiceNo}`
+  );
+}
+
 function mountInvoiceLinks(container, invoices, { closeSalesOrder = false, navFrom = null } = {}) {
   if (!container) return;
   container.replaceChildren();
@@ -130,23 +146,74 @@ function mountInvoiceLinks(container, invoices, { closeSalesOrder = false, navFr
     return;
   }
   container.classList.remove("empty-display");
-  const list = document.createElement("span");
-  list.className = "record-link-list";
-  linked.forEach((inv, index) => {
-    if (index > 0) list.appendChild(document.createTextNode(", "));
-    const invoiceNo = String(inv["Invoice #"] ?? "").trim();
-    list.appendChild(createRecordLinkButton(
-      invoiceNo,
-      "invoice-record-link",
-      () => {
-        if (closeSalesOrder) closeSalesOrderModal();
-        if (navFrom && typeof modalNavPush === "function") modalNavPush(navFrom);
-        if (typeof openInvoiceModal === "function") openInvoiceModal(inv);
-      },
-      `Open invoice ${invoiceNo}`
-    ));
+  const options = { closeSalesOrder, navFrom };
+
+  // 1–3 invoices: show each link inline, centered.
+  if (linked.length <= 3) {
+    const list = document.createElement("span");
+    list.className = "record-link-list record-link-list--center";
+    linked.forEach((inv, index) => {
+      if (index > 0) list.appendChild(document.createTextNode(", "));
+      list.appendChild(createInvoiceLinkButton(inv, options));
+    });
+    container.appendChild(list);
+    return;
+  }
+
+  // 4+: show a count chip; hover/focus reveals all invoice links in an overlay.
+  const wrap = document.createElement("span");
+  wrap.className = "invoice-link-summary";
+
+  const trigger = document.createElement("button");
+  trigger.type = "button";
+  trigger.className = "record-link invoice-count-btn";
+  trigger.textContent = `${linked.length} invoices`;
+  trigger.setAttribute("aria-haspopup", "true");
+  trigger.setAttribute("aria-expanded", "false");
+  trigger.title = "Hover to see all invoices";
+
+  const overlay = document.createElement("div");
+  overlay.className = "invoice-link-overlay";
+  overlay.hidden = true;
+  overlay.setAttribute("role", "menu");
+
+  linked.forEach(inv => {
+    const item = createInvoiceLinkButton(inv, options);
+    item.setAttribute("role", "menuitem");
+    item.classList.add("invoice-link-overlay-item");
+    overlay.appendChild(item);
   });
-  container.appendChild(list);
+
+  const setOpen = open => {
+    overlay.hidden = !open;
+    trigger.setAttribute("aria-expanded", open ? "true" : "false");
+    wrap.classList.toggle("is-open", open);
+  };
+
+  let hideTimer = null;
+  const scheduleHide = () => {
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => setOpen(false), 120);
+  };
+  const cancelHide = () => {
+    clearTimeout(hideTimer);
+    hideTimer = null;
+  };
+
+  wrap.addEventListener("mouseenter", () => { cancelHide(); setOpen(true); });
+  wrap.addEventListener("mouseleave", scheduleHide);
+  wrap.addEventListener("focusin", () => { cancelHide(); setOpen(true); });
+  wrap.addEventListener("focusout", e => {
+    if (!wrap.contains(e.relatedTarget)) scheduleHide();
+  });
+  trigger.addEventListener("click", e => {
+    e.stopPropagation();
+    setOpen(overlay.hidden);
+  });
+
+  wrap.appendChild(trigger);
+  wrap.appendChild(overlay);
+  container.appendChild(wrap);
 }
 
 function mountSalesOrderLink(container, soNumber, { closeInvoice = false, closePo = false, navFrom = null } = {}) {
