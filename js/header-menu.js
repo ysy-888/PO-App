@@ -152,7 +152,7 @@ function getCurrentViewSearchInput() {
   };
   const input = document.getElementById(searchInputIds[view]);
   if (input) return input;
-  return document.querySelector(".header-view-meta:not([hidden]) input[type='search']");
+  return document.querySelector(".toolbar:not([hidden]) .toolbar-search-wrap input[type='search']");
 }
 
 function focusCurrentViewSearch() {

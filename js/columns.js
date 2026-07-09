@@ -39,7 +39,7 @@ function getActiveSearchHighlightQuery() {
   };
   const view = typeof currentAppView !== "undefined" ? currentAppView : "";
   const input = document.getElementById(searchInputIds[view])
-    || document.querySelector(".header-view-meta:not([hidden]) input[type='search']");
+    || document.querySelector(".toolbar:not([hidden]) .toolbar-search-wrap input[type='search']");
   const query = String(input?.value ?? "").trim();
   return query || String(activeSearchQuery ?? "").trim();
 }

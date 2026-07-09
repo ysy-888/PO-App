@@ -6,7 +6,6 @@ const INV_STATUS_FILTER_OPEN = typeof STATUS_FILTER_OPEN !== "undefined" ? STATU
 const INV_STATUS_FILTER_BUTTONS = [
   { label: "All", value: INV_STATUS_FILTER_ALL },
   { label: "Closed", value: "Closed" },
-  { divider: true },
   { label: "Open", value: INV_STATUS_FILTER_OPEN },
 ];
 

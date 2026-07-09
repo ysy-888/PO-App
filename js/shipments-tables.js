@@ -442,15 +442,6 @@ function switchAppView(view) {
   const splitActive = splitView && isSplitViewTab(view);
   const salesOrderToolbar = document.getElementById("salesOrderToolbar");
   const poToolbar = document.getElementById("poToolbar");
-  const poHeaderMeta = document.getElementById("poHeaderMeta");
-  const shipmentHeaderMeta = document.getElementById("shipmentHeaderMeta");
-  const requestsHeaderMeta = document.getElementById("requestsHeaderMeta");
-  const chargebackHeaderMeta = document.getElementById("chargebackHeaderMeta");
-  const customersHeaderMeta = document.getElementById("customersHeaderMeta");
-  const stylesHeaderMeta = document.getElementById("stylesHeaderMeta");
-  const packingReviewHeaderMeta = document.getElementById("packingReviewHeaderMeta");
-  const salesOrderHeaderMeta = document.getElementById("salesOrderHeaderMeta");
-  const invoiceHeaderMeta = document.getElementById("invoiceHeaderMeta");
   const appMain = document.getElementById("appMain");
   const poViewContent = document.getElementById("poViewContent");
   const poTableWrap = document.getElementById("poTableWrap");
@@ -475,18 +466,9 @@ function switchAppView(view) {
   if (appMain) appMain.classList.toggle("is-split-active", splitActive);
 
   const invoiceToolbar = document.getElementById("invoiceToolbar");
-  if (poToolbar) poToolbar.hidden = view !== "po";
+  if (poToolbar) poToolbar.hidden = view !== "po" && !splitActive;
   if (salesOrderToolbar) salesOrderToolbar.hidden = view !== "sales";
   if (invoiceToolbar) invoiceToolbar.hidden = view !== "invoices";
-  if (poHeaderMeta) poHeaderMeta.hidden = view !== "po" && !splitActive;
-  if (shipmentHeaderMeta) shipmentHeaderMeta.hidden = view !== "shipments";
-  if (requestsHeaderMeta) requestsHeaderMeta.hidden = view !== "requests";
-  if (chargebackHeaderMeta) chargebackHeaderMeta.hidden = view !== "chargebacks";
-  if (customersHeaderMeta) customersHeaderMeta.hidden = view !== "customers";
-  if (stylesHeaderMeta) stylesHeaderMeta.hidden = view !== "styles";
-  if (packingReviewHeaderMeta) packingReviewHeaderMeta.hidden = view !== "packingReviews";
-  if (salesOrderHeaderMeta) salesOrderHeaderMeta.hidden = view !== "sales";
-  if (invoiceHeaderMeta) invoiceHeaderMeta.hidden = view !== "invoices";
   syncViewActionToolbars(view);
 
   if (splitActive) {

@@ -5,7 +5,6 @@ const SO_STATUS_FILTER_OPEN = typeof STATUS_FILTER_OPEN !== "undefined" ? STATUS
 const SO_STATUS_FILTER_BUTTONS = [
   { label: "All", value: SO_STATUS_FILTER_ALL },
   { label: "Closed", value: "Closed" },
-  { divider: true },
   { label: "Open", value: SO_STATUS_FILTER_OPEN },
 ];
 
