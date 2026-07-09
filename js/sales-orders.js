@@ -915,6 +915,15 @@ function soOutreachMethodLabel(method) {
   return m ? m.charAt(0).toUpperCase() + m.slice(1) : "—";
 }
 
+/** Look up the Customers-tab email for a sales order's customer name. */
+function getCustomerEmailForSalesOrder(order) {
+  const name = String(order?.Customer ?? "").trim();
+  if (!name) return "";
+  const customers = typeof allCustomers !== "undefined" ? allCustomers : [];
+  const match = customers.find(c => String(c?.Customer ?? "").trim() === name);
+  return String(match?.Email ?? "").trim();
+}
+
 /** m/d/yy for date-only entries; m/d/yy, h:mm AM/PM when a time is present. */
 function formatSoOutreachTime(at) {
   const s = String(at ?? "").trim();
@@ -1325,15 +1334,28 @@ function openSalesOrderModal(order) {
   <span class="so-memo-status" id="soOutreachEmailStatus"></span>
 </div>`;
 
+  const customerEmail = getCustomerEmailForSalesOrder(order);
   const outreachSection = `
 <div class="so-outreach-section">
   <div class="so-outreach-header">
     <div class="so-section-title">Outreach Log <span class="so-linked-count" id="soOutreachCount"></span></div>
     ${outreachStatusControl}
   </div>
+  <p class="so-outreach-customer-email">
+    <span class="so-outreach-customer-email-label">Customer Email</span>
+    <span class="so-outreach-customer-email-value${customerEmail ? "" : " is-missing"}">${escSo(customerEmail || "No email on file")}</span>
+  </p>
   <div class="so-outreach-list" id="soOutreachList"></div>
   ${outreachEditorHtml}
 </div>`;
+
+  const linkedSections = portal ? "" : `
+<div class="so-linked-row">
+  ${buildLinkedPosSection(order)}
+  ${buildLinkedInvoicesSection(order)}
+</div>`;
+
+  const postIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>`;
 
   bodyEl.innerHTML = `
 <div class="so-modal-columns">
@@ -1353,11 +1375,10 @@ function openSalesOrderModal(order) {
   ${buildSoLineItemsTable(lines, order)}
 </div>
 
-${portal ? "" : buildLinkedInvoicesSection(order)}
+${linkedSections}
 ${memoSection}
 ${portalMemoSection}
 ${outreachSection}
-${portal ? "" : buildLinkedPosSection(order)}
 </div>
 
 <aside class="so-modal-side">
@@ -1365,8 +1386,8 @@ ${portal ? "" : buildLinkedPosSection(order)}
   <div class="so-section-title">Comments <span class="so-linked-count" id="soCommentsCount"></span></div>
   <div class="so-comments-list" id="soCommentsList"></div>
   <div class="so-comment-composer">
-    <textarea class="so-comment-input" id="soCommentInput" rows="2" placeholder="Write a comment…"></textarea>
-    <button type="button" class="btn btn-primary so-comment-post-btn" id="soCommentPostBtn">Post</button>
+    <textarea class="so-comment-input" id="soCommentInput" rows="1" placeholder="Write a comment…"></textarea>
+    <button type="button" class="btn btn-primary so-comment-post-btn" id="soCommentPostBtn" aria-label="Post comment" title="Post" disabled>${postIconSvg}</button>
   </div>
 </div>
 </aside>
@@ -1386,6 +1407,11 @@ ${portal ? "" : buildLinkedPosSection(order)}
   if (commentInput && commentPostBtn) {
     const composerEl = bodyEl.querySelector(".so-comment-composer");
     const mentionCtl = composerEl ? attachSoMentionAutocomplete(commentInput, composerEl) : null;
+    const syncPostBtnState = () => {
+      commentPostBtn.disabled = commentInput.value.trim().length === 0;
+    };
+    syncPostBtnState();
+    commentInput.addEventListener("input", syncPostBtnState);
     const postComment = async () => {
       const text = commentInput.value.trim();
       if (!text) return;
@@ -1401,7 +1427,7 @@ ${portal ? "" : buildLinkedPosSection(order)}
       } catch (err) {
         showIndicator("Comment failed: " + err.message, "error");
       } finally {
-        commentPostBtn.disabled = false;
+        syncPostBtnState();
       }
     };
     commentPostBtn.addEventListener("click", postComment);

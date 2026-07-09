@@ -8940,8 +8940,8 @@ td.has-pending-approval .pending-approval-value {
 
 /* ── Sales Order modal card ─────────────────────────────────── */
 .so-modal-card {
-  max-width: 1280px;
-  width: 96vw;
+  max-width: 1560px;
+  width: 98vw;
   max-height: 92vh;
   display: flex;
   flex-direction: column;
@@ -9079,9 +9079,11 @@ td.has-pending-approval .pending-approval-value {
   border: 1px solid var(--border);
 }
 .so-line-table {
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
   border-collapse: collapse;
   font-size: 13px;
+  table-layout: auto;
 }
 .so-line-table thead th {
   background: var(--table-header-bg, #f8fafc);
@@ -9115,19 +9117,39 @@ td.has-pending-approval .pending-approval-value {
   padding-left: 5px;
   padding-right: 5px;
 }
-.so-line-table .so-price-col { width: 74px; min-width: 74px; white-space: nowrap; }
-.so-line-table .so-style-col { font-family: var(--font); font-size: 12px; min-width: 70px; }
-.so-line-table .so-desc-col { min-width: 200px; color: var(--text-secondary, #666); font-size: 12px; }
-.so-line-table .so-color-col { min-width: 130px; }
-.so-line-table .so-status-col { min-width: 80px; }
+.so-line-table .so-price-col {
+  width: 96px;
+  min-width: 96px;
+  white-space: nowrap;
+}
+.so-line-table .so-style-col {
+  font-family: var(--font);
+  font-size: 13px;
+  min-width: 110px;
+  white-space: nowrap;
+}
+.so-line-table .so-desc-col {
+  min-width: 280px;
+  color: var(--text-secondary, #666);
+  font-size: 12px;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+}
+.so-line-table .so-color-col {
+  min-width: 160px;
+  white-space: nowrap;
+}
+.so-line-table .so-status-col { min-width: 90px; white-space: nowrap; }
 .so-line-table .so-cxl-reason-col {
-  min-width: 116px;
+  min-width: 160px;
   font-size: 12px;
   color: var(--text-secondary, #666);
+  white-space: nowrap;
 }
 .so-line-table .so-total-col {
-  width: 68px;
-  min-width: 68px;
+  width: 80px;
+  min-width: 80px;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -9150,10 +9172,21 @@ td.has-pending-approval .pending-approval-value {
 .so-status-badge[data-status="cancelled"],
 .so-status-badge[data-status="canceled"] { color: #dc2626; }
 
-/* ── Linked POs section ─────────────────────────────────────── */
+/* ── Linked POs / Invoices (side-by-side in main column) ─────── */
+.so-linked-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  padding-top: 8px;
+  margin-top: 4px;
+}
+@media (max-width: 900px) {
+  .so-linked-row { grid-template-columns: 1fr; }
+}
 .so-linked-pos,
 .so-linked-invoices {
   padding-top: 4px;
+  min-width: 0;
 }
 .so-linked-count {
   font-weight: 400;
@@ -9172,14 +9205,22 @@ td.has-pending-approval .pending-approval-value {
 .so-linked-po-btn {
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
   background: var(--surface, #fff);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 8px 12px;
+  padding: 8px 10px;
   cursor: pointer;
   text-align: left;
   transition: background 0.1s, border-color 0.1s;
+}
+.so-linked-po-btn .so-linked-po-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 .so-linked-po-btn:hover {
   background: var(--row-hover, #f8fafc);
@@ -9220,9 +9261,10 @@ td.has-pending-approval .pending-approval-value {
 .so-memo-textarea {
   width: 100%;
   box-sizing: border-box;
+  height: 72px;
   min-height: 72px;
-  max-height: 200px;
-  resize: vertical;
+  max-height: 72px;
+  resize: none;
   font-size: 13px;
   font-family: inherit;
   padding: 8px 10px;
@@ -9333,9 +9375,10 @@ td.has-pending-approval .pending-approval-value {
 .so-comment-input {
   flex: 1;
   box-sizing: border-box;
+  height: 40px;
   min-height: 40px;
-  max-height: 140px;
-  resize: vertical;
+  max-height: 40px;
+  resize: none;
   font-size: 13px;
   font-family: inherit;
   padding: 8px 10px;
@@ -9350,7 +9393,28 @@ td.has-pending-approval .pending-approval-value {
   border-color: var(--accent, #3b82f6);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, #3b82f6) 15%, transparent);
 }
-.so-comment-post-btn { flex-shrink: 0; }
+.so-comment-post-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 6px;
+}
+.so-comment-post-btn:disabled,
+.so-comment-post-btn[disabled] {
+  opacity: 0.4;
+  cursor: default;
+  background: #94a3b8;
+  border-color: #94a3b8;
+  color: #fff;
+}
+.so-comment-post-btn svg {
+  display: block;
+  pointer-events: none;
+}
 
 /* ── @mentions ── */
 .so-comment-composer { position: relative; }
@@ -9516,8 +9580,29 @@ td.has-pending-approval .pending-approval-value {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 8px;
+  flex-wrap: wrap;
 }
 .so-outreach-header .so-section-title { margin-bottom: 0; }
+.so-outreach-customer-email {
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+  margin: 0 0 10px;
+}
+.so-outreach-customer-email-label {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-right: 6px;
+  color: var(--text-secondary, #888);
+}
+.so-outreach-customer-email-value {
+  color: var(--text);
+  font-weight: 500;
+}
+.so-outreach-customer-email-value.is-missing {
+  color: var(--empty-display, #aaa);
+  font-weight: 400;
+}
 .so-outreach-status-label {
   display: inline-flex;
   align-items: center;
