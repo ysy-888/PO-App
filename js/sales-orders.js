@@ -962,16 +962,16 @@ function renderSoOutreachLog(order) {
     const meta = document.createElement("div");
     meta.className = "so-outreach-entry-meta";
 
+    const when = document.createElement("span");
+    when.className = "so-outreach-when";
+    when.textContent = formatSoOutreachTime(entry?.at);
+    meta.appendChild(when);
+
     const method = document.createElement("span");
     method.className = "so-outreach-method";
     method.dataset.method = String(entry?.method ?? "").toLowerCase();
     method.textContent = soOutreachMethodLabel(entry?.method);
     meta.appendChild(method);
-
-    const when = document.createElement("span");
-    when.className = "so-outreach-when";
-    when.textContent = formatSoOutreachTime(entry?.at);
-    meta.appendChild(when);
 
     const authorLabel = typeof getUserDisplayLabel === "function"
       ? getUserDisplayLabel(String(entry?.authorId ?? ""), String(entry?.author ?? ""))
@@ -1318,7 +1318,21 @@ function openSalesOrderModal(order) {
 </label>`;
 
   const customerEmail = getCustomerEmailForSalesOrder(order);
-  const outreachEditorHtml = portal ? "" : `
+  const outreachNewBtnHtml = portal
+    ? ""
+    : `<button type="button" class="btn btn-secondary so-outreach-new-btn" id="soOutreachNewBtn">+ New Outreach</button>`;
+  const outreachManualHtml = portal ? "" : `
+<div class="so-outreach-manual">
+  <div class="so-outreach-add" id="soOutreachAddRow" hidden>
+    <input type="date" id="soOutreachDate" class="shipment-form-input so-outreach-date" />
+    <select id="soOutreachMethod" class="filter-select so-outreach-method-select">
+      ${SO_OUTREACH_METHODS.map(m => `<option value="${escSo(m)}">${escSo(soOutreachMethodLabel(m))}</option>`).join("")}
+    </select>
+    <input type="text" id="soOutreachNotes" class="shipment-form-input so-outreach-notes-input" placeholder="Notes" maxlength="2000" />
+    <button type="button" class="btn so-outreach-add-btn" id="soOutreachAddBtn">Add</button>
+  </div>
+</div>`;
+  const outreachEmailHtml = portal ? "" : `
 <div class="so-outreach-email-row">
   <p class="so-outreach-customer-email">
     <span class="so-outreach-customer-email-label">Customer Email</span>
@@ -1329,27 +1343,20 @@ function openSalesOrderModal(order) {
   </select>
   <button type="button" class="btn btn-primary so-outreach-send-btn" id="soOutreachSendBtn"${customerEmail ? "" : " disabled"}>Send Email</button>
   <span class="so-memo-status" id="soOutreachEmailStatus"></span>
-</div>
-<div class="so-outreach-manual">
-  <button type="button" class="btn btn-secondary so-outreach-new-btn" id="soOutreachNewBtn">+ New Outreach</button>
-  <div class="so-outreach-add" id="soOutreachAddRow" hidden>
-    <input type="date" id="soOutreachDate" class="shipment-form-input so-outreach-date" />
-    <select id="soOutreachMethod" class="filter-select so-outreach-method-select">
-      ${SO_OUTREACH_METHODS.map(m => `<option value="${escSo(m)}">${escSo(soOutreachMethodLabel(m))}</option>`).join("")}
-    </select>
-    <input type="text" id="soOutreachNotes" class="shipment-form-input so-outreach-notes-input" placeholder="Notes" maxlength="2000" />
-    <button type="button" class="btn so-outreach-add-btn" id="soOutreachAddBtn">Add</button>
-  </div>
 </div>`;
 
   const outreachSection = `
 <div class="so-outreach-section">
   <div class="so-outreach-header">
-    <div class="so-section-title">Outreach Log <span class="so-linked-count" id="soOutreachCount"></span></div>
+    <div class="so-outreach-title-row">
+      <div class="so-section-title">Outreach Log <span class="so-linked-count" id="soOutreachCount"></span></div>
+      ${outreachNewBtnHtml}
+    </div>
     ${outreachStatusControl}
   </div>
+  ${outreachManualHtml}
   <div class="so-outreach-list" id="soOutreachList"></div>
-  ${outreachEditorHtml}
+  ${outreachEmailHtml}
 </div>`;
 
   const linkedSections = portal ? "" : `

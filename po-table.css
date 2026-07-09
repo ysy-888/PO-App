@@ -8992,6 +8992,7 @@ td.has-pending-approval .pending-approval-value {
   max-height: 92vh;
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
 }
 
 /* Main content on the left, comments panel on the right. */
@@ -9017,7 +9018,6 @@ td.has-pending-approval .pending-approval-value {
 /* The modal body itself never scrolls sideways; wide line tables scroll
    inside their own bordered box (.so-line-table-wrap). */
 .so-modal-body { overflow-x: hidden; }
-.so-line-table .so-desc-col { white-space: normal; }
 .so-modal-body {
   flex: 1;
   overflow-y: auto;
@@ -9121,16 +9121,16 @@ td.has-pending-approval .pending-approval-value {
 
 /* ── Line items table ───────────────────────────────────────── */
 .so-line-table-wrap {
-  overflow-x: auto;
+  overflow-x: hidden;
   border-radius: 6px;
   border: 1px solid var(--border);
+  max-width: 100%;
 }
 .so-line-table {
-  width: max-content;
-  min-width: 100%;
+  width: 100%;
   border-collapse: collapse;
   font-size: 13px;
-  table-layout: auto;
+  table-layout: fixed;
 }
 .so-line-table thead th {
   background: var(--table-header-bg, #f8fafc);
@@ -9158,45 +9158,52 @@ td.has-pending-approval .pending-approval-value {
 .so-line-table .td-num { text-align: right; }
 .so-line-table .td-qty { text-align: center; }
 .so-line-table .so-size-col {
-  width: 34px;
-  min-width: 34px;
-  max-width: 42px;
-  padding-left: 5px;
-  padding-right: 5px;
+  width: 28px;
+  padding-left: 4px;
+  padding-right: 4px;
 }
 .so-line-table .so-price-col {
-  width: 96px;
-  min-width: 96px;
+  width: 88px;
   white-space: nowrap;
 }
 .so-line-table .so-style-col {
   font-family: var(--font);
   font-size: 13px;
-  min-width: 110px;
+  width: 88px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .so-line-table .so-desc-col {
-  min-width: 280px;
+  width: 140px;
   color: var(--text-secondary, #666);
   font-size: 12px;
-  white-space: normal;
-  overflow: visible;
-  text-overflow: unset;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .so-line-table .so-color-col {
-  min-width: 160px;
+  width: 100px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.so-line-table .so-status-col { min-width: 90px; white-space: nowrap; }
+.so-line-table .so-status-col {
+  width: 78px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .so-line-table .so-cxl-reason-col {
-  min-width: 160px;
+  width: 110px;
   font-size: 12px;
   color: var(--text-secondary, #666);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .so-line-table .so-total-col {
-  width: 80px;
-  min-width: 80px;
+  width: 68px;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -9626,8 +9633,14 @@ td.has-pending-approval .pending-approval-value {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 8px;
+  margin-bottom: 14px;
   flex-wrap: wrap;
+}
+.so-outreach-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
 }
 .so-outreach-header .so-section-title { margin-bottom: 0; }
 .so-outreach-customer-email {
@@ -9680,6 +9693,7 @@ td.has-pending-approval .pending-approval-value {
   gap: 6px;
   max-height: 240px;
   overflow-y: auto;
+  margin-top: 4px;
   margin-bottom: 10px;
 }
 .so-outreach-empty {
@@ -9729,18 +9743,21 @@ td.has-pending-approval .pending-approval-value {
   word-break: break-word;
 }
 .so-outreach-manual {
-  margin-bottom: 8px;
+  margin-top: 8px;
+  margin-bottom: 0;
 }
 .so-outreach-new-btn {
   font-size: 12px;
-  padding: 5px 12px;
+  padding: 4px 10px;
+  flex-shrink: 0;
 }
 .so-outreach-add {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  margin-top: 8px;
+  margin-top: 0;
+  margin-bottom: 8px;
 }
 .so-outreach-add[hidden] {
   display: none !important;
