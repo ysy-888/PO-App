@@ -1387,17 +1387,14 @@ function openSalesOrderModal(order) {
   </div>
 </div>`;
 
-  // Sales Portal Memo: internal users edit it; showroom users read it.
-  const portalMemoSection = portal
-    ? `
+  // Sales Portal Memo: editable by internal users and showroom portal users.
+  const portalMemoPlaceholder = portal
+    ? "Add a note…"
+    : "Memo shown to the showroom sales team…";
+  const portalMemoSection = `
 <div class="so-memo-section so-portal-memo-section">
   <div class="so-section-title">Sales Portal Memo</div>
-  <p class="so-portal-memo-text">${escSo(String(order["Sales Portal Memo"] ?? "").trim() || "—")}</p>
-</div>`
-    : `
-<div class="so-memo-section so-portal-memo-section">
-  <div class="so-section-title">Sales Portal Memo</div>
-  <textarea class="so-memo-textarea" id="soPortalMemoTextarea" placeholder="Memo shown to the showroom sales team…" rows="3">${escSo(order["Sales Portal Memo"] ?? "")}</textarea>
+  <textarea class="so-memo-textarea" id="soPortalMemoTextarea" placeholder="${escSo(portalMemoPlaceholder)}" rows="3">${escSo(order["Sales Portal Memo"] ?? "")}</textarea>
   <div class="so-memo-footer">
     <span class="so-memo-status" id="soPortalMemoStatus"></span>
     <button type="button" class="so-memo-save-btn" id="soPortalMemoSaveBtn">Save</button>
@@ -1580,7 +1577,7 @@ ${outreachSection}
     });
   }
 
-  // Wire Sales Portal Memo save (internal only — portal renders plain text)
+  // Wire Sales Portal Memo save (internal + showroom portal)
   const portalMemoTextarea = bodyEl.querySelector("#soPortalMemoTextarea");
   const portalMemoSaveBtn = bodyEl.querySelector("#soPortalMemoSaveBtn");
   const portalMemoStatus = bodyEl.querySelector("#soPortalMemoStatus");

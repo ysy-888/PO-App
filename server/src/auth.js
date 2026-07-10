@@ -76,8 +76,9 @@ async function resolveMembership(userId) {
 
 /**
  * Showroom portal accounts (external sales team). They may only load the
- * (sales-order-only) app state and post Sales Order comments; every other
- * API endpoint is rejected here so the restriction covers all routers.
+ * (sales-order-only) app state, post Sales Order comments, and edit the
+ * Sales Portal Memo; every other API endpoint is rejected here so the
+ * restriction covers all routers.
  */
 export const PORTAL_ROLE = "showroom";
 
@@ -88,6 +89,7 @@ export function isPortalRole(role) {
 const PORTAL_ALLOWED_ENDPOINTS = [
   { method: "GET", path: "/api/app-state" },
   { method: "POST", path: "/api/sales-orders/comment" },
+  { method: "POST", path: "/api/sales-orders/portal-memo" },
   // Notifications are per-user (mentions in SO comments) — portal-safe.
   { method: "GET", path: "/api/notifications" },
   { method: "POST", path: "/api/notifications/mark-read" },

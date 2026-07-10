@@ -330,7 +330,7 @@ router.post("/comment", requireAuth, async (req, res) => {
   return res.json({ success: true, comments });
 });
 
-// ── Sales Portal Memo (internal-only; portal accounts are blocked in auth) ──
+// ── Sales Portal Memo (editable by internal + showroom portal users) ──
 
 router.post("/portal-memo", requireAuth, async (req, res) => {
   const { soNumber, memo } = req.body ?? {};
