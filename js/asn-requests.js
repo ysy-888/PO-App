@@ -1130,17 +1130,18 @@ function updateAsnRequestActionButtons() {
     resendCarrierBtn.disabled = asnRequestOpInProgress || isAppSaving();
   }
 
-  // Status badge + Picked Up/Reopen menu item (view mode only — new requests have no status yet).
+  // Status badge + Picked Up/Reopen menu item — any existing request
+  // (sent or not), never on unsaved new requests.
   const pickedUp = asnRequestModalRow ? isAsnRequestPickedUp(asnRequestModalRow) : false;
   const pickedUpBtn = document.getElementById("asnPickedUpBtn");
   if (pickedUpBtn) {
-    pickedUpBtn.hidden = !isView || !asnRequestModalRow;
+    pickedUpBtn.hidden = !asnRequestModalRow;
     pickedUpBtn.textContent = pickedUp ? "Reopen" : "Picked Up";
     pickedUpBtn.disabled = asnRequestOpInProgress || isAppSaving();
   }
   const statusBadge = document.getElementById("asnRequestStatusBadge");
   if (statusBadge) {
-    statusBadge.hidden = !isView || !asnRequestModalRow;
+    statusBadge.hidden = !asnRequestModalRow;
     if (asnRequestModalRow) {
       statusBadge.textContent = pickedUp ? ASN_STATUS_PICKED_UP : ASN_STATUS_OPEN;
       statusBadge.className = "badge " + (pickedUp ? "badge-received" : "badge-otw");

@@ -46,7 +46,7 @@ const SHIPMENT_LINKED_PO_COLUMNS = [
   { col: "PO Qty", label: "Ord Qty", cellClass: "shipment-po-cell-qty" },
   { col: "Actual Qty", label: "Act Qty", cellClass: "shipment-po-cell-qty" },
   { col: "Ctn Qty", label: "Ctn Qty", cellClass: "shipment-po-cell-qty" },
-  { col: "Weight", label: "Weight", cellClass: "shipment-po-cell-qty" },
+  { col: "Status", label: "Status", cellClass: "shipment-po-cell-status" },
 ];
 
 const SHIPMENT_LINKED_PO_COL_CLASSES = [
@@ -61,11 +61,11 @@ const SHIPMENT_LINKED_PO_COL_CLASSES = [
   "shipment-po-col-qty",
   "shipment-po-col-qty",
   "shipment-po-col-qty",
-  "shipment-po-col-qty",
+  "shipment-po-col-status",
 ];
 
 /** Linked PO table column widths (px), select column first. */
-const SHIPMENT_LINKED_PO_COLUMN_WIDTHS = [52, 72, 120, 110, 104, 88, 88, 96, 58, 58, 58, 66];
+const SHIPMENT_LINKED_PO_COLUMN_WIDTHS = [52, 72, 120, 110, 104, 88, 88, 96, 58, 58, 58, 96];
 
 /** PO fields synced from / cleared with a shipment. */
 const SHIPMENT_PO_CLEAR_FIELDS = [

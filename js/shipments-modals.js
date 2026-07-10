@@ -1053,7 +1053,7 @@ function renderShipmentLinkedPoSection(source, { showAddButton = false } = {}) {
       td.dataset.col = col;
       if (cellClass) td.className = cellClass;
       const text = formatShipmentLinkedPoCell(col, row);
-      if (col === "PO #") {
+      if (col === "PO #" || col === "Status") {
         renderRequestLinkedPoDataCell(td, col, row, { cellClass });
       } else if (text === EMPTY_DISPLAY) {
         setDisplayText(td, EMPTY_DISPLAY);
