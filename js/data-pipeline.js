@@ -27,6 +27,9 @@ function applyUserSettingsFromServer(settings) {
     if (settings.columnLayout !== undefined && typeof applyColumnLayoutFromServer === "function") {
       applyColumnLayoutFromServer(settings.columnLayout);
     }
+    if (settings.soColumnLayout !== undefined && typeof applySoColumnLayoutFromServer === "function") {
+      applySoColumnLayoutFromServer(settings.soColumnLayout);
+    }
     if (typeof updateSettingsUi === "function") updateSettingsUi();
   } catch (err) {
     console.warn("Could not apply user settings from server; using defaults.", err);

@@ -96,14 +96,18 @@ function getSoEditableColumns() {
   return SO_COLUMNS.filter(col => !SO_NON_TOGGLEABLE_COLUMNS.has(col));
 }
 
+function getSoColumnLayoutPreferencePayload() {
+  return {
+    order: soColumnOrder,
+    visible: [...soVisibleColumns],
+  };
+}
+
 function saveSoColumnLayoutPreference() {
   try {
     localStorage.setItem(
       scopedStorageKey(SO_COLUMN_LAYOUT_STORAGE_BASE),
-      JSON.stringify({
-        order: soColumnOrder,
-        visible: [...soVisibleColumns],
-      })
+      JSON.stringify(getSoColumnLayoutPreferencePayload())
     );
   } catch {
     /* ignore */
@@ -114,23 +118,40 @@ function migrateSoColumnName(col) {
   return col === "INVOICE UNIT QTY" ? "INV QTY" : col;
 }
 
+function applySoColumnLayoutPreferenceData(data, { updateDom = false } = {}) {
+  if (!data || typeof data !== "object") return false;
+  if (!Array.isArray(data.order) || !Array.isArray(data.visible)) return false;
+  const storedOrder = data.order.map(migrateSoColumnName).filter(col => SO_COLUMNS.includes(col));
+  soColumnOrder = normalizeSoColumnOrder(data.order.map(migrateSoColumnName));
+  soVisibleColumns = ensureSoAlwaysVisibleColumns(
+    new Set(data.visible.map(migrateSoColumnName).filter(col => SO_COLUMNS.includes(col)))
+  );
+  SO_COLUMNS.forEach(col => {
+    if (!storedOrder.includes(col)) soVisibleColumns.add(col);
+  });
+  if (soVisibleColumns.size === SO_NON_TOGGLEABLE_COLUMNS.size) soVisibleColumns = new Set(SO_COLUMNS);
+  if (updateDom) {
+    indexSoTableColumns();
+    applySoColumnOrder();
+    applySoColumnVisibility();
+  }
+  return true;
+}
+
 function loadSoColumnLayoutPreference() {
   try {
     const raw = localStorage.getItem(scopedStorageKey(SO_COLUMN_LAYOUT_STORAGE_BASE));
     if (!raw) return false;
-    const data = JSON.parse(raw);
-    if (!data || !Array.isArray(data.order) || !Array.isArray(data.visible)) return false;
-    const storedOrder = data.order.map(migrateSoColumnName).filter(col => SO_COLUMNS.includes(col));
-    soColumnOrder = normalizeSoColumnOrder(data.order.map(migrateSoColumnName));
-    soVisibleColumns = ensureSoAlwaysVisibleColumns(new Set(data.visible.map(migrateSoColumnName).filter(col => SO_COLUMNS.includes(col))));
-    SO_COLUMNS.forEach(col => {
-      if (!storedOrder.includes(col)) soVisibleColumns.add(col);
-    });
-    if (soVisibleColumns.size === SO_NON_TOGGLEABLE_COLUMNS.size) soVisibleColumns = new Set(SO_COLUMNS);
-    return true;
+    return applySoColumnLayoutPreferenceData(JSON.parse(raw));
   } catch {
     return false;
   }
+}
+
+function applySoColumnLayoutFromServer(data) {
+  const ok = applySoColumnLayoutPreferenceData(data, { updateDom: true });
+  if (ok) saveSoColumnLayoutPreference();
+  return ok;
 }
 
 function loadSoColumnVisibility() {
@@ -285,6 +306,9 @@ function applySoEditTableFromPopover() {
   soColumnOrder = normalizeSoColumnOrder(soColumnOrderDraft);
   soVisibleColumns = ensureSoAlwaysVisibleColumns(new Set(visible));
   saveSoColumnLayoutPreference();
+  if (typeof persistUserPreferencePatch === "function") {
+    persistUserPreferencePatch({ soColumnLayout: getSoColumnLayoutPreferencePayload() });
+  }
   indexSoTableColumns();
   applySoColumnOrder();
   applySoColumnVisibility();
@@ -308,9 +332,32 @@ function resetSoEditTableToDefault() {
 }
 
 /** Global "Save as default": commit the current layout as the saved view. */
-function saveSoEditTableDefault() {
-  if (applySoEditTableFromPopover() && typeof setEditTableFooterMessage === "function") {
-    setEditTableFooterMessage("Default view saved", "success");
+async function saveSoEditTableDefault() {
+  const visible = getSoEditTableOrderKeys(soColumnOrderDraft);
+  if (visible.length === 0) return;
+  soColumnOrder = normalizeSoColumnOrder(soColumnOrderDraft);
+  soVisibleColumns = ensureSoAlwaysVisibleColumns(new Set(visible));
+  saveSoColumnLayoutPreference();
+  indexSoTableColumns();
+  applySoColumnOrder();
+  applySoColumnVisibility();
+  if (typeof renderSalesOrdersTable === "function") renderSalesOrdersTable();
+
+  try {
+    if (typeof setEditTableFooterMessage === "function") {
+      setEditTableFooterMessage(`Saving default${typeof ELLIPSIS !== "undefined" ? ELLIPSIS : "..."}`, "");
+    }
+    const json = await postApi("/api/settings/save-column", {
+      soColumnLayout: getSoColumnLayoutPreferencePayload(),
+    });
+    if (!json.success) throw new Error(json.error);
+    if (typeof setEditTableFooterMessage === "function") {
+      setEditTableFooterMessage("Default view saved", "success");
+    }
+  } catch (err) {
+    if (typeof setEditTableFooterMessage === "function") {
+      setEditTableFooterMessage("Save default failed: " + err.message, "error");
+    }
   }
 }
 

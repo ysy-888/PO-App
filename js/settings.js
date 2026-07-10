@@ -726,16 +726,19 @@ function initSettings() {
 
   document.getElementById("editTableOk")?.addEventListener("click", () => {
     const target = getEditTableTarget();
+    let applied = true;
     if (target === "po" && typeof applyEditTableFromPopover === "function") {
       applyEditTableFromPopover();
-    } else if (target === "so" && typeof applySoEditTableFromPopover === "function") {
-      applySoEditTableFromPopover();
-    } else if (target === "inv" && typeof applyInvoiceEditTableFromPopover === "function") {
-      applyInvoiceEditTableFromPopover();
-    } else if (target === "portal" && typeof applyPortalEditTableFromPopover === "function") {
-      applyPortalEditTableFromPopover();
+      return;
     }
-    closeSettingsModal();
+    if (target === "so" && typeof applySoEditTableFromPopover === "function") {
+      applied = applySoEditTableFromPopover();
+    } else if (target === "inv" && typeof applyInvoiceEditTableFromPopover === "function") {
+      applied = applyInvoiceEditTableFromPopover() !== false;
+    } else if (target === "portal" && typeof applyPortalEditTableFromPopover === "function") {
+      applied = applyPortalEditTableFromPopover() !== false;
+    }
+    if (applied) closeSettingsModal();
   });
 
   document.getElementById("editTableCancel")?.addEventListener("click", () => {

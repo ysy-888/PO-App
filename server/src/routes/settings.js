@@ -25,6 +25,7 @@ const USER_PREFERENCE_KEYS = new Set([
   "asnBolPickupAddress",
   "pageSize",
   "columnLayout",
+  "soColumnLayout",
 ]);
 
 /** Merge a partial settings object into the tenant's settings row. */
@@ -88,11 +89,11 @@ function extractUserPreferencePatch(body) {
 
 /**
  * POST /api/settings/save-column
- * Body: { columns?: object, columnOrder?: string[], statusFilter?: string, columnLayout?: object }
+ * Body: { columns?, columnOrder?, statusFilter?, columnLayout?, soColumnLayout? }
  * Persists a user's default table view.
  */
 router.post("/save-column", requireAuth, async (req, res) => {
-  const { columns, columnOrder, statusFilter, columnLayout } = req.body || {};
+  const { columns, columnOrder, statusFilter, columnLayout, soColumnLayout } = req.body || {};
 
   try {
     const patch = {};
@@ -100,6 +101,7 @@ router.post("/save-column", requireAuth, async (req, res) => {
     if (columnOrder !== undefined) patch.defaultColumnOrder = columnOrder;
     if (statusFilter !== undefined) patch.defaultStatusFilter = statusFilter;
     if (columnLayout !== undefined) patch.columnLayout = columnLayout;
+    if (soColumnLayout !== undefined) patch.soColumnLayout = soColumnLayout;
 
     if (Object.keys(patch).length === 0) {
       return res.json({ success: true });
@@ -115,7 +117,7 @@ router.post("/save-column", requireAuth, async (req, res) => {
 
 /**
  * POST /api/settings/user-preferences
- * Body: { cxlCountdownEnabled?, splitViewEnabled?, dateFormatId?, asnDefaultEmailAddresses?, pageSize?, columnLayout? }
+ * Body: { cxlCountdownEnabled?, splitViewEnabled?, dateFormatId?, asnDefaultEmailAddresses?, pageSize?, columnLayout?, soColumnLayout? }
  */
 router.post("/user-preferences", requireAuth, async (req, res) => {
   try {

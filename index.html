@@ -1428,11 +1428,9 @@
     <div class="settings-modal-body">
       <nav class="settings-nav" id="settingsNav" aria-label="Settings sections">
         <button type="button" class="settings-nav-item is-active" data-settings-section="general">General</button>
-        <button type="button" class="settings-nav-item" data-settings-section="asn-defaults">ASN</button>
-        <button type="button" class="settings-nav-item" data-settings-section="edit-table">Edit table</button>
-        <button type="button" class="settings-nav-item" data-settings-section="vendor-portal">Vendor Submissions</button>
-        <button type="button" class="settings-nav-item" data-settings-section="features">Features</button>
         <button type="button" class="settings-nav-item" data-settings-section="users">Users</button>
+        <button type="button" class="settings-nav-item" data-settings-section="edit-table">Edit table</button>
+        <button type="button" class="settings-nav-item" data-settings-section="asn-defaults">ASN</button>
       </nav>
       <div class="settings-panel-wrap">
         <section class="settings-section" id="settingsSectionGeneral" data-settings-section="general">
@@ -1461,53 +1459,45 @@
               <select id="settingsDateFormatSelect" class="filter-select settings-date-format-select" aria-label="Date format"></select>
             </div>
           </div>
-        </section>
-        <section class="settings-section" id="settingsSectionAsnDefaults" data-settings-section="asn-defaults" hidden>
-          <h4 class="settings-section-title">ASN</h4>
-          <div class="settings-group">
-            <div class="settings-group-label">ASN Request Email Defaults</div>
-            <p class="settings-hint settings-hint--block">Default Buyer Email and CC values for new ASN Requests. Enter multiple addresses separated by commas.</p>
-            <div class="settings-asn-default-email-list">
-              <div class="settings-asn-default-email-row" data-asn-default-email-buyer="lulusFashionLounge">
-                <div class="settings-asn-default-email-buyer">Lulu's Fashion Lounge</div>
-                <label class="settings-email-field">
-                  <span>Email</span>
-                  <textarea class="shipment-form-input settings-email-input" data-asn-default-email-field="email" rows="2" autocomplete="off" placeholder="name@example.com, name2@example.com"></textarea>
-                </label>
-                <label class="settings-email-field">
-                  <span>CC</span>
-                  <textarea class="shipment-form-input settings-email-input" data-asn-default-email-field="cc" rows="2" autocomplete="off" placeholder="name@example.com, name2@example.com"></textarea>
-                </label>
-              </div>
-              <div class="settings-asn-default-email-row" data-asn-default-email-buyer="12thTribe">
-                <div class="settings-asn-default-email-buyer">12th Tribe</div>
-                <label class="settings-email-field">
-                  <span>Email</span>
-                  <textarea class="shipment-form-input settings-email-input" data-asn-default-email-field="email" rows="2" autocomplete="off" placeholder="name@example.com, name2@example.com"></textarea>
-                </label>
-                <label class="settings-email-field">
-                  <span>CC</span>
-                  <textarea class="shipment-form-input settings-email-input" data-asn-default-email-field="cc" rows="2" autocomplete="off" placeholder="name@example.com, name2@example.com"></textarea>
-                </label>
-              </div>
+          <div class="settings-group" id="settingsVendorSubmissionsGroup">
+            <div class="settings-group-label">Vendor Submissions</div>
+            <div class="settings-option-list" id="settingsVendorSubmitModeList" role="radiogroup" aria-label="Vendor submissions mode">
+              <button type="button" class="settings-option-item" data-vendor-submit-mode="review" role="radio" aria-checked="true">
+                <span>Review queue</span>
+                <span class="settings-option-check" aria-hidden="true">✓</span>
+              </button>
+              <button type="button" class="settings-option-item" data-vendor-submit-mode="direct" role="radio" aria-checked="false">
+                <span>Direct (immediate)</span>
+                <span class="settings-option-check" hidden aria-hidden="true">✓</span>
+              </button>
             </div>
+            <p class="settings-hint">Review sends vendor packing lists to the Vendor Submissions tab for approve or reject. Direct saves them to the PO immediately.</p>
           </div>
           <div class="settings-group">
-            <div class="settings-group-label">Carriers</div>
-            <p class="settings-hint settings-hint--block">Manage carriers for ASN logistics emails.</p>
-            <div class="settings-carrier-list" id="settingsCarrierList"></div>
-            <button type="button" class="btn btn-secondary settings-carrier-add-btn" id="settingsCarrierAddBtn">+ Add Carrier</button>
+            <div class="settings-group-label">Features</div>
+            <p class="settings-hint settings-hint--block">Enable or disable tabs in the main navigation. Changes apply to all users in your organization.</p>
+            <div class="settings-switch-row">
+              <span class="settings-switch-label" id="settingsChargebacksLabel">Chargebacks</span>
+              <button type="button" class="settings-round-switch" id="settingsChargebacksToggle" role="switch" aria-labelledby="settingsChargebacksLabel" aria-checked="true">
+                <span class="settings-round-switch-thumb" aria-hidden="true"></span>
+              </button>
+            </div>
+            <p class="settings-hint">Show the Chargebacks tab in the main navigation.</p>
           </div>
-          <div class="settings-group">
-            <div class="settings-group-label">Default Carrier per Buyer</div>
-            <p class="settings-hint settings-hint--block">Carrier automatically selected when creating a new ASN request for each buyer.</p>
-            <div class="settings-asn-default-carrier-list" id="settingsAsnDefaultCarrierList"></div>
+          <div class="settings-group" id="settingsFeaturesVendorSubmissionsGroup">
+            <div class="settings-switch-row">
+              <span class="settings-switch-label" id="settingsVendorSubmissionsFeatureLabel">Vendor Submissions</span>
+              <button type="button" class="settings-round-switch" id="settingsVendorSubmissionsToggle" role="switch" aria-labelledby="settingsVendorSubmissionsFeatureLabel" aria-checked="true">
+                <span class="settings-round-switch-thumb" aria-hidden="true"></span>
+              </button>
+            </div>
+            <p class="settings-hint">Show the Vendor Submissions tab in the main navigation.</p>
           </div>
-          <div class="settings-group">
-            <div class="settings-group-label">BOL Default Pickup Address</div>
-            <p class="settings-hint settings-hint--block">Ship-from address printed on the Bill of Lading sent with ASN carrier emails. New ASN requests are prefilled with this address.</p>
-            <textarea class="shipment-form-input settings-email-input" id="settingsAsnPickupAddressInput" rows="3" autocomplete="off" placeholder="Company name, street, city, state ZIP"></textarea>
-          </div>
+        </section>
+        <section class="settings-section" id="settingsSectionUsers" data-settings-section="users" hidden>
+          <h4 class="settings-section-title">Users</h4>
+          <p class="settings-hint settings-hint--block">Set a display name for each account. Display names replace email addresses in Sales Order comment threads.</p>
+          <div class="settings-users-list" id="settingsUsersList"></div>
         </section>
         <section class="settings-section settings-section--edit-table" id="settingsSectionEditTable" data-settings-section="edit-table" hidden>
           <h4 class="settings-section-title">Edit table</h4>
@@ -1596,49 +1586,52 @@
             <button type="button" class="btn edit-table-default-btn" id="editTableResetDefault">Reset to default</button>
           </div>
         </section>
-        <section class="settings-section" id="settingsSectionVendorPortal" data-settings-section="vendor-portal" hidden>
-          <h4 class="settings-section-title">Vendor Submissions</h4>
-          <div class="settings-group" id="settingsVendorSubmissionsGroup">
-            <div class="settings-group-label">Vendor submissions</div>
-            <div class="settings-option-list" id="settingsVendorSubmitModeList" role="radiogroup" aria-label="Vendor submissions mode">
-              <button type="button" class="settings-option-item" data-vendor-submit-mode="review" role="radio" aria-checked="true">
-                <span>Review queue</span>
-                <span class="settings-option-check" aria-hidden="true">✓</span>
-              </button>
-              <button type="button" class="settings-option-item" data-vendor-submit-mode="direct" role="radio" aria-checked="false">
-                <span>Direct (immediate)</span>
-                <span class="settings-option-check" hidden aria-hidden="true">✓</span>
-              </button>
-            </div>
-            <p class="settings-hint">Review sends vendor packing lists to the Vendor Submissions tab for approve or reject. Direct saves them to the PO immediately.</p>
-          </div>
-        </section>
-        <section class="settings-section" id="settingsSectionFeatures" data-settings-section="features" hidden>
-          <h4 class="settings-section-title">Features</h4>
-          <p class="settings-hint settings-hint--block">Enable or disable tabs in the main navigation. Changes apply to all users in your organization.</p>
+        <section class="settings-section" id="settingsSectionAsnDefaults" data-settings-section="asn-defaults" hidden>
+          <h4 class="settings-section-title">ASN</h4>
           <div class="settings-group">
-            <div class="settings-switch-row">
-              <span class="settings-switch-label" id="settingsChargebacksLabel">Chargebacks</span>
-              <button type="button" class="settings-round-switch" id="settingsChargebacksToggle" role="switch" aria-labelledby="settingsChargebacksLabel" aria-checked="true">
-                <span class="settings-round-switch-thumb" aria-hidden="true"></span>
-              </button>
+            <div class="settings-group-label">ASN Request Email Defaults</div>
+            <p class="settings-hint settings-hint--block">Default Buyer Email and CC values for new ASN Requests. Enter multiple addresses separated by commas.</p>
+            <div class="settings-asn-default-email-list">
+              <div class="settings-asn-default-email-row" data-asn-default-email-buyer="lulusFashionLounge">
+                <div class="settings-asn-default-email-buyer">Lulu's Fashion Lounge</div>
+                <label class="settings-email-field">
+                  <span>Email</span>
+                  <textarea class="shipment-form-input settings-email-input" data-asn-default-email-field="email" rows="2" autocomplete="off" placeholder="name@example.com, name2@example.com"></textarea>
+                </label>
+                <label class="settings-email-field">
+                  <span>CC</span>
+                  <textarea class="shipment-form-input settings-email-input" data-asn-default-email-field="cc" rows="2" autocomplete="off" placeholder="name@example.com, name2@example.com"></textarea>
+                </label>
+              </div>
+              <div class="settings-asn-default-email-row" data-asn-default-email-buyer="12thTribe">
+                <div class="settings-asn-default-email-buyer">12th Tribe</div>
+                <label class="settings-email-field">
+                  <span>Email</span>
+                  <textarea class="shipment-form-input settings-email-input" data-asn-default-email-field="email" rows="2" autocomplete="off" placeholder="name@example.com, name2@example.com"></textarea>
+                </label>
+                <label class="settings-email-field">
+                  <span>CC</span>
+                  <textarea class="shipment-form-input settings-email-input" data-asn-default-email-field="cc" rows="2" autocomplete="off" placeholder="name@example.com, name2@example.com"></textarea>
+                </label>
+              </div>
             </div>
-            <p class="settings-hint">Show the Chargebacks tab in the main navigation.</p>
           </div>
-          <div class="settings-group" id="settingsFeaturesVendorSubmissionsGroup">
-            <div class="settings-switch-row">
-              <span class="settings-switch-label" id="settingsVendorSubmissionsFeatureLabel">Vendor Submissions</span>
-              <button type="button" class="settings-round-switch" id="settingsVendorSubmissionsToggle" role="switch" aria-labelledby="settingsVendorSubmissionsFeatureLabel" aria-checked="true">
-                <span class="settings-round-switch-thumb" aria-hidden="true"></span>
-              </button>
-            </div>
-            <p class="settings-hint">Show the Vendor Submissions tab in the main navigation.</p>
+          <div class="settings-group">
+            <div class="settings-group-label">Carriers</div>
+            <p class="settings-hint settings-hint--block">Manage carriers for ASN logistics emails.</p>
+            <div class="settings-carrier-list" id="settingsCarrierList"></div>
+            <button type="button" class="btn btn-secondary settings-carrier-add-btn" id="settingsCarrierAddBtn">+ Add Carrier</button>
           </div>
-        </section>
-        <section class="settings-section" id="settingsSectionUsers" data-settings-section="users" hidden>
-          <h4 class="settings-section-title">Users</h4>
-          <p class="settings-hint settings-hint--block">Set a display name for each account. Display names replace email addresses in Sales Order comment threads.</p>
-          <div class="settings-users-list" id="settingsUsersList"></div>
+          <div class="settings-group">
+            <div class="settings-group-label">Default Carrier per Buyer</div>
+            <p class="settings-hint settings-hint--block">Carrier automatically selected when creating a new ASN request for each buyer.</p>
+            <div class="settings-asn-default-carrier-list" id="settingsAsnDefaultCarrierList"></div>
+          </div>
+          <div class="settings-group">
+            <div class="settings-group-label">BOL Default Pickup Address</div>
+            <p class="settings-hint settings-hint--block">Ship-from address printed on the Bill of Lading sent with ASN carrier emails. New ASN requests are prefilled with this address.</p>
+            <textarea class="shipment-form-input settings-email-input" id="settingsAsnPickupAddressInput" rows="3" autocomplete="off" placeholder="Company name, street, city, state ZIP"></textarea>
+          </div>
         </section>
       </div>
     </div>
