@@ -12,6 +12,7 @@ const SO_COLUMNS = [
   "Subtotal",
   "TOTAL",
   "INVOICE STATUS",
+  "Tracking #",
   "Order Date",
   "Ship Date",
   "CXL Date",

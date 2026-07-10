@@ -48,12 +48,16 @@ router.get("/app-state", requireAuth, async (req, res) => {
   const tid = req.tenantId;
 
   // Showroom portal accounts get sales orders only — no POs, shipments,
-  // invoices, or any other entity. The frontend switches to portal mode
-  // when it sees portalMode: true.
+  // or other entities. A slim invoice payload (SO # / Invoice # / Tracking #)
+  // is included so the Sales Orders table can show Tracking #. The frontend
+  // switches to portal mode when it sees portalMode: true.
   if (isPortalRole(req.userRole)) {
     try {
-      const [salesOrdersResult, stylesResult, userSettingsResult, tenantSettingsResult, users] = await Promise.all([
+      const [salesOrdersResult, invoicesResult, stylesResult, userSettingsResult, tenantSettingsResult, users] = await Promise.all([
         supabase.from("sales_orders").select("data").eq("tenant_id", tid).order("created_at", { ascending: true }),
+        // Slim invoice rows so the portal can show Tracking # on sales orders
+        // without exposing invoice financials / memos.
+        supabase.from("invoices").select("data").eq("tenant_id", tid).order("created_at", { ascending: true }),
         supabase.from("styles").select("data").eq("tenant_id", tid),
         supabase.from("user_settings").select("settings").eq("tenant_id", tid).eq("user_id", req.userId).maybeSingle(),
         supabase.from("tenant_settings").select("settings").eq("tenant_id", tid).maybeSingle(),
@@ -63,6 +67,16 @@ router.get("/app-state", requireAuth, async (req, res) => {
         console.error("portal app-state query failed:", salesOrdersResult.error);
         return res.status(500).json({ success: false, error: "Failed to load app state." });
       }
+      const portalInvoices = invoicesResult.error
+        ? []
+        : (invoicesResult.data || []).map(row => {
+            const d = row.data || {};
+            return {
+              "Invoice #": d["Invoice #"] ?? "",
+              "SO #": d["SO #"] ?? "",
+              "Tracking #": d["Tracking #"] ?? "",
+            };
+          });
       return res.json({
         success: true,
         portalMode: true,
@@ -99,7 +113,7 @@ router.get("/app-state", requireAuth, async (req, res) => {
           .filter(order =>
             String(order.Division ?? "").trim().toLowerCase() === "elevator disco"
           ),
-        invoices: [],
+        invoices: portalInvoices,
         vendorSubmitMode: "review",
         chargebacksEnabled: false,
         vendorSubmissionsEnabled: false,

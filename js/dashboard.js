@@ -81,7 +81,8 @@ function isDashClosedSalesOrder(order) {
 }
 
 function isDashShopifyOrder(order) {
-  return String(order?.["Order Type"] ?? "").trim().toUpperCase() === "SHOPIFY";
+  const type = String(order?.["Order Type"] ?? "").trim().toUpperCase();
+  return type === "SHOPIFY" || type === "WEBSITE";
 }
 
 function getDashOpenSalesOrders() {

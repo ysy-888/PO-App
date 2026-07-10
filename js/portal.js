@@ -4,7 +4,9 @@
  * Portal accounts (tenant_memberships.role = "showroom") get a restricted
  * experience: the Sales Orders view only — search, filters, sorting, and
  * CSV export still work — with no other pages, no CSV import, and no
- * settings. The server enforces the same restriction (see server/src/auth.js);
+ * settings. A slim invoice payload (Tracking # only) is loaded so the
+ * Sales Orders table can show tracking from linked invoices. The server
+ * enforces the same restriction (see server/src/auth.js);
  * this file only adjusts the UI after /api/app-state reports portalMode: true.
  */
 
@@ -106,7 +108,14 @@ function isPortalHiddenSoColumn(col) {
   // Fixed leading columns (Flag/Selected) always show.
   if (typeof SO_NON_TOGGLEABLE_COLUMNS !== "undefined" && SO_NON_TOGGLEABLE_COLUMNS.has(col)) return false;
   const configured = getPortalVisibleColumnSet();
-  if (configured) return !configured.has(col);
+  if (configured) {
+    if (configured.has(col)) return false;
+    // Explicitly saved as hidden in the portal layout.
+    const order = portalColumnConfig?.order ?? [];
+    if (order.includes(col)) return true;
+    // Brand-new column not in the saved layout — follow default portal visibility.
+    return PORTAL_HIDDEN_SO_COLUMNS.has(col);
+  }
   return PORTAL_HIDDEN_SO_COLUMNS.has(col);
 }
 

@@ -7,6 +7,7 @@ const SO_SEARCH_COLUMNS = [
   "Division",
   "INVOICE #",
   "INVOICE STATUS",
+  "Tracking #",
   "Store",
   "N41 Status",
   "Order Type",
@@ -89,6 +90,19 @@ function getInvoiceStatusesForSalesOrder(order) {
   return statuses;
 }
 
+function getInvoiceTrackingNumbersForSalesOrder(order) {
+  const tracking = [];
+  const seen = new Set();
+  getLinkedInvoicesForSalesOrder(order).forEach(inv => {
+    const value = String(inv["Tracking #"] ?? "").trim();
+    const key = value.toLowerCase();
+    if (!value || seen.has(key)) return;
+    seen.add(key);
+    tracking.push(value);
+  });
+  return tracking;
+}
+
 function toInvNumberForSo(val) {
   const n = Number(String(val ?? "").replace(/[$,]/g, ""));
   return Number.isFinite(n) ? n : 0;
@@ -105,6 +119,7 @@ function getSoComputedColumnValue(col, order) {
   if (col === "Subtotal") return getInvoiceSubtotalForSalesOrder(order);
   if (col === "TOTAL") return getInvoiceTotalForSalesOrder(order);
   if (col === "INVOICE STATUS") return getInvoiceStatusesForSalesOrder(order).join(", ");
+  if (col === "Tracking #") return getInvoiceTrackingNumbersForSalesOrder(order).join(", ");
   return undefined;
 }
 
@@ -742,6 +757,14 @@ function renderSalesOrdersTable() {
         } else {
           setDisplayText(td, EMPTY_DISPLAY);
         }
+      } else if (col === "Tracking #") {
+        const tracking = getInvoiceTrackingNumbersForSalesOrder(order).join(", ");
+        if (tracking) {
+          mountSearchHighlightedText(td, tracking, tracking);
+          td.classList.remove("empty-display");
+        } else {
+          setDisplayText(td, EMPTY_DISPLAY);
+        }
       } else if (col === "Styles") {
         td.textContent = String((order.Lines ?? []).length);
         td.className = "td-num";
@@ -1333,19 +1356,26 @@ function openSalesOrderModal(order) {
   const invoiceUnitQty = getInvoiceUnitQtyForSalesOrder(order);
   const invoiceTotal = getInvoiceTotalForSalesOrder(order);
   const invoiceStatus = getInvoiceStatusesForSalesOrder(order).join(", ");
+  const invoiceTracking = getInvoiceTrackingNumbersForSalesOrder(order).join(", ");
 
   // Build modal body
   const bodyEl = overlay.querySelector(".so-modal-body");
   if (!bodyEl) return;
 
   // Showroom portal: no invoice fields, no linked invoices/POs, no memo.
+  // Tracking # is shown in both modes (pulled from linked invoices).
   const portal = typeof isPortalMode === "function" && isPortalMode();
 
-  const invoiceHeaderFields = portal ? "" : `
+  const trackingFieldHtml = `
+  <div class="so-field"><span class="so-field-label">Tracking #</span><span class="so-field-value">${escSo(invoiceTracking || "—")}</span></div>`;
+
+  const invoiceHeaderFields = portal
+    ? trackingFieldHtml
+    : `
   <div class="so-field"><span class="so-field-label">Invoice #</span><span class="so-field-value" data-so-invoice-links></span></div>
   <div class="so-field"><span class="so-field-label">Invoice Unit Qty</span><span class="so-field-value">${invoiceUnitQty > 0 ? invoiceUnitQty.toLocaleString() : "—"}</span></div>
   <div class="so-field"><span class="so-field-label">Total</span><span class="so-field-value">${invoiceTotal > 0 ? formatSoPrice(invoiceTotal) : "—"}</span></div>
-  <div class="so-field"><span class="so-field-label">Invoice Status</span><span class="so-field-value">${escSo(invoiceStatus || "—")}</span></div>`;
+  <div class="so-field"><span class="so-field-label">Invoice Status</span><span class="so-field-value">${escSo(invoiceStatus || "—")}</span></div>${trackingFieldHtml}`;
 
   const memoSection = portal ? "" : `
 <div class="so-memo-section">

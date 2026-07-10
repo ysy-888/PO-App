@@ -219,8 +219,9 @@ async function buildDesiredEvents(cutoff) {
     const soNumber = String(so["SO #"] ?? "").trim();
     const date = toYmd(so["CXL Date"]);
     if (!soNumber || !date) continue;
-    // Shopify orders don't belong on the operations calendar.
-    if (String(so["Order Type"] ?? "").trim().toUpperCase() === "SHOPIFY") continue;
+    // Shopify / Website orders don't belong on the operations calendar.
+    const soOrderType = String(so["Order Type"] ?? "").trim().toUpperCase();
+    if (soOrderType === "SHOPIFY" || soOrderType === "WEBSITE") continue;
     // Styles and units live on the SO's line items, not the header.
     const lines = Array.isArray(so["Lines"]) ? so["Lines"] : [];
     const styleNumbers = [...new Set(

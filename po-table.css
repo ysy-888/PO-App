@@ -8897,6 +8897,7 @@ td.has-pending-approval .pending-approval-value {
 #salesOrderTable .col-date       { width: 76px;  min-width: 68px;  max-width: 76px; }
 #salesOrderTable .col-cxl        { width: 76px;  min-width: 68px;  max-width: 76px; }
 #salesOrderTable .col-status     { width: 112px; min-width: 96px;  max-width: 132px; }
+#salesOrderTable .col-tracking   { width: 140px; min-width: 120px; max-width: 200px; }
 #salesOrderTable .col-vendor     { width: 104px; min-width: 88px;  max-width: 104px; }
 #salesOrderTable .col-n41-status { width: 90px;  min-width: 76px;  max-width: 90px; }
 #salesOrderTable .col-order-type { width: 112px; min-width: 96px;  max-width: 112px; }
@@ -9832,7 +9833,7 @@ td.has-pending-approval .pending-approval-value {
 
 /* ── Showroom portal (body.portal-mode) ─────────────────────── */
 /* Elevator Disco only: no division buttons, no toolbar dividers. */
-body.portal-mode #salesOrderToolbar .toolbar-filter-cluster > .toolbar-filter-section:first-child,
+body.portal-mode #salesOrderToolbar #soDivisionFilterSection,
 body.portal-mode #salesOrderToolbar .toolbar-filter-divider,
 body.portal-mode #soStatusFilters .filter-btn-group-divider {
   display: none;

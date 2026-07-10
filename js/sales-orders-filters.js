@@ -8,8 +8,19 @@ const SO_STATUS_FILTER_BUTTONS = [
   { label: "Open", value: SO_STATUS_FILTER_OPEN },
 ];
 
+/** Order types always excluded from the Sales Orders list (and portal). */
+const SO_HIDDEN_ORDER_TYPES = new Set(["SHOPIFY", "WEBSITE"]);
+
+const SO_ORDER_TYPE_FILTER_ALL = "";
+const SO_ORDER_TYPE_FILTER_BUTTONS = [
+  { label: "All", value: SO_ORDER_TYPE_FILTER_ALL },
+  { label: "Major", value: "MAJOR" },
+  { label: "Specialty", value: "SPECIALTY" },
+];
+
 let soActiveDivision = "";
 let soActiveStatusFilter = SO_STATUS_FILTER_OPEN;
+let soActiveOrderTypeFilter = SO_ORDER_TYPE_FILTER_ALL;
 
 const SO_COLUMN_FILTER_COLS = [
   "Customer",
@@ -47,6 +58,14 @@ function getSoToolbarStatusValue(order) {
   return String(order?.["N41 Status"] ?? "").trim();
 }
 
+function getSoOrderTypeValue(order) {
+  return String(order?.["Order Type"] ?? "").trim().toUpperCase();
+}
+
+function isSoHiddenOrderType(order) {
+  return SO_HIDDEN_ORDER_TYPES.has(getSoOrderTypeValue(order));
+}
+
 function rowMatchesSoToolbarStatusFilter(order) {
   if (soActiveStatusFilter === SO_STATUS_FILTER_ALL) return true;
 
@@ -59,8 +78,15 @@ function rowMatchesSoToolbarStatusFilter(order) {
   return status.toLowerCase() === String(soActiveStatusFilter).toLowerCase();
 }
 
+function rowMatchesSoToolbarOrderTypeFilter(order) {
+  if (soActiveOrderTypeFilter === SO_ORDER_TYPE_FILTER_ALL) return true;
+  return getSoOrderTypeValue(order) === soActiveOrderTypeFilter;
+}
+
 function rowPassesSoToolbarFilters(order) {
+  if (isSoHiddenOrderType(order)) return false;
   if (soActiveDivision && getSoDivisionValue(order) !== soActiveDivision) return false;
+  if (!rowMatchesSoToolbarOrderTypeFilter(order)) return false;
   return rowMatchesSoToolbarStatusFilter(order);
 }
 
@@ -76,6 +102,12 @@ function syncSoStatusFilterToolbar() {
   });
 }
 
+function syncSoOrderTypeFilterToolbar() {
+  document.querySelectorAll("#soOrderTypeFilters .filter-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.orderType === soActiveOrderTypeFilter);
+  });
+}
+
 function setSoDivisionFilter(division) {
   soActiveDivision = typeof normalizeDivision === "function" ? normalizeDivision(division) : String(division ?? "").trim();
   syncSoDivisionFilterToolbar();
@@ -85,6 +117,12 @@ function setSoDivisionFilter(division) {
 function setSoStatusFilter(status) {
   soActiveStatusFilter = status;
   syncSoStatusFilterToolbar();
+  applySalesOrderFilters();
+}
+
+function setSoOrderTypeFilter(orderType) {
+  soActiveOrderTypeFilter = String(orderType ?? "").trim().toUpperCase();
+  syncSoOrderTypeFilterToolbar();
   applySalesOrderFilters();
 }
 
@@ -106,6 +144,21 @@ function initSoToolbarFilters() {
       ...getSoDivisionFilterValues().map(division => makeDivisionBtn(division, division))
     );
     syncSoDivisionFilterToolbar();
+  }
+
+  const orderTypeGroup = document.getElementById("soOrderTypeFilters");
+  if (orderTypeGroup) {
+    orderTypeGroup.replaceChildren();
+    SO_ORDER_TYPE_FILTER_BUTTONS.forEach(item => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "filter-btn";
+      btn.dataset.orderType = item.value;
+      btn.textContent = item.label;
+      btn.addEventListener("click", () => setSoOrderTypeFilter(item.value));
+      orderTypeGroup.appendChild(btn);
+    });
+    syncSoOrderTypeFilterToolbar();
   }
 
   const statusGroup = document.getElementById("soStatusFilters");
@@ -168,7 +221,10 @@ function compareSoFilterValues(a, b, col) {
 
 function getSoUniqueColumnValues(col) {
   const values = new Set();
-  (allSalesOrders ?? []).forEach(order => values.add(getSoFilterValueKey(col, order)));
+  (allSalesOrders ?? []).forEach(order => {
+    if (isSoHiddenOrderType(order)) return;
+    values.add(getSoFilterValueKey(col, order));
+  });
   return [...values].sort((a, b) => compareSoFilterValues(a, b, col));
 }
 
@@ -180,6 +236,7 @@ function isSoColumnFilterActive(col) {
 function hasActiveSoColumnFilters() {
   return soFlagFilterActive ||
     soActiveDivision !== "" ||
+    soActiveOrderTypeFilter !== SO_ORDER_TYPE_FILTER_ALL ||
     soActiveStatusFilter !== SO_STATUS_FILTER_ALL ||
     SO_COLUMN_FILTER_COLS.some(col => isSoColumnFilterActive(col));
 }
@@ -192,11 +249,13 @@ function updateSoClearAllFiltersButton() {
 function clearAllSoColumnFilters() {
   soFlagFilterActive = false;
   soActiveDivision = "";
+  soActiveOrderTypeFilter = SO_ORDER_TYPE_FILTER_ALL;
   soActiveStatusFilter = SO_STATUS_FILTER_OPEN;
   SO_COLUMN_FILTER_COLS.forEach(col => { soColumnFilters[col] = null; });
   [...SO_DATE_FILTER_COLUMNS].forEach(col => { soDateColumnRangeFilters[col] = null; });
   closeSoColumnFilterPopover();
   syncSoDivisionFilterToolbar();
+  syncSoOrderTypeFilterToolbar();
   syncSoStatusFilterToolbar();
   updateSoColumnFilterHeaderStates();
   updateSoFlagFilterHeaderState();
