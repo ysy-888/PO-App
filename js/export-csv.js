@@ -182,6 +182,53 @@ function getInvoicesExportData() {
   return { headers, rows };
 }
 
+/** Sales Orders: visible columns in current order, filtered rows. */
+function getSalesOrdersExportData() {
+  const exportCols = typeof getSoColumnOrder === "function"
+    ? getSoColumnOrder().filter(col =>
+        (typeof isSoColumnVisible === "function" ? isSoColumnVisible(col) : true)
+        && col !== "Flag"
+        && col !== "Selected"
+      )
+    : (typeof SO_COLUMNS !== "undefined" ? SO_COLUMNS.filter(c => c !== "Flag" && c !== "Selected") : []);
+  const headers = exportCols;
+  const rows = (typeof filteredSalesOrders !== "undefined" ? filteredSalesOrders : []).map(order => {
+    return headers.map(col => {
+      let val;
+      if (typeof getSoComputedColumnValue === "function") {
+        const computed = getSoComputedColumnValue(col, order);
+        if (computed !== undefined) val = computed;
+      }
+      if (val === undefined) {
+        if (col === "Styles") val = (order.Lines ?? []).length;
+        else if (col === "Style #s") {
+          val = (order.Lines ?? []).map(l => String(l["Style #"] ?? "").trim()).filter(Boolean).join(", ");
+        } else if (col === "Total Units") {
+          val = typeof soTotalUnits === "function" ? soTotalUnits(order) : "";
+        } else if (col === "Total Price") {
+          val = typeof soTotalPrice === "function" ? soTotalPrice(order) : "";
+        } else {
+          val = order[col] ?? "";
+        }
+      }
+
+      if (typeof SO_DATE_FILTER_COLUMNS !== "undefined" && SO_DATE_FILTER_COLUMNS.has(col)) {
+        const display = typeof formatDateForDisplay === "function" ? formatDateForDisplay(val) : String(val ?? "");
+        return !display || display === EMPTY_DISPLAY ? "" : display;
+      }
+      if (col === "Total Price" || col === "Subtotal" || col === "TOTAL") {
+        const n = Number(val);
+        if (!Number.isFinite(n) || n === 0) return "";
+        return typeof formatSoPrice === "function" ? formatSoPrice(n) : String(n);
+      }
+      if (val === null || val === undefined || val === "") return "";
+      const s = String(val);
+      return s === EMPTY_DISPLAY ? "" : s;
+    });
+  });
+  return { headers, rows };
+}
+
 // ---------------------------------------------------------------------------
 // Dispatcher
 // ---------------------------------------------------------------------------
@@ -214,6 +261,10 @@ function exportCurrentViewCsv() {
     case "invoices":
       data = getInvoicesExportData();
       filename = `invoices_${today}.csv`;
+      break;
+    case "sales":
+      data = getSalesOrdersExportData();
+      filename = `sales-orders_${today}.csv`;
       break;
     default:
       return;
