@@ -490,6 +490,62 @@ export function buildAsnEmail(requestId, data, poRows) {
   return { to: data["Buyer Email"], cc: data.CC, subject, text, html };
 }
 
+const BOL_EMAIL_TABLE_COLUMNS = ["_num", "PO #", "Buyer PO #", "Style #", "Color", "Actual Qty", "Ctn Qty", "Weight"];
+const BOL_EMAIL_TABLE_LABELS = {
+  "PO #": "PO #",
+  "Buyer PO #": "Buyer PO #",
+  "Style #": "Style #",
+  "Color": "Color",
+  "Actual Qty": "Act Qty",
+  "Ctn Qty": "Ctn Qty",
+  "Weight": "Weight",
+};
+
+/** Carrier email for an ASN request — a BOL cover note (the BOL PDF is attached). */
+export function buildAsnBolEmail(requestId, data, poRows) {
+  const displayDate = formatDate(data["ASN Date"]);
+  const buyer = String(data.Buyer ?? "").trim();
+  const carrier = String(data.Carrier ?? "").trim();
+  const pickupAddress = String(data["Pickup Address"] ?? "").trim();
+  const deliveryAddress = String(data["Delivery Address"] ?? "").trim();
+  const subject = `[ELEVATOR DISCO] BOL - Pickup ${displayDate}${buyer ? ` - ${buyer}` : ""} - ${requestId}`.trim();
+
+  const text = [
+    "Hello,",
+    "",
+    "Please find the Bill of Lading attached for the pickup below.",
+    "",
+    `BOL #: ${requestId}`,
+    `Pickup Date: ${displayDate}`,
+    `Carrier: ${carrier}`,
+    `Ship From: ${pickupAddress}`,
+    `Ship To: ${buyer}${deliveryAddress ? ` — ${deliveryAddress}` : ""}`,
+    `PO Count: ${poRows.length}`,
+    "",
+    buildPoText(poRows, BOL_EMAIL_TABLE_COLUMNS, BOL_EMAIL_TABLE_LABELS, { qtyFooterCol: "Actual Qty" }),
+    "",
+    "www.elevatordisco.com",
+  ].join("\n");
+
+  const html = buildRequestEmailHtml({
+    requestTypeLabel: "Bill of Lading",
+    requestId,
+    headerRequestDate: displayDate,
+    intro: "Please find the Bill of Lading attached for the pickup below.",
+    metaRows: [
+      { label: "Pickup Date", value: displayDate },
+      { label: "Carrier", value: carrier },
+      { label: "Ship From", value: pickupAddress },
+      { label: "Ship To", value: [buyer, deliveryAddress].filter(Boolean).join(" — ") },
+      { label: "PO Count", value: poRows.length },
+    ],
+    notes: "",
+    bodyHtml: buildPoTableHtml(poRows, BOL_EMAIL_TABLE_COLUMNS, BOL_EMAIL_TABLE_LABELS, { qtyFooterCol: "Actual Qty" }),
+  });
+
+  return { to: data["Carrier Email"], cc: data["Carrier CC"], subject, text, html };
+}
+
 export function buildDeliveryPickupEmail(requestType, requestId, data, poRows) {
   const dateField = requestType === "Delivery" ? "Delivery Date" : "Pickup Date";
   const notesField = requestType === "Delivery" ? "Delivery Req Notes" : "Pickup Req Notes";

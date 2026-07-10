@@ -18,6 +18,9 @@ function applyUserSettingsFromServer(settings) {
     if ((settings.asnCarriers !== undefined || settings.asnDefaultCarrierByBuyer !== undefined) && typeof applyAsnCarriersPreference === "function") {
       applyAsnCarriersPreference(settings.asnCarriers ?? [], settings.asnDefaultCarrierByBuyer ?? {});
     }
+    if (settings.asnBolPickupAddress !== undefined && typeof applyAsnBolPickupAddressPreference === "function") {
+      applyAsnBolPickupAddressPreference(settings.asnBolPickupAddress);
+    }
     if (settings.pageSize !== undefined) {
       applyPageSize(settings.pageSize);
     }

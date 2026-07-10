@@ -34,35 +34,38 @@ const SHIPMENT_DATE_FIELDS = new Set(["EXF", "Shipped", "ETD", "ETA", "IHD"]);
 const SHIPMENT_MODAL_INFO_FIELDS = [SHIPMENT_EXF_REQUEST_ID_FIELD, "Ship Method", "Vessel", "House #"];
 const SHIPMENT_MODAL_DATE_FIELDS = ["EXF", "Shipped", "ETD", "ETA", "IHD"];
 
+/** Shared by the Shipment and ASN Request form tables (same columns/order). */
 const SHIPMENT_LINKED_PO_COLUMNS = [
   { col: "PO #", label: "PO #", cellClass: "shipment-po-cell-id" },
-  { col: "Style #", label: "Style #", cellClass: "shipment-po-cell-wrap" },
   { col: "Vendor", label: "Vendor", cellClass: "shipment-po-cell-vendor" },
   { col: "Buyer", label: "Buyer", cellClass: "shipment-po-cell-buyer" },
   { col: "Buyer PO #", label: "Buyer PO #", cellClass: "shipment-po-cell-buyer-po" },
-  { col: "PO Qty", label: "Order Qty", cellClass: "shipment-po-cell-qty" },
-  { col: "Actual Qty", label: "Actual Qty", cellClass: "shipment-po-cell-qty" },
-  { col: "Ctn Qty", label: "Ctn Qty", cellClass: "shipment-po-cell-qty" },
   { col: "CXL Date", label: "CXL Date", cellClass: "shipment-po-cell-date" },
-  { col: "Notes", label: "Notes", cellClass: "shipment-po-cell-notes" },
+  { col: "Style #", label: "Style #", cellClass: "shipment-po-cell-wrap" },
+  { col: "Color", label: "Color", cellClass: "shipment-po-cell-wrap" },
+  { col: "PO Qty", label: "Ord Qty", cellClass: "shipment-po-cell-qty" },
+  { col: "Actual Qty", label: "Act Qty", cellClass: "shipment-po-cell-qty" },
+  { col: "Ctn Qty", label: "Ctn Qty", cellClass: "shipment-po-cell-qty" },
+  { col: "Weight", label: "Weight", cellClass: "shipment-po-cell-qty" },
 ];
 
 const SHIPMENT_LINKED_PO_COL_CLASSES = [
   "shipment-po-col-select",
   "shipment-po-col-id",
-  "shipment-po-col-style",
   "shipment-po-col-vendor",
   "shipment-po-col-buyer",
   "shipment-po-col-buyer-po",
-  "shipment-po-col-qty",
-  "shipment-po-col-qty",
-  "shipment-po-col-qty",
   "shipment-po-col-date",
-  "shipment-po-col-notes",
+  "shipment-po-col-style",
+  "shipment-po-col-style",
+  "shipment-po-col-qty",
+  "shipment-po-col-qty",
+  "shipment-po-col-qty",
+  "shipment-po-col-qty",
 ];
 
-/** Linked PO table column widths (px); Notes column is flexible (null). */
-const SHIPMENT_LINKED_PO_COLUMN_WIDTHS = [52, 72, 120, 88, 120, 120, 58, 58, 58, 92, null];
+/** Linked PO table column widths (px), select column first. */
+const SHIPMENT_LINKED_PO_COLUMN_WIDTHS = [52, 72, 120, 110, 104, 88, 88, 96, 58, 58, 58, 66];
 
 /** PO fields synced from / cleared with a shipment. */
 const SHIPMENT_PO_CLEAR_FIELDS = [

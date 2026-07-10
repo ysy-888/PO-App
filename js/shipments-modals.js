@@ -63,6 +63,8 @@ function bindModalHeaderMenu(btnId, dropdownId) {
 function updateShipmentReceiveButton() {
   const btn = document.getElementById("shipmentReceiveBtn");
   const badge = document.getElementById("shipmentModalStatusBadge");
+  const deleteBtn = document.getElementById("shipmentModalDeleteBtn");
+  if (deleteBtn) deleteBtn.hidden = !shipmentModalRow;
   if (!shipmentModalRow) {
     if (btn) btn.hidden = true;
     if (badge) badge.hidden = true;
@@ -286,7 +288,8 @@ function buildShipmentModalLayout({ shipment = {}, formId, linkedSource, showAdd
 
   outer.appendChild(buildShipmentModalSplitLayout(
     buildShipmentFormEdit(shipment, formId, { lockExfDate, linkedPos }),
-    renderShipmentLinkedPoSection(linkedSource)
+    // Only the detail modal offers Add POs (create builds from the selection).
+    renderShipmentLinkedPoSection(linkedSource, { showAddButton: formId === "shipmentEditForm" })
   ));
 
   if (showAddPanel) {
@@ -606,8 +609,12 @@ function isShipmentModalDirty() {
 }
 
 function updateShipmentSaveButtonVisibility() {
+  const dirty = isShipmentModalDirty();
   const btn = document.getElementById("shipmentModalSaveBtn");
-  if (btn) btn.hidden = !isShipmentModalDirty();
+  if (btn) btn.hidden = !dirty;
+  // The whole footer (Save + Cancel) stays hidden until something is edited.
+  const footer = document.getElementById("shipmentModalFooter");
+  if (footer) footer.hidden = !dirty;
 }
 
 function getMajorityShipMethodFromPoRows(rows) {
@@ -953,7 +960,20 @@ function setAllLinkedPosSelected(pos, selected) {
   onFormPoSelectionChanged();
 }
 
-function renderShipmentLinkedPoSection(source) {
+/** "+ Add POs" button rendered at the lower-right of a linked-PO table. */
+function buildLinkedPoAddButtonRow(buttonId) {
+  const row = document.createElement("div");
+  row.className = "linked-po-add-row";
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.id = buttonId;
+  btn.className = "btn btn-secondary linked-po-add-btn";
+  btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg> Add POs`;
+  row.appendChild(btn);
+  return row;
+}
+
+function renderShipmentLinkedPoSection(source, { showAddButton = false } = {}) {
   const section = document.createElement("section");
   section.className = "shipment-linked-pos";
   section.classList.toggle("shipment-linked-pos--selection-disabled", shipmentAddPoPanelOpen);
@@ -967,6 +987,7 @@ function renderShipmentLinkedPoSection(source) {
     empty.className = "shipment-linked-empty";
     empty.textContent = "No POs linked to this shipment.";
     section.appendChild(empty);
+    if (showAddButton) section.appendChild(buildLinkedPoAddButtonRow("shipmentDetailAddPosBtn"));
     return section;
   }
 
@@ -1047,6 +1068,7 @@ function renderShipmentLinkedPoSection(source) {
   table.appendChild(tbody);
   wrap.appendChild(table);
   section.appendChild(wrap);
+  if (showAddButton) section.appendChild(buildLinkedPoAddButtonRow("shipmentDetailAddPosBtn"));
   if (typeof wireLinkedPoTableSorting === "function") wireLinkedPoTableSorting(table);
   updateShipmentLinkedPoSelectAllHeader(pos);
   return section;
@@ -1103,6 +1125,28 @@ async function saveShipmentModal() {
     showIndicator(`Saved ${CHECK_MARK}`, "success");
   } catch (err) {
     showIndicator("Save failed: " + err.message, "error");
+  } finally {
+    shipmentOpInProgress = false;
+  }
+}
+
+/** Delete the shipment open in the detail modal (menu action). */
+async function deleteShipmentFromModal() {
+  if (shipmentOpInProgress || !shipmentModalRow) return;
+  const id = String(shipmentModalRow[SHIPMENT_ID_FIELD] ?? "").trim();
+  if (!id) return;
+  if (!confirm(`Delete shipment ${id}? This cannot be undone — linked PO shipment fields will be cleared.`)) return;
+
+  shipmentOpInProgress = true;
+  showIndicator(`Deleting ${id}${ELLIPSIS}`, "");
+  try {
+    const json = await postApi("/api/shipments/delete", { shipmentIds: [id] });
+    if (!json.success) throw new Error(json.error);
+    applyShipmentsDeletedLocally([id]);
+    closeShipmentModalForce();
+    showIndicator(`${id} deleted ${CHECK_MARK}`, "success");
+  } catch (err) {
+    showIndicator("Delete failed: " + err.message, "error");
   } finally {
     shipmentOpInProgress = false;
   }

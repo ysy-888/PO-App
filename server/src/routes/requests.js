@@ -22,14 +22,15 @@ import { sanitizeUpdates } from "../importHelpers.js";
 import { sendEmail } from "../email.js";
 import {
   buildApprovalEmail,
+  buildAsnBolEmail,
   buildAsnEmail,
   buildDeliveryPickupEmail,
   buildExfEmail,
 } from "../emailTemplates.js";
 import {
-  buildAsnPickupEmailAttachments,
   buildRequestEmailAttachments,
 } from "../packingListPrint/index.js";
+import { buildAsnBolPdfAttachment } from "../bolPdf.js";
 import { getCartonWeightLbs } from "../packingListPrint/helpers.js";
 import { archiveAttachmentsToDrive } from "../google.js";
 import { requestCalendarSync } from "../calendarSync.js";
@@ -194,32 +195,52 @@ async function sendAndStoreRequestEmail({ tenantId, tableName, entityId, type, r
   return { ...result, data: updatedData };
 }
 
+/** Ship-to address for the BOL: the buyer's record in the Customers DB. */
+async function getCustomerAddress(tenantId, customerName) {
+  const target = String(customerName ?? "").trim().toLowerCase();
+  if (!target) return "";
+  const { data } = await supabase
+    .from("customers")
+    .select("data")
+    .eq("tenant_id", tenantId);
+  const row = (data || [])
+    .map(item => item.data || {})
+    .find(item => String(item.Customer ?? "").trim().toLowerCase() === target);
+  return String(row?.Address ?? "").trim();
+}
+
 async function sendAndStoreAsnCarrierEmail({ tenantId, requestId, requestData, poRows }) {
   const carrierEmail = String(requestData["Carrier Email"] ?? "").trim();
   const carrierCc = String(requestData["Carrier CC"] ?? "").trim();
-  const pickupRequestId = `ASN Pickup ${requestId}`;
-  const pickupData = {
-    "Pickup Date": requestData["ASN Date"] ?? "",
-    "Request Date": todayYmd(),
-    From: requestData["Carrier"] ?? "",
-    To: requestData["Buyer"] ?? "",
-    "Email To": carrierEmail,
-    "Email CC": carrierCc,
-    "Pickup Req Notes": `ASN pickup for ${requestId}`,
-  };
-
-  const message = buildDeliveryPickupEmail("Pickup", pickupRequestId, pickupData, poRows);
-  // Override to/cc with stored carrier fields
-  message.to = carrierEmail;
-  message.cc = carrierCc;
   const hasRecipient = Boolean(carrierEmail);
 
-  const attachments = await buildAsnPickupEmailAttachments(supabase, tenantId, {
-    asnRequestId: requestId,
-    asnData: requestData,
-    poRows,
-    labelInputs: [],
-  });
+  // BOL addresses: pickup from the request (defaulted from Settings → ASN);
+  // delivery from the request or, failing that, the Customers DB.
+  const pickupAddress = String(requestData["Pickup Address"] ?? "").trim();
+  let deliveryAddress = String(requestData["Delivery Address"] ?? "").trim();
+  if (!deliveryAddress) {
+    deliveryAddress = await getCustomerAddress(tenantId, requestData["Buyer"]);
+  }
+
+  const bolData = {
+    ...requestData,
+    "Pickup Address": pickupAddress,
+    "Delivery Address": deliveryAddress,
+  };
+
+  const message = buildAsnBolEmail(requestId, bolData, poRows);
+  message.to = carrierEmail;
+  message.cc = carrierCc;
+
+  const attachments = [
+    await buildAsnBolPdfAttachment({
+      requestId,
+      asnData: bolData,
+      poRows,
+      pickupAddress,
+      deliveryAddress,
+    }),
+  ];
 
   const result = await sendEmail({ ...message, attachments });
   archiveAttachmentsToDrive(attachments);
@@ -483,6 +504,38 @@ router.post("/asn/update", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("asn update failed:", err);
     return res.status(500).json({ success: false, error: err.message || "Failed to update ASN request." });
+  }
+});
+
+router.post("/asn/delete", requireAuth, async (req, res) => {
+  const { asnRequestId } = req.body || {};
+  if (!asnRequestId) return res.status(400).json({ success: false, error: "asnRequestId is required." });
+
+  try {
+    const { data: existing, error: fetchErr } = await supabase
+      .from("asn_requests").select("id, data").eq("tenant_id", req.tenantId).eq("entity_id", asnRequestId).maybeSingle();
+    if (fetchErr) throw fetchErr;
+    if (!existing) return res.status(404).json({ success: false, error: "ASN request not found." });
+
+    // Clear ASN fields on the linked POs before removing the request.
+    const poNumbers = splitPoNumbers(existing.data?.["PO Numbers"] || "");
+    if (poNumbers.length > 0) {
+      await updatePoFields(req.tenantId, poNumbers, {
+        "ASN Request ID": "",
+        "ASN Requested": false,
+        "ASN Date": "",
+        "ASN Req Date": "",
+      });
+    }
+
+    const { error: deleteErr } = await supabase
+      .from("asn_requests").delete().eq("id", existing.id).eq("tenant_id", req.tenantId);
+    if (deleteErr) throw deleteErr;
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error("asn delete failed:", err);
+    return res.status(500).json({ success: false, error: err.message || "Failed to delete ASN request." });
   }
 });
 

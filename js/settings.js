@@ -119,6 +119,51 @@ function initSettingsAsnDefaultEmails() {
   });
 }
 
+// ── BOL default pickup address ────────────────────────────────────────────────
+
+const ASN_BOL_PICKUP_ADDRESS_STORAGE_BASE = "asnBolPickupAddress";
+let asnBolPickupAddress = "";
+
+function getAsnBolPickupAddress() {
+  return asnBolPickupAddress;
+}
+
+function updateSettingsAsnBolPickupAddressUi() {
+  const input = document.getElementById("settingsAsnPickupAddressInput");
+  if (input && input.value !== asnBolPickupAddress) input.value = asnBolPickupAddress;
+}
+
+function applyAsnBolPickupAddressPreference(value) {
+  asnBolPickupAddress = String(value ?? "").trim();
+  updateSettingsAsnBolPickupAddressUi();
+}
+
+function loadAsnBolPickupAddressPreference() {
+  try {
+    applyAsnBolPickupAddressPreference(localStorage.getItem(scopedStorageKey(ASN_BOL_PICKUP_ADDRESS_STORAGE_BASE)) ?? "");
+  } catch {
+    applyAsnBolPickupAddressPreference("");
+  }
+}
+
+function saveAsnBolPickupAddressPreference() {
+  try {
+    localStorage.setItem(scopedStorageKey(ASN_BOL_PICKUP_ADDRESS_STORAGE_BASE), asnBolPickupAddress);
+  } catch {
+    /* ignore storage failures */
+  }
+  if (typeof persistUserPreferencePatch === "function") {
+    persistUserPreferencePatch({ asnBolPickupAddress });
+  }
+}
+
+function initSettingsAsnBolPickupAddress() {
+  document.getElementById("settingsAsnPickupAddressInput")?.addEventListener("change", e => {
+    asnBolPickupAddress = String(e.target.value ?? "").trim();
+    saveAsnBolPickupAddressPreference();
+  });
+}
+
 // ── Carrier management ────────────────────────────────────────────────────────
 
 let asnCarriers = [];
@@ -453,6 +498,7 @@ function updateSettingsUi() {
   updateSettingsSplitViewUi();
   updateSettingsDateFormatUi();
   updateSettingsAsnDefaultEmailsUi();
+  updateSettingsAsnBolPickupAddressUi();
   renderSettingsCarrierList();
   renderSettingsAsnDefaultCarrierList();
   if (typeof updateVendorSubmitModeCheck === "function") updateVendorSubmitModeCheck();
@@ -662,6 +708,8 @@ function initSettings() {
   initSettingsAsnDefaultEmails();
   loadAsnCarriersPreference();
   initSettingsCarriers();
+  loadAsnBolPickupAddressPreference();
+  initSettingsAsnBolPickupAddress();
 
   document.getElementById("settingsCloseBtn")?.addEventListener("click", closeSettingsModal);
 

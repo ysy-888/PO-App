@@ -47,11 +47,10 @@ const ASN_REQUEST_TABLE_COLUMN_LABELS = {
   "CC": "CC",
 };
 
-const ASN_REQUEST_LINKED_PO_COLUMNS = DELIVERY_PICKUP_LINKED_PO_COLUMNS.filter(({ col }) => col !== "Buyer");
+// Same columns/order as the shipment form table (shipments-tables.js).
+const ASN_REQUEST_LINKED_PO_COLUMNS = SHIPMENT_LINKED_PO_COLUMNS;
 
-const ASN_REQUEST_LINKED_PO_COLUMN_WIDTHS = [
-  52, 52, 170, 72, 108, 72, 64, 64, 64, 76,
-];
+const ASN_REQUEST_LINKED_PO_COLUMN_WIDTHS = SHIPMENT_LINKED_PO_COLUMN_WIDTHS;
 
 function appendAsnRequestLinkedPoColgroup(table) {
   const colgroup = document.createElement("colgroup");
@@ -75,6 +74,8 @@ let asnRequestBuyer = "";
 let asnRequestDraftCarrier = "";
 let asnRequestDraftCarrierEmail = "";
 let asnRequestDraftCarrierCc = "";
+let asnRequestDraftPickupAddress = "";
+let asnRequestDraftDeliveryAddress = "";
 let asnRequestSendBuyer = true;
 let asnRequestSendCarrier = true;
 let asnRequestModalRow = null;
@@ -94,6 +95,15 @@ function getAsnDefaultCarrierInfoForBuyer(buyer) {
     email: carrier?.email ?? "",
     cc: carrier?.cc ?? "",
   };
+}
+
+/** BOL ship-to: the buyer's address from the Customers DB. */
+function getCustomerAddressForBuyer(buyer) {
+  const key = String(buyer ?? "").trim().toLowerCase();
+  if (!key) return "";
+  const row = (typeof allCustomers !== "undefined" ? allCustomers : [])
+    .find(c => String(c?.Customer ?? "").trim().toLowerCase() === key);
+  return String(row?.Address ?? "").trim();
 }
 
 function getAsnCarrierInfoByName(name) {
@@ -243,6 +253,24 @@ async function setAsnRequestPickedUp(requestId, pickedUp) {
     const json = await postApi("/api/requests/asn/update", { asnRequestId: id, request: patch });
     if (!json.success) throw new Error(json.error || "Failed to update ASN request.");
     Object.assign(request, patch);
+
+    // Picked up → the linked POs are done; close them out.
+    if (pickedUp) {
+      const linkedRows = getRequestPoNumbers(request, ASN_REQUEST_ID_FIELD)
+        .map(po => allRows.find(r => String(r["PO #"]) === String(po)))
+        .filter(row => row && getRowStatus(row) !== "Closed");
+      if (linkedRows.length > 0) {
+        const items = linkedRows.map(row => ({
+          poNumber: String(row["PO #"]),
+          updates: { "Status": "Closed" },
+        }));
+        const poJson = await postApi("/api/po/batch-update", { items });
+        if (!poJson.success) throw new Error(poJson.error || "Failed to close linked POs.");
+        linkedRows.forEach(row => { row["Status"] = "Closed"; });
+        applyFilters();
+      }
+    }
+
     applyAsnRequestFilters();
     if (typeof refreshDashboardIfActive === "function") refreshDashboardIfActive();
     // Re-render the open modal so the PO checkboxes lock/unlock with the status.
@@ -256,6 +284,44 @@ async function setAsnRequestPickedUp(requestId, pickedUp) {
   } finally {
     asnRequestOpInProgress = false;
     if (asnRequestModalRow === request) updateAsnRequestActionButtons();
+  }
+}
+
+/** Delete the ASN request open in the modal (menu action). */
+async function deleteAsnRequestFromModal() {
+  if (asnRequestOpInProgress || !asnRequestModalRow) return;
+  const id = getAsnRequestRecordId(asnRequestModalRow);
+  if (!id) return;
+  if (!confirm(`Delete ASN request ${id}? This cannot be undone — linked PO ASN fields will be cleared.`)) return;
+
+  asnRequestOpInProgress = true;
+  showIndicator(`Deleting ${id}${ELLIPSIS}`, "");
+  try {
+    const json = await postApi("/api/requests/asn/delete", { asnRequestId: id });
+    if (!json.success) throw new Error(json.error || "Delete failed.");
+
+    // Local cleanup: drop the request and clear ASN fields on linked POs.
+    const poNumbers = getRequestPoNumbers(asnRequestModalRow, ASN_REQUEST_ID_FIELD);
+    const idx = allAsnRequests.findIndex(r => getAsnRequestRecordId(r) === id);
+    if (idx !== -1) allAsnRequests.splice(idx, 1);
+    poNumbers.forEach(poNumber => {
+      const row = allRows.find(r => String(r["PO #"]) === String(poNumber));
+      if (!row) return;
+      row[ASN_REQUEST_ID_FIELD] = "";
+      row["ASN Requested"] = false;
+      row[ASN_DATE_FIELD] = "";
+      row["ASN Req Date"] = "";
+    });
+
+    closeAsnRequestModal();
+    applyAsnRequestFilters();
+    applyFilters();
+    if (typeof refreshDashboardIfActive === "function") refreshDashboardIfActive();
+    showIndicator(`${id} deleted ${CHECK_MARK}`, "success");
+  } catch (err) {
+    showIndicator("Delete failed: " + err.message, "error");
+  } finally {
+    asnRequestOpInProgress = false;
   }
 }
 
@@ -499,6 +565,8 @@ function openAsnRequestFromSelection() {
   asnRequestDraftCarrier = "";
   asnRequestDraftCarrierEmail = "";
   asnRequestDraftCarrierCc = "";
+  asnRequestDraftPickupAddress = "";
+  asnRequestDraftDeliveryAddress = "";
   asnRequestSendBuyer = true;
   asnRequestSendCarrier = true;
   asnRequestAddPoPanelOpen = false;
@@ -522,6 +590,23 @@ function isAsnRequestAsnDateDirty() {
   return normalizeToYmd(getAsnRequestAsnDateValue()) !== normalizeToYmd(asnRequestSavedAsnDate);
 }
 
+// Snapshot of the form at render time — the footer (Save/Cancel) only
+// appears once the user actually edits something on an existing request.
+let asnRequestFormSnapshot = null;
+
+function captureAsnRequestFormSnapshot() {
+  const form = document.getElementById("asnRequestForm");
+  asnRequestFormSnapshot = form ? readRequestForm(form) : null;
+}
+
+function isAsnRequestFormDirty() {
+  const form = document.getElementById("asnRequestForm");
+  if (!form || !asnRequestFormSnapshot) return false;
+  const current = readRequestForm(form);
+  const keys = new Set([...Object.keys(current), ...Object.keys(asnRequestFormSnapshot)]);
+  return [...keys].some(key => String(current[key] ?? "") !== String(asnRequestFormSnapshot[key] ?? ""));
+}
+
 function captureAsnRequestDraft() {
   const form = document.getElementById("asnRequestForm");
   if (!form) return;
@@ -535,6 +620,8 @@ function captureAsnRequestDraft() {
   asnRequestDraftCarrier = formData["Carrier"] ?? asnRequestDraftCarrier ?? "";
   asnRequestDraftCarrierEmail = formData["Carrier Email"] ?? asnRequestDraftCarrierEmail ?? "";
   asnRequestDraftCarrierCc = formData["Carrier CC"] ?? asnRequestDraftCarrierCc ?? "";
+  asnRequestDraftPickupAddress = formData["Pickup Address"] ?? asnRequestDraftPickupAddress ?? "";
+  asnRequestDraftDeliveryAddress = formData["Delivery Address"] ?? asnRequestDraftDeliveryAddress ?? "";
   const sendBuyerCb = document.getElementById("asnSendToBuyerCb");
   const sendCarrierCb = document.getElementById("asnSendToCarrierCb");
   if (sendBuyerCb) asnRequestSendBuyer = sendBuyerCb.checked;
@@ -655,6 +742,22 @@ function renderAsnRequestModal(poNumbers, { asnDate = formatDateToYmd(new Date()
     carrierSelectRow.tr,
     carrierEmailRow.tr,
     carrierCcRow.tr,
+    createRequestFormMetaRow(
+      "Pickup Address",
+      "Pickup Address",
+      isExisting
+        ? (request["Pickup Address"] ?? "")
+        : (asnRequestDraftPickupAddress || (typeof getAsnBolPickupAddress === "function" ? getAsnBolPickupAddress() : "")),
+      { readOnly: isView }
+    ).tr,
+    createRequestFormMetaRow(
+      "Delivery Address",
+      "Delivery Address",
+      isExisting
+        ? (String(request["Delivery Address"] ?? "").trim() || getCustomerAddressForBuyer(request["Buyer"]))
+        : (asnRequestDraftDeliveryAddress || getCustomerAddressForBuyer(buyer)),
+      { readOnly: isView }
+    ).tr,
     ...(sendCarrierRow ? [sendCarrierRow.tr] : []),
   ];
   outer.appendChild(buildShipmentModalSplitLayout(
@@ -712,6 +815,7 @@ function renderAsnRequestModal(poNumbers, { asnDate = formatDateToYmd(new Date()
   }
 
   bringModalToFront(document.getElementById("asnRequestOverlay"));
+  captureAsnRequestFormSnapshot();
   updateAsnRequestActionButtons();
   updateToolbarRequestButtons();
 }
@@ -964,6 +1068,8 @@ function renderAsnRequestLinkedPoSection(pos, isView = false) {
   table.appendChild(tbody);
   wrap.appendChild(table);
   section.appendChild(wrap);
+  // "+ Add POs" lives at the lower-right of the table area (not the footer).
+  section.appendChild(buildLinkedPoAddButtonRow("asnRequestAddPosBtn"));
   if (typeof wireLinkedPoTableSorting === "function") wireLinkedPoTableSorting(table);
   return section;
 }
@@ -991,6 +1097,17 @@ function updateAsnRequestActionButtons() {
   const isView = submitBtn?.hidden === true;
   const saveDateBtn = document.getElementById("asnRequestSaveDateBtn");
   if (saveDateBtn) saveDateBtn.hidden = !isView || !isAsnRequestAsnDateDirty();
+
+  // Footer stays hidden on existing requests until something is edited;
+  // new (unsaved) requests always show it for the Create button.
+  const footer = document.getElementById("asnRequestFooter");
+  if (footer) footer.hidden = Boolean(asnRequestModalRow) && !isAsnRequestFormDirty();
+
+  const deleteBtn = document.getElementById("asnRequestDeleteBtn");
+  if (deleteBtn) {
+    deleteBtn.hidden = !asnRequestModalRow;
+    deleteBtn.disabled = asnRequestOpInProgress || isAppSaving();
+  }
   const cartonLabelBtn = document.getElementById("asnCartonLabelBtn");
   const printBtn = document.getElementById("asnRequestPrintBtn");
   if (printBtn) printBtn.hidden = !isView || asnRequestPoNumbers.length === 0;
@@ -1129,6 +1246,8 @@ function closeAsnRequestModal() {
   asnRequestDraftCarrier = "";
   asnRequestDraftCarrierEmail = "";
   asnRequestDraftCarrierCc = "";
+  asnRequestDraftPickupAddress = "";
+  asnRequestDraftDeliveryAddress = "";
   asnRequestSendBuyer = true;
   asnRequestSendCarrier = true;
   asnRequestModalRow = null;
@@ -1259,6 +1378,8 @@ function applyAsnRequestCreatedLocally(requestId, poNumbers, data, { sendBuyer =
     "Carrier": data["Carrier"] ?? "",
     "Carrier Email": data["Carrier Email"] ?? "",
     "Carrier CC": data["Carrier CC"] ?? "",
+    "Pickup Address": data["Pickup Address"] ?? "",
+    "Delivery Address": data["Delivery Address"] ?? "",
     [ASN_REQ_NOTES_FIELD]: data[ASN_REQ_NOTES_FIELD] ?? "",
     "PO Numbers": poNumbers.join(", "),
     "PO Count": poNumbers.length,
@@ -1494,7 +1615,17 @@ async function submitAsnPickupLabelModal() {
 function initAsnRequests() {
   document.getElementById("asnRequestBtn")?.addEventListener("click", openAsnRequestFromSelection);
   document.getElementById("asnRequestSubmitBtn")?.addEventListener("click", submitAsnRequest);
-  document.getElementById("asnRequestAddPosBtn")?.addEventListener("click", openAsnRequestAddPoPanel);
+  // The Add POs button is rendered inside the linked-PO table area on every
+  // modal render, so bind it via delegation.
+  document.addEventListener("click", e => {
+    if (e.target.closest("#asnRequestAddPosBtn")) openAsnRequestAddPoPanel();
+  });
+  document.getElementById("asnRequestDeleteBtn")?.addEventListener("click", deleteAsnRequestFromModal);
+  // Footer (Save/Cancel) only appears once the form is edited.
+  const asnBody = document.getElementById("asnRequestBody");
+  const onAsnBodyEdit = () => updateAsnRequestActionButtons();
+  asnBody?.addEventListener("input", onAsnBodyEdit);
+  asnBody?.addEventListener("change", onAsnBodyEdit);
   document.getElementById("asnRequestRemovePosBtn")?.addEventListener("click", removePosFromAsnRequest);
   document.getElementById("asnRequestAddPoDoneBtn")?.addEventListener("click", closeAsnRequestAddPoPanel);
   document.getElementById("asnRequestAddSelectedPosBtn")?.addEventListener("click", addSelectedPosToAsnRequest);

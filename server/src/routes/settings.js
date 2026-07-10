@@ -22,6 +22,7 @@ const USER_PREFERENCE_KEYS = new Set([
   "asnDefaultEmailAddresses",
   "asnCarriers",
   "asnDefaultCarrierByBuyer",
+  "asnBolPickupAddress",
   "pageSize",
   "columnLayout",
 ]);

@@ -1137,6 +1137,7 @@
               <div id="shipmentModalMenuDropdown" class="header-menu-dropdown modal-header-menu-dropdown" hidden role="menu">
                 <button type="button" class="header-menu-item" id="shipmentModalPrintBtn" role="menuitem" hidden title="Print packing list for linked POs">Print Packing List</button>
                 <button type="button" class="header-menu-item" id="shipmentReceiveBtn" role="menuitem" hidden>Receive</button>
+                <button type="button" class="header-menu-item header-menu-item-danger" id="shipmentModalDeleteBtn" role="menuitem" hidden>Delete Shipment</button>
               </div>
             </div>
             <button type="button" class="btn-close" id="shipmentModalCloseBtn" aria-label="Close">✕</button>
@@ -1145,11 +1146,7 @@
       </div>
     </div>
     <div class="modal-body" id="shipmentModalBody"></div>
-    <div class="modal-footer">
-      <button type="button" class="btn btn-secondary modal-footer-add-pos" id="shipmentDetailAddPosBtn">
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-        Add POs
-      </button>
+    <div class="modal-footer" id="shipmentModalFooter" hidden>
       <div id="shipmentModalFooterMessage" class="modal-footer-message shipment-footer-message" role="status" aria-live="polite" hidden></div>
       <button type="button" class="btn btn-primary" id="shipmentModalSaveBtn" hidden>
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
@@ -1242,6 +1239,7 @@
                 <button type="button" class="header-menu-item" id="asnResendEmailBtn" role="menuitem" hidden>Resend Email</button>
                 <button type="button" class="header-menu-item" id="asnResendCarrierBtn" role="menuitem" hidden>Resend Carrier</button>
                 <button type="button" class="header-menu-item" id="asnPickedUpBtn" role="menuitem" hidden>Picked Up</button>
+                <button type="button" class="header-menu-item header-menu-item-danger" id="asnRequestDeleteBtn" role="menuitem" hidden>Delete ASN Request</button>
               </div>
             </div>
             <button type="button" class="btn-close" id="asnRequestCancelBtn" aria-label="Close">✕</button>
@@ -1250,11 +1248,7 @@
       </div>
     </div>
     <div class="modal-body" id="asnRequestBody"></div>
-    <div class="modal-footer">
-      <button type="button" class="btn btn-secondary modal-footer-add-pos" id="asnRequestAddPosBtn">
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-        Add POs
-      </button>
+    <div class="modal-footer" id="asnRequestFooter" hidden>
       <div id="asnRequestFooterMessage" class="modal-footer-message shipment-footer-message" role="status" aria-live="polite" hidden></div>
       <button type="button" class="btn btn-primary" id="asnRequestSubmitBtn">
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
@@ -1508,6 +1502,11 @@
             <div class="settings-group-label">Default Carrier per Buyer</div>
             <p class="settings-hint settings-hint--block">Carrier automatically selected when creating a new ASN request for each buyer.</p>
             <div class="settings-asn-default-carrier-list" id="settingsAsnDefaultCarrierList"></div>
+          </div>
+          <div class="settings-group">
+            <div class="settings-group-label">BOL Default Pickup Address</div>
+            <p class="settings-hint settings-hint--block">Ship-from address printed on the Bill of Lading sent with ASN carrier emails. New ASN requests are prefilled with this address.</p>
+            <textarea class="shipment-form-input settings-email-input" id="settingsAsnPickupAddressInput" rows="3" autocomplete="off" placeholder="Company name, street, city, state ZIP"></textarea>
           </div>
         </section>
         <section class="settings-section settings-section--edit-table" id="settingsSectionEditTable" data-settings-section="edit-table" hidden>

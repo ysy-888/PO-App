@@ -9650,6 +9650,20 @@ td.has-pending-approval .pending-approval-value {
   overflow: hidden;
 }
 
+/* ── Shipment / ASN modal: table-area Add POs + danger menu items ── */
+.linked-po-add-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+.linked-po-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.header-menu-item-danger { color: #dc2626; }
+.header-menu-item-danger:hover { background: #fef2f2; }
+
 /* ── Sales Portal Memo + Outreach log ── */
 .so-portal-memo-text {
   margin: 0;
