@@ -49,7 +49,8 @@ async function loadData() {
       : (typeof getAccessToken === "function" ? getAccessToken() : null);
     if (!token) {
       // initAuth() will call loadData() again once the user signs in.
-      if (typeof clearAppInitialLoading === "function") clearAppInitialLoading();
+      // Keep appInitialLoadPending so the boot spinner shows after login.
+      if (typeof setAppSaving === "function") setAppSaving(false);
       showIndicator("Waiting for sign-in…", "");
       return;
     }

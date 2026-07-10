@@ -74,6 +74,7 @@ export async function buildAsnPickupEmailAttachments(supabase, tenantId, {
       requestDate: today,
       requestId: pickupRequestId,
       showInternalPoFields: false,
+      showExfDate: false,
     }
   );
 

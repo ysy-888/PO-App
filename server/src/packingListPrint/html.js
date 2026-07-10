@@ -178,7 +178,7 @@ export function createPackingHtmlBuilder(ctx) {
     return toQtyNumber(row["Actual Qty"]);
   }
 
-  function buildPlPrintPoDetailsHtml(row, activeCartons, { showInternalPoFields = true } = {}) {
+  function buildPlPrintPoDetailsHtml(row, activeCartons, { showInternalPoFields = true, showExfDate = true } = {}) {
     const actQty = plPrintActQtyTotal(row, activeCartons);
     const ctnQty = activeCartons.length || toQtyNumber(row["Ctn Qty"]);
     const identityDetails = [
@@ -192,11 +192,14 @@ export function createPackingHtmlBuilder(ctx) {
     }
     const dateDetails = [
       ["PO Date", plPrintDate(row["PO Date"])],
-      ["EXF Date", plPrintDate(row["EXF Date"] || row["EXF Request Date"] || row["EXF"])],
-      ["Shipment ID", plPrintVal(row["Shipment ID"])],
     ];
+    if (showExfDate) {
+      dateDetails.push(["EXF Date", plPrintDate(row["EXF Date"] || row["EXF Request Date"] || row["EXF"])]);
+    }
+    dateDetails.push(["Shipment ID", plPrintVal(row["Shipment ID"])]);
     if (showInternalPoFields) {
-      dateDetails.splice(2, 0, ["Ship Method", plPrintVal(row["Ship Method"])]);
+      const shipMethodIdx = showExfDate ? 2 : 1;
+      dateDetails.splice(shipMethodIdx, 0, ["Ship Method", plPrintVal(row["Ship Method"])]);
     }
     return `<div class="pl-details-block"><p class="pl-section-title">PO Details</p>${plPrintSummaryGridFromColumns([
       identityDetails,
@@ -279,7 +282,7 @@ ${notesHtml}
 </div>`;
   }
 
-  function buildPlPrintPoSectionHtml(row, { showInternalPoFields = true } = {}) {
+  function buildPlPrintPoSectionHtml(row, { showInternalPoFields = true, showExfDate = true } = {}) {
     const poNum = plPrintVal(row["PO #"]);
     const style = plPrintVal(row["Style #"]);
     const color = plPrintVal(row["Color"]);
@@ -303,7 +306,7 @@ ${notesHtml}
     </tr>
   </table>
   <div class="pl-body">
-    ${buildPlPrintPoDetailsHtml(row, activeCartons, { showInternalPoFields })}
+    ${buildPlPrintPoDetailsHtml(row, activeCartons, { showInternalPoFields, showExfDate })}
     ${buildPlPrintPackingListHtml(row)}
   </div>
 </div>`;
@@ -492,15 +495,21 @@ ${notesHtml}
       requestDate = "",
       requestId = "",
       showInternalPoFields = true,
+      showExfDate = true,
     } = {}) {
       const rows = poNumbers
         .map(po => ctx.getPoRow(po))
         .filter(Boolean);
       if (rows.length === 0) return "<p>No POs found.</p>";
+      // ASN packing lists omit EXF Date even if the caller didn't set the flag.
+      const includeExfDate = showExfDate && titlePageType !== "ASN";
       const titlePage = includeTitlePage
         ? buildPlPrintTitlePageHtml(rows, { titleLabel, titlePageType, typeDate, requestDate, requestId, showInternalPoFields })
         : "";
-      return plPrintPageStyles() + titlePage + rows.map(row => buildPlPrintPoSectionHtml(row, { showInternalPoFields })).join("\n");
+      return plPrintPageStyles() + titlePage + rows.map(row => buildPlPrintPoSectionHtml(row, {
+        showInternalPoFields,
+        showExfDate: includeExfDate,
+      })).join("\n");
     },
 
     buildCartonLabelsPrintHtml(poNumbers, labelInputs) {

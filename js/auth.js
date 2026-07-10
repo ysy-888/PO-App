@@ -55,6 +55,7 @@ function initAuthStateListener(client) {
     if (event !== "SIGNED_IN") return;
     const overlay = document.getElementById("authLoginOverlay");
     if (overlay) overlay.remove();
+    if (typeof setAppSaving === "function") setAppSaving(true, "Loading...");
     if (typeof loadData === "function") loadData();
   });
 }
@@ -126,12 +127,17 @@ async function _attemptLogin(overlay) {
   _session = data.session;
   overlay.remove();
 
+  // Show the boot loader while the first app-state fetch runs.
+  if (typeof setAppSaving === "function") setAppSaving(true, "Loading...");
+
   // Kick off data load now that we have a valid token.
   if (typeof loadData === "function") loadData();
 }
 
 function _showLoginUI() {
-  if (typeof clearAppInitialLoading === "function") clearAppInitialLoading();
+  // Hide the boot spinner while the login form is up, but keep
+  // appInitialLoadPending so the full-screen loader returns after sign-in.
+  if (typeof setAppSaving === "function") setAppSaving(false);
   const overlay = _buildLoginOverlay();
   document.body.appendChild(overlay);
 

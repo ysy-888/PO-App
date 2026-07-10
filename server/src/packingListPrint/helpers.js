@@ -54,5 +54,7 @@ export function getPackingListPdfOptions(type, entityId, requestData) {
     typeDate: requestData?.[config.dateField] ?? "",
     requestDate: requestData?.["Request Date"] ?? "",
     requestId: entityId,
+    // ASN packing lists are buyer-facing — EXF Date is internal ops only.
+    showExfDate: type !== "asn",
   };
 }

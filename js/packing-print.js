@@ -355,9 +355,19 @@ function plPrintActQtyTotal(row, activeCartons) {
   return toQtyNumber(row["Actual Qty"]);
 }
 
-function buildPlPrintPoDetailsHtml(row, activeCartons) {
+function buildPlPrintPoDetailsHtml(row, activeCartons, { showExfDate = true } = {}) {
   const actQty = plPrintActQtyTotal(row, activeCartons);
   const ctnQty = activeCartons.length || toQtyNumber(row["Ctn Qty"]);
+  const dateDetails = [
+    ["PO Date", plPrintDate(row["PO Date"])],
+  ];
+  if (showExfDate) {
+    dateDetails.push(["EXF Date", plPrintDate(row["EXF Date"] || row["EXF Request Date"] || row["EXF"])]);
+  }
+  dateDetails.push(
+    ["Ship Method", plPrintVal(row["Ship Method"])],
+    ["Shipment ID", plPrintVal(row["Shipment ID"])],
+  );
   return `<div class="pl-details-block"><p class="pl-section-title">PO Details</p>${plPrintSummaryGridFromColumns([
     [
       ["PO #", plPrintVal(row["PO #"])],
@@ -371,12 +381,7 @@ function buildPlPrintPoDetailsHtml(row, activeCartons) {
       ["Color", plPrintVal(row["Color"])],
       ["Act Qty", plPrintEsc(String(actQty))],
     ],
-    [
-      ["PO Date", plPrintDate(row["PO Date"])],
-      ["EXF Date", plPrintDate(row["EXF Date"] || row["EXF Request Date"] || row["EXF"])],
-      ["Ship Method", plPrintVal(row["Ship Method"])],
-      ["Shipment ID", plPrintVal(row["Shipment ID"])],
-    ],
+    dateDetails,
   ])}</div>`;
 }
 
@@ -450,7 +455,7 @@ ${notesHtml}
 </div>`;
 }
 
-function buildPlPrintPoSectionHtml(row) {
+function buildPlPrintPoSectionHtml(row, { showExfDate = true } = {}) {
   const poNum = plPrintVal(row["PO #"]);
   const style = plPrintVal(row["Style #"]);
   const color = plPrintVal(row["Color"]);
@@ -474,7 +479,7 @@ function buildPlPrintPoSectionHtml(row) {
     </tr>
   </table>
   <div class="pl-body">
-    ${buildPlPrintPoDetailsHtml(row, activeCartons)}
+    ${buildPlPrintPoDetailsHtml(row, activeCartons, { showExfDate })}
     ${buildPlPrintPackingListHtml(row)}
   </div>
 </div>`;
@@ -617,10 +622,11 @@ function buildGroupPackingListPrintHtml(poNumbers, {
     .map(po => allRows.find(r => String(r["PO #"]) === String(po)))
     .filter(Boolean);
   if (rows.length === 0) return "<p>No POs found.</p>";
+  const showExfDate = titlePageType !== "ASN";
   const titlePage = includeTitlePage
     ? buildPlPrintTitlePageHtml(rows, { titleLabel, titlePageType, typeDate, requestDate, requestId })
     : "";
-  return plPrintPageStyles() + titlePage + rows.map(row => buildPlPrintPoSectionHtml(row)).join("\n");
+  return plPrintPageStyles() + titlePage + rows.map(row => buildPlPrintPoSectionHtml(row, { showExfDate })).join("\n");
 }
 
 // Sized for a 4x6 thermal label printed landscape (6in wide x 4in tall).

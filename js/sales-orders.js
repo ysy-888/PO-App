@@ -1354,23 +1354,32 @@ function openSalesOrderModal(order) {
   const lines = order.Lines ?? [];
   const linkedInvoices = getLinkedInvoicesForSalesOrder(order);
   const invoiceUnitQty = getInvoiceUnitQtyForSalesOrder(order);
+  const invoiceSubtotal = getInvoiceSubtotalForSalesOrder(order);
   const invoiceTotal = getInvoiceTotalForSalesOrder(order);
   const invoiceStatus = getInvoiceStatusesForSalesOrder(order).join(", ");
   const invoiceTracking = getInvoiceTrackingNumbersForSalesOrder(order).join(", ");
+  const invoiceNumbers = linkedInvoices
+    .map(inv => String(inv["Invoice #"] ?? "").trim())
+    .filter(Boolean)
+    .join(", ");
 
   // Build modal body
   const bodyEl = overlay.querySelector(".so-modal-body");
   if (!bodyEl) return;
 
-  // Showroom portal: no invoice fields, no linked invoices/POs, no memo.
-  // Tracking # is shown in both modes (pulled from linked invoices).
+  // Showroom portal: invoice summary fields + tracking; no linked invoice/PO
+  // panels, no internal memo. Tracking # is shown in both modes.
   const portal = typeof isPortalMode === "function" && isPortalMode();
 
   const trackingFieldHtml = `
   <div class="so-field"><span class="so-field-label">Tracking #</span><span class="so-field-value">${escSo(invoiceTracking || "—")}</span></div>`;
 
   const invoiceHeaderFields = portal
-    ? trackingFieldHtml
+    ? `
+  <div class="so-field"><span class="so-field-label">Invoice #</span><span class="so-field-value">${escSo(invoiceNumbers || "—")}</span></div>
+  <div class="so-field"><span class="so-field-label">Invoice Unit Qty</span><span class="so-field-value">${invoiceUnitQty > 0 ? invoiceUnitQty.toLocaleString() : "—"}</span></div>
+  <div class="so-field"><span class="so-field-label">Subtotal</span><span class="so-field-value">${invoiceSubtotal > 0 ? formatSoPrice(invoiceSubtotal) : "—"}</span></div>
+  <div class="so-field"><span class="so-field-label">Invoice Status</span><span class="so-field-value">${escSo(invoiceStatus || "—")}</span></div>${trackingFieldHtml}`
     : `
   <div class="so-field"><span class="so-field-label">Invoice #</span><span class="so-field-value" data-so-invoice-links></span></div>
   <div class="so-field"><span class="so-field-label">Invoice Unit Qty</span><span class="so-field-value">${invoiceUnitQty > 0 ? invoiceUnitQty.toLocaleString() : "—"}</span></div>
@@ -1805,9 +1814,11 @@ function initSalesOrdersView() {
     if (typeof modalNavBack === "function") modalNavBack(closeSalesOrderModal);
   });
 
-  // Close on overlay backdrop click
+  // Close on overlay backdrop click (not drag-from-inside releases)
   const overlay = document.getElementById("salesOrderModalOverlay");
-  if (overlay) {
+  if (overlay && typeof bindDirectBackdropDismiss === "function") {
+    bindDirectBackdropDismiss(overlay, closeSalesOrderModal);
+  } else if (overlay) {
     overlay.addEventListener("click", e => {
       if (e.target === overlay) closeSalesOrderModal();
     });
