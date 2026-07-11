@@ -694,6 +694,7 @@ function renderSalesOrdersTable() {
       ? "No sales orders yet. Import a Sales Order Details CSV to get started."
       : "No sales orders match the current filters.";
     tbody.innerHTML = `<tr class="state-row"><td colspan="${visibleColCount || 1}">${msg}</td></tr>`;
+    if (typeof fitSalesOrderColumnWidths === "function") fitSalesOrderColumnWidths();
     return;
   }
 
@@ -794,6 +795,7 @@ function renderSalesOrdersTable() {
     tbody.appendChild(tr);
   });
   updateSoSelectAllHeader();
+  if (typeof fitSalesOrderColumnWidths === "function") fitSalesOrderColumnWidths();
 }
 
 // ── Modal ────────────────────────────────────────────────────────────────────
@@ -1778,6 +1780,7 @@ function initSalesOrdersView() {
   loadSoColumnVisibility();
   indexSoTableColumns();
   applySoColumnOrder();
+  applySoTwoLineHeaders();
   applySoColumnVisibility();
   applySoPageSize(loadSoPageSizePreference());
   initSoToolbarFilters();

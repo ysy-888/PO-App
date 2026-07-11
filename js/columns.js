@@ -115,6 +115,137 @@ const COLUMN_WIDTH_TIER_MAX = {
   packing: 36,
 };
 
+/**
+ * Shared content-type column width design system (px).
+ * Columns are sized to longest cell/header + pad, then clamped to [min, max].
+ */
+const COL_WIDTH_TYPE = {
+  flag:       { min: 34, max: 34, pad: 0, fixed: true },
+  select:     { min: 30, max: 30, pad: 0, fixed: true },
+  packing:    { min: 36, max: 36, pad: 0, fixed: true },
+  /** SO # / PO # / Invoice # */
+  id:         { min: 52, max: 88, pad: 16 },
+  /** Dates (e.g. 12/31/2025) */
+  date:       { min: 68, max: 82, pad: 14 },
+  /** Quantities */
+  qty:        { min: 44, max: 64, pad: 14 },
+  /** Currency */
+  price:      { min: 58, max: 88, pad: 14 },
+  /** Customer / Buyer names */
+  customer:   { min: 100, max: 180, pad: 18 },
+  /** Customer PO # / Buyer PO # */
+  customerPo: { min: 72, max: 120, pad: 16 },
+  /** Status labels */
+  status:     { min: 56, max: 96, pad: 14 },
+  tracking:   { min: 80, max: 140, pad: 16 },
+  /** Short categorical text (Division, Store, N41, …) */
+  textS:      { min: 56, max: 92, pad: 14 },
+  /** Medium categorical text (Order Type, Customer Type, …) */
+  textM:      { min: 72, max: 110, pad: 16 },
+  /** Small counts (Styles) */
+  count:      { min: 44, max: 56, pad: 12 },
+  /** Comma-separated style lists */
+  styleList:  { min: 140, max: 300, pad: 18 },
+  memo:       { min: 100, max: 180, pad: 16 },
+  notes:      { min: 120, max: 240, pad: 18 },
+};
+
+const COL_WIDTH_FILTER_EXTRA_PX = 22;
+const COL_WIDTH_SORT_EXTRA_PX = 12;
+
+let _colWidthMeasureCtx = null;
+
+function getColWidthMeasureCtx() {
+  if (_colWidthMeasureCtx) return _colWidthMeasureCtx;
+  const canvas = document.createElement("canvas");
+  _colWidthMeasureCtx = canvas.getContext("2d");
+  return _colWidthMeasureCtx;
+}
+
+function measureTableTextWidth(text, font) {
+  const ctx = getColWidthMeasureCtx();
+  if (!ctx) return String(text ?? "").length * 7;
+  ctx.font = font || "12px Inter, system-ui, sans-serif";
+  return ctx.measureText(String(text ?? "")).width;
+}
+
+/** Approximate letter-spacing not included by canvas measureText. */
+function measureHeaderLabelWidth(text, font, fontSizePx = 11, letterSpacingEm = 0.04) {
+  const str = String(text ?? "");
+  const base = measureTableTextWidth(str, font);
+  if (str.length <= 1) return base;
+  return base + (str.length - 1) * fontSizePx * letterSpacingEm;
+}
+
+/**
+ * Fit <col> widths to content for a table using COL_WIDTH_TYPE clamps.
+ * @param {HTMLTableElement} table
+ * @param {{ getType: (col: string) => string, isFilterable?: (col: string) => boolean }} options
+ */
+function fitTableColumnWidths(table, options = {}) {
+  if (!table || typeof options.getType !== "function") return;
+
+  const sampleTd = table.querySelector("tbody tr:not(.state-row) td");
+  const sampleTh = table.querySelector("thead th[data-col]");
+  const bodyFont = sampleTd
+    ? getComputedStyle(sampleTd).font
+    : "12px Inter, system-ui, sans-serif";
+  const headStyle = sampleTh ? getComputedStyle(sampleTh) : null;
+  const headFont = headStyle?.font || "600 11px Inter, system-ui, sans-serif";
+  const headSize = parseFloat(headStyle?.fontSize) || 11;
+
+  let total = 0;
+  table.querySelectorAll("colgroup col[data-col]").forEach(colEl => {
+    const colName = colEl.getAttribute("data-col");
+    if (!colName) return;
+    if (colEl.style.display === "none" || colEl.classList.contains("col-hidden")) return;
+
+    const typeKey = options.getType(colName) || "textS";
+    const spec = COL_WIDTH_TYPE[typeKey] || COL_WIDTH_TYPE.textS;
+
+    if (spec.fixed) {
+      colEl.style.width = `${spec.min}px`;
+      colEl.style.minWidth = `${spec.min}px`;
+      colEl.style.maxWidth = `${spec.max}px`;
+      total += spec.min;
+      return;
+    }
+
+    let contentPx = 0;
+    const th = table.querySelector(`thead th[data-col="${CSS.escape(colName)}"]`);
+    const rawLabel = (th?.querySelector(".th-label")?.textContent || th?.textContent || colName).trim();
+    const headerLabel = typeof formatTwoLineHeaderLabel === "function"
+      ? formatTwoLineHeaderLabel(rawLabel)
+      : rawLabel;
+    String(headerLabel).split("\n").forEach(line => {
+      const t = line.trim();
+      if (!t) return;
+      contentPx = Math.max(contentPx, measureHeaderLabelWidth(t, headFont, headSize));
+    });
+
+    if (options.isFilterable?.(colName) || th?.classList.contains("th-filterable")) {
+      contentPx += COL_WIDTH_FILTER_EXTRA_PX;
+    } else if (th && !th.classList.contains("th-flag-col") && !th.classList.contains("th-select-col")) {
+      contentPx += COL_WIDTH_SORT_EXTRA_PX;
+    }
+
+    table.querySelectorAll(`tbody td[data-col="${CSS.escape(colName)}"]`).forEach(td => {
+      const text = (td.textContent || "").replace(/\s+/g, " ").trim();
+      if (!text || text === "—" || text === "–" || text === "-") return;
+      contentPx = Math.max(contentPx, measureTableTextWidth(text, bodyFont));
+    });
+
+    const pad = spec.pad ?? 16;
+    const width = Math.min(spec.max, Math.max(spec.min, Math.ceil(contentPx + pad)));
+    colEl.style.width = `${width}px`;
+    colEl.style.minWidth = `${spec.min}px`;
+    colEl.style.maxWidth = `${spec.max}px`;
+    total += width;
+  });
+
+  if (total > 0) table.style.minWidth = `${total}px`;
+}
+
 const PO_COL_WIDTH_CLASSES = [
   "col-w-xs", "col-w-s", "col-w-m", "col-w-l",
   "col-w-flag", "col-w-select", "col-w-packing",

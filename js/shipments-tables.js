@@ -40,7 +40,7 @@ const SHIPMENT_LINKED_PO_COLUMNS = [
   { col: "Vendor", label: "Vendor", cellClass: "shipment-po-cell-vendor" },
   { col: "Buyer", label: "Buyer", cellClass: "shipment-po-cell-buyer" },
   { col: "Buyer PO #", label: "Buyer PO #", cellClass: "shipment-po-cell-buyer-po" },
-  { col: "CXL Date", label: "CXL Date", cellClass: "shipment-po-cell-date" },
+  { col: "SO CXL Date", label: "SO CXL Date", cellClass: "shipment-po-cell-date" },
   { col: "Style #", label: "Style #", cellClass: "shipment-po-cell-wrap shipment-po-cell-style" },
   { col: "Color", label: "Color", cellClass: "shipment-po-cell-wrap" },
   { col: "PO Qty", label: "Ord Qty", cellClass: "shipment-po-cell-qty" },

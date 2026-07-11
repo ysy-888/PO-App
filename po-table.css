@@ -36,6 +36,22 @@
   --editable-hover-border: #9aa1aa;
   --font: 'Inter', system-ui, sans-serif;
   --font-mono: 'DM Mono', monospace;
+
+  /* Content-type column width design system (see COL_WIDTH_TYPE in columns.js) */
+  --col-type-id-min: 52px;
+  --col-type-id-max: 88px;
+  --col-type-date-min: 68px;
+  --col-type-date-max: 82px;
+  --col-type-qty-min: 44px;
+  --col-type-qty-max: 64px;
+  --col-type-price-min: 58px;
+  --col-type-price-max: 88px;
+  --col-type-customer-min: 100px;
+  --col-type-customer-max: 180px;
+  --col-type-customer-po-min: 72px;
+  --col-type-customer-po-max: 120px;
+  --col-type-status-min: 56px;
+  --col-type-status-max: 96px;
   --icon-caret-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M3.5 6.25 8 10.75l4.5-4.5' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --icon-filter: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M3 5h18l-6.5 7.5V19l-3 1.5V12.5L3 5z' fill='%23000'/%3E%3C/svg%3E");
   --cursor-copy: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='24' viewBox='0 0 40 24'%3E%3Crect x='1' y='1' width='38' height='22' rx='4' fill='%23ffffff' stroke='%23c8c5ba' stroke-width='1.2'/%3E%3Ctext x='20' y='15.5' text-anchor='middle' font-family='DM Sans,system-ui,sans-serif' font-size='10' font-weight='600' fill='%231a1a18'%3Ecopy%3C/text%3E%3C/svg%3E") 6 6, pointer;
@@ -8894,104 +8910,49 @@ td.has-pending-approval .pending-approval-value {
   padding-left: 8px;
   box-sizing: border-box;
 }
-/* min-width ≈ sum of preferred col widths so fixed layout doesn't crush columns */
-#salesOrderTable { min-width: 2760px; }
-/* Safety net: any column without an explicit rule still gets a usable floor.
-   :where() keeps specificity at zero so the per-column rules below win. */
-#salesOrderTable :where(col:not(.col-flag):not(.col-select)) { min-width: 72px; }
-#salesOrderTable .col-flag,
-#invoiceTable .col-flag          { width: 34px;  min-width: 34px;  max-width: 34px; }
-#salesOrderTable .col-select,
-#invoiceTable .col-select        { width: 30px;  min-width: 30px;  max-width: 30px; }
-#salesOrderTable .col-so         { width: 88px;  min-width: 80px;  max-width: 110px; }
-#salesOrderTable .col-buyer      { width: 180px; min-width: 160px; max-width: 240px; }
-#salesOrderTable .col-buyer-po   { width: 140px; min-width: 120px; max-width: 180px; }
-#salesOrderTable .col-division   { width: 100px; min-width: 88px;  max-width: 120px; }
-#salesOrderTable .col-date       { width: 92px;  min-width: 88px;  max-width: 100px; }
-#salesOrderTable .col-cxl        { width: 92px;  min-width: 88px;  max-width: 100px; }
-#salesOrderTable .col-status     { width: 128px; min-width: 112px; max-width: 148px; }
-#salesOrderTable .col-tracking   { width: 140px; min-width: 120px; max-width: 200px; }
-#salesOrderTable .col-vendor     { width: 100px; min-width: 88px;  max-width: 120px; }
-#salesOrderTable .col-n41-status { width: 100px; min-width: 92px;  max-width: 120px; }
-#salesOrderTable .col-order-type { width: 112px; min-width: 100px; max-width: 132px; }
-#salesOrderTable .col-cust-type  { width: 120px; min-width: 108px; max-width: 148px; }
-#salesOrderTable .col-so-styles  { width: 72px;  min-width: 64px;  max-width: 88px; }
-#salesOrderTable .col-so-units   { width: 96px;  min-width: 88px;  max-width: 112px; }
-#salesOrderTable .col-so-price   { width: 108px; min-width: 96px;  max-width: 128px; }
-#salesOrderTable .col-so-style-nums { width: 360px; min-width: 280px; max-width: 480px; }
-#salesOrderTable .col-so-memo    { width: 180px; min-width: 140px; max-width: 280px; }
 
-/* Mirror col min/max onto cells so global td { max-width: 0 } can't crush them */
-#salesOrderTable :is(th, td)[data-col="SO #"],
-#salesOrderTable :is(th, td)[data-col="INVOICE #"] {
-  min-width: 80px;
-  max-width: 110px;
+/* Widths are fitted by fitSalesOrderColumnWidths() using COL_WIDTH_TYPE.
+   These are fallbacks only (before first fit / empty state). */
+#salesOrderTable {
+  min-width: 0;
+  --so-col-flag: 34px;
+  --so-col-select: 30px;
+  --so-col-id: 64px;
+  --so-col-date: 76px;
+  --so-col-qty: 56px;
+  --so-col-price: 72px;
+  --so-col-customer: 140px;
+  --so-col-customer-po: 100px;
+  --so-col-status: 72px;
+  --so-col-tracking: 110px;
+  --so-col-text-s: 72px;
+  --so-col-text-m: 92px;
+  --so-col-count: 52px;
+  --so-col-style-list: 220px;
+  --so-col-memo: 140px;
 }
-#salesOrderTable :is(th, td)[data-col="Customer"] {
-  min-width: 160px;
-  max-width: 240px;
-}
-#salesOrderTable :is(th, td)[data-col="Customer PO #"] {
-  min-width: 120px;
-  max-width: 180px;
-}
-#salesOrderTable :is(th, td)[data-col="Division"] {
-  min-width: 88px;
-  max-width: 120px;
-}
-#salesOrderTable :is(th, td)[data-col="INV QTY"],
-#salesOrderTable :is(th, td)[data-col="Total Units"] {
-  min-width: 88px;
-  max-width: 112px;
-}
-#salesOrderTable :is(th, td)[data-col="Subtotal"],
-#salesOrderTable :is(th, td)[data-col="TOTAL"],
-#salesOrderTable :is(th, td)[data-col="Total Price"] {
-  min-width: 96px;
-  max-width: 128px;
-}
-#salesOrderTable :is(th, td)[data-col="INVOICE STATUS"] {
-  min-width: 112px;
-  max-width: 148px;
-}
-#salesOrderTable :is(th, td)[data-col="Tracking #"] {
-  min-width: 120px;
-  max-width: 200px;
-}
-#salesOrderTable :is(th, td)[data-col="Order Date"],
-#salesOrderTable :is(th, td)[data-col="Ship Date"],
-#salesOrderTable :is(th, td)[data-col="CXL Date"] {
-  min-width: 88px;
-  max-width: 100px;
-}
-#salesOrderTable :is(th, td)[data-col="Store"] {
-  min-width: 88px;
-  max-width: 120px;
-}
-#salesOrderTable :is(th, td)[data-col="N41 Status"] {
-  min-width: 92px;
-  max-width: 120px;
-}
-#salesOrderTable :is(th, td)[data-col="Order Type"] {
-  min-width: 100px;
-  max-width: 132px;
-}
-#salesOrderTable :is(th, td)[data-col="Customer Type"] {
-  min-width: 108px;
-  max-width: 148px;
-}
-#salesOrderTable :is(th, td)[data-col="Styles"] {
-  min-width: 64px;
-  max-width: 88px;
-}
-#salesOrderTable :is(th, td)[data-col="Style #s"] {
-  min-width: 280px;
-  max-width: 480px;
-}
-#salesOrderTable :is(th, td)[data-col="Memo"] {
-  min-width: 140px;
-  max-width: 280px;
-}
+
+#salesOrderTable .col-flag,
+#invoiceTable .col-flag   { width: var(--so-col-flag); max-width: var(--so-col-flag); }
+#salesOrderTable .col-select,
+#invoiceTable .col-select { width: var(--so-col-select); max-width: var(--so-col-select); }
+#salesOrderTable .col-so         { width: var(--so-col-id); }
+#salesOrderTable .col-buyer      { width: var(--so-col-customer); }
+#salesOrderTable .col-buyer-po   { width: var(--so-col-customer-po); }
+#salesOrderTable .col-division   { width: var(--so-col-text-s); }
+#salesOrderTable .col-date,
+#salesOrderTable .col-cxl        { width: var(--so-col-date); }
+#salesOrderTable .col-status     { width: var(--so-col-status); }
+#salesOrderTable .col-tracking   { width: var(--so-col-tracking); }
+#salesOrderTable .col-vendor,
+#salesOrderTable .col-n41-status { width: var(--so-col-text-s); }
+#salesOrderTable .col-order-type,
+#salesOrderTable .col-cust-type  { width: var(--so-col-text-m); }
+#salesOrderTable .col-so-styles  { width: var(--so-col-count); }
+#salesOrderTable .col-so-units   { width: var(--so-col-qty); }
+#salesOrderTable .col-so-price   { width: var(--so-col-price); }
+#salesOrderTable .col-so-style-nums { width: var(--so-col-style-list); }
+#salesOrderTable .col-so-memo    { width: var(--so-col-memo); }
 
 #salesOrderTable th.th-flag-col,
 #salesOrderTable td.td-flag-cell,

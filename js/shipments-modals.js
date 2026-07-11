@@ -865,6 +865,11 @@ function formatShipmentLinkedPoCell(col, row) {
     const weight = getPackingWeightForPo(row["PO #"]);
     return weight > 0 ? `${formatShipmentLinkedPoTotal(weight)} lbs` : EMPTY_DISPLAY;
   }
+  if (col === "SO CXL Date") {
+    val = typeof getSoCxlDateForPo === "function" ? getSoCxlDateForPo(row) : (row[col] ?? "");
+    if (isEmptyValue(val)) return EMPTY_DISPLAY;
+    return formatDateForDisplay(val);
+  }
   if (col === "CXL Date") {
     if (isEmptyValue(val)) return EMPTY_DISPLAY;
     return formatDateForDisplay(val);

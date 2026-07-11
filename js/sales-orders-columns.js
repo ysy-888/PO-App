@@ -27,6 +27,61 @@ const SO_COLUMNS = [
   "Memo",
 ];
 
+/** Content-type width tokens from COL_WIDTH_TYPE (columns.js). */
+const SO_COLUMN_WIDTH_TYPE = {
+  Flag: "flag",
+  Selected: "select",
+  "SO #": "id",
+  Customer: "customer",
+  "Customer PO #": "customerPo",
+  Division: "textS",
+  "INVOICE #": "id",
+  "INV QTY": "qty",
+  Subtotal: "price",
+  TOTAL: "price",
+  "INVOICE STATUS": "status",
+  "Tracking #": "tracking",
+  "Order Date": "date",
+  "Ship Date": "date",
+  "CXL Date": "date",
+  Store: "textS",
+  "N41 Status": "textS",
+  "Order Type": "textM",
+  "Customer Type": "textM",
+  Styles: "count",
+  "Style #s": "styleList",
+  "Total Units": "qty",
+  "Total Price": "price",
+  Memo: "memo",
+};
+
+function getSoColumnWidthType(col) {
+  return SO_COLUMN_WIDTH_TYPE[col] || "textS";
+}
+
+function applySoTwoLineHeaders() {
+  const table = document.getElementById("salesOrderTable");
+  if (!table || typeof formatTwoLineHeaderLabel !== "function") return;
+  table.querySelectorAll("thead th[data-col]").forEach(th => {
+    if (th.classList.contains("th-flag-col") || th.classList.contains("th-select-col")) return;
+    const label = th.querySelector(".th-label");
+    if (!label) return;
+    label.textContent = formatTwoLineHeaderLabel(label.textContent);
+  });
+}
+
+function fitSalesOrderColumnWidths() {
+  const table = document.getElementById("salesOrderTable");
+  if (!table || typeof fitTableColumnWidths !== "function") return;
+  applySoTwoLineHeaders();
+  fitTableColumnWidths(table, {
+    getType: getSoColumnWidthType,
+    isFilterable: col =>
+      (typeof SO_FILTERABLE_COLUMNS !== "undefined" && SO_FILTERABLE_COLUMNS.has(col))
+      || (typeof SO_DATE_FILTER_COLUMNS !== "undefined" && SO_DATE_FILTER_COLUMNS.has(col)),
+  });
+}
+
 const SO_FIXED_LEADING_COLUMNS = ["Flag", "Selected"];
 const SO_NON_TOGGLEABLE_COLUMNS = new Set(SO_FIXED_LEADING_COLUMNS);
 
@@ -177,6 +232,7 @@ function applySoColumnVisibility() {
       el.style.display = visible ? "" : "none";
     });
   });
+  if (typeof fitSalesOrderColumnWidths === "function") fitSalesOrderColumnWidths();
 }
 
 function indexSoTableColumns() {
