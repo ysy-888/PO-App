@@ -48,15 +48,15 @@ router.get("/app-state", requireAuth, async (req, res) => {
   const tid = req.tenantId;
 
   // Showroom portal accounts get sales orders only — no POs, shipments,
-  // or other entities. A slim invoice payload (SO # / Invoice # / Tracking #)
-  // is included so the Sales Orders table can show Tracking #. The frontend
+  // or other entities. A slim invoice payload (Invoice # / qty / subtotal /
+  // status / tracking) is included for the Sales Orders modal. The frontend
   // switches to portal mode when it sees portalMode: true.
   if (isPortalRole(req.userRole)) {
     try {
       const [salesOrdersResult, invoicesResult, stylesResult, userSettingsResult, tenantSettingsResult, users] = await Promise.all([
         supabase.from("sales_orders").select("data").eq("tenant_id", tid).order("created_at", { ascending: true }),
-        // Slim invoice rows so the portal can show Tracking # on sales orders
-        // without exposing invoice financials / memos.
+        // Slim invoice rows for portal SO modal fields (Invoice #, qty,
+        // subtotal, status, tracking) — no memos / received / balance.
         supabase.from("invoices").select("data").eq("tenant_id", tid).order("created_at", { ascending: true }),
         supabase.from("styles").select("data").eq("tenant_id", tid),
         supabase.from("user_settings").select("settings").eq("tenant_id", tid).eq("user_id", req.userId).maybeSingle(),
@@ -74,6 +74,9 @@ router.get("/app-state", requireAuth, async (req, res) => {
             return {
               "Invoice #": d["Invoice #"] ?? "",
               "SO #": d["SO #"] ?? "",
+              "Unit Qty": d["Unit Qty"] ?? "",
+              Subtotal: d.Subtotal ?? "",
+              Status: d.Status ?? "",
               "Tracking #": d["Tracking #"] ?? "",
             };
           });

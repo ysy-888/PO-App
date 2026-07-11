@@ -4,9 +4,9 @@
  * Portal accounts (tenant_memberships.role = "showroom") get a restricted
  * experience: the Sales Orders view only — search, filters, sorting, and
  * CSV export still work — with no other pages, no CSV import, and no
- * settings. A slim invoice payload (Tracking # only) is loaded so the
- * Sales Orders table can show tracking from linked invoices. The server
- * enforces the same restriction (see server/src/auth.js);
+ * settings. A slim invoice payload (Invoice # / qty / subtotal / status /
+ * tracking) is loaded so the Sales Orders modal can show those fields.
+ * The server enforces the same restriction (see server/src/auth.js);
  * this file only adjusts the UI after /api/app-state reports portalMode: true.
  */
 
