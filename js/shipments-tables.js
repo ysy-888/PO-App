@@ -41,7 +41,7 @@ const SHIPMENT_LINKED_PO_COLUMNS = [
   { col: "Buyer", label: "Buyer", cellClass: "shipment-po-cell-buyer" },
   { col: "Buyer PO #", label: "Buyer PO #", cellClass: "shipment-po-cell-buyer-po" },
   { col: "CXL Date", label: "CXL Date", cellClass: "shipment-po-cell-date" },
-  { col: "Style #", label: "Style #", cellClass: "shipment-po-cell-wrap" },
+  { col: "Style #", label: "Style #", cellClass: "shipment-po-cell-wrap shipment-po-cell-style" },
   { col: "Color", label: "Color", cellClass: "shipment-po-cell-wrap" },
   { col: "PO Qty", label: "Ord Qty", cellClass: "shipment-po-cell-qty" },
   { col: "Actual Qty", label: "Act Qty", cellClass: "shipment-po-cell-qty" },
@@ -56,7 +56,7 @@ const SHIPMENT_LINKED_PO_COL_CLASSES = [
   "shipment-po-col-buyer",
   "shipment-po-col-buyer-po",
   "shipment-po-col-date",
-  "shipment-po-col-style",
+  "shipment-po-col-style-num",
   "shipment-po-col-style",
   "shipment-po-col-qty",
   "shipment-po-col-qty",
@@ -65,7 +65,7 @@ const SHIPMENT_LINKED_PO_COL_CLASSES = [
 ];
 
 /** Linked PO table column widths (px), select column first. */
-const SHIPMENT_LINKED_PO_COLUMN_WIDTHS = [52, 72, 120, 110, 104, 88, 88, 96, 58, 58, 58, 96];
+const SHIPMENT_LINKED_PO_COLUMN_WIDTHS = [52, 72, 120, 160, 104, 88, 140, 96, 58, 58, 58, 96];
 
 /** PO fields synced from / cleared with a shipment. */
 const SHIPMENT_PO_CLEAR_FIELDS = [

@@ -54,8 +54,10 @@ const ASN_REQUEST_LINKED_PO_COLUMN_WIDTHS = SHIPMENT_LINKED_PO_COLUMN_WIDTHS;
 
 function appendAsnRequestLinkedPoColgroup(table) {
   const colgroup = document.createElement("colgroup");
-  ASN_REQUEST_LINKED_PO_COLUMN_WIDTHS.forEach(width => {
+  ASN_REQUEST_LINKED_PO_COLUMN_WIDTHS.forEach((width, i) => {
     const col = document.createElement("col");
+    const className = SHIPMENT_LINKED_PO_COL_CLASSES[i];
+    if (className) col.className = className;
     col.style.width = `${width}px`;
     colgroup.appendChild(col);
   });
