@@ -29,6 +29,13 @@ function getAccessToken() {
 }
 
 async function getAccessTokenAsync() {
+  // Prefer the session kept fresh by onAuthStateChange. Calling getSession()
+  // while supabase-js holds its internal auth lock (e.g. during the token
+  // refresh it runs when the tab regains focus) can hang indefinitely.
+  const expiresAtMs = (_session?.expires_at ?? 0) * 1000;
+  if (_session?.access_token && expiresAtMs - Date.now() > 60_000) {
+    return _session.access_token;
+  }
   const client = _getSupabaseClient();
   const { data: { session } } = await client.auth.getSession();
   _session = session;
@@ -51,12 +58,20 @@ function initAuthStateListener(client) {
   if (_authListenerReady) return;
   _authListenerReady = true;
   client.auth.onAuthStateChange((event, newSession) => {
+    const wasSignedIn = Boolean(_session?.access_token);
     _session = newSession;
-    if (event !== "SIGNED_IN") return;
+    // Supabase re-emits SIGNED_IN whenever the tab regains focus; only a
+    // real signed-out → signed-in transition should trigger the blocking
+    // loader and a full reload.
+    if (event !== "SIGNED_IN" || wasSignedIn) return;
     const overlay = document.getElementById("authLoginOverlay");
     if (overlay) overlay.remove();
     if (typeof setAppSaving === "function") setAppSaving(true, "Loading...");
-    if (typeof loadData === "function") loadData();
+    // Defer out of this callback: supabase-js dispatches it while holding
+    // its internal auth lock, and loadData() calls back into the client.
+    setTimeout(() => {
+      if (typeof loadData === "function") loadData();
+    }, 0);
   });
 }
 
