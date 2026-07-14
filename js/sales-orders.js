@@ -931,15 +931,38 @@ function buildSoLineItemsTable(lines, order = null) {
   return html;
 }
 
-function buildLinkedPosSection(order) {
-  const soNum = String(order["SO #"] ?? "").trim();
-  const custPo = String(order["Customer PO #"] ?? "").trim();
-
-  const linked = (typeof allRows !== "undefined" ? allRows : []).filter(po => {
+function getLinkedPosForSalesOrder(order) {
+  const soNum = String(order?.["SO #"] ?? "").trim();
+  const custPo = String(order?.["Customer PO #"] ?? "").trim();
+  return (typeof allRows !== "undefined" ? allRows : []).filter(po => {
     const poSo = String(po["SO #"] ?? "").trim();
     const poBuyerPo = String(po["Buyer PO #"] ?? "").trim();
     return (soNum && poSo === soNum) || (custPo && poBuyerPo === custPo);
   });
+}
+
+/** ASN request id assigned to a PO, or "" if none / the request no longer exists. */
+function getAsnRequestIdForPo(po) {
+  const id = String(po?.[ASN_REQUEST_ID_FIELD] ?? "").trim();
+  if (!id) return "";
+  if (typeof getAsnRequestById === "function" && !getAsnRequestById(id)) return "";
+  return id;
+}
+
+/** Distinct ASN request ids assigned to any of the SO's linked POs. */
+function getAsnRequestIdsForSalesOrder(order) {
+  const ids = [];
+  getLinkedPosForSalesOrder(order).forEach(po => {
+    const id = getAsnRequestIdForPo(po);
+    if (id && !ids.includes(id)) ids.push(id);
+  });
+  return ids;
+}
+
+const SO_ASN_BADGE_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>';
+
+function buildLinkedPosSection(order) {
+  const linked = getLinkedPosForSalesOrder(order);
 
   if (linked.length === 0) {
     return `<div class="so-linked-pos">
@@ -955,9 +978,14 @@ function buildLinkedPosSection(order) {
     const status = String(po["Status"] ?? "").trim();
     const vendor = String(po["Vendor"] ?? "").trim();
     const qty = po["PO Qty"] ?? "";
+    const asnId = getAsnRequestIdForPo(po);
+    const asnBadge = asnId
+      ? `<span class="so-po-asn-badge" role="button" tabindex="0" data-asn-id="${escSo(asnId)}" title="Assigned to ASN request ${escSo(asnId)} — click to open">${SO_ASN_BADGE_ICON}${escSo(asnId)}</span>`
+      : "";
     return `<button type="button" class="so-linked-po-btn" data-po="${escSo(poNum)}">
   <span class="so-linked-po-num">PO #${escSo(poNum)}</span>
   <span class="so-linked-po-meta">${escSo([style, color].filter(Boolean).join(" / "))}${vendor ? " · " + escSo(vendor) : ""}${qty ? " · Qty " + qty : ""}${status ? " · " + escSo(status) : ""}</span>
+  ${asnBadge}
 </button>`;
   }).join("");
 
@@ -1719,6 +1747,19 @@ ${outreachSection}
       closeSalesOrderModal();
       if (typeof modalNavPush === "function") modalNavPush({ type: "so", id: soNum });
       openPODetail(poRow);
+    });
+  });
+
+  // ASN badges on linked POs — open the ASN request on top of this modal.
+  bodyEl.querySelectorAll(".so-po-asn-badge[data-asn-id]").forEach(badge => {
+    const open = e => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (typeof openAsnRequestDetail === "function") openAsnRequestDetail(badge.dataset.asnId);
+    };
+    badge.addEventListener("click", open);
+    badge.addEventListener("keydown", e => {
+      if (e.key === "Enter" || e.key === " ") open(e);
     });
   });
 

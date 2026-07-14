@@ -144,6 +144,7 @@ function buildDashEventsByDate() {
       cls: dashSoEventClass(order),
       done: isDashClosedSalesOrder(order),
       open: () => { if (typeof openSalesOrderModal === "function") openSalesOrderModal(order); },
+      badges: dashAsnBadgesForSalesOrder(order),
     });
   });
 
@@ -411,6 +412,19 @@ function buildDashCalCell(date, byDate, todayYmd) {
       meta.textContent = ev.meta;
       chip.appendChild(meta);
     }
+    (ev.badges ?? []).forEach(badge => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "dash-event-asn-mark";
+      if (badge.title) btn.title = badge.title;
+      const icon = createDashEventIcon("dash-event--asn");
+      if (icon) btn.appendChild(icon);
+      btn.addEventListener("click", e => {
+        e.stopPropagation();
+        badge.onClick?.();
+      });
+      chip.appendChild(btn);
+    });
     cell.appendChild(chip);
   } else if (soEvents.length > 1) {
     // One bar per order type: "4 Major Orders", "2 Specialty Orders"…
@@ -560,6 +574,7 @@ function renderDashDayPane() {
       date: "",
       dot: ev.cls.replace("dash-event--", "dash-dot--"),
       onOpen: ev.open,
+      badges: ev.badges ?? [],
     });
     if (ev.done) row.classList.add("is-done");
     list.appendChild(row);
@@ -640,7 +655,21 @@ function dashEmptyState(text) {
   return el;
 }
 
-function dashListRow({ id, sub, date, dateLabel = "", overdue = false, onOpen, action = null, dot = "" }) {
+/** Small clickable ASN badges for an SO's linked POs, or [] if none. */
+function dashAsnBadgesForSalesOrder(order) {
+  const ids = typeof getAsnRequestIdsForSalesOrder === "function"
+    ? getAsnRequestIdsForSalesOrder(order)
+    : [];
+  return ids.map(id => ({
+    label: id,
+    cls: "dash-row-badge--asn",
+    icon: "dash-event--asn",
+    title: `Assigned to ASN request ${id} — click to open`,
+    onClick: () => { if (typeof openAsnRequestDetail === "function") openAsnRequestDetail(id); },
+  }));
+}
+
+function dashListRow({ id, sub, date, dateLabel = "", overdue = false, onOpen, action = null, dot = "", badges = [] }) {
   const row = document.createElement("div");
   row.className = "dash-list-row";
   row.setAttribute("role", "button");
@@ -665,6 +694,26 @@ function dashListRow({ id, sub, date, dateLabel = "", overdue = false, onOpen, a
     main.appendChild(subEl);
   }
   row.appendChild(main);
+
+  if (badges.length > 0) {
+    const badgesEl = document.createElement("span");
+    badgesEl.className = "dash-row-badges";
+    badges.forEach(badge => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "dash-row-badge" + (badge.cls ? ` ${badge.cls}` : "");
+      if (badge.title) btn.title = badge.title;
+      const icon = badge.icon ? createDashEventIcon(badge.icon) : null;
+      if (icon) btn.appendChild(icon);
+      btn.append(badge.label);
+      btn.addEventListener("click", e => {
+        e.stopPropagation();
+        badge.onClick?.();
+      });
+      badgesEl.appendChild(btn);
+    });
+    row.appendChild(badgesEl);
+  }
 
   if (date || dateLabel) {
     const end = document.createElement("span");
@@ -781,6 +830,7 @@ function renderDashWeeks() {
       dateLabel: orderUnits > 0 ? `${orderUnits.toLocaleString()} pcs` : "",
       overdue: cxl < todayYmd,
       onOpen: () => { if (typeof openSalesOrderModal === "function") openSalesOrderModal(order); },
+      badges: dashAsnBadgesForSalesOrder(order),
     }));
   });
 }

@@ -9372,6 +9372,36 @@ td.has-pending-approval .pending-approval-value {
   color: var(--text-secondary, #666);
 }
 
+/* ── ASN badge on a linked PO (SO modal) ────────────────────── */
+.so-po-asn-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  align-self: center;
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border: 1px solid rgba(211, 64, 46, 0.35);
+  border-radius: 999px;
+  background: rgba(211, 64, 46, 0.08);
+  color: #d3402e;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+}
+.so-po-asn-badge:hover,
+.so-po-asn-badge:focus-visible {
+  background: rgba(211, 64, 46, 0.16);
+  border-color: #d3402e;
+}
+.so-po-asn-badge svg {
+  width: 12px;
+  height: 12px;
+  display: block;
+}
+
 /* ── SO # cell in PO table — clickable link style ───────────── */
 #tableBody td[data-col="SO #"]:not(:empty) {
   cursor: pointer;
@@ -10309,6 +10339,61 @@ span.dash-event { cursor: pointer; /* clicking selects the day */ }
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+.dash-row-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.dash-row-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface, #fff);
+  color: var(--text-secondary, #666);
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.dash-row-badge .dash-event-icon svg {
+  width: 11px;
+  height: 11px;
+}
+
+.dash-row-badge--asn {
+  border-color: rgba(211, 64, 46, 0.35);
+  background: rgba(211, 64, 46, 0.08);
+  color: #d3402e;
+}
+.dash-row-badge--asn:hover,
+.dash-row-badge--asn:focus-visible {
+  background: rgba(211, 64, 46, 0.16);
+  border-color: #d3402e;
+}
+
+/* Tiny ASN marker on a lone-SO calendar chip */
+.dash-event-asn-mark {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  flex-shrink: 0;
+  padding: 1px 3px;
+  border: none;
+  border-radius: 4px;
+  background: rgba(211, 64, 46, 0.85);
+  color: #fff;
+  cursor: pointer;
+}
+.dash-event-asn-mark:hover { background: #d3402e; }
 
 .dash-row-end {
   display: flex;
