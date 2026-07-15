@@ -494,6 +494,27 @@ async function addRequestedPoToShipment(poNumber) {
   await addPosToShipment([po], { keepPanelOpen: true });
 }
 
+async function addPosToShipmentById(shipmentId, poNumbers) {
+  const createOverlay = document.getElementById("createShipmentOverlay");
+  if (createOverlay?.classList.contains("open")) {
+    showIndicator("Finish or cancel the shipment you're creating first", "error");
+    return;
+  }
+
+  const shipment = getShipmentById(shipmentId);
+  if (!shipment) {
+    showIndicator("Shipment not found", "error");
+    return;
+  }
+  if (isShipmentReceived(shipment)) {
+    showIndicator("That shipment is already received", "error");
+    return;
+  }
+
+  shipmentModalRow = shipment;
+  await addPosToShipment(poNumbers);
+}
+
 async function addPosToShipment(poNumbers, { keepPanelOpen = false } = {}) {
   const createOverlay = document.getElementById("createShipmentOverlay");
 

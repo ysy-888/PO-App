@@ -129,6 +129,10 @@ function isShipmentReceived(shipment) {
   return getShipmentStatus(shipment) === SHIPMENT_STATUS_RECEIVED;
 }
 
+function getOpenShipments() {
+  return (allShipments ?? []).filter(shipment => !isShipmentReceived(shipment));
+}
+
 function getPosForShipment(shipmentId) {
   const key = String(shipmentId ?? "").trim();
   if (isEmptyValue(key)) return [];

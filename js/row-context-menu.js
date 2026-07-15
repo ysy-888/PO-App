@@ -1,4 +1,4 @@
-/** Right-click context menu for table rows: Open, and Select/Deselect when available. */
+/** Right-click context menu for table rows: Open, Select/Deselect, and PO add-to actions. */
 
 let rowContextMenuEl = null;
 let rowContextMenuDismissBound = false;
@@ -36,6 +36,15 @@ function positionRowContextMenu(clientX, clientY) {
   }
   rowContextMenuEl.style.left = `${left}px`;
   rowContextMenuEl.style.top = `${top}px`;
+  flipRowContextMenuSubmenus(left);
+}
+
+function flipRowContextMenuSubmenus(menuLeft) {
+  if (!rowContextMenuEl) return;
+  const openRight = menuLeft + 320 < window.innerWidth;
+  rowContextMenuEl.querySelectorAll(".row-context-menu-submenu").forEach(sub => {
+    sub.classList.toggle("opens-left", !openRight);
+  });
 }
 
 function bindRowContextMenuDismiss() {
@@ -50,21 +59,94 @@ function bindRowContextMenuDismiss() {
   window.addEventListener("resize", hideRowContextMenu);
 }
 
-function addRowContextMenuItem(label, onSelect) {
+function addRowContextMenuItem(label, onSelect, { disabled = false, separator = false } = {}) {
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "header-menu-item row-context-menu-item";
+  if (separator) btn.classList.add("header-menu-item-separator");
   btn.textContent = label;
-  btn.addEventListener("click", e => {
-    e.preventDefault();
-    e.stopPropagation();
-    hideRowContextMenu();
-    onSelect();
-  });
+  btn.disabled = disabled;
+  if (!disabled) {
+    btn.addEventListener("click", e => {
+      e.preventDefault();
+      e.stopPropagation();
+      hideRowContextMenu();
+      onSelect();
+    });
+  }
   rowContextMenuEl.appendChild(btn);
 }
 
-function showRowContextMenu(clientX, clientY, { onOpen, canSelect = false, isSelected = false, onToggleSelect } = {}) {
+function addRowContextMenuSubmenu(label, items, { emptyLabel = "None open", separator = false } = {}) {
+  const wrap = document.createElement("div");
+  wrap.className = "row-context-menu-submenu-wrap";
+  if (separator) wrap.classList.add("header-menu-item-separator");
+
+  const trigger = document.createElement("button");
+  trigger.type = "button";
+  trigger.className = "header-menu-item row-context-menu-item row-context-menu-submenu-trigger";
+  trigger.innerHTML =
+    `<span>${label}</span><span class="header-menu-submenu-arrow" aria-hidden="true">›</span>`;
+  trigger.addEventListener("click", e => {
+    e.preventDefault();
+    e.stopPropagation();
+    const willOpen = !wrap.classList.contains("is-open");
+    rowContextMenuEl.querySelectorAll(".row-context-menu-submenu-wrap.is-open").forEach(el => {
+      if (el !== wrap) el.classList.remove("is-open");
+    });
+    wrap.classList.toggle("is-open", willOpen);
+  });
+
+  const sub = document.createElement("div");
+  sub.className = "row-context-menu-submenu";
+
+  if (!items.length) {
+    const empty = document.createElement("div");
+    empty.className = "row-context-menu-empty";
+    empty.textContent = emptyLabel;
+    sub.appendChild(empty);
+  } else {
+    items.forEach(item => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "header-menu-item row-context-menu-item";
+      btn.disabled = Boolean(item.disabled);
+      if (item.sublabel) {
+        btn.classList.add("row-context-menu-item-stacked");
+        const title = document.createElement("span");
+        title.className = "row-context-menu-item-title";
+        title.textContent = item.label;
+        const sublabel = document.createElement("span");
+        sublabel.className = "row-context-menu-item-sub";
+        sublabel.textContent = item.sublabel;
+        btn.append(title, sublabel);
+      } else {
+        btn.textContent = item.label;
+      }
+      if (!item.disabled && typeof item.onSelect === "function") {
+        btn.addEventListener("click", e => {
+          e.preventDefault();
+          e.stopPropagation();
+          hideRowContextMenu();
+          item.onSelect();
+        });
+      }
+      sub.appendChild(btn);
+    });
+  }
+
+  wrap.append(trigger, sub);
+  rowContextMenuEl.appendChild(wrap);
+}
+
+function showRowContextMenu(clientX, clientY, {
+  onOpen,
+  canSelect = false,
+  isSelected = false,
+  onToggleSelect,
+  extraItems = [],
+  submenus = [],
+} = {}) {
   if (typeof onOpen !== "function") return;
 
   ensureRowContextMenu();
@@ -76,6 +158,20 @@ function showRowContextMenu(clientX, clientY, { onOpen, canSelect = false, isSel
   if (canSelect && typeof onToggleSelect === "function") {
     addRowContextMenuItem(isSelected ? "Deselect" : "Select", onToggleSelect);
   }
+
+  extraItems.forEach((item, index) => {
+    addRowContextMenuItem(item.label, item.onSelect, {
+      disabled: item.disabled,
+      separator: index === 0 || item.separator,
+    });
+  });
+
+  submenus.forEach((menu, index) => {
+    addRowContextMenuSubmenu(menu.label, menu.items || [], {
+      emptyLabel: menu.emptyLabel,
+      separator: index === 0 && extraItems.length === 0,
+    });
+  });
 
   positionRowContextMenu(clientX, clientY);
 }
@@ -92,6 +188,149 @@ function syncLinkedPoRowCheckbox(tr, selected) {
   const cb = tr.querySelector(".po-select-checkbox:not(:disabled)");
   if (!cb || cb.checked === selected) return;
   cb.click();
+}
+
+function getContextMenuTargetPoRows(clickedRow) {
+  const selected = typeof getCheckedFilteredPos === "function" ? getCheckedFilteredPos() : [];
+  if (selected.length > 0) return selected;
+  return clickedRow ? [clickedRow] : [];
+}
+
+function getContextMenuShipmentSubmenuItems(clickedRow) {
+  if (typeof getOpenShipments !== "function" || typeof addPosToShipmentById !== "function") {
+    return [];
+  }
+
+  return getOpenShipments()
+    .slice()
+    .sort((a, b) => String(a[SHIPMENT_ID_FIELD] ?? "").localeCompare(
+      String(b[SHIPMENT_ID_FIELD] ?? ""),
+      undefined,
+      { numeric: true }
+    ))
+    .map(shipment => {
+      const id = String(shipment[SHIPMENT_ID_FIELD] ?? "").trim();
+      const method = String(shipment["Ship Method"] ?? "").trim();
+      const poCount = typeof countPosForShipment === "function" ? countPosForShipment(id) : 0;
+      const parts = [
+        method,
+        poCount > 0 ? `${poCount} PO${poCount === 1 ? "" : "s"}` : "",
+      ].filter(Boolean);
+      return {
+        label: id || "Shipment",
+        sublabel: parts.join(" · ") || "Open",
+        onSelect() {
+          addContextMenuPosToShipment(shipment, clickedRow);
+        },
+      };
+    });
+}
+
+function getContextMenuAsnSubmenuItems(clickedRow) {
+  if (typeof getOpenAsnRequests !== "function" || typeof addPosToAsnRequestById !== "function") {
+    return [];
+  }
+
+  return getOpenAsnRequests()
+    .slice()
+    .sort((a, b) => getAsnRequestRecordId(b).localeCompare(getAsnRequestRecordId(a), undefined, { numeric: true }))
+    .map(request => {
+      const id = getAsnRequestRecordId(request);
+      const buyer = String(request["Buyer"] ?? "").trim();
+      const poCount = typeof getAsnRequestPoCount === "function" ? getAsnRequestPoCount(request) : 0;
+      const parts = [
+        buyer,
+        poCount > 0 ? `${poCount} PO${poCount === 1 ? "" : "s"}` : "",
+      ].filter(Boolean);
+      return {
+        label: id || "ASN Request",
+        sublabel: parts.join(" · ") || "Open",
+        onSelect() {
+          addContextMenuPosToAsnRequest(request, clickedRow);
+        },
+      };
+    });
+}
+
+function addContextMenuPosToShipment(shipment, clickedRow) {
+  const rows = getContextMenuTargetPoRows(clickedRow);
+  const eligible = typeof isPoEligibleForShipment === "function"
+    ? rows.filter(isPoEligibleForShipment)
+    : rows;
+  if (eligible.length === 0) {
+    showIndicator(
+      rows.length > 1
+        ? "Selected POs are not eligible for shipment"
+        : "This PO is not eligible for shipment",
+      "error"
+    );
+    return;
+  }
+
+  const skipped = rows.length - eligible.length;
+  const poNumbers = eligible.map(row => String(row["PO #"] ?? "").trim()).filter(Boolean);
+  const shipmentId = String(shipment?.[SHIPMENT_ID_FIELD] ?? "").trim();
+  if (!shipmentId || poNumbers.length === 0) return;
+
+  if (skipped > 0) {
+    showIndicator(
+      `Adding ${poNumbers.length} eligible PO${poNumbers.length === 1 ? "" : "s"} ` +
+      `(${skipped} skipped)`,
+      ""
+    );
+  }
+  addPosToShipmentById(shipmentId, poNumbers);
+}
+
+function addContextMenuPosToAsnRequest(request, clickedRow) {
+  const rows = getContextMenuTargetPoRows(clickedRow);
+  if (rows.length === 0) {
+    showIndicator("No POs to add", "error");
+    return;
+  }
+
+  const requestId = typeof getAsnRequestRecordId === "function"
+    ? getAsnRequestRecordId(request)
+    : "";
+  if (!requestId) return;
+
+  const existing = new Set(
+    typeof getRequestPoNumbers === "function"
+      ? getRequestPoNumbers(request, ASN_REQUEST_ID_FIELD).map(String)
+      : []
+  );
+  const poNumbers = rows
+    .map(row => String(row["PO #"] ?? "").trim())
+    .filter(po => po && !existing.has(po));
+
+  if (poNumbers.length === 0) {
+    showIndicator(
+      rows.length === 1
+        ? "This PO is already on that ASN request"
+        : "Selected POs are already on that ASN request",
+      "error"
+    );
+    return;
+  }
+
+  addPosToAsnRequestById(requestId, poNumbers);
+}
+
+function buildPoRowContextMenuExtras(row) {
+  return {
+    submenus: [
+      {
+        label: "Add to Shipment",
+        emptyLabel: "No open shipments",
+        items: getContextMenuShipmentSubmenuItems(row),
+      },
+      {
+        label: "Add to ASN Request",
+        emptyLabel: "No open ASN requests",
+        items: getContextMenuAsnSubmenuItems(row),
+      },
+    ],
+  };
 }
 
 function resolveRowContextMenuAction(tr) {
@@ -111,6 +350,7 @@ function resolveRowContextMenuAction(tr) {
           syncLinkedPoRowCheckbox(tr, next);
         }
       },
+      ...buildPoRowContextMenuExtras(row),
     };
   }
 

@@ -235,6 +235,42 @@ function isAsnRequestPickedUp(request) {
   return getAsnRequestStatus(request) === ASN_STATUS_PICKED_UP;
 }
 
+function getOpenAsnRequests() {
+  return (allAsnRequests ?? []).filter(request => !isAsnRequestPickedUp(request));
+}
+
+function getAsnRequestPoCount(request) {
+  const raw = String(request?.["PO Numbers"] ?? "").trim();
+  if (raw) return raw.split(",").map(s => s.trim()).filter(Boolean).length;
+  const n = Number(request?.["PO Count"]);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+async function addPosToAsnRequestById(asnRequestId, poNumbers) {
+  const overlay = document.getElementById("asnRequestOverlay");
+  if (
+    overlay?.classList.contains("open") &&
+    asnRequestModalRow &&
+    !getAsnRequestRecordId(asnRequestModalRow)
+  ) {
+    showIndicator("Finish or cancel the ASN request you're creating first", "error");
+    return;
+  }
+
+  const request = getAsnRequestById(asnRequestId);
+  if (!request) {
+    showIndicator("ASN request not found", "error");
+    return;
+  }
+  if (isAsnRequestPickedUp(request)) {
+    showIndicator("That ASN request is already picked up", "error");
+    return;
+  }
+
+  openAsnRequestDetail(asnRequestId);
+  await addPosToAsnRequest(poNumbers);
+}
+
 /** Close (or reopen) an ASN request; picking up stamps Status/Picked Up Date. */
 async function setAsnRequestPickedUp(requestId, pickedUp) {
   if (asnRequestOpInProgress || isAppSaving()) return;
