@@ -77,6 +77,28 @@ async function updatePoFields(tenantId, poNumbers, updates) {
   }
 }
 
+/** Set linked PO Status to Closed when an ASN is marked Picked Up. */
+async function closeLinkedPoStatuses(tenantId, poNumbers) {
+  const targets = splitPoNumbers(poNumbers);
+  if (targets.length === 0) return;
+
+  const { data: rows } = await supabase
+    .from("purchase_orders")
+    .select("id, po_number, data")
+    .eq("tenant_id", tenantId)
+    .in("po_number", targets.map(String));
+
+  for (const row of rows || []) {
+    const status = String(row.data?.Status ?? "").trim();
+    if (status === "Closed") continue;
+    await supabase
+      .from("purchase_orders")
+      .update({ data: { ...(row.data || {}), Status: "Closed" } })
+      .eq("id", row.id)
+      .eq("tenant_id", tenantId);
+  }
+}
+
 function todayYmd() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -483,7 +505,10 @@ router.post("/asn/update", requireAuth, async (req, res) => {
     if (!existing) return res.status(404).json({ success: false, error: "ASN request not found." });
 
     const now = todayYmd();
+    const prevStatus = String(existing.data?.Status ?? "").trim();
     const merged = { ...(existing.data || {}), ...sanitizeUpdates(request || {}), "Updated At": now };
+    const nextStatus = String(merged.Status ?? "").trim();
+    const becomingPickedUp = nextStatus === "Picked Up" && prevStatus !== "Picked Up";
     const { error } = await supabase.from("asn_requests").update({ data: merged }).eq("id", existing.id).eq("tenant_id", req.tenantId);
     if (error) throw error;
 
@@ -498,6 +523,12 @@ router.post("/asn/update", requireAuth, async (req, res) => {
           "ASN Req Date": merged["Request Date"] ?? "",
         });
       }
+    }
+
+    // Picked Up → close linked PO app Status.
+    if (becomingPickedUp) {
+      const poNumbers = splitPoNumbers(merged["PO Numbers"] || "");
+      await closeLinkedPoStatuses(req.tenantId, poNumbers);
     }
 
     return res.json({ success: true, request: merged });

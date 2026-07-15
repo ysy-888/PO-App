@@ -292,7 +292,9 @@ async function setAsnRequestPickedUp(requestId, pickedUp) {
     if (!json.success) throw new Error(json.error || "Failed to update ASN request.");
     Object.assign(request, patch);
 
-    // Picked up → the linked POs are done; close them out.
+    // Picked up → linked PO app Status becomes Closed.
+    // Server closes them on /asn/update; client also persists so local UI stays in sync
+    // even if an older server build is still running.
     if (pickedUp) {
       const linkedRows = getRequestPoNumbers(request, ASN_REQUEST_ID_FIELD)
         .map(po => allRows.find(r => String(r["PO #"]) === String(po)))
@@ -300,12 +302,13 @@ async function setAsnRequestPickedUp(requestId, pickedUp) {
       if (linkedRows.length > 0) {
         const items = linkedRows.map(row => ({
           poNumber: String(row["PO #"]),
-          updates: { "Status": "Closed" },
+          updates: { Status: "Closed" },
         }));
         const poJson = await postApi("/api/po/batch-update", { items });
         if (!poJson.success) throw new Error(poJson.error || "Failed to close linked POs.");
         linkedRows.forEach(row => { row["Status"] = "Closed"; });
-        applyFilters();
+        if (typeof applyFilters === "function") applyFilters();
+        else if (typeof queuePoTableRefresh === "function") queuePoTableRefresh();
       }
     }
 

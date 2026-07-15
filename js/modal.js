@@ -2708,10 +2708,6 @@ function applyModalUpdatesToTableRow(poNumber, updates) {
 
 async function saveModalChanges() {
   if (isAppSaving() || modalSaveInProgress || !modalRow || !modalSnapshot) return;
-  if (typeof isPoClosed === "function" && isPoClosed(modalRow) && !isModalPendingSubmissionReview()) {
-    showIndicator("Closed POs cannot be edited", "error");
-    return;
-  }
   if (!hasModalPendingChanges()) return;
   commitActiveModalEditor();
 
@@ -2721,6 +2717,18 @@ async function saveModalChanges() {
   const pendingSubmissionId = modalPendingSubmissionId;
   const reviewingPending = Boolean(pendingSubmissionId);
   if (Object.keys(updates).length === 0 && !hasPackingChanges && !reviewingPending) return;
+
+  // Closed POs: Status may still be updated (same as table / isPoFieldEditable).
+  // Check the snapshot so setting Status → Closed is not treated as a blocked edit.
+  const closedOriginally =
+    typeof isPoClosed === "function" && isPoClosed(modalSnapshot);
+  if (closedOriginally && !reviewingPending) {
+    const nonStatusKeys = Object.keys(updates).filter(key => key !== "Status");
+    if (nonStatusKeys.length > 0 || hasPackingChanges) {
+      showIndicator("Closed POs cannot be edited", "error");
+      return;
+    }
+  }
 
   const poNumber = modalRow["PO #"];
 
