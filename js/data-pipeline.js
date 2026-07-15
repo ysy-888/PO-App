@@ -187,6 +187,7 @@ function applyFilters() {
     if (div && row["Division"] !== div) return false;
     if (!rowMatchesStatusFilter(row)) return false;
     if (flagFilterActive && !isTruthy(row["Flag"])) return false;
+    if (selectedOnlyFilterActive && !isTruthy(row["Selected"])) return false;
     if (!rowPassesColumnFilters(row)) return false;
     if (q) {
       const haystack = COLUMNS.map(c => String(getColumnFilterRawValue(c, row) ?? "")).join(" ").toLowerCase();
@@ -243,9 +244,25 @@ function updateRowCounter() {
 
   const rowText = getRowCounterText();
   const selectedCount = getFilteredSelectedCount();
-  el.textContent = selectedCount >= 1
-    ? `${selectedCount} selected out of ${rowText}`
-    : rowText;
+  const canToggleSelectedOnly = selectedCount >= 1 || selectedOnlyFilterActive;
+
+  if (selectedOnlyFilterActive) {
+    el.textContent = selectedCount >= 1
+      ? `${selectedCount} selected`
+      : rowText;
+  } else {
+    el.textContent = selectedCount >= 1
+      ? `${selectedCount} selected out of ${rowText}`
+      : rowText;
+  }
+
+  el.classList.toggle("is-actionable", canToggleSelectedOnly);
+  el.classList.toggle("filter-active", selectedOnlyFilterActive);
+  el.setAttribute("aria-pressed", selectedOnlyFilterActive ? "true" : "false");
+  el.disabled = !canToggleSelectedOnly;
+  el.title = selectedOnlyFilterActive
+    ? "Show all rows"
+    : (canToggleSelectedOnly ? "Show selected only" : "");
 }
 
 function updatePaginationUI() {

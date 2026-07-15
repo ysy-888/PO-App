@@ -204,6 +204,7 @@ function rowPassesNonStatusFilters(row) {
   const div = activeDivision;
   if (div && row["Division"] !== div) return false;
   if (typeof flagFilterActive !== "undefined" && flagFilterActive && !isTruthy(row["Flag"])) return false;
+  if (typeof selectedOnlyFilterActive !== "undefined" && selectedOnlyFilterActive && !isTruthy(row["Selected"])) return false;
   if (typeof rowPassesColumnFilters === "function" && !rowPassesColumnFilters(row)) return false;
   const q = typeof activeSearchQuery !== "undefined" ? activeSearchQuery : "";
   if (q) {

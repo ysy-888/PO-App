@@ -110,6 +110,7 @@ function isColumnFilterActive(col) {
 
 function hasActiveColumnFilters() {
   return flagFilterActive ||
+    selectedOnlyFilterActive ||
     isStatusHeaderFilterActive() ||
     COLUMN_FILTER_COLS.some(col => isColumnFilterActive(col));
 }
@@ -121,6 +122,7 @@ function updateClearAllFiltersButton() {
 
 function clearAllColumnFilters() {
   flagFilterActive = false;
+  selectedOnlyFilterActive = false;
   activeStatus = STATUS_FILTER_OPEN;
   statusFilterSelection = new Set([STATUS_FILTER_OPEN]);
   COLUMN_FILTER_COLS.forEach(col => { columnFilters[col] = null; });
@@ -129,6 +131,7 @@ function clearAllColumnFilters() {
   syncStatusFilterToolbar();
   updateColumnFilterHeaderStates();
   updateFlagFilterHeaderState();
+  if (typeof updateSelectedOnlyFilterState === "function") updateSelectedOnlyFilterState();
   applyFilters();
 }
 

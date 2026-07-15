@@ -764,6 +764,7 @@ select.filter-select:focus { border-color: var(--accent); }
 }
 
 .toolbar-row-counter {
+  font: inherit;
   font-size: 14px;
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -773,6 +774,40 @@ select.filter-select:focus { border-color: var(--accent); }
   border-radius: 999px;
   padding: 5px 12px;
   line-height: 1.2;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+#rowCounter.is-actionable {
+  cursor: pointer;
+}
+
+#rowCounter.is-actionable:hover {
+  background: var(--accent-heavy);
+  border-color: var(--accent);
+}
+
+#rowCounter.filter-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+#rowCounter.filter-active:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+#rowCounter:disabled {
+  cursor: default;
+}
+
+#rowCounter:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .page-size-control {

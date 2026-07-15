@@ -13,6 +13,7 @@ let allSalesOrders = [];
 let allInvoices = [];
 let packingListPanelOpen = false;
 let flagFilterActive = false;
+let selectedOnlyFilterActive = false;
 let sortCol = "SO CXL Date";
 let sortDir = 1;
 let pageSize = 60;
@@ -28,6 +29,7 @@ let invCurrentPage = 1;
 
 function resetLocalSelectedState(rows) {
   rows.forEach(row => { row["Selected"] = false; });
+  selectedOnlyFilterActive = false;
 }
 
 function normalizeChargeback(row) {

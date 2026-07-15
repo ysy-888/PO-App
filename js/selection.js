@@ -13,6 +13,7 @@ function toggleRowSelected(row, selected) {
   const next = toSheetBool(selected);
   if (isTruthy(row["Selected"]) === next) return false;
   row["Selected"] = next;
+  if (syncSelectedOnlyFilterAfterSelectionChange()) return true;
   updateSelectAllHeader();
   if (typeof onPoSelectionChanged === "function") onPoSelectionChanged();
   requestAnimationFrame(updateCheckboxSelectAntsOverlay);
@@ -28,11 +29,19 @@ function getPoSelectionKey(poOrRow) {
 }
 
 function clearMainTableSelection() {
+  const wasSelectedOnly = selectedOnlyFilterActive;
   resetLocalSelectedState(allRows);
   clearMiniSelection();
   document.querySelectorAll("#tableBody .po-select-checkbox").forEach(cb => {
     cb.checked = false;
   });
+  if (wasSelectedOnly) {
+    updateSelectedOnlyFilterState();
+    applyFilters();
+    if (typeof onPoSelectionChanged === "function") onPoSelectionChanged();
+    requestAnimationFrame(updateCheckboxSelectAntsOverlay);
+    return;
+  }
   updateSelectAllHeader();
   requestAnimationFrame(updateCheckboxSelectAntsOverlay);
 }
@@ -579,6 +588,7 @@ function setAllFilteredSelected(selected) {
     changed = true;
   });
   if (!changed) return;
+  if (syncSelectedOnlyFilterAfterSelectionChange()) return;
   renderTable();
   if (typeof onPoSelectionChanged === "function") onPoSelectionChanged();
 }
@@ -626,12 +636,44 @@ function initFlagFilterHeader() {
   th.addEventListener("click", toggleFlagFilter);
 }
 
+function hasAnySelectedRows() {
+  return allRows.some(row => isTruthy(row["Selected"]));
+}
+
+function updateSelectedOnlyFilterState() {
+  if (typeof updateRowCounter === "function") updateRowCounter();
+}
+
+function syncSelectedOnlyFilterAfterSelectionChange() {
+  if (!selectedOnlyFilterActive) return false;
+  if (!hasAnySelectedRows()) selectedOnlyFilterActive = false;
+  updateSelectedOnlyFilterState();
+  applyFilters();
+  if (typeof onPoSelectionChanged === "function") onPoSelectionChanged();
+  requestAnimationFrame(updateCheckboxSelectAntsOverlay);
+  return true;
+}
+
+function toggleSelectedOnlyFilter() {
+  if (!selectedOnlyFilterActive && getFilteredSelectedCount() < 1) return;
+  selectedOnlyFilterActive = !selectedOnlyFilterActive;
+  updateSelectedOnlyFilterState();
+  applyFilters();
+}
+
+function initSelectedOnlyFilter() {
+  const el = document.getElementById("rowCounter");
+  if (!el) return;
+  el.addEventListener("click", toggleSelectedOnlyFilter);
+}
+
 function initRowSelection() {
   const cb = document.getElementById("selectAllRowsCheckbox");
   cb?.addEventListener("click", e => {
     e.stopPropagation();
     setAllFilteredSelected(cb.checked);
   });
+  initSelectedOnlyFilter();
   initRowMiniSelection();
 }
 
