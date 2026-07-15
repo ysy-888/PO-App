@@ -5809,6 +5809,10 @@ td.n41-status-mismatch,
 #shipmentTable .col-exf-request-id { width: 110px; }
 .col-po-count    { width: 80px; }
 
+#shipmentTable td.shipment-ihd-cell {
+  font-weight: 700;
+}
+
 .modal-footer {
   display: flex;
   justify-content: flex-end;

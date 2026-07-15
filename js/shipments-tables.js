@@ -21,7 +21,7 @@ const SHIPMENT_STATUS_FILTER_BUTTONS = [
 let shipmentActiveStatusFilter = SHIPMENT_STATUS_OPEN;
 
 const SHIPMENT_TABLE_COLUMNS = [
-  "Shipment ID", SHIPMENT_STATUS_FIELD, SHIPMENT_EXF_REQUEST_ID_FIELD, "Ship Method", "PO Count", "Vessel", "House #", "EXF",
+  "Shipment ID", SHIPMENT_STATUS_FIELD, SHIPMENT_EXF_REQUEST_ID_FIELD, "Ship Method", "PO Count", "Vessel", "EXF",
   "Shipped", "ETD", "ETA", "IHD", "Notes"
 ];
 
@@ -653,6 +653,7 @@ function renderShipmentsTable() {
     SHIPMENT_TABLE_COLUMNS.forEach(col => {
       const td = document.createElement("td");
       td.dataset.col = col;
+      if (col === "IHD") td.classList.add("shipment-ihd-cell");
       if (col === SHIPMENT_STATUS_FIELD) {
         const status = getShipmentStatus(shipment);
         const badge = document.createElement("span");

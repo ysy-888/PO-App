@@ -81,10 +81,6 @@ function initShipments() {
   shipmentBody?.addEventListener("change", onShipmentBodyEdit);
   document.querySelector('[data-dismiss="shipment-modal"]')?.addEventListener("click", closeShipmentModalForce);
   document.getElementById("shipmentModalDeleteBtn")?.addEventListener("click", deleteShipmentFromModal);
-  // Rendered inside the linked-PO table area on every render → delegate.
-  document.addEventListener("click", e => {
-    if (e.target.closest("#shipmentDetailAddPosBtn")) openShipmentAddPoPanel();
-  });
   document.getElementById("shipmentDetailRemovePosBtn")?.addEventListener("click", removePosFromShipment);
   document.getElementById("shipmentDetailAddPoDoneBtn")?.addEventListener("click", closeShipmentAddPoPanel);
   document.getElementById("shipmentDetailAddSelectedPosBtn")?.addEventListener("click", addSelectedPosToShipment);

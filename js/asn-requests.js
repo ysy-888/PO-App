@@ -1107,7 +1107,7 @@ function renderAsnRequestLinkedPoSection(pos, isView = false) {
   wrap.appendChild(table);
   section.appendChild(wrap);
   // "+ Add POs" lives at the lower-right of the table area (not the footer).
-  section.appendChild(buildLinkedPoAddButtonRow("asnRequestAddPosBtn"));
+  section.appendChild(buildLinkedPoAddButtonRow("asnRequestAddPosBtn", openAsnRequestAddPoPanel));
   if (typeof wireLinkedPoTableSorting === "function") wireLinkedPoTableSorting(table);
   return section;
 }
@@ -1654,11 +1654,6 @@ async function submitAsnPickupLabelModal() {
 function initAsnRequests() {
   document.getElementById("asnRequestBtn")?.addEventListener("click", openAsnRequestFromSelection);
   document.getElementById("asnRequestSubmitBtn")?.addEventListener("click", submitAsnRequest);
-  // The Add POs button is rendered inside the linked-PO table area on every
-  // modal render, so bind it via delegation.
-  document.addEventListener("click", e => {
-    if (e.target.closest("#asnRequestAddPosBtn")) openAsnRequestAddPoPanel();
-  });
   document.getElementById("asnRequestDeleteBtn")?.addEventListener("click", deleteAsnRequestFromModal);
   // Footer (Save/Cancel) only appears once the form is edited.
   const asnBody = document.getElementById("asnRequestBody");

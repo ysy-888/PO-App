@@ -987,7 +987,7 @@ function setAllLinkedPosSelected(pos, selected) {
 }
 
 /** "+ Add POs" button rendered at the lower-right of a linked-PO table. */
-function buildLinkedPoAddButtonRow(buttonId) {
+function buildLinkedPoAddButtonRow(buttonId, onClick) {
   const row = document.createElement("div");
   row.className = "linked-po-add-row";
   const btn = document.createElement("button");
@@ -995,6 +995,11 @@ function buildLinkedPoAddButtonRow(buttonId) {
   btn.id = buttonId;
   btn.className = "btn btn-secondary linked-po-add-btn";
   btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg> Add POs`;
+  // Bind directly — modal cards use stopPropagation(), so document-level
+  // bubble delegation never sees clicks from inside the card.
+  if (typeof onClick === "function") {
+    btn.addEventListener("click", onClick);
+  }
   row.appendChild(btn);
   return row;
 }
@@ -1013,7 +1018,9 @@ function renderShipmentLinkedPoSection(source, { showAddButton = false } = {}) {
     empty.className = "shipment-linked-empty";
     empty.textContent = "No POs linked to this shipment.";
     section.appendChild(empty);
-    if (showAddButton) section.appendChild(buildLinkedPoAddButtonRow("shipmentDetailAddPosBtn"));
+    if (showAddButton) {
+      section.appendChild(buildLinkedPoAddButtonRow("shipmentDetailAddPosBtn", openShipmentAddPoPanel));
+    }
     return section;
   }
 
@@ -1094,7 +1101,9 @@ function renderShipmentLinkedPoSection(source, { showAddButton = false } = {}) {
   table.appendChild(tbody);
   wrap.appendChild(table);
   section.appendChild(wrap);
-  if (showAddButton) section.appendChild(buildLinkedPoAddButtonRow("shipmentDetailAddPosBtn"));
+  if (showAddButton) {
+    section.appendChild(buildLinkedPoAddButtonRow("shipmentDetailAddPosBtn", openShipmentAddPoPanel));
+  }
   if (typeof wireLinkedPoTableSorting === "function") wireLinkedPoTableSorting(table);
   updateShipmentLinkedPoSelectAllHeader(pos);
   return section;
