@@ -364,7 +364,7 @@ body {
 .row-context-menu {
   position: fixed;
   z-index: 2000;
-  min-width: 160px;
+  min-width: 180px;
   background: var(--surface);
   border: 1px solid var(--border-strong);
   border-radius: 8px;
@@ -374,6 +374,67 @@ body {
 
 .row-context-menu-item {
   width: 100%;
+}
+
+.row-context-menu-submenu-wrap {
+  position: relative;
+}
+
+.row-context-menu-submenu-trigger {
+  justify-content: space-between;
+}
+
+.row-context-menu-submenu {
+  display: none;
+  position: absolute;
+  top: 0;
+  left: calc(100% + 4px);
+  min-width: 200px;
+  max-width: 280px;
+  max-height: min(320px, 60vh);
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  padding: 4px 0;
+  z-index: 2010;
+}
+
+.row-context-menu-submenu.opens-left {
+  left: auto;
+  right: calc(100% + 4px);
+}
+
+.row-context-menu-submenu-wrap:hover > .row-context-menu-submenu,
+.row-context-menu-submenu-wrap:focus-within > .row-context-menu-submenu,
+.row-context-menu-submenu-wrap.is-open > .row-context-menu-submenu {
+  display: block;
+}
+
+.row-context-menu-item-stacked {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.row-context-menu-item-title {
+  font-weight: 600;
+}
+
+.row-context-menu-item-sub,
+.row-context-menu-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.row-context-menu-empty {
+  padding: 8px 12px;
+}
+
+.row-context-menu-item:disabled {
+  opacity: 0.55;
+  cursor: default;
 }
 
 /* ── Toolbar ── */
