@@ -1246,6 +1246,17 @@ function formatCartonWeightValue(value) {
   return n > 0 ? String(n) : "";
 }
 
+/** Whole-number lbs for packing-list display (always round up). */
+function formatCartonWeightDisplayLbs(value) {
+  const n = toQtyNumber(value);
+  return n > 0 ? String(Math.ceil(n)) : "";
+}
+
+function ceilCartonWeightLbs(value) {
+  const n = toQtyNumber(value);
+  return n > 0 ? Math.ceil(n) : 0;
+}
+
 let poModalMenuOpen = false;
 let poModalMenuDismissBound = false;
 
@@ -1446,7 +1457,7 @@ function computePackingWeightTotal(cartons) {
 }
 
 function formatPackingWeightTotal(weight) {
-  const n = toQtyNumber(weight);
+  const n = ceilCartonWeightLbs(weight);
   return n > 0 ? `${n} lbs` : "";
 }
 
@@ -1750,14 +1761,11 @@ function createPackingListEditor(row, packingList, sourceCartons, { editable = f
       const weightInput = document.createElement("input");
       weightInput.type = "number";
       weightInput.min = "0";
-      weightInput.step = "0.01";
-      weightInput.inputMode = "decimal";
+      weightInput.step = "1";
+      weightInput.inputMode = "numeric";
       weightInput.className = "packing-list-weight-input";
       weightInput.placeholder = EN_DASH;
-      weightInput.value = (() => {
-        const lbs = getCartonWeightLbs(carton);
-        return lbs > 0 ? String(lbs) : "";
-      })();
+      weightInput.value = formatCartonWeightDisplayLbs(getCartonWeightLbs(carton));
       weightInput.dataset.cartonIndex = String(cartonIndex);
       weightInput.dataset.field = CARTON_WEIGHT_FIELD;
       if (readOnly) weightInput.readOnly = true;
@@ -1826,16 +1834,36 @@ function createPackingListEditor(row, packingList, sourceCartons, { editable = f
     return cartonIndex;
   }
 
+  function writePackingWeightInput(input, value, { updateInputValue = false } = {}) {
+    const cartonIndex = Number(input.dataset.cartonIndex);
+    if (!Number.isInteger(cartonIndex) || !cartons[cartonIndex]) return null;
+    const weightRaw = String(value ?? "").trim();
+    const weightLbs = weightRaw === "" ? 0 : ceilCartonWeightLbs(weightRaw);
+    const display = formatCartonWeightDisplayLbs(weightLbs);
+    cartons[cartonIndex][CARTON_WEIGHT_LBS_SAVE_FIELD] = display;
+    cartons[cartonIndex][CARTON_WEIGHT_FIELD] = display === ""
+      ? ""
+      : formatCartonWeightValue(cartonWeightLbsToKg(weightLbs));
+    if (updateInputValue) input.value = display;
+    return cartonIndex;
+  }
+
   function handlePackingListPaste(e) {
     if (readOnly) return;
     const target = e.target;
-    if (!(target instanceof HTMLInputElement) || !target.classList.contains("packing-list-input")) return;
+    if (!(target instanceof HTMLInputElement)) return;
+    const isQtyInput = target.classList.contains("packing-list-input");
+    const isWeightInput = target.classList.contains("packing-list-weight-input");
+    if (!isQtyInput && !isWeightInput) return;
+
     const clipboardText = e.clipboardData?.getData("text/plain") ?? "";
     if (!clipboardText || !/[\t\r\n]/.test(clipboardText)) return;
 
     const startCartonIndex = Number(target.dataset.cartonIndex);
-    const startUnitIndex = getPackingUnitIndex(target.dataset.field);
-    if (!Number.isInteger(startCartonIndex) || startUnitIndex < 0) return;
+    if (!Number.isInteger(startCartonIndex)) return;
+
+    const startUnitIndex = isWeightInput ? labels.length : getPackingUnitIndex(target.dataset.field);
+    if (!isWeightInput && startUnitIndex < 0) return;
 
     e.preventDefault();
     setChargebackError(editor, "");
@@ -1845,12 +1873,25 @@ function createPackingListEditor(row, packingList, sourceCartons, { editable = f
       const cartonIndex = startCartonIndex + rowOffset;
       if (!cartons[cartonIndex]) return;
       cells.forEach((cellValue, colOffset) => {
-        const unitIndex = startUnitIndex + colOffset;
-        if (unitIndex >= labels.length) return;
+        const colIndex = startUnitIndex + colOffset;
         const normalizedValue = normalizePackingPastedQty(cellValue);
         if (normalizedValue === null) return;
+
+        if (colIndex === labels.length) {
+          const weightInput = bodyGrid.querySelector(
+            `.packing-list-weight-input[data-carton-index="${cartonIndex}"]`
+          );
+          if (!(weightInput instanceof HTMLInputElement)) return;
+          const changedCartonIndex = writePackingWeightInput(weightInput, normalizedValue, {
+            updateInputValue: true,
+          });
+          if (changedCartonIndex !== null) changedCartonIndexes.add(changedCartonIndex);
+          return;
+        }
+
+        if (colIndex < 0 || colIndex >= labels.length) return;
         const input = bodyGrid.querySelector(
-          `.packing-list-input[data-carton-index="${cartonIndex}"][data-field="Unit ${unitIndex + 1}"]`
+          `.packing-list-input[data-carton-index="${cartonIndex}"][data-field="Unit ${colIndex + 1}"]`
         );
         if (!(input instanceof HTMLInputElement)) return;
         const changedCartonIndex = writePackingQtyInput(input, normalizedValue, { updateInputValue: true });
@@ -1902,10 +1943,7 @@ function createPackingListEditor(row, packingList, sourceCartons, { editable = f
     const field = target.dataset.field;
     if (!field || !Number.isFinite(cartonIndex)) return;
     if (field === CARTON_WEIGHT_FIELD) {
-      const weightRaw = target.value.trim();
-      const weightLbs = toQtyNumber(weightRaw);
-      cartons[cartonIndex][CARTON_WEIGHT_LBS_SAVE_FIELD] = weightRaw === "" ? "" : formatCartonWeightValue(weightLbs);
-      cartons[cartonIndex][CARTON_WEIGHT_FIELD] = weightRaw === "" ? "" : formatCartonWeightValue(cartonWeightLbsToKg(weightLbs));
+      writePackingWeightInput(target, target.value, { updateInputValue: true });
       setPackingEditorTotals(editor, row, cartons);
       updateModalSaveState();
     } else {
@@ -2485,14 +2523,14 @@ function normalizePackingCartonsForSave(editorCartons) {
     out["Total Units"] = computeCartonTotal(out);
     const weightLbsRaw = String(carton[CARTON_WEIGHT_LBS_SAVE_FIELD] ?? "").trim();
     const weightKgRaw = String(carton[CARTON_WEIGHT_FIELD] ?? "").trim();
-    const weightKg = weightLbsRaw === ""
-      ? toQtyNumber(weightKgRaw)
-      : cartonWeightLbsToKg(weightLbsRaw);
-    const weightLbs = weightLbsRaw === ""
-      ? cartonWeightKgToLbs(weightKg)
-      : toQtyNumber(weightLbsRaw);
+    const weightLbs = ceilCartonWeightLbs(
+      weightLbsRaw === ""
+        ? cartonWeightKgToLbs(toQtyNumber(weightKgRaw))
+        : weightLbsRaw
+    );
+    const weightKg = weightLbs > 0 ? cartonWeightLbsToKg(weightLbs) : 0;
     out[CARTON_WEIGHT_FIELD] = formatCartonWeightValue(weightKg);
-    out[CARTON_WEIGHT_LBS_SAVE_FIELD] = formatCartonWeightValue(weightLbs);
+    out[CARTON_WEIGHT_LBS_SAVE_FIELD] = formatCartonWeightDisplayLbs(weightLbs);
     return out;
   });
 }
