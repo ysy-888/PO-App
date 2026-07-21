@@ -97,7 +97,28 @@ export function createPackingHtmlBuilder(ctx) {
     return cols;
   }
 
-  function plPrintTitleColgroup({ showInternalPoFields = true, isAsnTitlePage = false } = {}) {
+  function plPrintTitleColgroup({
+    showInternalPoFields = true,
+    isAsnTitlePage = false,
+    isAsnOrShipmentCover = false,
+  } = {}) {
+    // ASN/Shipment cover: #, PO #, Buyer, Buyer PO #, Style #, Color, Actual Qty, Ctn Qty
+    if (isAsnOrShipmentCover) {
+      const cols = [
+        32,
+        ...(showInternalPoFields ? [64] : []),
+        150,
+        82,
+        74,
+        72,
+        70,
+        62,
+      ];
+      const buyerIndex = showInternalPoFields ? 2 : 1;
+      return `<colgroup>${cols.map((width, index) =>
+        `<col width="${width}"${index === buyerIndex ? ' class="pl-title-buyer-col"' : ""}>`
+      ).join("")}</colgroup>`;
+    }
     const cols = [
       32,
       ...(showInternalPoFields ? [64] : []),
@@ -342,6 +363,7 @@ ${notesHtml}
     const typeDateLabel = plPrintTitleTypeDateLabel(titlePageType);
     const typeDateDisplay = plPrintDate(typeDate);
     const requestDateDisplay = plPrintDate(requestDate);
+    const requestIdRaw = String(requestId ?? "").trim();
     const requestIdDisplay = plPrintVal(requestId);
     const headerSubtitle = typeDateDisplay !== "—"
       ? `${plPrintEsc(typeDateLabel)}: ${typeDateDisplay}`
@@ -351,16 +373,43 @@ ${notesHtml}
     const totalWeight = rows.reduce((sum, row) => sum + plPrintWeightForPo(row), 0);
 
     const isAsnTitlePage = titlePageType === "ASN";
-    const labelColspan = (isAsnTitlePage ? 6 : 5) - (showInternalPoFields ? 0 : 1);
+    const isShipmentTitlePage = titlePageType === "Shipment";
+    const isAsnOrShipmentCover = isAsnTitlePage || isShipmentTitlePage;
+    const headerBrand = isAsnTitlePage
+      ? "ASN Packing List"
+      : isShipmentTitlePage
+        ? "Shipment Packing List"
+        : "ELEVATOR DISCO";
+    const headerTitleHtml = isAsnOrShipmentCover
+      ? ""
+      : `<div class="pl-header-title">Packing List</div>`;
+    const headerRightPrimary = isAsnOrShipmentCover
+      ? (requestIdRaw ? plPrintEsc(requestIdRaw) : "")
+      : plPrintEsc(label);
+    const labelColspan = isAsnOrShipmentCover
+      ? (showInternalPoFields ? 6 : 5)
+      : ((isAsnTitlePage ? 6 : 5) - (showInternalPoFields ? 0 : 1));
 
     const tableRows = rows.map((row, i) => {
       const ctnQty = plPrintCtnQtyForPo(row);
+      const poCell = showInternalPoFields
+        ? `<td class="pl-center">${plPrintVal(row["PO #"])}</td>`
+        : "";
+      if (isAsnOrShipmentCover) {
+        return `<tr>
+      <td class="pl-center">${i + 1}</td>
+      ${poCell}
+      <td class="pl-center pl-title-buyer-col">${plPrintVal(row["Buyer"])}</td>
+      <td class="pl-center">${plPrintVal(row["Buyer PO #"])}</td>
+      <td class="pl-center">${plPrintVal(row["Style #"])}</td>
+      <td class="pl-center">${plPrintVal(row["Color"])}</td>
+      <td class="pl-center">${plPrintNum(row["Actual Qty"])}</td>
+      <td class="pl-center">${plPrintEsc(String(ctnQty))}</td>
+    </tr>`;
+      }
       const weight = plPrintWeightForPo(row);
       const buyerPoCell = isAsnTitlePage
         ? `<td class="pl-center">${plPrintVal(row["Buyer PO #"])}</td>`
-        : "";
-      const poCell = showInternalPoFields
-        ? `<td class="pl-center">${plPrintVal(row["PO #"])}</td>`
         : "";
       return `<tr>
       <td class="pl-center">${i + 1}</td>
@@ -375,16 +424,52 @@ ${notesHtml}
     </tr>`;
     }).join("");
 
+    const coverTableHead = isAsnOrShipmentCover
+      ? `<tr>
+          <th class="pl-center">#</th>
+          ${showInternalPoFields ? '<th class="pl-center">PO #</th>' : ""}
+          <th class="pl-center pl-title-buyer-col">Buyer</th>
+          <th class="pl-center">${showInternalPoFields ? "Buyer PO #" : "Buyer PO"}</th>
+          <th class="pl-center">Style #</th>
+          <th class="pl-center">Color</th>
+          <th class="pl-center">Actual Qty</th>
+          <th class="pl-center">Ctn Qty</th>
+        </tr>`
+      : `<tr>
+          <th class="pl-center">#</th>
+          ${showInternalPoFields ? '<th class="pl-center">PO #</th>' : ""}
+          ${isAsnTitlePage ? `<th class="pl-center">${showInternalPoFields ? "Buyer PO #" : "Buyer PO"}</th>` : ""}
+          <th class="pl-center">Style #</th>
+          <th class="pl-center">Color</th>
+          <th class="pl-center pl-title-buyer-col">Buyer</th>
+          <th class="pl-center">Actual Qty</th>
+          <th class="pl-center">Ctn Qty</th>
+          <th class="pl-center">Weight</th>
+        </tr>`;
+
+    const coverTableFoot = isAsnOrShipmentCover
+      ? `<tr>
+          <td colspan="${labelColspan}" class="pl-center">Total (${rows.length} PO${rows.length === 1 ? "" : "s"})</td>
+          <td class="pl-center">${totalActQty}</td>
+          <td class="pl-center">${totalCtnQty}</td>
+        </tr>`
+      : `<tr>
+          <td colspan="${labelColspan}" class="pl-center">Total (${rows.length} PO${rows.length === 1 ? "" : "s"})</td>
+          <td class="pl-center">${totalActQty}</td>
+          <td class="pl-center">${totalCtnQty}</td>
+          <td class="pl-center">${totalWeight > 0 ? plPrintEsc(plPrintFmtWeight(totalWeight)) : "—"}</td>
+        </tr>`;
+
     return `
 <div class="pl-print-page">
   <table class="pl-header" cellpadding="0" cellspacing="0" width="100%">
     <tr>
       <td>
-        <div class="pl-header-brand">ELEVATOR DISCO</div>
-        <div class="pl-header-title">Packing List</div>
+        <div class="pl-header-brand">${plPrintEsc(headerBrand)}</div>
+        ${headerTitleHtml}
       </td>
       <td align="right">
-        <div class="pl-header-po">${plPrintEsc(label)}</div>
+        ${headerRightPrimary ? `<div class="pl-header-po">${headerRightPrimary}</div>` : ""}
         <div class="pl-header-sub">${headerSubtitle}</div>
       </td>
     </tr>
@@ -407,28 +492,13 @@ ${notesHtml}
     </div>
     <p class="pl-section-title">Included POs</p>
     <table class="pl-carton-table pl-title-table" cellpadding="0" cellspacing="0">
-      ${plPrintTitleColgroup({ showInternalPoFields, isAsnTitlePage })}
+      ${plPrintTitleColgroup({ showInternalPoFields, isAsnTitlePage, isAsnOrShipmentCover })}
       <thead>
-        <tr>
-          <th class="pl-center">#</th>
-          ${showInternalPoFields ? '<th class="pl-center">PO #</th>' : ""}
-          ${isAsnTitlePage ? `<th class="pl-center">${showInternalPoFields ? "Buyer PO #" : "Buyer PO"}</th>` : ""}
-          <th class="pl-center">Style #</th>
-          <th class="pl-center">Color</th>
-          <th class="pl-center pl-title-buyer-col">Buyer</th>
-          <th class="pl-center">Actual Qty</th>
-          <th class="pl-center">Ctn Qty</th>
-          <th class="pl-center">Weight</th>
-        </tr>
+        ${coverTableHead}
       </thead>
       <tbody>${tableRows}</tbody>
       <tfoot>
-        <tr>
-          <td colspan="${labelColspan}" class="pl-center">Total (${rows.length} PO${rows.length === 1 ? "" : "s"})</td>
-          <td class="pl-center">${totalActQty}</td>
-          <td class="pl-center">${totalCtnQty}</td>
-          <td class="pl-center">${totalWeight > 0 ? plPrintEsc(plPrintFmtWeight(totalWeight)) : "—"}</td>
-        </tr>
+        ${coverTableFoot}
       </tfoot>
     </table>
   </div>
