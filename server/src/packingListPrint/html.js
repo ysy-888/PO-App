@@ -102,7 +102,7 @@ export function createPackingHtmlBuilder(ctx) {
     isAsnTitlePage = false,
     isAsnOrShipmentCover = false,
   } = {}) {
-    // ASN/Shipment cover: #, PO #, Buyer, Buyer PO #, Style #, Color, Actual Qty, Ctn Qty
+    // ASN/Shipment cover: #, PO #, Buyer, Buyer PO #, Style #, Color, Actual Qty, Ctn Qty, Weight
     if (isAsnOrShipmentCover) {
       const cols = [
         32,
@@ -113,6 +113,7 @@ export function createPackingHtmlBuilder(ctx) {
         72,
         70,
         62,
+        78,
       ];
       const buyerIndex = showInternalPoFields ? 2 : 1;
       return `<colgroup>${cols.map((width, index) =>
@@ -395,6 +396,7 @@ ${notesHtml}
       const poCell = showInternalPoFields
         ? `<td class="pl-center">${plPrintVal(row["PO #"])}</td>`
         : "";
+      const weight = plPrintWeightForPo(row);
       if (isAsnOrShipmentCover) {
         return `<tr>
       <td class="pl-center">${i + 1}</td>
@@ -405,9 +407,9 @@ ${notesHtml}
       <td class="pl-center">${plPrintVal(row["Color"])}</td>
       <td class="pl-center">${plPrintNum(row["Actual Qty"])}</td>
       <td class="pl-center">${plPrintEsc(String(ctnQty))}</td>
+      <td class="pl-center">${weight > 0 ? plPrintEsc(plPrintFmtWeight(weight)) : "—"}</td>
     </tr>`;
       }
-      const weight = plPrintWeightForPo(row);
       const buyerPoCell = isAsnTitlePage
         ? `<td class="pl-center">${plPrintVal(row["Buyer PO #"])}</td>`
         : "";
@@ -434,6 +436,7 @@ ${notesHtml}
           <th class="pl-center">Color</th>
           <th class="pl-center">Actual Qty</th>
           <th class="pl-center">Ctn Qty</th>
+          <th class="pl-center">Weight</th>
         </tr>`
       : `<tr>
           <th class="pl-center">#</th>
@@ -447,13 +450,7 @@ ${notesHtml}
           <th class="pl-center">Weight</th>
         </tr>`;
 
-    const coverTableFoot = isAsnOrShipmentCover
-      ? `<tr>
-          <td colspan="${labelColspan}" class="pl-center">Total (${rows.length} PO${rows.length === 1 ? "" : "s"})</td>
-          <td class="pl-center">${totalActQty}</td>
-          <td class="pl-center">${totalCtnQty}</td>
-        </tr>`
-      : `<tr>
+    const coverTableFoot = `<tr>
           <td colspan="${labelColspan}" class="pl-center">Total (${rows.length} PO${rows.length === 1 ? "" : "s"})</td>
           <td class="pl-center">${totalActQty}</td>
           <td class="pl-center">${totalCtnQty}</td>
